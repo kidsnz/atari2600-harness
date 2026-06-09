@@ -6,6 +6,7 @@ package emu
 
 import (
 	"github.com/jetsetilly/gopher2600/cartridgeloader"
+	"github.com/jetsetilly/gopher2600/debugger/govern"
 	"github.com/jetsetilly/gopher2600/environment"
 	"github.com/jetsetilly/gopher2600/hardware"
 	"github.com/jetsetilly/gopher2600/hardware/television"
@@ -76,4 +77,24 @@ func (e *Emu) StepFrame() (int, error) {
 // PeekRAM は副作用なしでメモリを読む（read_ram / peek の土台）。
 func (e *Emu) PeekRAM(addr uint16) (uint8, error) {
 	return e.VCS.Mem.Peek(addr)
+}
+
+// Poke はメモリへ 1 バイト書き込む（poke ツール）。
+func (e *Emu) Poke(addr uint16, val uint8) error {
+	return e.VCS.Mem.Poke(addr, val)
+}
+
+// RunUntilBeam は最大 maxFrames フレーム実行し、ビームが (scanline, clock) に達したら
+// 早期停止する。条件で止まったとき halted=true（breakif の土台）。
+func (e *Emu) RunUntilBeam(maxFrames, scanline, clock int) (halted bool, err error) {
+	check := func() (govern.State, error) {
+		c := e.VCS.TV.GetCoords()
+		if c.Scanline == scanline && c.Clock == clock {
+			halted = true
+			return govern.Ending, nil
+		}
+		return govern.Running, nil
+	}
+	err = e.VCS.RunForFrameCount(maxFrames, check)
+	return halted, err
 }

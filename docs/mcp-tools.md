@@ -37,9 +37,14 @@ server.Run(context.Background(), &mcp.StdioTransport{})
 type Coords struct {
     Frame    int `json:"frame"`
     Scanline int `json:"scanline"`
-    Clock    int `json:"clock"`     // カラークロック 0–227（HBLANK 0–67 / 可視 68–227）
+    Clock    int `json:"clock"`     // ★Gopher2600規約: HBLANK −68..−1 / 可視 0..159
 }
 ```
+**★重要（実機検証で確定）:** `GetCoords().Clock` は内部 clock から `ClksHBlank(68)` を
+引いた値。よってスキャンライン先頭（HBLANK 開始）は **clock = −68**、可視領域の先頭ピクセルが
+**clock = 0**、可視右端が **clock = 159**。スプライトの `HmovedPixel` も同じ可視ピクセル座標
+（0–159）なので、横位置 litmus test では両者を直接比較できる。
+（resources.md / CLAUDE.md の「0–159 カラークロック」表記はこの 0 起点と一致。0–227 ではない。）
 全ツールの Out に `Coords` を埋める（mcp-gameboy 流「やったこと＝結果の観測」を数値で踏襲）。
 取得元: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`。
 

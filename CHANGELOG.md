@@ -19,9 +19,22 @@
   決定的・単純・高速。研究ドキュメント（resources.md）が想定した terminal 駆動は不要だった。
 - Gopher2600 は `replace => ./Gopher2600`（nightly clone）で固定。clone 自体は `.gitignore`。
 
+- **最小 MCP プロトタイプ（Phase 2.2）動作。** `cmd/harness` が stdio で 8 ツールを露出し、
+  JSON-RPC 疎通を数値で確認。`load_rom`→`step_frame`→`read_ram` で `$80`=`$42`、
+  `read_cpu` で PC=`$F024`（probe と一致）。
+  - ツール: `load_rom` / `step_frame` / `read_cpu` / `read_ram` / `read_tia` / `peek` / `poke` / `breakif`。
+  - `read_tia` は `Video.PlayerN.ResetPixel/HmovedPixel` を露出（横位置 litmus の判定値）。
+  - 公式 `modelcontextprotocol/go-sdk` v1.6.1。typed Out で JSON Schema 自動生成。
+
+### 決定
+- **★ビーム clock 座標規約を実機で確定:** `GetCoords().Clock` は HBLANK=`−68..−1` / 可視=`0..159`
+  （可視先頭ピクセル = clock 0）。spec の暫定記述「0–227」は誤りだった。スプライト `HmovedPixel`
+  と同座標系なので litmus test で直接比較できる。→ Phase 4 で CLAUDE.md へ蒸留。
+- 任意引数は json タグ `,omitempty` で optional 化（jsonschema-go は omitempty/omitzero を任意扱い）。
+
 ### 追加予定
-- 最小 MCP プロトタイプ（`load_rom` + `step_frame` + `read_cpu/ram/tia` + `breakif`）
-- 横スプライト位置決め（litmus test）でハーネスの有効性を検証
+- 横スプライト位置決め（litmus test）でハーネスの有効性を検証（Phase 3）
+- `get_screen_annotated`（XY グリッド注釈スクショ。Phase 2.3）
 
 ## [0.2.0] - 2026-06-09
 
