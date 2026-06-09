@@ -5,36 +5,36 @@
 
 ## [Unreleased]
 
+### 追加予定
+- 横スプライト位置決め（litmus test）でハーネスの有効性を検証（Phase 3）
+- `get_screen_annotated`（XY グリッド注釈スクショ。Phase 2.3）
+
+## [0.3.0] - 2026-06-09
+
 ### 追加
 - **ハーネス配管検証（Phase 2.1）成功。** Gopher2600 をライブラリとして自プロセスに
   埋め込み、完全 headless で数値駆動できることを実 ROM で確認。
   - Go モジュール `github.com/kidsnz/atari2600-dev`。ローカル Gopher2600 へ `replace`。
-  - `internal/emu`: 駆動ラッパ（New/LoadROM/Coords/RunFrames/StepFrame/PeekRAM）。
+  - `internal/emu`: 駆動ラッパ（New/LoadROM/Coords/RunFrames/StepFrame/PeekRAM/Poke/RunUntilBeam）。
   - `cmd/probe`: 数値検証 CLI。`roms/smoke.asm`（NTSC 262 ライン・RAM `$80`=sentinel `$42`）で
     `ScanlinesPF=262` / `RAM[$80]=$42` / CPU 実行（PC=F024）を確認。
-
-### 決定
-- **駆動は terminal/PushedFunction でなく `hardware.VCS` 直接埋め込み。** 実 API 調査の結果、
-  `hardware`/`television`/`setup` は SDL/cgo 非依存の純 Go であり、ライブラリ埋め込みの方が
-  決定的・単純・高速。研究ドキュメント（resources.md）が想定した terminal 駆動は不要だった。
-- Gopher2600 は `replace => ./Gopher2600`（nightly clone）で固定。clone 自体は `.gitignore`。
-
 - **最小 MCP プロトタイプ（Phase 2.2）動作。** `cmd/harness` が stdio で 8 ツールを露出し、
   JSON-RPC 疎通を数値で確認。`load_rom`→`step_frame`→`read_ram` で `$80`=`$42`、
   `read_cpu` で PC=`$F024`（probe と一致）。
   - ツール: `load_rom` / `step_frame` / `read_cpu` / `read_ram` / `read_tia` / `peek` / `poke` / `breakif`。
   - `read_tia` は `Video.PlayerN.ResetPixel/HmovedPixel` を露出（横位置 litmus の判定値）。
   - 公式 `modelcontextprotocol/go-sdk` v1.6.1。typed Out で JSON Schema 自動生成。
+  - 実装仕様 `docs/mcp-tools.md`（全 API 裏取り済みのレシピ）。
 
 ### 決定
+- **駆動は terminal/PushedFunction でなく `hardware.VCS` 直接埋め込み。** 実 API 調査の結果、
+  `hardware`/`television`/`setup` は SDL/cgo 非依存の純 Go であり、ライブラリ埋め込みの方が
+  決定的・単純・高速。研究ドキュメント（resources.md）が想定した terminal 駆動は不要だった。
+- Gopher2600 は `replace => ./Gopher2600`（nightly clone）で固定。clone 自体は `.gitignore`。
 - **★ビーム clock 座標規約を実機で確定:** `GetCoords().Clock` は HBLANK=`−68..−1` / 可視=`0..159`
   （可視先頭ピクセル = clock 0）。spec の暫定記述「0–227」は誤りだった。スプライト `HmovedPixel`
   と同座標系なので litmus test で直接比較できる。→ Phase 4 で CLAUDE.md へ蒸留。
 - 任意引数は json タグ `,omitempty` で optional 化（jsonschema-go は omitempty/omitzero を任意扱い）。
-
-### 追加予定
-- 横スプライト位置決め（litmus test）でハーネスの有効性を検証（Phase 3）
-- `get_screen_annotated`（XY グリッド注釈スクショ。Phase 2.3）
 
 ## [0.2.0] - 2026-06-09
 
