@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+### 追加
+- **ハーネス配管検証（Phase 2.1）成功。** Gopher2600 をライブラリとして自プロセスに
+  埋め込み、完全 headless で数値駆動できることを実 ROM で確認。
+  - Go モジュール `github.com/kidsnz/atari2600-dev`。ローカル Gopher2600 へ `replace`。
+  - `internal/emu`: 駆動ラッパ（New/LoadROM/Coords/RunFrames/StepFrame/PeekRAM）。
+  - `cmd/probe`: 数値検証 CLI。`roms/smoke.asm`（NTSC 262 ライン・RAM `$80`=sentinel `$42`）で
+    `ScanlinesPF=262` / `RAM[$80]=$42` / CPU 実行（PC=F024）を確認。
+
+### 決定
+- **駆動は terminal/PushedFunction でなく `hardware.VCS` 直接埋め込み。** 実 API 調査の結果、
+  `hardware`/`television`/`setup` は SDL/cgo 非依存の純 Go であり、ライブラリ埋め込みの方が
+  決定的・単純・高速。研究ドキュメント（resources.md）が想定した terminal 駆動は不要だった。
+- Gopher2600 は `replace => ./Gopher2600`（nightly clone）で固定。clone 自体は `.gitignore`。
+
 ### 追加予定
 - 最小 MCP プロトタイプ（`load_rom` + `step_frame` + `read_cpu/ram/tia` + `breakif`）
 - 横スプライト位置決め（litmus test）でハーネスの有効性を検証

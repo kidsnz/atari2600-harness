@@ -9,3 +9,13 @@
 
 # Go
 *.test
+/bin/probe
+/bin/harness
+
+# external dependency: Gopher2600 upstream clone (obtain per README)
+/Gopher2600/
+
+# assembled ROM binaries (built from roms/*.asm via DASM)
+/roms/*.bin
+/roms/*.lst
+/roms/*.sym

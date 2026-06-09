@@ -31,11 +31,30 @@ atari2600-dev/
 ├── CLAUDE.md               # 毎セッション常時ロードされる開発憲法（前提・鉄則・確定定数）
 ├── README.md
 ├── CHANGELOG.md
+├── go.mod                  # Go モジュール（ローカル Gopher2600 へ replace）
+├── Gopher2600/             # 外部依存（git 管理外。下記手順で取得）
+├── internal/
+│   └── emu/                # Gopher2600 駆動ラッパ（headless・数値駆動）
+├── cmd/
+│   └── probe/              # 配管検証 CLI（数値で状態を確認）
+├── roms/                   # テスト ROM（.asm をコミット、.bin は git 管理外）
 └── docs/
     ├── gap-analysis.md      # 欠落A〜Eの分析（この環境の仕様の土台）
     ├── tool-landscape.md    # 欠落に当てるツール／資料の地図
     └── resources.md         # 必要資料の棚卸し＋実装仕様・リサーチ結果
 ```
+
+## 開発セットアップ（macOS / Apple Silicon）
+
+```sh
+brew install dasm cc65 pkg-config go        # アセンブラ・6502シミュ・ビルド依存
+git clone https://github.com/JetSetIlly/Gopher2600.git   # エンジン（repo ルートへ）
+go mod tidy                                  # 依存解決
+dasm roms/smoke.asm -f3 -oroms/smoke.bin     # テスト ROM をアセンブル
+go run ./cmd/probe                           # 配管検証（数値出力）
+```
+
+`Gopher2600/` は `replace` で参照するため repo ルート直下に clone する（git 管理外）。
 
 ## 来歴
 
