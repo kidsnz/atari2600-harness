@@ -6,11 +6,27 @@ package main
 
 import (
 	"fmt"
+	"image"
+	"image/color"
 	"image/png"
 	"os"
 
+	"github.com/kidsnz/atari2600-dev/internal/annotate"
 	"github.com/kidsnz/atari2600-dev/internal/emu"
 )
+
+func writePNG(path string, img image.Image) {
+	f, err := os.Create(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "create png:", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
+		fmt.Fprintln(os.Stderr, "encode png:", err)
+		os.Exit(1)
+	}
+}
 
 func main() {
 	rom := "roms/smoke.bin"
@@ -52,18 +68,23 @@ func main() {
 		cpu.PC.Value(), cpu.A.Value(), cpu.X.Value(), cpu.Y.Value(), cpu.SP.Address())
 	fmt.Printf("RAM[$80]    : $%02X   (expect $42)\n", sentinel)
 
-	// フレーム捕捉の目視確認用 PNG（A1）
+	// フレーム捕捉（A1）と注釈描画（A3）の目視確認用 PNG
 	img, visTop := e.Snapshot()
 	b := img.Bounds()
-	f, err := os.Create("bin/frame.png")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "create png:", err)
-		os.Exit(1)
+	writePNG("bin/frame.png", img)
+
+	v := e.VCS.TIA.Video
+	markers := []annotate.Marker{
+		{Label: "P0", Clock: v.Player0.HmovedPixel, Col: color.RGBA{230, 60, 60, 255}},  // 赤
+		{Label: "M0", Clock: v.Missile0.HmovedPixel, Col: color.RGBA{235, 140, 40, 255}}, // 橙
+		{Label: "P1", Clock: v.Player1.HmovedPixel, Col: color.RGBA{230, 215, 50, 255}},  // 黄
+		{Label: "M1", Clock: v.Missile1.HmovedPixel, Col: color.RGBA{70, 200, 70, 255}},  // 緑
+		{Label: "BL", Clock: v.Ball.HmovedPixel, Col: color.RGBA{180, 90, 210, 255}},     // 紫
 	}
-	defer f.Close()
-	if err := png.Encode(f, img); err != nil {
-		fmt.Fprintln(os.Stderr, "encode png:", err)
-		os.Exit(1)
-	}
+	annotated := annotate.Render(img, visTop, 3, markers)
+	writePNG("bin/frame_annotated.png", annotated)
+
 	fmt.Printf("Snapshot    : %dx%d  visibleTop=%d  → bin/frame.png\n", b.Dx(), b.Dy(), visTop)
+	fmt.Printf("Annotated   : %dx%d  → bin/frame_annotated.png\n",
+		annotated.Bounds().Dx(), annotated.Bounds().Dy())
 }
