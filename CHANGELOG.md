@@ -5,18 +5,20 @@
 
 ## [Unreleased]
 
-### 追加
-- **litmus test 粗調整（Phase 3 前半）成功。** ハーネス経由で player0 を位置決めし
-  `read_tia.ResetPixel` を数値で実測。`roms/litmus_pos.asm` + `$80`(DELAY) スイープで：
-  - 粗調整 1 ループ = 5 CPU サイクル = **15px**、DELAY 3〜11 で完全線形（`ResetPixel = 15·DELAY − 18`）。
-  - 可視幅 **160 で折返し**、**最左クランプ X=3**（プレイヤー）を確認。
-  - `HmovedPixel == ResetPixel`（HMCLR で動き 0）。
-  - 測定値は `docs/litmus-results.md` に記録（Phase 4 蒸留の入力）。
-  - **これが過去 Pong の失敗 #1「魔法定数の総当たり」の解毒。位置を数値で予測・検証可能に。**
-
 ### 追加予定
-- litmus test 後半: HMOVE 微調整（±1px）の検証（Phase 3）
 - `get_screen_annotated`（XY グリッド注釈スクショ。Phase 2.3）
+- 核心定数の CLAUDE.md 蒸留（Phase 4。clock 規約・実測オフセット等）
+
+## [0.4.0] - 2026-06-09
+
+### 追加
+- **litmus test 完全合格（Phase 3）。ハーネスが本物であることを数値で実証。** 鉄則#4 達成。
+  - 粗調整（`roms/litmus_pos.asm`）: `$80`(DELAY) スイープで 1 ループ=5 CPU サイクル=**15px**、
+    DELAY 3〜11 で完全線形（`ResetPixel = 15·DELAY − 18`）、可視幅 **160 折返し**、最左クランプ **X=3**。
+  - 微調整（`roms/litmus_hmove.asm`）: HMP0 ニブル全 16 値スイープで `HmovedPixel` の変位が
+    **CLAUDE.md の HMOVE 表と完全一致**（2の補数・正=左/負=右・範囲 +7〜−8、1px 粒度）。
+  - 粗 15px ＋ 微 1px で**任意 X を数値的に予測・配置・検証可能**に。測定値は `docs/litmus-results.md`。
+  - **過去 Pong の失敗 #1（魔法定数総当たり）・#3（位置決め破綻）= 欠落 B を解毒。**
 
 ## [0.3.0] - 2026-06-09
 
