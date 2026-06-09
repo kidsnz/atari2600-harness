@@ -1,0 +1,11 @@
+# OS / editor
+.DS_Store
+.vscode/
+
+# build output
+/build/
+/bin/
+*.o
+
+# Go
+*.test
