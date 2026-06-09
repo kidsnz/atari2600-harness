@@ -56,6 +56,17 @@ go run ./cmd/probe                           # 配管検証（数値出力）
 
 `Gopher2600/` は `replace` で参照するため repo ルート直下に clone する（git 管理外）。
 
+### Claude Code から MCP ツールとして使う
+
+`.mcp.json` がハーネスバイナリ（`bin/harness`）を MCP サーバとして登録している。
+初回はバイナリをビルドしてから Claude Code を再起動すると、`get_screen_annotated` 等の
+ツールが使えるようになる（ROM パスは絶対パスで渡す）。
+
+```sh
+go build -o bin/harness ./cmd/harness   # .mcp.json が参照するバイナリを用意
+# → Claude Code を再起動して MCP サーバ "atari2600" をロード
+```
+
 ## 来歴
 
 旧名 `Stella-MCP`。エンジンが Stella に限らない（Gopher2600 / BizHawk 等が候補）こと、

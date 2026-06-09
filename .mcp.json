@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "atari2600": {
+      "command": "/Users/shinji/Documents/Projects/260501_Claude-Code/260609_atari2600-dev/bin/harness"
+    }
+  }
+}
