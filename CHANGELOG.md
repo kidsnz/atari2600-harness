@@ -6,9 +6,21 @@
 ## [Unreleased]
 
 ### 追加予定
-- Gopher2600 ＋ DASM ＋ sim65 ＋ Stella の macOS 環境セットアップ（実機導入と疎通確認）
 - 最小 MCP プロトタイプ（`load_rom` + `step_frame` + `read_cpu/ram/tia` + `breakif`）
 - 横スプライト位置決め（litmus test）でハーネスの有効性を検証
+
+## [0.2.0] - 2026-06-09
+
+### 追加
+- **macOS / Apple Silicon 環境セットアップ完了。** 全ツールの導入・疎通確認済み。
+  - Go 1.26.4（arm64）
+  - cc65 2.19 / sim65 V2.18（純 6502 サイクル計測層）
+  - pkgconf 2.5.1（SDL2 リンク用）
+  - Gopher2600 ビルド済み（`go build -tags=release .`、27MB バイナリ）
+  - DASM 2.20.14.1 / Stella.app / SDL2 は前フェーズから継続
+
+### 決定
+- Gopher2600 は `go build -tags=release .` でビルド。`--version` フラグ無し、起動確認はヘルプ表示で代替。
 
 ## [0.1.0] - 2026-06-09
 
