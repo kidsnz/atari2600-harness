@@ -5,6 +5,8 @@
 package emu
 
 import (
+	"image"
+
 	"github.com/jetsetilly/gopher2600/cartridgeloader"
 	"github.com/jetsetilly/gopher2600/debugger/govern"
 	"github.com/jetsetilly/gopher2600/environment"
@@ -18,6 +20,7 @@ import (
 type Emu struct {
 	TV  *television.Television
 	VCS *hardware.VCS
+	cap *capture // 最新フレームを image.RGBA に取り込む PixelRenderer
 }
 
 // New は指定 TV 仕様（"NTSC" / "PAL" / "AUTO" 等）で headless な VCS を作る。
@@ -26,13 +29,23 @@ func New(spec string) (*Emu, error) {
 	if err != nil {
 		return nil, err
 	}
-	tv.SetFPSLimit(false) // headless: スロットルしない
+
+	cap := newCapture()
+	tv.AddPixelRenderer(cap) // NewVCS の前に接続（thumbnailer 同様）
+	tv.SetFPSLimit(false)    // headless: スロットルしない
 
 	vcs, err := hardware.NewVCS(environment.MainEmulation, tv, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &Emu{TV: tv, VCS: vcs}, nil
+	return &Emu{TV: tv, VCS: vcs, cap: cap}, nil
+}
+
+// Snapshot は最新フレームの可視域（160×可視高さ）を独立コピーで返す。
+// visibleTop はクロップ y=0 に対応する絶対 scanline（縦座標マッピング用）。
+// 座標規約: 返り画像の x = 可視 clock 0..159、y = 絶対 scanline − visibleTop。
+func (e *Emu) Snapshot() (img *image.RGBA, visibleTop int) {
+	return e.cap.snapshot()
 }
 
 // LoadROM はファイルから ROM をロードして VCS にアタッチする。

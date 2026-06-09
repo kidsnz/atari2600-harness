@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"image/png"
 	"os"
 
 	"github.com/kidsnz/atari2600-dev/internal/emu"
@@ -50,4 +51,19 @@ func main() {
 	fmt.Printf("CPU         : PC=%04X A=%02X X=%02X Y=%02X SP=%04X\n",
 		cpu.PC.Value(), cpu.A.Value(), cpu.X.Value(), cpu.Y.Value(), cpu.SP.Address())
 	fmt.Printf("RAM[$80]    : $%02X   (expect $42)\n", sentinel)
+
+	// フレーム捕捉の目視確認用 PNG（A1）
+	img, visTop := e.Snapshot()
+	b := img.Bounds()
+	f, err := os.Create("bin/frame.png")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "create png:", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
+		fmt.Fprintln(os.Stderr, "encode png:", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Snapshot    : %dx%d  visibleTop=%d  → bin/frame.png\n", b.Dx(), b.Dy(), visTop)
 }
