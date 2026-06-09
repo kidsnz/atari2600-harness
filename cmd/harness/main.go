@@ -4,8 +4,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image/png"
 	"os"
 	"strings"
 	"sync"
@@ -291,6 +293,61 @@ func handleBreakIf(ctx context.Context, req *mcp.CallToolRequest, in BreakIfIn) 
 	return nil, BreakIfOut{Halted: halted, Coords: coordsOf(e)}, nil
 }
 
+// --- get_screen_annotated（ユーザー↔Claude 通信回線）---
+
+type ScreenIn struct {
+	Scale int `json:"scale,omitempty" jsonschema:"integer upscale factor (default 3)"`
+}
+type SpritePos struct {
+	Label string `json:"label"`
+	Clock int    `json:"clock"` // HmovedPixel, 可視 0..159
+}
+type ScreenOut struct {
+	Width   int         `json:"width"`
+	Height  int         `json:"height"`
+	Sprites []SpritePos `json:"sprites"` // 各オブジェクトの横位置（画像と同じ数値）
+	Coords  Coords      `json:"coords"`
+}
+
+func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in ScreenIn) (*mcp.CallToolResult, ScreenOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ScreenOut{}, err
+	}
+	scale := in.Scale
+	if scale <= 0 {
+		scale = 3
+	}
+	img := e.Annotated(scale)
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, ScreenOut{}, fmt.Errorf("encode png: %w", err)
+	}
+
+	sprites := make([]SpritePos, 0, 5)
+	for _, m := range e.Markers() {
+		sprites = append(sprites, SpritePos{Label: m.Label, Clock: m.Clock})
+	}
+
+	// 画像（人間向け）＋ 数値（Claude 向け structured Out）を両方返す。
+	result := &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.ImageContent{Data: buf.Bytes(), MIMEType: "image/png"},
+		},
+	}
+	out := ScreenOut{
+		Width:   img.Bounds().Dx(),
+		Height:  img.Bounds().Dy(),
+		Sprites: sprites,
+		Coords:  coordsOf(e),
+	}
+	return result, out, nil
+}
+
 // --- main ---
 
 func main() {
@@ -307,6 +364,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
+	mcp.AddTool(server, &mcp.Tool{Name: "get_screen_annotated", Description: "Return the latest frame as a PNG with an XY grid in real TIA coordinates (x=clock 0..159, y=scanline) and labelled sprite-position markers. The primary visual channel: the user can point at it and instruct by coordinate. Also returns sprite positions numerically."}, handleScreenAnnotated)
 
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		fmt.Fprintln(os.Stderr, "harness:", err)

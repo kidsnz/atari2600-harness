@@ -6,6 +6,7 @@ package emu
 
 import (
 	"image"
+	"image/color"
 
 	"github.com/jetsetilly/gopher2600/cartridgeloader"
 	"github.com/jetsetilly/gopher2600/debugger/govern"
@@ -14,6 +15,8 @@ import (
 	"github.com/jetsetilly/gopher2600/hardware/television"
 	"github.com/jetsetilly/gopher2600/hardware/television/coords"
 	"github.com/jetsetilly/gopher2600/setup"
+
+	"github.com/kidsnz/atari2600-dev/internal/annotate"
 )
 
 // Emu は 1 台の VCS とその TV を保持する。
@@ -46,6 +49,26 @@ func New(spec string) (*Emu, error) {
 // 座標規約: 返り画像の x = 可視 clock 0..159、y = 絶対 scanline − visibleTop。
 func (e *Emu) Snapshot() (img *image.RGBA, visibleTop int) {
 	return e.cap.snapshot()
+}
+
+// Markers は 5 オブジェクトの横位置マーカーを Fixed Debug Colors で返す
+// （P0=赤 / M0=橙 / P1=黄 / M1=緑 / BL=紫）。Clock は HmovedPixel（可視 0..159）。
+func (e *Emu) Markers() []annotate.Marker {
+	v := e.VCS.TIA.Video
+	return []annotate.Marker{
+		{Label: "P0", Clock: v.Player0.HmovedPixel, Col: color.RGBA{230, 60, 60, 255}},
+		{Label: "M0", Clock: v.Missile0.HmovedPixel, Col: color.RGBA{235, 140, 40, 255}},
+		{Label: "P1", Clock: v.Player1.HmovedPixel, Col: color.RGBA{230, 215, 50, 255}},
+		{Label: "M1", Clock: v.Missile1.HmovedPixel, Col: color.RGBA{70, 200, 70, 255}},
+		{Label: "BL", Clock: v.Ball.HmovedPixel, Col: color.RGBA{180, 90, 210, 255}},
+	}
+}
+
+// Annotated は最新フレームに TIA 実座標のグリッド・軸ラベル・スプライトマーカーを重ねた
+// 注釈画像を返す（ユーザー↔Claude の通信回線）。scale は整数倍率（×3〜4 推奨）。
+func (e *Emu) Annotated(scale int) *image.RGBA {
+	img, visTop := e.cap.snapshot()
+	return annotate.Render(img, visTop, scale, e.Markers())
 }
 
 // LoadROM はファイルから ROM をロードして VCS にアタッチする。

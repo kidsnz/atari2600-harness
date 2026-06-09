@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"sort"
 
 	"github.com/fogleman/gg"
 	"golang.org/x/image/font/basicfont"
@@ -27,7 +28,7 @@ const (
 	leftMargin = 30 // y 軸ラベル用
 	topMargin  = 16 // x 軸ラベル用
 	rightPad   = 10
-	botPad     = 16 // マーカーラベル用
+	botPad     = 30 // マーカーラベル 2 段用
 )
 
 var (
@@ -79,22 +80,28 @@ func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.R
 		setLine(dc, major)
 		dc.DrawLine(left, cy(r), right, cy(r))
 		dc.Stroke()
-		if major {
+		if major && r != 0 { // r=0 は左上の clock ラベルと衝突するため省略
 			dc.SetColor(labelCol)
 			dc.DrawStringAnchored(fmt.Sprintf("%d", visibleTop+r), left-3, cy(r), 1, 0.5)
 		}
 	}
 
-	// スプライトマーカー（縦線＋数値ラベル）
+	// スプライトマーカー（縦線＋数値ラベル）。可視分を clock 順にソートし、順位の偶奇で
+	// ラベルを 2 段に振る＝画面で隣り合うラベルが必ず別段になり重なりを回避。
+	vis := make([]Marker, 0, len(markers))
 	for _, m := range markers {
-		if m.Clock < 0 || m.Clock > fw {
-			continue
+		if m.Clock >= 0 && m.Clock <= fw {
+			vis = append(vis, m)
 		}
+	}
+	sort.SliceStable(vis, func(i, j int) bool { return vis[i].Clock < vis[j].Clock })
+	for rank, m := range vis {
 		dc.SetColor(m.Col)
 		dc.SetLineWidth(1.5)
 		dc.DrawLine(cx(m.Clock), top, cx(m.Clock), bottom)
 		dc.Stroke()
-		dc.DrawStringAnchored(fmt.Sprintf("%s:%d", m.Label, m.Clock), cx(m.Clock), bottom+8, 0.5, 0.5)
+		ly := bottom + 7 + float64((rank%2)*12)
+		dc.DrawStringAnchored(fmt.Sprintf("%s:%d", m.Label, m.Clock), cx(m.Clock), ly, 0.5, 0.5)
 	}
 
 	return dc.Image().(*image.RGBA)

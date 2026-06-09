@@ -6,7 +6,20 @@
 ## [Unreleased]
 
 ### 追加予定
-- `get_screen_annotated`（XY グリッド注釈スクショ＝ユーザー↔Claude 通信回線。一級市民扱い）
+- 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
+- `step_scanline|clock` / `watch|trap` ツールの拡充
+
+## [0.5.0] - 2026-06-09
+
+### 追加
+- **`get_screen_annotated` 実装（ユーザー↔Claude の通信回線）。** 一級市民として完成。
+  - `internal/emu/capture.go`: `PixelRenderer` 実装でフレームを `image.RGBA` 捕捉（thumbnailer パターン）。
+    座標規約: クロップ画像 x = 可視 clock 0..159（= `HmovedPixel`）、y = 絶対 scanline − visibleTop。
+  - `internal/annotate`: TIA 実座標の XY グリッド＋軸ラベル＋スプライトマーカー（Fixed Debug Colors）を
+    nearest-neighbor ×3 拡大で描画（`fogleman/gg` + `basicfont`）。ラベルは clock 順ソートで 2 段化し重なり回避。
+  - MCP ツールは **画像（`ImageContent` PNG）＋ 数値（structured Out のスプライト位置）を同時返却**。
+    JSON-RPC 往復で base64 無損を確認。litmus_pos の白スプライトが clock 72 のマーカーと一致。
+  - これでユーザーが画像を見て「P0 を clock 80 へ」と座標指示 → Claude が register に直訳する往復が成立。
 
 ## [0.4.1] - 2026-06-09
 

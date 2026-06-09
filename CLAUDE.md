@@ -24,8 +24,9 @@
 - 照合オラクル = **Stella**（`-sssingle -ss1x`, `-tia.dbgcolors roygbp`, `-dbg.script`+`dump`）。
 - 画像オーバーレイ = **Go 内製**（`image/draw` + `fogleman/gg`）。ImageMagick へシェルアウトしない。
 - アセンブラ = **DASM**（`-f3`）。**BizHawk は macOS 不可で不採用。**
-- MCP ツール(**実装済 v0.3.0**, `cmd/harness`): `load_rom` / `step_frame` / `read_cpu` / `read_ram` /
-  `read_tia` / `peek` / `poke` / `breakif`。未実装(予定): `step_scanline|clock` / `watch|trap` / `get_screen_annotated`。
+- MCP ツール(**実装済**, `cmd/harness`): `load_rom` / `step_frame` / `read_cpu` / `read_ram` /
+  `read_tia` / `peek` / `poke` / `breakif` / **`get_screen_annotated`**(v0.5.0, 画像＋数値を同時返却)。
+  未実装(予定): `step_scanline|clock` / `watch|trap`。
 
 ## 絶対に取り違えてはいけない定数（出典: `docs/resources.md`）
 **フレーム** — 1 ライン = 228 カラークロック（HBLANK 68 + 可視 160）= **76 CPU サイクル**（3 クロック/サイクル）。
