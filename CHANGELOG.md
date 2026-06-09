@@ -5,8 +5,17 @@
 
 ## [Unreleased]
 
+### 追加
+- **litmus test 粗調整（Phase 3 前半）成功。** ハーネス経由で player0 を位置決めし
+  `read_tia.ResetPixel` を数値で実測。`roms/litmus_pos.asm` + `$80`(DELAY) スイープで：
+  - 粗調整 1 ループ = 5 CPU サイクル = **15px**、DELAY 3〜11 で完全線形（`ResetPixel = 15·DELAY − 18`）。
+  - 可視幅 **160 で折返し**、**最左クランプ X=3**（プレイヤー）を確認。
+  - `HmovedPixel == ResetPixel`（HMCLR で動き 0）。
+  - 測定値は `docs/litmus-results.md` に記録（Phase 4 蒸留の入力）。
+  - **これが過去 Pong の失敗 #1「魔法定数の総当たり」の解毒。位置を数値で予測・検証可能に。**
+
 ### 追加予定
-- 横スプライト位置決め（litmus test）でハーネスの有効性を検証（Phase 3）
+- litmus test 後半: HMOVE 微調整（±1px）の検証（Phase 3）
 - `get_screen_annotated`（XY グリッド注釈スクショ。Phase 2.3）
 
 ## [0.3.0] - 2026-06-09
