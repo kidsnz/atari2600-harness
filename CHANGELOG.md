@@ -6,8 +6,19 @@
 ## [Unreleased]
 
 ### 追加予定
-- `get_screen_annotated`（XY グリッド注釈スクショ。Phase 2.3）
-- 核心定数の CLAUDE.md 蒸留（Phase 4。clock 規約・実測オフセット等）
+- `get_screen_annotated`（XY グリッド注釈スクショ＝ユーザー↔Claude 通信回線。一級市民扱い）
+
+## [0.4.1] - 2026-06-09
+
+### 変更
+- **核心定数を CLAUDE.md へ蒸留（Phase 4）。** 実機検証で確定した事実を常時文脈に焼いた：
+  - ビーム座標規約 `GetCoords().Clock` = HBLANK `−68..−1` / 可視 `0..159`（新規・重要定数）。
+  - 横位置: litmus 裏取り（3px/サイクル・粗 15px・160 折返し・最左 X=3）＋ オフセットは kernel 固有、
+    最終判定は `read_tia.HmovedPixel`（可視 0–159）で実測する旨。
+  - HMOVE 表に「全 16 ニブル実機裏取り済」を明記。
+  - 確定アーキテクチャ: 駆動はライブラリ埋め込み（terminal 不要）、MCP 8 ツール実装済みへ更新。
+  - 注釈スクショを**ユーザー↔Claude の主要通信回線・一級市民**として再定義（TIA 実座標校正・数値ラベル・人間可読性優先）。
+  - ルーティング表に `docs/mcp-tools.md` / `docs/litmus-results.md`、開発環境を実態（go/pkg-config・clone+replace）へ修正。
 
 ## [0.4.0] - 2026-06-09
 

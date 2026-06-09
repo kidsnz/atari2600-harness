@@ -16,32 +16,44 @@
 4. **litmus test:** スプライトを任意 X に置く／1px 動かすが `X = 3N − 55` どおりに通ること。これが通れば環境は本物。
 
 ## 確定アーキテクチャ
-- エンジン = **Gopher2600**(Go)。薄い **Go MCP**（公式 `modelcontextprotocol/go-sdk`, stdio）で包む。
-  設計は mcp-gameboy の「**全ツールが最新フレーム画像を返す**（やったこと＝結果の観測を一体化）」を踏襲。
+- エンジン = **Gopher2600**(Go) を**ライブラリとして自プロセスに埋め込み**、薄い **Go MCP**
+  （公式 `modelcontextprotocol/go-sdk` v1.6.1, stdio）で包む。`hardware`/`television`/`setup` は
+  SDL 非依存の純 Go なので headless 数値駆動が成立。terminal/PushedFunction は不要だった（v0.3.0 確定）。
+- 各ツールは結果を**数値（typed JSON, Coords 同梱）**で返す。画像（`get_screen_annotated`）は別格＝下記注釈スクショ。
 - 回帰 = **Gopher2600 の `regress` + 録画/再生**。純 6502 のサイクル = sim65 / 6502profiler。
-- 照合オラクル & 注釈スクショ = **Stella**（`-sssingle -ss1x`, `-tia.dbgcolors roygbp`, `-dbg.script`+`dump`）。
+- 照合オラクル = **Stella**（`-sssingle -ss1x`, `-tia.dbgcolors roygbp`, `-dbg.script`+`dump`）。
 - 画像オーバーレイ = **Go 内製**（`image/draw` + `fogleman/gg`）。ImageMagick へシェルアウトしない。
 - アセンブラ = **DASM**（`-f3`）。**BizHawk は macOS 不可で不採用。**
-- MCP ツール(予定): `load_rom` / `step`(clock|scanline|frame) / `read_cpu|ram|tia|riot` / `peek|poke` /
-  `breakif|watch|trap` / `get_screen_annotated`。
+- MCP ツール(**実装済 v0.3.0**, `cmd/harness`): `load_rom` / `step_frame` / `read_cpu` / `read_ram` /
+  `read_tia` / `peek` / `poke` / `breakif`。未実装(予定): `step_scanline|clock` / `watch|trap` / `get_screen_annotated`。
 
 ## 絶対に取り違えてはいけない定数（出典: `docs/resources.md`）
 **フレーム** — 1 ライン = 228 カラークロック（HBLANK 68 + 可視 160）= **76 CPU サイクル**（3 クロック/サイクル）。
 NTSC **262** = VSYNC 3 / VBLANK 37 / 可視 **192** / Overscan 30。PAL・SECAM 312 = 3/45/228/36。
 実ゲームは逸脱するので「厳密 262」を決め打ちせず範囲＋警告で扱う。
 
+**ビーム座標(Gopher2600 `GetCoords`, 実機裏取り済 v0.3.0)** — `Clock` 規約は **HBLANK = −68..−1 / 可視 = 0..159**
+（可視先頭ピクセル = clock 0）。スプライト `ResetPixel`/`HmovedPixel` と**同一座標系**＝直接比較可。`Scanline` は 0 起点整数。
+
 **横位置** — ミサイル/ボール `X = 3N − 55`、**プレイヤーは +1px → `X = 3N − 54`**
 （N = 同期点から RESPx ストローブまでの CPU サイクル数）。最左 X=2（プレイヤー 3）。
 ズレの正体 = TIA 約 5 カラークロック遅延 + HBLANK 68。粒度 3px。粗調整は divide-by-15（5 サイクルループ）。
+**litmus 実機裏取り済(v0.4.0):** 傾き 3px/CPUサイクル・粗 15px/5サイクル・160 折返し・最左 X=3 を確認。
+ただし式の**オフセット定数は kernel 固有**（プロローグのサイクル数を含む）→ N の絶対値は決め打ちせず、
+位置の最終判定は **`read_tia` の `HmovedPixel`**（可視 0–159 座標）で実測する。HMOVE 未発火時は `ResetPixel` と一致。
 
 **HMOVE** — 上位ニブルのみ・2 の補数・**正=左 / 負=右**・範囲 +7〜−8。動くのは HMOVE ストローブ時のみ。HMOVE は **WSYNC 直後**。
+（litmus v0.4.0 で全 16 ニブル実機裏取り: `$70`=左7 … `$00`=0 … `$F0`=右1 … `$80`=右8。1px 粒度。）
 
 **衝突(CXxx)** — 各 D7/D6 に 2 ラッチ・sticky。`BIT CXxx` → `BMI`(D7)/`BVS`(D6)。
 **CXCLR**=全衝突クリア、**HMCLR**=動きレジスタクリア（別物）。
 
 **ハード** — RAM 128 バイト。ROM `$F000`(4K)、ベクタ `$FFFA`。
 
-**注釈スクショ** — グリッドは **XY 二次元**（横 0–159 カラークロック / 縦 0–191 scanline）。X 専用ではない、両軸常時。
+**注釈スクショ(`get_screen_annotated`)** — Claude 専用補助ではなく**ユーザー↔Claude の主要通信回線**＝一級市民。
+ユーザーが画像を見て「P0 を clock 80 へ」と視覚的にデータ指示 → Claude が register に直訳する往復ループ。
+よってグリッドは **TIA 実座標で校正**（横 clock 0–159 / 縦 scanline 0–191、両軸常時）＝ユーザーの座標がそのまま
+register 値へ直結すること。現在位置を**数値ラベル**で焼く。人間可読性最優先（×3–4 拡大・軸ラベル）。
 
 ## ルーティング表（作業前に読む）
 | 作業 | 先に読む |
@@ -49,11 +61,14 @@ NTSC **262** = VSYNC 3 / VBLANK 37 / 可視 **192** / Overscan 30。PAL・SECAM 
 | なぜこの設計か / 失敗の構造 | `docs/gap-analysis.md` |
 | ツール選定理由・代替案 | `docs/tool-landscape.md` |
 | 実装仕様（Gopher2600 API / MCP / Stella flags）・定数の出典 | `docs/resources.md` |
+| MCP ツール実装仕様（go-sdk API・各ツール I/O） | `docs/mcp-tools.md` |
+| litmus 実測値（横位置・HMOVE の権威データ） | `docs/litmus-results.md` |
 | 決定の経緯・変更履歴 | `CHANGELOG.md` |
 
 ## 開発環境（macOS / Apple Silicon）
-`brew install dasm cc65 sdl2` / Gopher2600: `go build -tags=release .` / Stella: `brew install --cask stella`。
-ビルド: `dasm x.asm -f3 -ox.bin`。
+`brew install dasm cc65 pkg-config go` / Stella: `brew install --cask stella`。
+Gopher2600 は repo ルートへ clone（git 管理外, `go.mod` の `replace` で参照）。
+ROM ビルド: `dasm x.asm -f3 -ox.bin`。配管検証: `go run ./cmd/probe`。MCP サーバ: `go build -o bin/harness ./cmd/harness`。
 
 ## バージョン管理
 意味ある変更ごとに `CHANGELOG.md`（Keep a Changelog）へ追記し SemVer でタグ。決定は CHANGELOG の「決定」節に残す。
