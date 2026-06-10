@@ -45,6 +45,7 @@ func TestStepScanline(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var total int64
 	for i := 0; i < 40; i++ {
 		prev := e.Coords()
 		before := e.TotalCycles()
@@ -58,8 +59,12 @@ func TestStepScanline(t *testing.T) {
 			t.Fatalf("step %d: scanline jumped from (f%d,s%d) to (f%d,s%d), want +1 line or frame wrap",
 				i, prev.Frame, prev.Scanline, cur.Frame, cur.Scanline)
 		}
-		if e.TotalCycles()-before <= 0 {
-			t.Fatalf("step %d: no CPU cycles consumed across a scanline", i)
-		}
+		total += e.TotalCycles() - before
+	}
+	// 個々のラインは「純 WSYNC stall のパススルー」で 0 サイクル（命令を 1 つも実行しない）もあり得るため
+	// 「毎ライン > 0」は不変条件でない（電源投入時のビーム位相で前後する）。40 ライン累積で CPU が前進している
+	// ことだけを確認する＝決定性に依らず堅牢。
+	if total <= 0 {
+		t.Fatalf("no CPU cycles consumed across 40 scanlines (total=%d)", total)
 	}
 }

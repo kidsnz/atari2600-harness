@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.29.1] - 2026-06-10
+
+### Fixed
+- **Flaky `TestStepScanline` (surfaced by CI).** The test asserted every single scanline step consumes
+  >0 CPU cycles, but a scanline can legitimately be a pure WSYNC-stall pass-through (0 instructions executed)
+  depending on beam-phase alignment — not an invariant. Relaxed to assert the **cumulative** cycles across
+  40 scanlines is >0 (the CPU makes progress), which is robust. Keeps the CI badge reliable.
+
 ## [0.29.0] - 2026-06-10
 
 ### Added
