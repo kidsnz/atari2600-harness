@@ -1,0 +1,11 @@
+{
+  "rom": "roms/litmus/litmus_sprite.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tiareg.player0.color", "op": "==", "value": 14}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

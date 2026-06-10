@@ -12,7 +12,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
-## [0.22.2] - 2026-06-10
+## [0.23.0] - 2026-06-10
+
+### Added
+- **`pkg/sprite` — ASCII → player GRP encoder (hardening-roadmap S-1).** A mirror of `pkg/playfield` for
+  player graphics: 8-wide ASCII rows → GRP bytes (`EncodeRow`/`Encode`, D7 = leftmost = standard TIA bit
+  order), plus `Reflect` for REFP-less mirroring / P0+P1 right halves. Reuses `playfield.ParseASCIIRow`.
+  Unit-tested, including that `..XXXX..` = `0x3C` matches the existing hand-coded Monet Frogger lily-pad byte.
+- **`roms/litmus/litmus_sprite.asm` + `scenarios/sprite.json` (+golden) — numeric hardware proof.** An
+  asymmetric ramp sprite (top `0x80` 1px → bottom `0xFF` 8px) rendered by player0 at X=3. Verified on
+  Gopher2600 via `read_row`: the white span widens 1→2→…→8 px from clock 3 (visible lines 96–103), proving
+  D7 = leftmost and top→bottom row order are byte-exact. Locked for regression with a golden-frame scenario;
+  all litmus scenarios PASS. First step of the sprite track toward the P0+P1 16px flagship (S-3).
 
 ### Added
 - **Strengthening roadmap (`docs/hardening-roadmap.md`).** A prioritized roadmap for the next phase —
