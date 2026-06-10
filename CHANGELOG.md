@@ -17,6 +17,12 @@
     実証済み設計）・R-2 音声レシピ（Slocum ガイド＋`za2600/audio.asm`、音声を「範囲外」→「着手可能」へ格上げ、
     `TIA.Audio` シャドウ読みを P1 に同梱提案）・R-3 サイクルコスト表（Bensema、書く側の予測を補強）・
     R-4 実ゲーム構造の索引化。新規発見ではなく未採掘脈の採掘という位置づけ。
+  - **「外部リサーチ（GitHub/web）」節を追記。** 最大の発見＝**埋め込み済 Gopher2600 自体に最難項目が
+    ライブラリ実装済**（debugger driver は外したまま `recorder`/`regression`/`tracker`/`reflection`/`digest`/
+    `rewind`(deeppoke) を単体利用可。P2/R-2 が「作る」→「配線する」に縮小。exported API 確認済）。
+    `debugger/halt_*` は unexported でパターン参照どまり、License=GPL-3.0 も明記。G-2 C64 MCP 群
+    （vice-mcp 等。**2600 は皆無＝我々が最初**）と sim6502 の pluggable backend DSL、G-3 テスト DSL 先行例
+    （64spec/sim65/Klaus2m5）、G-4 オーサリングツール連携（PlayerPal、注釈の paint→register 化）。
 
 ### 追加予定
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）

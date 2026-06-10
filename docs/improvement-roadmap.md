@@ -181,6 +181,66 @@
 
 ---
 
+## 外部リサーチ — さらに進化させるアイデア（GitHub/web, 2026-06）
+
+GitHub/web を横断調査した結果。**最大の発見が2つ:**
+(1) 我々が埋め込んでいる **Gopher2600 自体に、本ロードマップの最難項目が既にライブラリとして実装済**。
+`hardware.VCS` を直接埋め込み debugger driver を外した決定（v0.3.0・決定的/単純で正しい）を**壊さずに**、
+その"下"の package 群を単体利用できる ＝ 多くの P2/R 項目は「作る」でなく**「配線する」**。
+(2) **C64 には emulator-MCP が複数あるが Atari 2600 は皆無 ＝ 本プロジェクトが最初。**
+
+### G-1. Gopher2600 の未使用パッケージを"昇格"（最優先・最接地・インパクト最大）
+debugger driver は外したまま、下記ライブラリを単体利用（exported API は実コードで確認済）：
+
+| package | exported API（確認済） | 充たすロードマップ項目 |
+|---|---|---|
+| `recorder` | `NewRecorder(transcript, *hardware.VCS)` / `NewPlayback(transcript)` | **D-2 入力リプレイ** |
+| `regression` | `RegressAdd` / `RegressRun`（video-hash＋Playback＋Log の3種テスト） | **D-3 ゴールデン回帰**（CLAUDE.md 既述・未配線） |
+| `tracker` | `Entry`/`Distortion`/`MusicalNote`/`NoteToPianoKey`（`audio.Tracker` 実装） | **R-2 音声検証** — AUDx を**音名/音色名**へ変換 |
+| `reflection` | `NewReflector(*hardware.VCS)`（per-video-step の element 帰属＋`Hmove` comb） | **注釈拡張**（どのオブジェクトが描いたか） |
+| `digest` | `NewVideo(tv)` / `NewAudio(tv)` | フレーム/音声ハッシュ＝ゴールデン土台 |
+| `rewind` | `PokeHook`（**deeppoke**）/ `ComparisonState` | **CLAUDE.md「poke の癖」を解決**（持続 poke）＋状態 diff |
+
+- **正直な限界:** `debugger/halt_watches|traps|breakpoints` も存在するが**型が unexported**で debugger loop に結合
+  → `watch|trap`（P0 B-3）は**パターン参照**にとどまる（recorder 等のようなドロップイン不可）。
+- **配線コスト差:** `recorder`/`digest`/`regression` はほぼドロップイン。`tracker`/`reflection` は毎 video-cycle ステップや
+  FrameTrigger 登録などの配線が要る。
+- **ライセンス:** Gopher2600 = **GPL-3.0**（既に `go.mod` の `replace` で内包・同条件運用）。利用形態に留意。
+- **効果:** P2(D-2/D-3)・R-2 が「実装」から「既存ライブラリ配線」へ縮小 ＝ 最小コストで回帰・入力リプレイ・音声検証が入る。
+
+### G-2. C64 MCP エコシステムからの借用＋位置づけ
+- **発見:** C64 には emulator-MCP が複数 ——
+  [`barryw/vice-mcp`](https://github.com/barryw/vice-mcp)（~17k 行 C を VICE に直埋込。breakpoint/sprite/**SID レジスタ読み**/
+  screenshot/step を JSON-RPC で）、[`chrisgleissner/c64bridge`](https://github.com/chrisgleissner/c64bridge)、
+  [`axewater/mcp-vice-emu`](https://github.com/axewater/mcp-vice-emu)、[`cliffhall/mcp-c64`](https://github.com/cliffhall/mcp-c64) 他。
+  **Atari 2600 は皆無 ＝ 本プロジェクトが最初。**
+- **借用アイデア:**
+  ① vice-mcp の「**SID レジスタ読み**」＝我々の TIA 音声シャドウ読み（R-2 / G-1 `tracker`）の裏付け（音もレジスタで読むのが標準）。
+  ② [`barryw/sim6502`](https://github.com/barryw/sim6502) の **pluggable backend テスト DSL**（速い純CPU＋cycle-accurate を同一DSLで切替）
+  → P2 を **「sim65＝純CPU高速」＋「Gopher2600＝cycle/TIA 正確」の二層**に（CLAUDE.md「純6502=sim65」と整合）。
+  ③ [LLM→6502 パイプライン](https://hackaday.com/2024/11/07/using-ai-to-help-with-assembly/)（Amazon Q 他、RAG コーパス＋自動コンパイラ feedback）
+  → P3 `assemble_and_load` の **DASM エラー構造化・即時差し戻し**を強化。我々は CLAUDE.md＋docs が事実上のコーパス。
+- **位置づけの価値:** 「2600 未開拓・我々が最初」を `gap-analysis.md` / README に1行明記 ＝ 独立化(spinoff)時の対外的意義が立つ。
+
+### G-3. テスト DSL の先行例（P2 を独自発明しない）
+- [`barryw/sim6502`](https://github.com/barryw/sim6502)（DSL＋複数バックエンド）/ [`64bites/64spec`](https://github.com/64bites/64spec)
+  （KickAssembler の describe-it spec）/ sim65（cc65、サイクル表示＋トレース）/
+  [`AsaiYusuke/6502_test_executor`](https://github.com/AsaiYusuke/6502_test_executor)（cc65 ベース）/
+  [`Klaus2m5/6502_65C02_functional_tests`](https://github.com/Klaus2m5/6502_65C02_functional_tests)（全 opcode）。
+- **採掘:** P2 D-1 のアサーション仕様は、これらの DSL 形（`expect A == $1C` / `cycles <= 76`）を借りる（独自発明しない）。
+  sim65 は確定アーキ既述だが**未配線** → TIA 非依存ロジック（スコア計算・LFSR 乱数 等）は sim65 で高速 CI、TIA 絡みは Gopher2600 と役割分担。
+  Klaus2m5 は Gopher2600 CPU 自体の正しさ担保にも使える。
+
+### G-4. 制作（オーサリング）ツール連携（中期・任意）
+- [`PlayerPal 2.2`](https://atariage.com/forums/topic/318184-tool-update-playerpal-22/)（マルチカラー sprite エディタ→ASM/batari 出力）/
+  [masswerk VCS tools](https://www.masswerk.at/vcs-tools/) / Tiny 8-bit sprite editor / batari の PF・sprite・music エディタ。
+- **採掘アイデア:** ① これらの ASM/データ出力形式を import して `roms/<game>/gen` のスプライト表に流し込む。
+  ② 野心案: **注釈スクショを"逆向き"に使う** ＝ ユーザーが画像上で塗る → GRP/register データへ
+  （CLAUDE.md「主回線」を**入力方向へ拡張** ＝ paint→register エディタ）。
+- **注意:** 北極星(Frogger)に必要になってからでよい。拡散リスクがあるので索引化に留める。
+
+---
+
 ## 推奨着手順
 
 1. **B-1 `read_cycles`**（小・即効） → **B-3 予算ガード**（本丸）。ここで欠落B が実ループで初めて閉じる。
@@ -191,5 +251,6 @@
 
 > 制作（Frogger）側では **R-1 Freeway アーキテクチャ**が最も即効。音声検証 **R-2** は P1
 > （`read_tia_registers`）に Audio シャドウを同梱する形で一緒に入れるのが自然。
+> **P2/R-2 は自前実装せず G-1 の Gopher2600 既存パッケージ（`recorder`/`regression`/`tracker`）配線が最短路。**
 > 実装時は CLAUDE.md「Smoke-test harness before reconnect」に従い、`bin/harness` 改修後は
 > MCP `initialize` でスモークテストしてから再接続を依頼すること（`AddTool` 起動パニック対策）。
