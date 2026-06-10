@@ -5,6 +5,7 @@
 package emu
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 
@@ -118,6 +119,38 @@ func (e *Emu) PeekRAM(addr uint16) (uint8, error) {
 // Poke はメモリへ 1 バイト書き込む（poke ツール）。
 func (e *Emu) Poke(addr uint16, val uint8) error {
 	return e.VCS.Mem.Poke(addr, val)
+}
+
+// RowRun は ReadRow の連長エンコード 1 区間。可視 clock [Clock, Clock+Len) が同色 Hex。
+type RowRun struct {
+	Clock int    `json:"clock"` // 区間先頭の可視 clock（0..159）
+	Len   int    `json:"len"`   // 連続ピクセル数
+	Hex   string `json:"hex"`   // 表示 RGB（RRGGBB）。背景か前景かは色で判定
+}
+
+// ReadRow は指定した可視 scanline（注釈グリッドの y と同座標、0 起点）の 1 ライン分の
+// ピクセル色を、横方向に連長エンコード(RLE)して返す。playfield の点灯列や per-scanline 色を
+// 目視でなく数値で確かめるための土台。width は可視幅（通常 160）。
+func (e *Emu) ReadRow(scanline int) (runs []RowRun, width int, err error) {
+	img, _ := e.cap.snapshot()
+	w := img.Bounds().Dx()
+	h := img.Bounds().Dy()
+	if scanline < 0 || scanline >= h {
+		return nil, w, fmt.Errorf("scanline %d out of visible range 0..%d", scanline, h-1)
+	}
+	hexAt := func(x int) string {
+		c := img.RGBAAt(x, scanline)
+		return fmt.Sprintf("%02X%02X%02X", c.R, c.G, c.B)
+	}
+	for x := 0; x < w; x++ {
+		hx := hexAt(x)
+		if len(runs) > 0 && runs[len(runs)-1].Hex == hx {
+			runs[len(runs)-1].Len++
+			continue
+		}
+		runs = append(runs, RowRun{Clock: x, Len: 1, Hex: hx})
+	}
+	return runs, w, nil
 }
 
 // RunUntilBeam は最大 maxFrames フレーム実行し、ビームが (scanline, clock) に達したら

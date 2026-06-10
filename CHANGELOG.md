@@ -9,6 +9,46 @@
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
 
+## [0.7.0] - 2026-06-09
+
+### 追加
+- **M1「静かな池」達成＝描画パイプライン端から端まで開通。** 北極星 ROM「Monet 睡蓮 Frogger」の最初の
+  マイルストーン。`ASCIIアート＋色設計 → EncodeSymmetric → asmgen(kernel) → dasm → load_rom → read_row照合`。
+  - `internal/playfield/asmgen.go`: `GenerateSymmetricASM` — 対称(reflect) playfield 静止画の自己完結 DASM
+    ソースを生成。ABB(kirkjerk) の対称カーネルを土台に、水背景の per-row COLUBK を追加。レジスタ設定順
+    COLUBK→PF0→PF1→PF2→COLUPF（PF を just-in-time で書き glitch 回避、水背景は全幅正しく）。
+  - `cmd/genpf`: Monet 池シーンを設計（青/紫/緑の per-row 水 wash＋睡蓮パッド散布）→ `roms/monet_m1.asm`。
+  - **検証:** read_row(scanline30) で睡蓮パッド col2-5(clock8-23, 緑COLUPF)＋鏡像(clock136-151)＝設計と完全一致、
+    水(COLUBK青)も正しい。Monet の横色帯＋対称睡蓮が実機 Gopher2600 に出た。
+
+## [0.6.0] - 2026-06-09
+
+### 追加
+- **`read_row` ツール（playfield 点灯列 / per-scanline 色を数値で読む）。** 注釈スクショの目視に頼らず、
+  指定した可視 scanline の 1 ライン分のピクセル色を横方向に連長エンコード(RLE) `{clock,len,hex}` で返す。
+  鉄則#1「判定は数値、スクショは補助」を playfield/色にも適用するための汎用プリミティブ。
+  - `internal/emu/emu.go`: `Emu.ReadRow(scanline)` + `RowRun` 型。`Snapshot()` の可視クロップ RGBA を RLE 化。
+  - 北極星 ROM「Monet 睡蓮 Frogger」の gap 0（PF ビット順 litmus）と gap 1（per-scanline 色）の検証土台。
+- **playfield ビット順 litmus（`roms/litmus_pf.asm`）＝gap 0 合格。** ABB / falukropp の 2 ソースから抽出した
+  「列→PF レジスタ＋ビット順」変換表を実機 Gopher2600 で `read_row` 裏取り。各レジスタ最左列のみ点灯
+  （PF0=$10→clock0-3 / PF1=$80→16-19 / PF2=$01→48-51、右半に反復）。各 4clock 幅ぴったりで完全一致。
+  確定表を `docs/resources.md`・`CLAUDE.md` に焼いた。副産物: TIA 書込専用レジスタは poke 非持続の癖を記録。
+- **per-scanline 色 litmus（`roms/litmus_color.asm`）＝gap 1 合格。** 毎ライン `stx COLUBK` で縦グラデーション。
+  `read_row` で scanline 20/100/180 が各々別の単色（全幅160の単一 run）＝Monet の横色帯の核を実証。
+- **`internal/playfield` パッケージ＝gap 2 核。** ASCIIグリッド→PF0/PF1/PF2 変換（`EncodeSymmetric` /
+  `EncodeAsymmetric` /`ParseASCIIRow`）。検証済みビット順を実装し、**litmus の実機値と一致することを go test で自己検証**。
+
+## [0.5.1] - 2026-06-09
+
+### 追加
+- **`get_screen_annotated` が PNG をファイルへも保存（通信回線の実用化）。** インライン画像を描画しない
+  クライアント（CLI ターミナル等）でもユーザーが最新フレームを開けるよう、毎回固定パスへ上書き保存する。
+  - 保存先は env `ATARI2600_SCREEN_PATH`（未設定なら OS temp の `atari2600_screen.png`）。
+  - `.mcp.json` で `<project>/preview/screen.png` を指定。VS Code の画像プレビューはファイル変更で自動リロード
+    ＝タブを開きっぱなしで「Claude が呼ぶ→画面が更新される」往復が成立する。
+  - structured Out に `png_path` を追加し、保存先の絶対パスを毎回返す。
+  - `.gitignore` に `/preview/` を追加（生成物）。サーバ版 0.3.0→0.5.1。
+
 ## [0.5.0] - 2026-06-09
 
 ### 追加

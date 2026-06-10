@@ -96,6 +96,22 @@ CXBLPF: D7=BL-PF (D6 未使用)  CXPPMM: D7=P0-P1 D6=M0-M1
 ```
 - **CXCLR**(書込strobe)=全衝突ラッチをクリア。 **HMCLR**(書込strobe)=動きレジスタ(HMxx)を 0 に（衝突とは別物）。
 
+### ⭐ playfield ビット順（実機裏取り済 v0.6.0・`litmus_pf` / read_row）
+ABB(`kirkjerk/atari-background-builder`) と falukropp(`vcs_playfield_editor`) の**2ソース独立実装が一致**、
+さらに Gopher2600 上で `read_row` により**数値裏取り済**。画面**左→右に40列、各列=4カラークロック幅**：
+```
+col:  0 1 2 3 | 4 5 6 7 8 9 10 11 | 12 13 14 15 16 17 18 19
+reg:  PF0     | PF1               | PF2
+bit:  4 5 6 7 | 7 6 5 4 3 2 1  0  | 0  1  2  3  4  5  6  7
+```
+- **PF0** = 上ニブルのみ。col0→D4 / col1→D5 / col2→D6 / col3→D7（下ニブル未使用）。
+- **PF1** = MSB 先。col4→D7 … col11→D0。
+- **PF2** = LSB 先。col12→D0 … col19→D7。
+- 左半 = 可視 clock 0–79、右半 = 80–159。**CTRLPF D0=0→repeat（右半が左半の複製）/ D0=1→reflect（鏡像）**。
+- litmus 実測(scanline100): `PF0=$10`→clock 0-3 / `PF1=$80`→16-19 / `PF2=$01`→48-51、右半に反復。各 4clock 幅ぴったり。
+- **注意（poke の癖）:** TIA 書込専用レジスタ($0D/$0E…)は `poke` で安定して持続しない（poke は RAM 向け）。
+  レンダリングを変えるときは poke でなく **ROM/kernel で sta** する。位置・色も同様。
+
 ### 検証・テスト資料（カテゴリ 3）= NEW
 - **Klaus Dormann 6502 functional test** — CPU 正しさのゴールド基準（成功で PC が既知アドレスに停止）。Gopher2600 も使用。
 - ⭐ **Gopher2600 は録画/再生 + 組込み `regress`（回帰テスト DB）を持つ** — フレームハッシュのゴールデン画像差分が既製。欠落 D の本命。

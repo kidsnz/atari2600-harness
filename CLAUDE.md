@@ -49,12 +49,19 @@ NTSC **262** = VSYNC 3 / VBLANK 37 / 可視 **192** / Overscan 30。PAL・SECAM 
 **衝突(CXxx)** — 各 D7/D6 に 2 ラッチ・sticky。`BIT CXxx` → `BMI`(D7)/`BVS`(D6)。
 **CXCLR**=全衝突クリア、**HMCLR**=動きレジスタクリア（別物）。
 
+**playfield（ビット順・実機裏取り済 v0.6.0）** — 左→右に40列、各列=4カラークロック幅。**2ソース(ABB/falukropp)一致＋`read_row`実測**。
+`PF0`=上ニブルのみ col0→D4..col3→D7 ／ `PF1`=MSB先 col4→D7..col11→D0 ／ `PF2`=LSB先 col12→D0..col19→D7。
+左半=clock 0–79・右半=80–159。`CTRLPF` D0: 0=repeat（右半複製）/ 1=reflect（鏡像）。検証は `read_row`（数値・目視に頼らない）。
+
 **ハード** — RAM 128 バイト。ROM `$F000`(4K)、ベクタ `$FFFA`。
+**poke の癖** — `poke` は RAM 向け。TIA 書込専用レジスタ($0D PF0 等)は poke で安定して持続しない → レンダリング変更は ROM/kernel の `sta` で。
 
 **注釈スクショ(`get_screen_annotated`)** — Claude 専用補助ではなく**ユーザー↔Claude の主要通信回線**＝一級市民。
 ユーザーが画像を見て「P0 を clock 80 へ」と視覚的にデータ指示 → Claude が register に直訳する往復ループ。
 よってグリッドは **TIA 実座標で校正**（横 clock 0–159 / 縦 scanline 0–191、両軸常時）＝ユーザーの座標がそのまま
 register 値へ直結すること。現在位置を**数値ラベル**で焼く。人間可読性最優先（×3–4 拡大・軸ラベル）。
+画像はインライン返却に加え**毎回ファイルへ上書き保存**（env `ATARI2600_SCREEN_PATH`、既定は `.mcp.json` で
+`preview/screen.png`）＝VS Code プレビューが自動リロードし往復できる。`png_path` を JSON でも返す。
 
 ## ルーティング表（作業前に読む）
 | 作業 | 先に読む |

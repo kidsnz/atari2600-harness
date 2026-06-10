@@ -15,6 +15,9 @@
 # external dependency: Gopher2600 upstream clone (obtain per README)
 /Gopher2600/
 
+# annotated screenshot output (user<->Claude comms channel; overwritten each call)
+/preview/
+
 # assembled ROM binaries (built from roms/*.asm via DASM)
 /roms/*.bin
 /roms/*.lst

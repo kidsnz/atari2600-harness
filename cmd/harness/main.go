@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"image/png"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -215,6 +216,38 @@ func handleReadTIA(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*
 	}, nil
 }
 
+// --- read_row（playfield 点灯列 / per-scanline 色を数値で読む）---
+
+type ReadRowIn struct {
+	Scanline int `json:"scanline" jsonschema:"visible scanline (0-based, same y as the annotated grid)"`
+}
+type ReadRowOut struct {
+	Scanline int          `json:"scanline"`
+	Width    int          `json:"width"` // 可視幅（通常 160）
+	Runs     []emu.RowRun `json:"runs"`  // 横方向の連長エンコード {clock,len,hex}
+	Coords   Coords       `json:"coords"`
+}
+
+func handleReadRow(ctx context.Context, req *mcp.CallToolRequest, in ReadRowIn) (*mcp.CallToolResult, ReadRowOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ReadRowOut{}, err
+	}
+	runs, width, err := e.ReadRow(in.Scanline)
+	if err != nil {
+		return nil, ReadRowOut{}, err
+	}
+	return nil, ReadRowOut{
+		Scanline: in.Scanline,
+		Width:    width,
+		Runs:     runs,
+		Coords:   coordsOf(e),
+	}, nil
+}
+
 // --- peek / poke ---
 
 type PeekIn struct {
@@ -307,6 +340,7 @@ type ScreenOut struct {
 	Height  int         `json:"height"`
 	Sprites []SpritePos `json:"sprites"` // 各オブジェクトの横位置（画像と同じ数値）
 	Coords  Coords      `json:"coords"`
+	PNGPath string      `json:"png_path"` // 人間が開ける固定パス（毎回上書き）
 }
 
 func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in ScreenIn) (*mcp.CallToolResult, ScreenOut, error) {
@@ -328,6 +362,21 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 		return nil, ScreenOut{}, fmt.Errorf("encode png: %w", err)
 	}
 
+	// 人間が開ける固定パスへ毎回上書き保存（ユーザー↔Claude 通信回線）。
+	// MCP のインライン画像を描画しないクライアントでも、このファイルを開けば最新フレームが見られる。
+	// VS Code の画像プレビューはファイル変更で自動リロード＝タブを開きっぱなしで往復可能。
+	// 保存先は env ATARI2600_SCREEN_PATH で指定（未設定なら OS temp）。
+	pngPath := os.Getenv("ATARI2600_SCREEN_PATH")
+	if pngPath == "" {
+		pngPath = filepath.Join(os.TempDir(), "atari2600_screen.png")
+	}
+	if err := os.MkdirAll(filepath.Dir(pngPath), 0o755); err != nil {
+		return nil, ScreenOut{}, fmt.Errorf("mkdir for png: %w", err)
+	}
+	if err := os.WriteFile(pngPath, buf.Bytes(), 0o644); err != nil {
+		return nil, ScreenOut{}, fmt.Errorf("write png: %w", err)
+	}
+
 	sprites := make([]SpritePos, 0, 5)
 	for _, m := range e.Markers() {
 		sprites = append(sprites, SpritePos{Label: m.Label, Clock: m.Clock})
@@ -344,6 +393,7 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 		Height:  img.Bounds().Dy(),
 		Sprites: sprites,
 		Coords:  coordsOf(e),
+		PNGPath: pngPath,
 	}
 	return result, out, nil
 }
@@ -353,7 +403,7 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "0.3.0",
+		Version: "0.6.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -361,6 +411,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_cpu", Description: "Read 6507 registers, status flags, and beam coords."}, handleReadCPU)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_ram", Description: "Dump the 128 bytes of RAM ($80-$FF) as hex."}, handleReadRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_tia", Description: "Read TIA sprite positions (ResetPixel/HmovedPixel) and HBLANK. Authoritative for horizontal-position checks."}, handleReadTIA)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
