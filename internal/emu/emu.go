@@ -10,7 +10,6 @@ import (
 	"image/color"
 
 	"github.com/jetsetilly/gopher2600/cartridgeloader"
-	"github.com/jetsetilly/gopher2600/debugger/govern"
 	"github.com/jetsetilly/gopher2600/environment"
 	"github.com/jetsetilly/gopher2600/hardware"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports"
@@ -32,11 +31,24 @@ type Emu struct {
 	cycleMark int64 // 区間計測の基準点（MarkCycles で現在の cpuCycles に揃える）
 }
 
-// accumCycle は直近に完了した命令のサイクル数を累積へ加える。CPU の命令境界
-// （Step 1回 / RunForFrameCount の continueCheck = いずれも 1 命令ごと）で呼ぶこと。
-// LastResult.Cycles は PageFault/分岐の +1 を含む実サイクル数（出典: docs/improvement-roadmap B-1）。
-func (e *Emu) accumCycle() {
-	e.cpuCycles += int64(e.VCS.CPU.LastResult.Cycles)
+// stepInstr は VCS を 1 ステップ進め、実際に 1 命令が実行された場合だけその実サイクル数を
+// 累積へ加えて executed=true を返す。
+//
+// 肝: CPU は WSYNC stall 中（RdyFlg=false）だと ExecuteInstruction が命令を進めず
+// cycleCallback を 1 回呼ぶだけで返り、LastResult は据え置かれる（Gopher2600 cpu.go:614）。
+// よって「Step 直前に RdyFlg が true だった時だけ」が実命令の実行ステップ＝加算すべき点。
+// stall ステップを数えると直前命令のサイクル数を多重加算してしまう（WSYNC を使う全 ROM で過大）。
+// この規約で cpuCycles は「実行した命令サイクルの総和」になる（WSYNC の空転は含めない）。
+func (e *Emu) stepInstr() (executed bool, err error) {
+	ready := e.VCS.CPU.RdyFlg
+	if err := e.VCS.Step(nil); err != nil {
+		return false, err
+	}
+	if ready {
+		e.cpuCycles += int64(e.VCS.CPU.LastResult.Cycles)
+		return true, nil
+	}
+	return false, nil
 }
 
 // LastCycles は直近に完了した 1 命令のサイクル数を返す。
@@ -110,25 +122,35 @@ func (e *Emu) Coords() coords.TelevisionCoords {
 	return e.VCS.TV.GetCoords()
 }
 
-// RunFrames は n フレーム実行する（条件停止なし）。continueCheck は命令完了ごとに
-// 呼ばれる（run.go RunForFrameCount）ので、そこで CPU サイクルを累積する。
+// RunFrames は n フレーム実行する（条件停止なし）。stepInstr 経由で CPU サイクルを正しく累積する
+// （RunForFrameCount を使わないのは、stall ステップを除外した正確なサイクル計上を統一するため）。
 func (e *Emu) RunFrames(n int) error {
-	return e.VCS.RunForFrameCount(n, func() (govern.State, error) {
-		e.accumCycle()
-		return govern.Running, nil
-	})
+	if n <= 0 {
+		return nil
+	}
+	target := e.VCS.TV.GetCoords().Frame + n
+	for {
+		if e.VCS.CPU.Jammed {
+			return nil // CPU jam 時は無限ループ防止（RunForFrameCount と同じガード）
+		}
+		if e.VCS.TV.IsFrameNum(target) {
+			return nil
+		}
+		if _, err := e.stepInstr(); err != nil {
+			return err
+		}
+	}
 }
 
-// StepFrame はちょうど 1 フレーム分カラークロック単位でステップし、そのフレームに
-// 含まれた scanline 数を返す（タイミング検証点。NTSC なら 262 を期待）。
+// StepFrame はちょうど 1 フレーム分ステップし、そのフレームに含まれた scanline 数を返す
+// （タイミング検証点。NTSC なら 262 を期待）。
 func (e *Emu) StepFrame() (int, error) {
 	start := e.VCS.TV.GetCoords().Frame
 	maxScanline := 0
 	for {
-		if err := e.VCS.Step(nil); err != nil {
+		if _, err := e.stepInstr(); err != nil {
 			return 0, err
 		}
-		e.accumCycle() // Step は 1 命令ぶん進む
 		c := e.VCS.TV.GetCoords()
 		if c.Frame != start {
 			break
@@ -222,15 +244,20 @@ func (e *Emu) ReadRow(scanline int) (runs []RowRun, width int, err error) {
 // RunUntilBeam は最大 maxFrames フレーム実行し、ビームが (scanline, clock) に達したら
 // 早期停止する。条件で止まったとき halted=true（breakif の土台）。
 func (e *Emu) RunUntilBeam(maxFrames, scanline, clock int) (halted bool, err error) {
-	check := func() (govern.State, error) {
-		e.accumCycle() // continueCheck は命令完了ごと
+	target := e.VCS.TV.GetCoords().Frame + maxFrames
+	for {
+		if e.VCS.CPU.Jammed {
+			return false, nil
+		}
+		if e.VCS.TV.IsFrameNum(target) {
+			return false, nil // フレーム上限に到達（条件未成立）
+		}
+		if _, err := e.stepInstr(); err != nil {
+			return false, err
+		}
 		c := e.VCS.TV.GetCoords()
 		if c.Scanline == scanline && c.Clock == clock {
-			halted = true
-			return govern.Ending, nil
+			return true, nil
 		}
-		return govern.Running, nil
 	}
-	err = e.VCS.RunForFrameCount(maxFrames, check)
-	return halted, err
 }

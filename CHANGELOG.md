@@ -32,6 +32,21 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.12.1] - 2026-06-10
+
+### 修正
+- **`read_cycles` が WSYNC stall 中の空転を多重カウントしていた（v0.12.0 のバグ）。** CPU は WSYNC stall 中
+  （`RdyFlg=false`）だと命令を実行せず `cycleCallback` を 1 回呼ぶだけで返り `LastResult` を据え置く
+  （Gopher2600 `cpu.go:614`）。旧実装は命令境界ごとに `LastResult.Cycles` を加算していたため、stall の各
+  Step で直前命令のサイクル数を重複加算し、WSYNC を使う全 ROM で過大計上になっていた（litmus_cycles は
+  WSYNC 不使用のため初回検証をすり抜けた）。
+  - **修正**: 進行を `stepInstr()` プリミティブへ統一。**Step 直前に `RdyFlg` が true だった時だけ**加算する
+    （＝実命令が走ったステップのみ）。`cpuCycles` の意味は「実行した命令サイクルの総和（WSYNC 空転は含めない）」。
+    `RunFrames`/`RunUntilBeam` を `RunForFrameCount` から自前 step ループへ置換し全経路で一貫させた。
+  - **回帰テスト**: `TestCycleCounterExcludesWsyncStall`（smoke.bin で 1 フレームの実行サイクルが
+    マシン時間 lines×76 の 1/4 未満であることを検証＝旧バグなら超過して落ちる）。実測 = 1 フレーム 2336 cy
+    （マシン 19912 の約 1/8）。
+
 ## [0.12.0] - 2026-06-10
 
 ### 追加
