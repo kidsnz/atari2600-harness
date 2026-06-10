@@ -1,0 +1,13 @@
+{
+  "rom": "roms/litmus/litmus_missile.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tia.missile0.hmoved_pixel", "op": "==", "value": 38},
+    {"at_frame": 2, "field": "tia.ball.hmoved_pixel", "op": "==", "value": 140},
+    {"at_frame": 2, "field": "tiareg.ball.enabled", "op": "==", "value": 1}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

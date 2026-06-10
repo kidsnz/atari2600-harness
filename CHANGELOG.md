@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.30.0] - 2026-06-10
+
+### Added
+- **Missile/ball position litmus.** `roms/litmus/litmus_missile.asm` enables and positions missile0 and the
+  ball in the visible region; `read_tia` reads **missile0=38 / ball=140** and `read_row` shows a 1px vertical
+  line at each clock — verifying the harness reads the missile/ball object-position family (the `X = 3N − 55`
+  side, complementing the player `X = 3N − 54` litmus_pos). Locked by `scenarios/missile.json`. 11 litmus pass.
+
 ## [0.29.1] - 2026-06-10
 
 ### Fixed
