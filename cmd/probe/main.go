@@ -10,7 +10,7 @@ import (
 	"image/png"
 	"os"
 
-	"github.com/kidsnz/atari2600-dev/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
 
 func writePNG(path string, img image.Image) {

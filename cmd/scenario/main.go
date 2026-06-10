@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kidsnz/atari2600-dev/internal/scenario"
+	"github.com/kidsnz/atari2600-harness/internal/scenario"
 )
 
 func main() {

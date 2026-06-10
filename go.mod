@@ -1,4 +1,4 @@
-module github.com/kidsnz/atari2600-dev
+module github.com/kidsnz/atari2600-harness
 
 go 1.26.4
 

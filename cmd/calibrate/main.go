@@ -11,8 +11,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/kidsnz/atari2600-dev/internal/calibrate"
-	"github.com/kidsnz/atari2600-dev/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/calibrate"
+	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
 
 const cyclesPerUnit = 5 // litmus_pos の SBC(2)+BCS(3) ループ

@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/kidsnz/atari2600-dev/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
 
 // Point は 1 計測（遅延ユニット DELAY と、その結果の player0 ResetPixel）。

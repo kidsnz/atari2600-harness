@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/kidsnz/atari2600-dev/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
 
 // TestFitWrapAndSaturation は折返し（160）と左端飽和の混じった点列でも傾きを正しく復元することを確認する。

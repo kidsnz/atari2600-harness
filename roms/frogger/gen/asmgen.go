@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kidsnz/atari2600-dev/pkg/playfield"
+	"github.com/kidsnz/atari2600-harness/pkg/playfield"
 )
 
 // SceneOpts は生成するカーネルのパラメータ。

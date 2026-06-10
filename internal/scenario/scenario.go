@@ -15,8 +15,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kidsnz/atari2600-dev/internal/build"
-	"github.com/kidsnz/atari2600-dev/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/build"
+	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
 
 // Input はあるフレームで与えるジョイスティック操作（D-2: 入力タイムライン）。

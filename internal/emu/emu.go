@@ -20,7 +20,7 @@ import (
 	"github.com/jetsetilly/gopher2600/hardware/tia/video"
 	"github.com/jetsetilly/gopher2600/setup"
 
-	"github.com/kidsnz/atari2600-dev/internal/annotate"
+	"github.com/kidsnz/atari2600-harness/internal/annotate"
 )
 
 // Emu は 1 台の VCS とその TV を保持する。

@@ -6,6 +6,9 @@
 ## [Unreleased]
 
 ### 変更
+- **Go モジュール名を `github.com/kidsnz/atari2600-dev` → `github.com/kidsnz/atari2600-harness` にリネーム
+  （spinoff 準備）.** 基盤が独立リポ `atari2600-harness` になる前提に合わせ、`go.mod` と import 9 ファイルを
+  一括置換。build/vet/test 緑、全シナリオ PASS。
 - **`internal/playfield` → `pkg/playfield` へ公開昇格（spinoff 準備）.** Go は `internal/` を別モジュールから
   import できないため、playfield エンコーダ（Atari 2600 普遍知識）を公開パッケージ化。唯一の越境 importer
   `roms/frogger/gen` の import を書換。全シーンを再生成（header コメントのみ差分）。build/vet/test 緑、
