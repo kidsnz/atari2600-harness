@@ -32,6 +32,29 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.13.0] - 2026-06-10
+
+### 追加
+- **`assert_line_budget` MCP ツール（欠落B の本丸 / B-3 = per-scanline サイクル予算ガード）。** Pong v2 を
+  黙って殺した失敗モード（per-scanline サイクル超過 → 画面ロール、検知不能）を数値で捕まえる。最大
+  `max_frames` 走らせ、ある論理ライン（= WSYNC ストローブの間隔）が `budget`（既定 76cy = 1 ライン）を
+  超えて余分なスキャンラインを食い込んだ瞬間に停止。返却 `over` / `at_scanline`（超過ラインの開始）/
+  `line_cycles`（消費した概算 machine cycle）。多ライン・カーネル（2LK 等）は `budget` を 152 等へ。
+  - **検出原理**: WSYNC ストローブ = CPU `RdyFlg` の true→false 遷移（WSYNC だけが RDY を落とす,
+    `tia.go:195`）。WSYNC は必ず次スキャンライン境界まで stall するので、連続ストローブ間の **scanline 差 =
+    その論理ラインが消費した物理ライン数**（work が 76cy に収まれば 1、超えれば ≥2）。machine-cycle 差は
+    隣接ライン依存で誤検知しやすいため scanline 差を採用。debugger の `watch|trap`（型 unexported）に
+    触れず、exported `RdyFlg` + ビーム座標だけで `internal/emu` の自前 step ループに実装（v0.3.0 の
+    「debugger driver を外す」決定と整合、roadmap G-1 の限界どおり）。
+  - **実装**: `internal/emu/emu.go` `RunUntilBudget`。`cmd/harness/main.go` `handleBudgetGuard` + `AddTool`。
+    起動直後はリセット／VSYNC 同期が乱れる（実測: frame 0 で strobe が scanline 22→30 と飛ぶ）ため、
+    計測前に 2 フレーム空走して安定させる。
+  - **検証ロム**: `roms/litmus/litmus_overrun.asm`（可視中央に WSYNC 前 ~100cy のビジーループを 1 本だけ仕込み、
+    その論理ラインが 2 物理ラインを食う）。
+  - **検証**: `internal/emu/emu_budget_test.go` — overrun ROM で `over=true`・`line_cycles=152`（2 ライン消費）・
+    `at_scanline` が可視域、正常 ROM（smoke / **frogger 実ゲーム**）で `over=false`（誤検知なし）。frogger は
+    60 フレーム走らせても無検知。MCP end-to-end でも overrun→over=true(132,152) / frogger→over=false を確認。
+
 ## [0.12.1] - 2026-06-10
 
 ### 修正

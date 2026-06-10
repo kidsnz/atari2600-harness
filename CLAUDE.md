@@ -26,8 +26,9 @@
 - アセンブラ = **DASM**（`-f3`）。**BizHawk は macOS 不可で不採用。**
 - MCP ツール(**実装済**, `cmd/harness`): `load_rom` / `step_frame` / `read_cpu` / `read_ram` /
   `read_tia` / `peek` / `poke` / `breakif` / **`get_screen_annotated`**(v0.5.0, 画像＋数値を同時返却) /
-  **`read_cycles`**(v0.12.0, CPU サイクル数値露出＝鉄則2を実ループへ。直近命令/区間/累積)。
-  未実装(予定): `step_scanline|clock` / `watch|trap`（B-3 予算ガードは `read_cycles` の次段）。
+  **`read_cycles`**(v0.12.0, CPU サイクル数値露出＝鉄則2を実ループへ。直近命令/区間/累積) /
+  **`assert_line_budget`**(v0.13.0, per-scanline 予算ガード＝WSYNC 間が予算超過＝ロール要因で halt)。
+  未実装(予定): `step_scanline|clock` / `watch|trap`。
 
 ## 絶対に取り違えてはいけない定数（出典: `docs/resources.md`）
 **フレーム** — 1 ライン = 228 カラークロック（HBLANK 68 + 可視 160）= **76 CPU サイクル**（3 クロック/サイクル）。

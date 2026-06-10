@@ -382,6 +382,38 @@ func handleBreakIf(ctx context.Context, req *mcp.CallToolRequest, in BreakIfIn) 
 	return nil, BreakIfOut{Halted: halted, Coords: coordsOf(e)}, nil
 }
 
+// --- assert_line_budget（B-3: per-scanline サイクル予算ガード）---
+
+type BudgetIn struct {
+	MaxFrames int `json:"max_frames,omitempty" jsonschema:"upper bound on frames to run (default 1)"`
+	Budget    int `json:"budget,omitempty" jsonschema:"CPU-cycle budget per WSYNC interval (default 76 = one scanline)"`
+}
+type BudgetOut struct {
+	Over       bool   `json:"over"`        // true=ある論理ラインが予算超過（ロール要因）で停止
+	AtScanline int    `json:"at_scanline"` // 超過した論理ラインの開始 scanline（over=true 時）
+	LineCycles int    `json:"line_cycles"` // そのラインが消費した概算 machine cycle（消費ライン数×76）
+	Coords     Coords `json:"coords"`
+}
+
+func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetIn) (*mcp.CallToolResult, BudgetOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, BudgetOut{}, err
+	}
+	maxFrames := in.MaxFrames
+	if maxFrames <= 0 {
+		maxFrames = 1
+	}
+	over, atScanline, lineCycles, err := e.RunUntilBudget(maxFrames, in.Budget)
+	if err != nil {
+		return nil, BudgetOut{}, fmt.Errorf("run until budget: %w", err)
+	}
+	return nil, BudgetOut{Over: over, AtScanline: atScanline, LineCycles: lineCycles, Coords: coordsOf(e)}, nil
+}
+
 // --- get_screen_annotated（ユーザー↔Claude 通信回線）---
 
 type ScreenIn struct {
@@ -473,6 +505,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
+	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed)."}, handleBudgetGuard)
 	mcp.AddTool(server, &mcp.Tool{Name: "get_screen_annotated", Description: "Return the latest frame as a PNG with an XY grid in real TIA coordinates (x=clock 0..159, y=scanline) and labelled sprite-position markers. The primary visual channel: the user can point at it and instruct by coordinate. Also returns sprite positions numerically."}, handleScreenAnnotated)
 
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {

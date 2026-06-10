@@ -128,6 +128,26 @@ type Coords struct {
 - Out: `{ Coords; Halted bool }`
 - 補足: RAM 値や衝突での停止は次イテレーションで拡張。まずビーム位置停止だけ通す。
 
+### 7b. `assert_line_budget`  ★欠落B の本丸（B-3, v0.13.0）
+- In: `{ MaxFrames int (default 1); Budget int (default 76 = 1 ライン分の CPU サイクル) }`
+- 動作: ある論理ライン（= WSYNC ストローブ間隔）が予算を超えて余分なスキャンラインを食い込んだ瞬間に停止。
+  Pong v2 を黙って殺した「per-scanline 超過 → ロール」を数値で捕まえる。`emu.RunUntilBudget`。
+  - **検出**: WSYNC ストローブ = CPU `RdyFlg` の true→false 遷移（WSYNC のみが RDY を落とす）。WSYNC は次
+    スキャンライン境界まで stall するので、連続ストローブ間の scanline 差 = その論理ラインが消費した物理ライン数
+    （1 に収まれば OK、≥2 で超過）。`maxLines = budget/76`（既定 1）を超えたら停止。
+  - 計測前に 2 フレーム空走（起動直後は VSYNC 同期が乱れ誤検知するため）。多ライン・カーネルは budget を上げる。
+- Out:
+  ```go
+  type BudgetOut struct {
+      Over       bool // true=予算超過（ロール要因）で停止
+      AtScanline int  // 超過した論理ラインの開始 scanline
+      LineCycles int  // そのラインが消費した概算 machine cycle（消費物理ライン数 × 76）
+      Coords
+  }
+  ```
+  - **検証**: `roms/litmus/litmus_overrun.bin`（WSYNC 前 ~100cy の重いライン 1 本）で `Over=true`・
+    `LineCycles=152`。smoke / frogger は `Over=false`（誤検知なし）。`internal/emu/emu_budget_test.go`。
+
 ## 動作確認（受け入れ条件）
 
 1. `go build ./cmd/harness` が通る。

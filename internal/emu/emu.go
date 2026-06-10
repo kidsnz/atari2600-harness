@@ -261,3 +261,65 @@ func (e *Emu) RunUntilBeam(maxFrames, scanline, clock int) (halted bool, err err
 		}
 	}
 }
+
+// RunUntilBudget は最大 maxFrames フレーム走らせ、ある論理ライン（= WSYNC ストローブの間隔）が
+// サイクル予算を超えて物理スキャンラインを食い込んだ瞬間に停止する。これは Pong v2 を黙って殺した
+// 失敗モード（per-scanline サイクル超過 → 画面ロール、検知不能）を数値で捕まえる本丸ガード。
+//
+// 検出原理:
+//   - WSYNC ストローブ = CPU RdyFlg の true→false 遷移（WSYNC だけが RDY を落とす, tia.go:195）。
+//   - WSYNC は必ず次スキャンライン境界まで stall する。よって連続ストローブ間の「scanline 差」=
+//     その論理ラインが実際に消費した物理ライン数（work が 1 ライン=76cy に収まれば 1、超えれば ≥2）。
+//     scanline 差はプログラム局所で安定（machine cycle 差は隣接ライン依存で誤検知しやすく不採用）。
+//
+// budgetCycles は 1 WSYNC 区間あたりの CPU サイクル予算（既定 76 = 1 ライン）。多ライン・カーネル
+// （例 2LK）では 152 等に上げる。over=true のとき atScanline=超過ラインの開始 scanline、
+// lineCycles=そのラインが消費した概算 machine cycle（消費物理ライン数 × 76）。
+func (e *Emu) RunUntilBudget(maxFrames, budgetCycles int) (over bool, atScanline, lineCycles int, err error) {
+	if budgetCycles <= 0 {
+		budgetCycles = 76
+	}
+	maxLines := budgetCycles / 76
+	if maxLines < 1 {
+		maxLines = 1
+	}
+
+	// 起動直後の数フレームはリセット／VSYNC 同期が安定せず WSYNC 間隔が乱れる（実測: frame 0 で
+	// strobe が scanline 22→30 と飛ぶ）。誤検知を避けるため計測前に 2 フレーム空走して安定させる。
+	if err := e.RunFrames(2); err != nil {
+		return false, 0, 0, err
+	}
+
+	target := e.VCS.TV.GetCoords().Frame + maxFrames
+	prevRdy := e.VCS.CPU.RdyFlg
+	haveBaseline := false
+	lastStrobeScanline := 0
+	lastStrobeFrame := 0
+
+	for {
+		if e.VCS.CPU.Jammed {
+			return false, 0, 0, nil
+		}
+		if e.VCS.TV.IsFrameNum(target) {
+			return false, 0, 0, nil // フレーム上限に到達（超過なし）
+		}
+		if _, err := e.stepInstr(); err != nil {
+			return false, 0, 0, err
+		}
+
+		rdy := e.VCS.CPU.RdyFlg
+		if prevRdy && !rdy { // WSYNC ストローブ（STA WSYNC が今のステップで RDY を落とした）
+			c := e.VCS.TV.GetCoords()
+			if haveBaseline && c.Frame == lastStrobeFrame {
+				lines := c.Scanline - lastStrobeScanline // この論理ラインが食った物理ライン数
+				if lines > maxLines {
+					return true, lastStrobeScanline + 1, lines * 76, nil
+				}
+			}
+			lastStrobeScanline = c.Scanline
+			lastStrobeFrame = c.Frame
+			haveBaseline = true
+		}
+		prevRdy = rdy
+	}
+}
