@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.29.0] - 2026-06-10
+
+### Added
+- **NUSIZ multi-copy litmus coverage (extends S-2).** `roms/litmus/litmus_nusiz_copies.asm` renders an 8px
+  solid sprite at `NUSIZ0=$03` (ThreeCopiesClose); `read_row` confirms **three 8px white spans at clock
+  3/19/35 (16px copy spacing)**. Locked by `scenarios/nusiz_copies.json` (golden + `player0.nusiz=3`).
+  Deepens verified coverage of the NUSIZ helper beyond double-width. 10 litmus scenarios now pass.
+
 ## [0.28.0] - 2026-06-10
 
 ### Added
