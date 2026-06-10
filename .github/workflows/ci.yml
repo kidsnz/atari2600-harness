@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Set up Go (from go.mod)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install DASM (assembler)
+        run: sudo apt-get update && sudo apt-get install -y dasm
+
+      - name: Clone the Gopher2600 engine (pinned)
+        # The harness embeds Gopher2600 via `replace => ./Gopher2600` (gitignored).
+        # Pin the exact commit the harness is verified against.
+        run: |
+          git clone https://github.com/JetSetIlly/Gopher2600.git
+          git -C Gopher2600 checkout 5d532e8831c63a4794c1ce3f5f4c32ad069aee8b
+
+      - name: Assemble litmus ROMs (.bin are gitignored; tests/scenarios need them)
+        run: |
+          for f in roms/litmus/*.asm; do
+            dasm "$f" -f3 -o"${f%.asm}.bin"
+          done
+
+      - name: Build / vet / test (no cgo — the harness uses SDL-free Gopher2600 packages)
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          go build ./...
+          go vet ./...
+          go test ./...
+
+      - name: Litmus regression scenarios
+        env:
+          CGO_ENABLED: "0"
+        run: go run ./cmd/scenario roms/litmus/scenarios/*.json
