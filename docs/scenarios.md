@@ -32,7 +32,8 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
   "checks": {                           // whole-run properties (measurements with side effects; evaluated after the timeline)
     "ntsc_frame_lines": 262,            // StepFrame() == 262
     "max_line_budget": 76,              // budget guard is never exceeded (equivalent to assert_line_budget)
-    "golden_frame": true               // D-3: compare the rendered frame-chain hash against <scenario>.golden
+    "golden_frame": true,              // D-3: compare the rendered frame-chain hash against <scenario>.golden
+    "golden_audio": true               // A-2: compare the audio-chain hash against <scenario>.audio.golden
   }
 }
 ```
@@ -60,7 +61,8 @@ reused as-is for regression). **Unknown fields are an error** (typos are not swa
 | `audio.ch0\|ch1.control\|freq\|volume` | `ReadAudio` |
 
 `checks` (whole run): `ntsc_frame_lines` (`StepFrame`) / `max_line_budget` (`RunUntilBudget`) /
-`golden_frame` (render-chain hash, below).
+`golden_frame` (render-chain hash, below) / `golden_audio` (audio-chain hash, same mechanism via
+Gopher2600 `digest.Audio`, compared against `<scenario>.audio.golden`).
 
 ## Golden-frame regression (D-3, v0.19.0)
 

@@ -40,6 +40,7 @@ type Checks struct {
 	NTSCFrameLines *int `json:"ntsc_frame_lines,omitempty"` // StepFrame() == この値（NTSC は 262）
 	MaxLineBudget  *int `json:"max_line_budget,omitempty"`  // RunUntilBudget が超過しない（既定予算 76）
 	GoldenFrame    bool `json:"golden_frame,omitempty"`     // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
+	GoldenAudio    bool `json:"golden_audio,omitempty"`     // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
 }
 
 // Scenario は 1 本のシナリオ定義。
@@ -65,6 +66,7 @@ type AssertResult struct {
 type Result struct {
 	Asserts    []AssertResult
 	GoldenHash string // golden_frame 指定時に算出した描画連鎖ハッシュ（決定性確認用）
+	AudioHash  string // golden_audio 指定時に算出した音声連鎖ハッシュ
 	Pass       bool
 }
 
@@ -121,6 +123,12 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			return nil, err
 		}
 	}
+	goldenA := s.Checks != nil && s.Checks.GoldenAudio
+	if goldenA {
+		if err := e.EnableAudioDigest(); err != nil {
+			return nil, err
+		}
+	}
 
 	warmup := s.WarmupFrames
 	if warmup == 0 {
@@ -131,6 +139,9 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 	}
 	if golden {
 		e.ResetVideoDigest() // warmup を除外＝タイムラインのフレームだけで決定的なハッシュにする
+	}
+	if goldenA {
+		e.ResetAudioDigest()
 	}
 
 	// フレーム別にインデックス化。
@@ -194,6 +205,13 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				return nil, err
 			}
 		}
+		if goldenA {
+			hash := e.AudioHash()
+			res.AudioHash = hash
+			if err := evalGoldenAudio(s, hash, updateGoldens, res); err != nil {
+				return nil, err
+			}
+		}
 		if s.Checks.NTSCFrameLines != nil {
 			lines, err := e.StepFrame()
 			if err != nil {
@@ -227,28 +245,42 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 	return res, nil
 }
 
-// evalGolden は算出ハッシュを <scenario>.golden と照合する。ファイルが無い／updateGoldens なら記録。
-// srcPath が空（プログラム生成）ならファイル照合はスキップ（ハッシュは Result.GoldenHash に入る）。
+// audioGoldenPath は scenario ファイルパスから対応する .audio.golden ファイルのパスを返す。
+func audioGoldenPath(srcPath string) string {
+	return strings.TrimSuffix(srcPath, filepath.Ext(srcPath)) + ".audio.golden"
+}
+
+// evalGolden は描画連鎖ハッシュを <scenario>.golden と照合する（label="golden_frame"）。
 func evalGolden(s *Scenario, hash string, update bool, res *Result) error {
-	if s.srcPath == "" {
-		res.Asserts = append(res.Asserts, AssertResult{Desc: "golden_frame (no file; hash computed)", Pass: true})
+	return evalGoldenFile(s.srcPath, goldenPath(s.srcPath), "golden_frame", hash, update, res)
+}
+
+// evalGoldenAudio は音声連鎖ハッシュを <scenario>.audio.golden と照合する（label="golden_audio"）。
+func evalGoldenAudio(s *Scenario, hash string, update bool, res *Result) error {
+	return evalGoldenFile(s.srcPath, audioGoldenPath(s.srcPath), "golden_audio", hash, update, res)
+}
+
+// evalGoldenFile は算出ハッシュを golden ファイルと照合する（映像・音声で共有）。ファイルが無い／
+// update なら記録。srcPath が空（プログラム生成）ならファイル照合はスキップ。
+func evalGoldenFile(srcPath, gp, label, hash string, update bool, res *Result) error {
+	if srcPath == "" {
+		res.Asserts = append(res.Asserts, AssertResult{Desc: label + " (no file; hash computed)", Pass: true})
 		return nil
 	}
-	gp := goldenPath(s.srcPath)
 	existing, err := os.ReadFile(gp)
 	switch {
 	case update || errors.Is(err, fs.ErrNotExist):
 		if err := os.WriteFile(gp, []byte(hash+"\n"), 0o644); err != nil {
 			return err
 		}
-		res.Asserts = append(res.Asserts, AssertResult{Desc: "golden_frame recorded " + filepath.Base(gp), Pass: true})
+		res.Asserts = append(res.Asserts, AssertResult{Desc: label + " recorded " + filepath.Base(gp), Pass: true})
 		return nil
 	case err != nil:
 		return err
 	default:
 		want := strings.TrimSpace(string(existing))
 		ok := want == hash
-		res.Asserts = append(res.Asserts, AssertResult{Desc: "golden_frame matches", Pass: ok})
+		res.Asserts = append(res.Asserts, AssertResult{Desc: label + " matches", Pass: ok})
 		if !ok {
 			res.Pass = false
 		}

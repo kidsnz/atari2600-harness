@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.26.0] - 2026-06-10
+
+### Added
+- **Golden-audio regression `checks.golden_audio` (hardening-roadmap A-2).** Mirrors the video golden for
+  sound: a sha1 audio-chain (Gopher2600 `digest.Audio`) over the timeline is compared against
+  `<scenario>.audio.golden`. `internal/emu` gains `EnableAudioDigest`/`ResetAudioDigest`/`AudioHash`
+  (symmetric to the video digest); `internal/scenario`'s golden eval is generalized to share video/audio.
+  Verified with `roms/litmus/scenarios/audio.json` on `litmus_audio.asm` (deterministic record→match, plus
+  numeric AUDC/AUDF/AUDV asserts). All 8 litmus scenarios pass. CLI only; MCP binary unchanged.
+
 ## [0.25.0] - 2026-06-10
 
 ### Added

@@ -33,6 +33,7 @@ type Emu struct {
 	cycleMark int64 // 区間計測の基準点（MarkCycles で現在の cpuCycles に揃える）
 
 	vdigest *digest.Video // ゴールデンフレーム回帰用の連鎖ハッシュ（任意・EnableVideoDigest で有効化）
+	adigest *digest.Audio // ゴールデン音声回帰用の連鎖ハッシュ（任意・EnableAudioDigest で有効化）
 }
 
 // EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。
@@ -62,6 +63,35 @@ func (e *Emu) VideoHash() string {
 		return ""
 	}
 	return e.vdigest.Hash()
+}
+
+// EnableAudioDigest は音声の連鎖ハッシュ（音の指紋）を取り始める（A-2 ゴールデン音声回帰）。
+// 映像 digest と同型・別チャンネル。冪等。
+func (e *Emu) EnableAudioDigest() error {
+	if e.adigest != nil {
+		return nil
+	}
+	d, err := digest.NewAudio(e.TV) // TV に AudioMixer として自己登録する
+	if err != nil {
+		return err
+	}
+	e.adigest = d
+	return nil
+}
+
+// ResetAudioDigest は音声ハッシュ連鎖をゼロから取り直す（warmup 除外で決定的化）。
+func (e *Emu) ResetAudioDigest() {
+	if e.adigest != nil {
+		e.adigest.ResetDigest()
+	}
+}
+
+// AudioHash は現在までの音声連鎖ハッシュを返す（未有効なら ""）。
+func (e *Emu) AudioHash() string {
+	if e.adigest == nil {
+		return ""
+	}
+	return e.adigest.Hash()
 }
 
 // stepInstr は VCS を 1 ステップ進め、実際に 1 命令が実行された場合だけその実サイクル数を
