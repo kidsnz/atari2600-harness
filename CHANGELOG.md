@@ -9,6 +9,22 @@
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
 
+## [0.8.0] - 2026-06-09
+
+### 追加
+- **M2/M3 アニメーション着手。** 2 つの動きの土台を実機裏取り。
+  - **per-frame 色テーブル・アニメ（`GenerateAsymmetricShimmerASM`）。** 水色テーブルを RAM 化し毎フレーム
+    VBLANK でスクロール再充填。VBLANK/Overscan を **TIM64T タイマー方式**へ（計算量に依存せずライン安定）。
+    検証: scanline100 の水色が frame 9/19/29 で青→藤→緑と循環。可視ループ(サイクル臨界)は不変。
+    ※ ただし「テーブル剛体シフト＝色帯が一方向に流れる」見た目は Monet の狙いと違うと判断（保留。将来は
+    その場明滅=twinkle / 前後ゆらぎ=sway で作り直す）。`cmd/genpf anim` → `roms/monet_anim.asm`。
+  - **スプライトの滑らかな横移動＝水流（`roms/sprite_flow.asm`, M3 ステップ1）。** player0 を睡蓮パッドとして
+    表示、`NUSIZ0=$03` で 3 コピー、`HMP0=$F0` を毎フレーム HMOVE strobe＝**累積で +1px/frame ドリフト**。
+    検証: HmovedPixel が frame5=133→frame15=143＝ちょうど +1px/frame の連続移動。HMOVE は VBLANK 内で撃ち
+    comb を可視域に出さない。**2600 で滑らかな横移動はスプライト(HMOVE)の仕事**＝playfield 横スクロール（粗い
+    事前計算フェーズ）を避けた正攻法。Frogger の足場・カエル移動の土台。
+  - `cmd/genpf`: `buildMonetScene()` で静止/アニメの Monet シーンを共有化。`SceneOpts.Speed` 追加。
+
 ## [0.7.2] - 2026-06-09
 
 ### 変更

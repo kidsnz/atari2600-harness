@@ -5,9 +5,10 @@ import (
 	"strings"
 )
 
-// SceneOpts は生成する静止画カーネルのパラメータ。
+// SceneOpts は生成するカーネルのパラメータ。
 type SceneOpts struct {
 	LineHeight int // 1 playfield 行あたりの scanline 数（既定 4）
+	Speed      int // アニメ: 1 シフトあたりのフレーム数（小さいほど速い。既定 6）
 }
 
 // GenerateSymmetricASM は対称(reflect)playfield の静止画 DASM ソースを自己完結で吐く
@@ -305,6 +306,210 @@ OScan:  sta WSYNC
 	b.WriteString(emit("PF2DataB", pf2b))
 	b.WriteString("\n")
 	b.WriteString(emit("BGColors", water))
+	b.WriteString("\n")
+	b.WriteString("        org $FFFC\n        .word Start\n        .word Start\n")
+
+	return b.String(), nil
+}
+
+// GenerateAsymmetricShimmerASM は非対称 Monet を「水面のきらめき」アニメ化する（M2 ステップ1）。
+// 水色テーブルを RAM に置き、毎フレーム VBLANK 中にスクロール位置をずらして詰め直す＝色帯が
+// ゆっくり流れる。サイクル臨界の可視ループは静止版と同一（読み先が ROM→RAM になるだけ＝同サイクル）。
+// VBLANK/Overscan は TIM64T タイマー方式で、フレーム内の計算量に関係なくライン数を安定させる。
+//
+// waterCycle は巡回する水色パレット（長さ=行数）。lily は定数 COLUPF。opts.Speed = 1 シフト/N フレーム。
+func GenerateAsymmetricShimmerASM(art []string, waterCycle []byte, lily byte, opts SceneOpts) (string, error) {
+	rows := len(art)
+	if rows == 0 {
+		return "", fmt.Errorf("art is empty")
+	}
+	if len(waterCycle) != rows {
+		return "", fmt.Errorf("waterCycle(%d) length must equal art rows(%d)", len(waterCycle), rows)
+	}
+	if rows > 120 { // RAM 水バッファ($90..)＋2×パレット ROM の都合で控えめに
+		return "", fmt.Errorf("rows %d too large for animated kernel (max 120)", rows)
+	}
+	h := opts.LineHeight
+	if h <= 0 {
+		h = 4
+	}
+	speed := opts.Speed
+	if speed <= 0 {
+		speed = 6
+	}
+
+	pf0a := make([]byte, rows)
+	pf1a := make([]byte, rows)
+	pf2a := make([]byte, rows)
+	pf0b := make([]byte, rows)
+	pf1b := make([]byte, rows)
+	pf2b := make([]byte, rows)
+	for i, line := range art {
+		r := EncodeAsymmetric(ParseASCIIRow(line))
+		pf0a[i], pf1a[i], pf2a[i] = r.PF0A, r.PF1A, r.PF2A
+		pf0b[i], pf1b[i], pf2b[i] = r.PF0B, r.PF1B, r.PF2B
+	}
+	emit := func(name string, vals []byte) string {
+		var sb strings.Builder
+		sb.WriteString(name + "\n")
+		for i := 0; i < rows; i++ {
+			fmt.Fprintf(&sb, "        .byte $%02X\n", vals[rows-1-i])
+		}
+		return sb.String()
+	}
+	// BGCycle: 2×行数。BGCycle[k] = 逆順 waterCycle の (k mod rows)。Offset=0 で静止版の並びに一致。
+	bg := make([]byte, 2*rows)
+	for k := 0; k < 2*rows; k++ {
+		bg[k] = waterCycle[rows-1-(k%rows)]
+	}
+	emitRaw := func(name string, vals []byte) string {
+		var sb strings.Builder
+		sb.WriteString(name + "\n")
+		for _, v := range vals {
+			fmt.Fprintf(&sb, "        .byte $%02X\n", v)
+		}
+		return sb.String()
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, `; asym Monet shimmer — internal/playfield.GenerateAsymmetricShimmerASM
+; 非対称 Monet を水面きらめきアニメ化。RAM 水テーブルを毎フレーム VBLANK でスクロール再充填。
+        processor 6502
+VSYNC   = $00
+VBLANK  = $01
+WSYNC   = $02
+COLUPF  = $08
+COLUBK  = $09
+CTRLPF  = $0A
+PF0     = $0D
+PF1     = $0E
+PF2     = $0F
+INTIM   = $0284
+TIM64T  = $0296
+PFHGT   = $80
+Offset  = $81
+SubCnt  = $82
+WaterRAM = $90
+
+        org $F000
+Start:
+        sei
+        cld
+        ldx #$FF
+        txs
+        lda #0
+Clr:    sta $00,x
+        dex
+        bne Clr
+        lda #0
+        sta CTRLPF
+        sta Offset
+        sta SubCnt
+        lda #$%02X
+        sta COLUPF      ; 睡蓮（定数 COLUPF）
+
+NextFrame:
+        lda #2
+        sta VBLANK
+        sta VSYNC
+        sta WSYNC
+        sta WSYNC
+        sta WSYNC
+        lda #0
+        sta VSYNC
+        lda #44
+        sta TIM64T      ; VBLANK タイマー
+
+        ; --- スクロール位置更新（%d フレームに 1 シフト）---
+        inc SubCnt
+        lda SubCnt
+        cmp #%d
+        bcc NoShift
+        lda #0
+        sta SubCnt
+        inc Offset
+        lda Offset
+        cmp #%d
+        bcc NoShift
+        lda #0
+        sta Offset
+NoShift:
+        ; --- WaterRAM[i] = BGCycle[Offset+i], i=0..rows-1 ---
+        ldx #%d
+Fill:   txa
+        clc
+        adc Offset
+        tay
+        lda BGCycle,y
+        sta WaterRAM,x
+        dex
+        bpl Fill
+
+WaitVB: lda INTIM
+        bne WaitVB
+        sta WSYNC
+        lda #0
+        sta VBLANK
+
+        ldx #%d
+        lda #%d
+        sta PFHGT
+PFLoop:
+        sta WSYNC                 ; (0)
+        lda WaterRAM,x            ; (4)  per-row 水（RAM・アニメ）
+        sta COLUBK                ; (7)
+        lda PF0DataA,x            ; (11)
+        sta PF0                   ; (14)
+        lda PF1DataA,x            ; (18)
+        sta PF1                   ; (21)
+        lda PF2DataA,x            ; (25)
+        sta PF2                   ; (28)
+        lda PF0DataB,x            ; (32)
+        tay                       ; (34)
+        lda PF1DataB,x            ; (38)
+        sta PF1                   ; (41)
+        sty PF0                   ; (44)
+        lda PF2DataB,x            ; (48)
+        sta PF2                   ; (51)
+        dec PFHGT                 ; (56)
+        bne PFSkip
+        lda #%d
+        sta PFHGT
+        dex
+        cpx #$FF
+        beq PFDone
+PFSkip:
+        jmp PFLoop
+PFDone:
+        lda #0
+        sta PF0
+        sta PF1
+        sta PF2
+        sta COLUBK
+        lda #2
+        sta VBLANK
+        lda #35
+        sta TIM64T      ; Overscan タイマー
+WaitOS: lda INTIM
+        bne WaitOS
+        sta WSYNC
+        jmp NextFrame
+
+`, lily, speed, speed, rows, rows-1, rows-1, h, h)
+
+	b.WriteString(emit("PF0DataA", pf0a))
+	b.WriteString("\n")
+	b.WriteString(emit("PF1DataA", pf1a))
+	b.WriteString("\n")
+	b.WriteString(emit("PF2DataA", pf2a))
+	b.WriteString("\n")
+	b.WriteString(emit("PF0DataB", pf0b))
+	b.WriteString("\n")
+	b.WriteString(emit("PF1DataB", pf1b))
+	b.WriteString("\n")
+	b.WriteString(emit("PF2DataB", pf2b))
+	b.WriteString("\n")
+	b.WriteString(emitRaw("BGCycle", bg))
 	b.WriteString("\n")
 	b.WriteString("        org $FFFC\n        .word Start\n        .word Start\n")
 
