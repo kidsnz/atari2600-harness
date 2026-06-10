@@ -20,9 +20,44 @@ func main() {
 		genAsymTest()
 	case "anim":
 		genMonetAnim()
+	case "sprite":
+		genMonetSprite()
 	default:
 		genMonetM1()
 	}
+}
+
+// genMonetSprite は「Monet 水面（per-scanline 色帯）の上を流れる睡蓮スプライト」→ roms/monet_sprite.asm（M3 step2 統合）。
+func genMonetSprite() {
+	_, water48, _ := buildMonetScene() // 48 行ぶんの水色 wash を流用
+	bg := make([]byte, 192)
+	for y := 0; y < 192; y++ {
+		bg[y] = water48[y/4] // 各行を ×4 に展開（行高4）
+	}
+	// 睡蓮パッド 8px。縦の一帯（scanline 88..95）にだけ非ゼロ。
+	pad := []byte{
+		0x3C, // 00111100
+		0x7E, // 01111110
+		0xFF, 0xFF, 0xFF, 0xFF,
+		0x7E,
+		0x3C,
+	}
+	grp0 := make([]byte, 192)
+	const padTop = 88
+	for i, b := range pad {
+		grp0[padTop+i] = b
+	}
+	src, err := playfield.GenerateMonetSpriteASM(bg, grp0, 0x03, 0xC8, 0xF0) // NUSIZ=3コピー, 緑, 右1px/frame
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "generate:", err)
+		os.Exit(1)
+	}
+	const out = "roms/monet_sprite.asm"
+	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
+		fmt.Fprintln(os.Stderr, "write:", err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s (Monet water + flowing lily sprite)\n", out)
 }
 
 // buildMonetScene は Monet 睡蓮シーンを返す（静止/アニメで共有）。

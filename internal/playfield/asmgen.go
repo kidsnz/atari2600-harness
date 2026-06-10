@@ -312,6 +312,108 @@ OScan:  sta WSYNC
 	return b.String(), nil
 }
 
+// GenerateMonetSpriteASM は「Monet 水面（per-scanline 色帯）の上を、滑らかに流れる睡蓮スプライト」
+// を出す統合カーネル（M3 ステップ2）。水色(COLUBK)とスプライト(GRP0)を各 scanline で 1 バイトずつ
+// テーブルから読むだけ＝両方 HBLANK 内に確定し、サイクル予算に余裕。HMOVE で毎フレーム drift。
+//
+// bg/grp0 はともに長さ192（可視 scanline ごと）。grp0 は睡蓮の縦位置にだけ非ゼロ。
+// nusiz/colup0 は NUSIZ0/COLUP0、hmp0 は毎フレーム HMOVE strobe で適用する動き（$F0=右1px）。
+func GenerateMonetSpriteASM(bg, grp0 []byte, nusiz, colup0, hmp0 byte) (string, error) {
+	if len(bg) != 192 || len(grp0) != 192 {
+		return "", fmt.Errorf("bg(%d)/grp0(%d) must both be length 192", len(bg), len(grp0))
+	}
+	emit := func(name string, vals []byte) string {
+		var sb strings.Builder
+		sb.WriteString(name + "\n")
+		for _, v := range vals {
+			fmt.Fprintf(&sb, "        .byte $%02X\n", v)
+		}
+		return sb.String()
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, `; Monet water + flowing lily sprite — internal/playfield.GenerateMonetSpriteASM
+; per-scanline COLUBK(水) + per-scanline GRP0(睡蓮) をテーブルから。HMOVE で毎フレーム drift。
+        processor 6502
+VSYNC   = $00
+VBLANK  = $01
+WSYNC   = $02
+NUSIZ0  = $04
+COLUP0  = $06
+COLUBK  = $09
+RESP0   = $10
+GRP0    = $1B
+HMP0    = $20
+HMOVE   = $2A
+
+        org $F000
+Start:
+        sei
+        cld
+        ldx #$FF
+        txs
+        lda #0
+Clr:    sta $00,x
+        dex
+        bne Clr
+        lda #$%02X
+        sta COLUP0
+        lda #$%02X
+        sta NUSIZ0
+        sta WSYNC
+        ldx #12
+DLY:    dex
+        bne DLY
+        sta RESP0
+        lda #$%02X
+        sta HMP0
+
+NextFrame:
+        lda #2
+        sta VBLANK
+        sta VSYNC
+        sta WSYNC
+        sta WSYNC
+        sta WSYNC
+        lda #0
+        sta VSYNC
+        sta WSYNC
+        sta HMOVE       ; 累積モーション適用（毎フレーム drift）
+        ldx #36
+VB:     sta WSYNC
+        dex
+        bne VB
+        lda #0
+        sta VBLANK
+
+        ldy #0
+VL:     sta WSYNC
+        lda GRP0Tab,y   ; 睡蓮（HBLANK 内）
+        sta GRP0
+        lda BGTab,y     ; 水（HBLANK 内）
+        sta COLUBK
+        iny
+        cpy #192
+        bne VL
+        lda #0
+        sta GRP0
+
+        lda #2
+        sta VBLANK
+        ldx #30
+OS:     sta WSYNC
+        dex
+        bne OS
+        jmp NextFrame
+
+`, colup0, nusiz, hmp0)
+	b.WriteString(emit("GRP0Tab", grp0))
+	b.WriteString("\n")
+	b.WriteString(emit("BGTab", bg))
+	b.WriteString("\n")
+	b.WriteString("        org $FFFC\n        .word Start\n        .word Start\n")
+	return b.String(), nil
+}
+
 // GenerateAsymmetricShimmerASM は非対称 Monet を「水面のきらめき」アニメ化する（M2 ステップ1）。
 // 水色テーブルを RAM に置き、毎フレーム VBLANK 中にスクロール位置をずらして詰め直す＝色帯が
 // ゆっくり流れる。サイクル臨界の可視ループは静止版と同一（読み先が ROM→RAM になるだけ＝同サイクル）。

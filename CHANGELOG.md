@@ -9,6 +9,18 @@
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
 
+## [0.8.1] - 2026-06-09
+
+### 追加
+- **Monet 水面＋流れる睡蓮スプライトの統合（M3 ステップ2）。** 背景(per-scanline 色帯)と前景(HMOVE で
+  流れるスプライト)を同居。
+  - `internal/playfield.GenerateMonetSpriteASM`: per-scanline COLUBK(水)＋per-scanline GRP0(睡蓮)を
+    各 scanline で 1 バイトずつテーブルから読む＝両方 HBLANK 内に確定し、サイクル臨界を回避。
+    `NUSIZ0` でコピー数、`HMP0` を毎フレーム HMOVE strobe で drift。
+  - `cmd/genpf sprite` → `roms/monet_sprite.asm`（水=Monet 勾配を192に展開, 睡蓮=scanline88-95, 3コピー）。
+  - **検証:** HmovedPixel が frame5=133→frame17=145＝統合カーネルでも +1px/frame。画面は水の色帯の上を
+    緑の睡蓮3つが流れる。Monet の2本柱（色帯の水＋滑らかに流れる足場）が合体。
+
 ## [0.8.0] - 2026-06-09
 
 ### 追加
