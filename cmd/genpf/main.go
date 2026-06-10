@@ -11,6 +11,44 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "asym" {
+		genAsymTest()
+		return
+	}
+	genMonetM1()
+}
+
+// genAsymTest は非対称 playfield の検証シーン。幅4の点灯ブロックが 40 列を上→下に掃引する対角
+// ストライプ。上の行は左半(col<20)だけ・下の行は右半(col>=20)だけ点灯＝reflect では不可能な絵。
+// read_row で「上の行は左半のみ lit / 下の行は右半のみ lit」を数値確認すれば非対称が証明される。
+func genAsymTest() {
+	const rows = 48
+	art := make([]string, rows)
+	lily := make([]byte, rows)
+	for r := 0; r < rows; r++ {
+		start := r * 36 / rows                                    // 0..35 を掃引
+		row := []byte("........................................") // 40 dots
+		for dx := 0; dx < 4 && start+dx < 40; dx++ {
+			row[start+dx] = 'X'
+		}
+		art[r] = string(row)
+		lily[r] = 0x0E // 白（位置が読みやすいよう単色）
+	}
+	const water = 0x84 // 青
+	src, err := playfield.GenerateAsymmetricASM(art, lily, water, playfield.SceneOpts{LineHeight: 4})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "generate:", err)
+		os.Exit(1)
+	}
+	const out = "roms/asym_test.asm"
+	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
+		fmt.Fprintln(os.Stderr, "write:", err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s (%d rows, diagonal sweep 0..35)\n", out, rows)
+}
+
+func genMonetM1() {
 	const rows = 48
 
 	// 決定的ジッタ（再現可能な「broken color」揺らぎ用 LCG）。

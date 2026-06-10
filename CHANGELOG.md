@@ -9,6 +9,17 @@
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
 
+## [0.7.1] - 2026-06-09
+
+### 追加
+- **非対称(左右独立) playfield 能力を獲得・実機裏取り（アニメ前の検証）。** 有機的・非対称な水面/睡蓮に必要。
+  - `internal/playfield.GenerateAsymmetricASM`: 1 ライン内で PF0/1/2 を A(左)→B(右) に詰め替える
+    ABB(kirkjerk) の「repeated」非対称カーネルを逐語転写（72サイクル/ライン、`tay`/`sty` で間合い）。
+    `EncodeAsymmetric` のビット配置が ABB repeated と一致することを利用。
+  - `cmd/genpf asym`: 幅4ブロックが40列を上→下に掃引する対角ストライプ検証シーン → `roms/asym_test.asm`。
+  - **検証:** read_row(scanline20)=白 clock8-23（左半のみ）／(scanline172)=白 clock120-135（右半のみ）。
+    片側だけ点灯＝reflect では不可能＝左右独立描画の決定的証明。画面も中心で折れない 1 本の対角。
+
 ## [0.7.0] - 2026-06-09
 
 ### 追加
