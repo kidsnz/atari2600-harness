@@ -414,6 +414,143 @@ OS:     sta WSYNC
 	return b.String(), nil
 }
 
+// GenerateMonetFullASM はフルシーン統合（M3→M5 入口）: Monet 水面（per-scanline COLUBK）の上に
+// player0=流れる睡蓮（NUSIZ コピー・HMP0 で一定ドリフト）と player1=操作できるカエル（SWCHA で左右）。
+// per-scanline で GRP0/GRP1/COLUBK を各 1 バイト読むだけ＝全部 HBLANK 内で確定。HMOVE 1 回で両者を動かす。
+//
+// bg/grp0/grp1 は長さ192。grp0=睡蓮の縦帯、grp1=カエルの縦帯にだけ非ゼロ。
+func GenerateMonetFullASM(bg, grp0, grp1 []byte, nusiz0, nusiz1, colup0, colup1, hmp0 byte) (string, error) {
+	for _, t := range [][]byte{bg, grp0, grp1} {
+		if len(t) != 192 {
+			return "", fmt.Errorf("bg/grp0/grp1 must all be length 192")
+		}
+	}
+	emit := func(name string, vals []byte) string {
+		var sb strings.Builder
+		sb.WriteString(name + "\n")
+		for _, v := range vals {
+			fmt.Fprintf(&sb, "        .byte $%02X\n", v)
+		}
+		return sb.String()
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, `; Monet full scene — internal/playfield.GenerateMonetFullASM
+; 水面(per-scanline COLUBK) + 流れる睡蓮(player0/NUSIZ/HMP0) + 操作カエル(player1/SWCHA)。
+        processor 6502
+VSYNC   = $00
+VBLANK  = $01
+WSYNC   = $02
+NUSIZ0  = $04
+NUSIZ1  = $05
+COLUP0  = $06
+COLUP1  = $07
+COLUBK  = $09
+RESP0   = $10
+RESP1   = $11
+GRP0    = $1B
+GRP1    = $1C
+HMP0    = $20
+HMP1    = $21
+HMOVE   = $2A
+SWCHA   = $0280
+
+        org $F000
+Start:
+        sei
+        cld
+        ldx #$FF
+        txs
+        lda #0
+Clr:    sta $00,x
+        dex
+        bne Clr
+        lda #$%02X
+        sta COLUP0
+        lda #$%02X
+        sta COLUP1
+        lda #$%02X
+        sta NUSIZ0
+        lda #$%02X
+        sta NUSIZ1
+
+        sta WSYNC        ; 睡蓮(player0) 初期 X
+        ldx #14
+P0d:    dex
+        bne P0d
+        sta RESP0
+        sta WSYNC        ; カエル(player1) 初期 X（中央寄り）
+        ldx #26
+P1d:    dex
+        bne P1d
+        sta RESP1
+        lda #$%02X
+        sta HMP0         ; 睡蓮の一定ドリフト
+
+NextFrame:
+        lda #2
+        sta VBLANK
+        sta VSYNC
+        sta WSYNC
+        sta WSYNC
+        sta WSYNC
+        lda #0
+        sta VSYNC
+
+        ; --- 入力 → HMP1（カエル左右）---
+        ldx #$00
+        lda SWCHA
+        and #$80
+        bne CkL
+        ldx #$E0         ; 右 2px
+CkL:    lda SWCHA
+        and #$40
+        bne SetH
+        ldx #$20         ; 左 2px
+SetH:   stx HMP1
+
+        sta WSYNC
+        sta HMOVE        ; 両プレイヤーへ累積モーション適用
+        ldx #36
+VB:     sta WSYNC
+        dex
+        bne VB
+        lda #0
+        sta VBLANK
+
+        ldy #0
+VL:     sta WSYNC
+        lda GRP0Tab,y    ; 睡蓮
+        sta GRP0
+        lda GRP1Tab,y    ; カエル
+        sta GRP1
+        lda BGTab,y      ; 水
+        sta COLUBK
+        iny
+        cpy #192
+        bne VL
+        lda #0
+        sta GRP0
+        sta GRP1
+
+        lda #2
+        sta VBLANK
+        ldx #30
+OS:     sta WSYNC
+        dex
+        bne OS
+        jmp NextFrame
+
+`, colup0, colup1, nusiz0, nusiz1, hmp0)
+	b.WriteString(emit("GRP0Tab", grp0))
+	b.WriteString("\n")
+	b.WriteString(emit("GRP1Tab", grp1))
+	b.WriteString("\n")
+	b.WriteString(emit("BGTab", bg))
+	b.WriteString("\n")
+	b.WriteString("        org $FFFC\n        .word Start\n        .word Start\n")
+	return b.String(), nil
+}
+
 // GenerateAsymmetricShimmerASM は非対称 Monet を「水面のきらめき」アニメ化する（M2 ステップ1）。
 // 水色テーブルを RAM に置き、毎フレーム VBLANK 中にスクロール位置をずらして詰め直す＝色帯が
 // ゆっくり流れる。サイクル臨界の可視ループは静止版と同一（読み先が ROM→RAM になるだけ＝同サイクル）。

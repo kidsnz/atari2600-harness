@@ -22,9 +22,42 @@ func main() {
 		genMonetAnim()
 	case "sprite":
 		genMonetSprite()
+	case "full":
+		genMonetFull()
 	default:
 		genMonetM1()
 	}
+}
+
+// genMonetFull はフルシーン: Monet 水面＋流れる睡蓮(player0)＋操作カエル(player1) → roms/monet_full.asm。
+func genMonetFull() {
+	_, water48, _ := buildMonetScene()
+	bg := make([]byte, 192)
+	for y := 0; y < 192; y++ {
+		bg[y] = water48[y/4]
+	}
+	pad := []byte{0x3C, 0x7E, 0xFF, 0xFF, 0xFF, 0xFF, 0x7E, 0x3C}
+	frog := []byte{0x24, 0x7E, 0xFF, 0xFF, 0xBD, 0x7E, 0x24, 0x42}
+	grp0 := make([]byte, 192) // 睡蓮レーン scanline 76..83
+	for i, b := range pad {
+		grp0[76+i] = b
+	}
+	grp1 := make([]byte, 192) // カエル scanline 150..157（手前）
+	for i, b := range frog {
+		grp1[150+i] = b
+	}
+	// player0=3コピー緑(右1px/f drift), player1=単体カエル黄緑
+	src, err := playfield.GenerateMonetFullASM(bg, grp0, grp1, 0x03, 0x00, 0xC8, 0x1C, 0xF0)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "generate:", err)
+		os.Exit(1)
+	}
+	const out = "roms/monet_full.asm"
+	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
+		fmt.Fprintln(os.Stderr, "write:", err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s (water + flowing lilies + controllable frog)\n", out)
 }
 
 // genMonetSprite は「Monet 水面（per-scanline 色帯）の上を流れる睡蓮スプライト」→ roms/monet_sprite.asm（M3 step2 統合）。

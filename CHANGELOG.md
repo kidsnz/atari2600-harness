@@ -9,6 +9,17 @@
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
 
+## [0.9.1] - 2026-06-09
+
+### 追加
+- **フルシーン統合（Frogger の舞台）。** Monet 水面（per-scanline COLUBK）の上に、流れる睡蓮(player0)と
+  操作できるカエル(player1)を同居。
+  - `internal/playfield.GenerateMonetFullASM`: per-scanline で GRP0/GRP1/COLUBK を各 1 バイト読む2スプライト
+    版。player0=睡蓮（NUSIZ コピー・HMP0 で一定ドリフト）、player1=カエル（SWCHA を読んで HMP1）。HMOVE 1 回で
+    両者に別々の動きを適用。`cmd/genpf full` → `roms/monet_full.asm`。
+  - **検証:** frame5→13 でカエル 111→125（+2px/f, 右入力中）/ 睡蓮 3→11（+1px/f, 自動ドリフト）。
+    1 画面で水・流れる足場・操作キャラの3要素が独立に動くことを数値実証。
+
 ## [0.9.0] - 2026-06-09
 
 ### 追加
