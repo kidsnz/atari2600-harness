@@ -6,6 +6,10 @@
 ## [Unreleased]
 
 ### 変更
+- **`internal/playfield` → `pkg/playfield` へ公開昇格（spinoff 準備）.** Go は `internal/` を別モジュールから
+  import できないため、playfield エンコーダ（Atari 2600 普遍知識）を公開パッケージ化。唯一の越境 importer
+  `roms/frogger/gen` の import を書換。全シーンを再生成（header コメントのみ差分）。build/vet/test 緑、
+  全シナリオ（frogger 3＋litmus 3）PASS で裏取り。これで roms を別モジュールに切り出してもエンコーダを共有できる。
 - **ドキュメント鮮度監査（spinoff 前段）.** `README.md` を v0.21.0 の実態へリライト（旧構成図＝`cmd/probe`＋
   `internal/emu` のみ → cmd 4本・internal 6本・roms/<game>・MCP 19ツール・欠落A〜E全閉を反映、smoke.asm パスを
   `roms/litmus/` に修正）。軽微 stale も是正：`improvement-roadmap` に「基盤系は全クローズ」注記、`mcp-tools` の

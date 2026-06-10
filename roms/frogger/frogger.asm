@@ -1,4 +1,4 @@
-; Monet Frogger (playable) — internal/playfield.GenerateFroggerASM
+; Monet Frogger (playable) — pkg/playfield.GenerateFroggerASM
         processor 6502
 VSYNC   = $00
 VBLANK  = $01

@@ -1,4 +1,4 @@
-; asym Monet shimmer — internal/playfield.GenerateAsymmetricShimmerASM
+; asym Monet shimmer — pkg/playfield.GenerateAsymmetricShimmerASM
 ; 非対称 Monet を水面きらめきアニメ化。RAM 水テーブルを毎フレーム VBLANK でスクロール再充填。
         processor 6502
 VSYNC   = $00

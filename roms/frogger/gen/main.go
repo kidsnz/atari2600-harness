@@ -1,5 +1,5 @@
-// Command genpf は北極星 ROM「Monet 睡蓮 Frogger」の M1（静止画）シーンを設計し、
-// internal/playfield で DASM ソース（roms/monet_m1.asm）に変換する。
+// Command gen は北極星 ROM「Monet 睡蓮 Frogger」の各シーンを設計し、
+// pkg/playfield で DASM ソース（roms/frogger/*.asm）に変換する。
 // 「ASCIIアート＋色テーブル → ROM」配管の最初の本番＝対称(reflect) playfield 静止画。
 package main
 

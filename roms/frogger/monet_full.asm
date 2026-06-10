@@ -1,4 +1,4 @@
-; Monet full scene — internal/playfield.GenerateMonetFullASM
+; Monet full scene — pkg/playfield.GenerateMonetFullASM
 ; 水面(per-scanline COLUBK) + 流れる睡蓮(player0/NUSIZ/HMP0) + 操作カエル(player1/SWCHA)。
         processor 6502
 VSYNC   = $00

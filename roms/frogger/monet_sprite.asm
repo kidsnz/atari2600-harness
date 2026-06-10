@@ -1,4 +1,4 @@
-; Monet water + flowing lily sprite — internal/playfield.GenerateMonetSpriteASM
+; Monet water + flowing lily sprite — pkg/playfield.GenerateMonetSpriteASM
 ; per-scanline COLUBK(水) + per-scanline GRP0(睡蓮) をテーブルから。HMOVE で毎フレーム drift。
         processor 6502
 VSYNC   = $00
