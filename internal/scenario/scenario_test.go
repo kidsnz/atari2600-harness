@@ -40,6 +40,7 @@ func TestRunSamples(t *testing.T) {
 	t.Chdir("../..")
 	for _, f := range []string{
 		"roms/litmus/scenarios/smoke.json",
+		"roms/litmus/scenarios/smoke_src.json",
 		"roms/litmus/scenarios/collide.json",
 		"roms/frogger/scenarios/boot.json",
 		"roms/frogger/scenarios/hop.json",
@@ -61,6 +62,37 @@ func TestRunSamples(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestRunAsmSource は rom に .asm を指定すると実行前にアセンブルされ、ソース 1 枚から合否まで
+// 走ること（欠落E のビルドループ短縮）を確認する。
+func TestRunAsmSource(t *testing.T) {
+	t.Chdir("../..")
+	s := &Scenario{
+		Rom:     "roms/litmus/smoke.asm",
+		Asserts: []Assert{{AtFrame: 0, Field: "ram.0x80", Op: "==", Value: 66}},
+	}
+	res, err := Run(s, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Pass {
+		t.Fatalf("asm-source scenario failed: %+v", res.Asserts)
+	}
+}
+
+// TestRunAsmSourceError は壊れた .asm がアセンブル段でエラーになる（握り潰さない）ことを確認する。
+func TestRunAsmSourceError(t *testing.T) {
+	t.Chdir("../..")
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.asm")
+	if err := os.WriteFile(bad, []byte("\tprocessor 6502\n\tlda bogus_undefined_label_xyz\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Scenario{Rom: bad}
+	if _, err := Run(s, false); err == nil {
+		t.Fatalf("expected assemble error for broken .asm, got nil")
 	}
 }
 

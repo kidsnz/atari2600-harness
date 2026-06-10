@@ -32,6 +32,17 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.21.0] - 2026-06-10
+
+### 追加 / 変更
+- **シナリオの `rom` に `.asm` ソースを直接指定可能に（欠落E を完全クローズ）。** scenario の `rom` が `.asm` なら
+  実行前に dasm でアセンブルしてから走る ＝ **「ソース 1 枚 → アセンブル → 実行 → 数値アサート → 合否」が
+  1 コマンド**（`go run ./cmd/scenario foo.json`）。欠落E（反復コスト）の理想形に到達。
+- **dasm 実行を `internal/build` に集約（DRY）。** `assemble_and_load`(harness) とシナリオの `.asm` 直指定が
+  同じ `build.Assemble`/`build.BinPathFor` を共有。アセンブル失敗は握り潰さずエラー（失敗行を含む dasm 出力）。
+  - サンプル: `roms/litmus/scenarios/smoke_src.json`（`rom: smoke.asm`）。
+  - 検証: `scenario_test.go` — .asm 直指定で assemble→run→pass、壊れた .asm はエラー。
+
 ## [0.20.0] - 2026-06-10
 
 ### 追加

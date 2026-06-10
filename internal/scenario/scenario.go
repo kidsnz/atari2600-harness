@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kidsnz/atari2600-dev/internal/build"
 	"github.com/kidsnz/atari2600-dev/internal/emu"
 )
 
@@ -99,8 +100,19 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := e.LoadROM(s.Rom); err != nil {
-		return nil, fmt.Errorf("load %s: %w", s.Rom, err)
+
+	// rom が .asm なら実行前に dasm でアセンブル（ソース1枚→合否を 1 コマンドに＝欠落E）。
+	romPath := s.Rom
+	if strings.EqualFold(filepath.Ext(romPath), ".asm") {
+		bin := build.BinPathFor(romPath)
+		out, aerr := build.Assemble(romPath, bin)
+		if aerr != nil {
+			return nil, fmt.Errorf("assemble %s failed:\n%s", romPath, out)
+		}
+		romPath = bin
+	}
+	if err := e.LoadROM(romPath); err != nil {
+		return nil, fmt.Errorf("load %s: %w", romPath, err)
 	}
 
 	golden := s.Checks != nil && s.Checks.GoldenFrame

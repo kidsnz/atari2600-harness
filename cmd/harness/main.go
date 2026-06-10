@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"image/png"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kidsnz/atari2600-dev/internal/build"
 	"github.com/kidsnz/atari2600-dev/internal/emu"
 )
 
@@ -104,14 +104,14 @@ func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in Ass
 	}
 	bin := in.BinPath
 	if bin == "" {
-		bin = strings.TrimSuffix(in.AsmPath, filepath.Ext(in.AsmPath)) + ".bin"
+		bin = build.BinPathFor(in.AsmPath)
 	}
 
-	// dasm -f3（DASM の生バイナリ出力）。CombinedOutput で失敗行を含む診断をそのまま返す。
-	out, err := exec.Command("dasm", in.AsmPath, "-f3", "-o"+bin).CombinedOutput()
+	// dasm -f3。失敗行を含む診断をそのまま返す。
+	out, err := build.Assemble(in.AsmPath, bin)
 	if err != nil {
 		// アセンブル失敗は MCP エラーにせず Ok=false＋dasm 出力で構造化返却（Claude が失敗行を見て直す）。
-		return nil, AssembleOut{Ok: false, BinPath: bin, DasmOutput: string(out)}, nil
+		return nil, AssembleOut{Ok: false, BinPath: bin, DasmOutput: out}, nil
 	}
 
 	spec := in.TVSpec
@@ -123,10 +123,10 @@ func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in Ass
 		return nil, AssembleOut{}, fmt.Errorf("new emu: %w", err)
 	}
 	if err := e.LoadROM(bin); err != nil {
-		return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: string(out)}, fmt.Errorf("assembled ok but load failed: %w", err)
+		return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: out}, fmt.Errorf("assembled ok but load failed: %w", err)
 	}
 	current = e
-	return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: string(out), Loaded: true, Coords: coordsOf(e)}, nil
+	return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: out, Loaded: true, Coords: coordsOf(e)}, nil
 }
 
 // --- step_frame ---

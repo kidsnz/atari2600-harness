@@ -1,0 +1,9 @@
+{
+  "rom": "roms/litmus/smoke.asm",
+  "asserts": [
+    {"at_frame": 0, "field": "ram.0x80", "op": "==", "value": 66}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262
+  }
+}

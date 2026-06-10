@@ -20,7 +20,7 @@
 | B タイミング | サイクル計算が合わない | **閉** | 位置・サイクル露出（B-1, v0.12）・予算ガード（B-3, v0.13）・フレーム内粒度（B-2, v0.15）・kernel定数自動較正（B-4, v0.20）すべて実装済 |
 | C 知識 | 6502/TIA 詳細の誤り | **閉** | kernel 依存定数（missile式 N・HBLANK境界）が未formalize |
 | D 検証 | 再現・回帰が無い | **閉** | シナリオランナー（D-1 アサーション v0.18 + D-2 入力リプレイ v0.18 + D-3 ゴールデンフレーム回帰 v0.19）実装済 |
-| E 摩擦 | edit→run→inspect が多段 | **改善** | `assemble_and_load`（P3, v0.16.0）で assemble→load を 1 ショット化。残り = 検証自動化（P2） |
+| E 摩擦 | edit→run→inspect が多段 | **閉** | `assemble_and_load`（P3, v0.16）＋ シナリオ回帰（P2, v0.18-19）＋ scenario の `.asm` 直指定（v0.21）で「ソース1枚→合否」が1コマンド |
 
 ---
 
@@ -105,7 +105,7 @@
 
 ---
 
-## P3 — 欠落E: ビルドループ短縮
+## P3 — 欠落E: ビルドループ短縮　✅ クローズ（v0.16 assemble_and_load ＋ v0.18-19 シナリオ回帰 ＋ v0.21 scenario の .asm 直指定＝ソース1枚→合否が1コマンド）
 
 ### `assemble_and_load`（多段を 1 ショット化）　✅ 実装済 v0.16.0
 - **問題:** `edit asmgen` → `go run ./roms/<game>/gen` → `dasm -f3` → `load_rom` の多段。摩擦が反復速度を削る。

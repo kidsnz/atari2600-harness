@@ -13,7 +13,7 @@ go run ./cmd/scenario roms/<game>/scenarios/*.json   # 全 pass で exit 0 / 失
 
 ```jsonc
 {
-  "rom": "roms/frogger/frogger.bin",   // 必須
+  "rom": "roms/frogger/frogger.bin",   // 必須。.asm を指定すると実行前に dasm でアセンブル（ソース→合否を1コマンド）
   "tv_spec": "NTSC",                    // 省略時 NTSC
   "warmup_frames": 2,                   // 計測前の空走（起動安定。省略時 2）
 
