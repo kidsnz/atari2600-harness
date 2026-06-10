@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### 追加予定
+- 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
+- `step_scanline|clock` / `watch|trap` ツールの拡充
+
+## [0.22.0] - 2026-06-10
+
 ### 変更
 - **物理 spinoff：基盤を独立リポ `atari2600-harness` に分離（ロムは別リポ `atari2600-roms` へ）.** 傘フォルダ
   `260609_atari2600-dev/` の下に `harness/`（この repo・既存履歴を維持）と `roms/`（新 repo）を兄弟配置し
@@ -44,14 +50,6 @@
     `debugger/halt_*` は unexported でパターン参照どまり、License=GPL-3.0 も明記。G-2 C64 MCP 群
     （vice-mcp 等。**2600 は皆無＝我々が最初**）と sim6502 の pluggable backend DSL、G-3 テスト DSL 先行例
     （64spec/sim65/Klaus2m5）、G-4 オーサリングツール連携（PlayerPal、注釈の paint→register 化）。
-
-### 追加予定
-- 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
-- `step_scanline|clock` / `watch|trap` ツールの拡充
-- **【TODO】制作システム（ハーネス）の独立プロジェクト化。** ハーネスは特定ロムに依存せず汎用の制作・検証
-  システムとして育てる方針。北極星ロム（Monet Frogger）が一段落したら、`internal/emu`・`cmd/harness`・MCP
-  ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
-  generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
 ## [0.21.0] - 2026-06-10
 
