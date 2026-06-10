@@ -31,7 +31,8 @@
   **`read_tia_registers`**(v0.14.0, 書込専用レジスタ現在値の実測＝色推論を廃す) /
   **`read_collisions`**(v0.14.0, CXxx を名前付き真偽ペアで構造化) /
   **`step_scanline`**(v0.15.0, scanline +1 まで進めて停止) / **`step_instruction`**(v0.15.0, 1 命令ずつ) /
-  **`assemble_and_load`**(v0.16.0, dasm→load 1ショット・失敗は dasm 出力を構造化返却)。
+  **`assemble_and_load`**(v0.16.0, dasm→load 1ショット・失敗は dasm 出力を構造化返却) /
+  **`read_audio`**(v0.17.0, TIA 音声 AUDC/AUDF/AUDV を数値読み＝音も数値で検証)。
   未実装(予定): `step_clock`（色クロック単位＝Step が命令単位のため要 finer hook） / `watch|trap`
   （予算系は `assert_line_budget` で実質カバー済）。
 

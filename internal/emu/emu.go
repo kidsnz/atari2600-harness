@@ -359,6 +359,32 @@ func (e *Emu) ReadTIARegisters() TIARegisters {
 	}
 }
 
+// --- R-2: TIA 音声レジスタの現在値読み（音も数値で検証）---
+
+// AudioChannel は 1 音声チャンネルの書込専用レジスタ現在値。
+type AudioChannel struct {
+	Control uint8 `json:"control"` // AUDC: 波形/音色（下位 4bit）
+	Freq    uint8 `json:"freq"`    // AUDF: 分周（下位 5bit）
+	Volume  uint8 `json:"volume"`  // AUDV: 音量（下位 4bit）
+}
+
+// AudioState は 2 チャンネルの音声レジスタ現在値（read_audio の戻り）。
+type AudioState struct {
+	Channel0 AudioChannel `json:"channel0"`
+	Channel1 AudioChannel `json:"channel1"`
+}
+
+// ReadAudio は TIA 音声レジスタ（AUDC/AUDF/AUDV）の現在値を Gopher2600 の exported
+// PeekChannels から読む。read_tia は映像のみで音声に検証経路が無かったため、鉄則1（判定は数値）を
+// 音声領域へ拡張する。改変不要（Audio.PeekChannels は exported）。
+func (e *Emu) ReadAudio() AudioState {
+	r := e.VCS.TIA.Audio.PeekChannels()
+	return AudioState{
+		Channel0: AudioChannel{Control: r[0].Control, Freq: r[0].Freq, Volume: r[0].Volume},
+		Channel1: AudioChannel{Control: r[1].Control, Freq: r[1].Freq, Volume: r[1].Volume},
+	}
+}
+
 // --- P1: 衝突（CXxx）の構造化読み ---
 
 // Collisions は 8 本の CXxx レジスタ（$30–$37, 各 D7/D6 ラッチ・sticky）を意味づけした真偽集合。

@@ -32,6 +32,18 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.17.0] - 2026-06-10
+
+### 追加
+- **`read_audio` MCP ツール（R-2 / 音声検証経路）。** TIA 音声レジスタ AUDC(control)/AUDF(freq)/AUDV(volume)
+  の現在値を両チャンネル分、数値で返す。`read_tia`/`read_row` は映像のみで音声に検証経路が無かった
+  （鉄則1「判定は数値」を音声領域へ拡張）。Gopher2600 の exported `Audio.PeekChannels()` を使うため
+  外部クローンの改変は不要（channel0/1 自体は unexported だが PeekChannels で取れる）。
+  - **実装**: `internal/emu` `ReadAudio()` + 型（`AudioChannel`/`AudioState`）。`cmd/harness/main.go` に
+    handler + `AddTool`。
+  - **検証ロム**: `roms/litmus/litmus_audio.asm`（ch0=AUDC$0C/AUDF$14/AUDV$0A, ch1=AUDC$04/AUDF$1F/AUDV$08）。
+  - **検証**: `emu_audio_test.go` で既知書込みと完全一致。MCP e2e でも両チャンネル一致を確認。
+
 ## [0.16.0] - 2026-06-10
 
 ### 追加

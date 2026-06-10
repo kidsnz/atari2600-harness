@@ -356,6 +356,24 @@ func handleReadTIARegisters(ctx context.Context, req *mcp.CallToolRequest, _ str
 	return nil, ReadTIARegsOut{TIARegisters: e.ReadTIARegisters(), Coords: coordsOf(e)}, nil
 }
 
+// --- read_audio（R-2: 音声レジスタを数値で）---
+
+type ReadAudioOut struct {
+	emu.AudioState
+	Coords Coords `json:"coords"`
+}
+
+func handleReadAudio(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, ReadAudioOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ReadAudioOut{}, err
+	}
+	return nil, ReadAudioOut{AudioState: e.ReadAudio(), Coords: coordsOf(e)}, nil
+}
+
 // --- read_collisions（P1: CXxx を構造化）---
 
 type ReadCollisionsOut struct {
@@ -636,6 +654,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_tia", Description: "Read TIA sprite positions (ResetPixel/HmovedPixel) and HBLANK. Authoritative for horizontal-position checks."}, handleReadTIA)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_tia_registers", Description: "Read the current values of the write-only TIA registers (COLUP0/1, COLUPF, COLUBK, NUSIZ, CTRLPF, PF0/1/2, REFP, VDEL, ENAM/ENABL, GRP, etc.) straight from emulator state. Use this to confirm a 'sta COLUP0' actually took effect instead of inferring from pixel colors."}, handleReadTIARegisters)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_collisions", Description: "Read the 8 TIA collision latches (CXxx, $30-$37; sticky until CXCLR) as named boolean pairs (p0_p1, m0_p0, p0_pf, bl_pf, ...). Structured replacement for raw peeks of the collision registers."}, handleReadCollisions)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_audio", Description: "Read the current TIA audio register values for both channels: control (AUDC, waveform), freq (AUDF, divider), volume (AUDV). Lets you verify sound numerically — read_tia/read_row only cover video."}, handleReadAudio)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
 	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject joystick input (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. action left|right|up|down|fire|center. pressed=true holds, false releases; state persists until changed. center releases all directions."}, handleSetInput)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)

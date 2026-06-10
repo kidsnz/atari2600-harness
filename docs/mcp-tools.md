@@ -146,6 +146,13 @@ type Coords struct {
 - 注: PF0 は上位ニブルのみ保持（`$FF` 書込→読みは `$F0`）＝実 TIA 挙動。
 - 検証: smoke の COLUBK=$1E / litmus_pf の PF 非ゼロ。`internal/emu/emu_tia_test.go`。
 
+### 5d. `read_audio`  ★音声検証経路（R-2, v0.17.0）
+- In: `struct{}`
+- 動作: TIA 音声レジスタの現在値を `e.VCS.TIA.Audio.PeekChannels()`（exported）から読む（`emu.ReadAudio`）。
+  read_tia/read_row は映像のみ＝音声に検証経路が無かったのを補う。
+- Out: `emu.AudioState`（`channel0`/`channel1` 各 `control`(AUDC) / `freq`(AUDF) / `volume`(AUDV)）＋ `Coords`。
+- 検証: `litmus_audio.bin`（ch0=$0C/$14/$0A, ch1=$04/$1F/$08）で完全一致。`internal/emu/emu_audio_test.go`。
+
 ### 5c. `read_collisions`  ★CXxx 構造化（P1, v0.14.0）
 - In: `struct{}`
 - 動作: 衝突レジスタ `$30–$37`（各 D7/D6 ラッチ・sticky・CXCLR まで保持）を副作用なし peek して名前付き
