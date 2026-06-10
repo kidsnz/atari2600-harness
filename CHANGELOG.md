@@ -12,6 +12,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.22.2] - 2026-06-10
+
+### Added
+- **Strengthening roadmap (`docs/hardening-roadmap.md`).** A prioritized roadmap for the next phase —
+  making the harness stronger beyond gap-closing. Theme A: deepen authoring + verification into the thin
+  domains (S = sprites, incl. `pkg/sprite` ASCII→GRP, NUSIZ helper, and the ★ P0+P1 two-sprite combine for
+  up to 16px / multicolor characters placed numerically via the X(N) calibration; A = audio, incl. note/
+  timbre names in `read_audio` via Gopher2600 `tracker`, a `digest.Audio` golden, and a `pkg/audio` SFX
+  helper). Theme B: harden the foundation (★ CI via GitHub Actions, optional Gopher2600 version pin,
+  PAL/SECAM verification, Stella oracle cross-check, completing `step_clock`/`watch|trap`/`run_scenario`).
+  Theme C: wire upstream Gopher2600 libraries (`recorder`/`regression`/`reflection`). Each item lists where
+  to touch + how to verify + size. Cross-linked from the routing tables in CLAUDE.md / README /
+  improvement-roadmap. No code changes (implementation in separate sessions).
+
 ## [0.22.1] - 2026-06-10
 
 ### Added

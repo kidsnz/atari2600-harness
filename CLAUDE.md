@@ -100,6 +100,7 @@ round trip. Also return `png_path` in JSON.
 | Scenario regression format (input timeline + numeric assertions) | `docs/scenarios.md` |
 | litmus measurements (authoritative horizontal-position / HMOVE data) | `docs/litmus-results.md` |
 | Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
+| Strengthening roadmap (sprites / audio / CI hardening) | `docs/hardening-roadmap.md` |
 | Decision history and changelog | `CHANGELOG.md` |
 
 ## Repository layout (v0.22.0 spinoff, standalone repo)

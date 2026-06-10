@@ -117,6 +117,7 @@ go build -o bin/harness ./cmd/harness   # produce the binary referenced by .mcp.
 | Scenario regression format | [`docs/scenarios.md`](docs/scenarios.md) |
 | Litmus measurements (horizontal position, HMOVE) | [`docs/litmus-results.md`](docs/litmus-results.md) |
 | Roadmap / next moves | [`docs/improvement-roadmap.md`](docs/improvement-roadmap.md) |
+| Strengthening roadmap (sprites / audio / CI) | [`docs/hardening-roadmap.md`](docs/hardening-roadmap.md) |
 | Decisions and changelog | [`CHANGELOG.md`](CHANGELOG.md) |
 
 As far as a public search (GitHub/web, 2026-06) shows, no MCP server for the Atari 2600 exists yet —

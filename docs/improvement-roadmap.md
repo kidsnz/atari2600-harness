@@ -8,6 +8,10 @@ can start without guesswork.
 > **Status (v0.21.0):** the base-layer P0–P3 of this roadmap (the implementation of gaps A–E) are **all
 > closed**. The remaining unstarted items are mainly the game-side R-1 (Freeway port) / R-2 (audio recipes)
 > and extensions like `step_clock` (color-clock granularity).
+>
+> **Next phase → see [`hardening-roadmap.md`](hardening-roadmap.md)** for strengthening the harness beyond
+> gap-closing: deepening authoring + verification into thin domains (sprites incl. the P0+P1 16px technique,
+> audio) and hardening the foundation (CI, trust, completing stub tools).
 
 ## Central observation — position is closed, the timing budget is open
 
