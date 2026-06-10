@@ -38,7 +38,14 @@ func genFrogger() {
 	_, water48, _ := buildMonetScene()
 	bg := make([]byte, 192)
 	for y := 0; y < 192; y++ {
-		bg[y] = water48[y/4]
+		switch {
+		case y < 28: // 上＝ゴール帯（金）
+			bg[y] = 0x1E
+		case y >= 148: // 下＝スタート岸（緑）
+			bg[y] = 0xC4
+		default: // 中＝Monet 水
+			bg[y] = water48[y/4]
+		}
 	}
 	pad := []byte{0x3C, 0x7E, 0xFF, 0xFF, 0xFF, 0xFF, 0x7E, 0x3C}
 	frog := []byte{0x24, 0x7E, 0xFF, 0xFF, 0xBD, 0x7E, 0x24, 0x42}

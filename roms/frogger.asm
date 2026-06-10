@@ -116,6 +116,12 @@ DD:
         lda OnPad
         bne ChkWin
         dec Lives
+        bne DrownReset  ; まだ残機あり → frog だけ start へ
+        lda #3          ; game over → 全リスタート
+        sta Lives
+        lda #0
+        sta Score
+DrownReset:
         lda #144
         sta FrogY
         jmp HMlogic
@@ -392,34 +398,34 @@ GRP0Tab
         .byte $00
 
 BGTab
-        .byte $78
-        .byte $78
-        .byte $78
-        .byte $78
-        .byte $8A
-        .byte $8A
-        .byte $8A
-        .byte $8A
-        .byte $78
-        .byte $78
-        .byte $78
-        .byte $78
-        .byte $96
-        .byte $96
-        .byte $96
-        .byte $96
-        .byte $9C
-        .byte $9C
-        .byte $9C
-        .byte $9C
-        .byte $8C
-        .byte $8C
-        .byte $8C
-        .byte $8C
-        .byte $56
-        .byte $56
-        .byte $56
-        .byte $56
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
+        .byte $1E
         .byte $54
         .byte $54
         .byte $54
@@ -540,14 +546,6 @@ BGTab
         .byte $BC
         .byte $BC
         .byte $BC
-        .byte $C8
-        .byte $C8
-        .byte $C8
-        .byte $C8
-        .byte $B6
-        .byte $B6
-        .byte $B6
-        .byte $B6
         .byte $C4
         .byte $C4
         .byte $C4
@@ -556,34 +554,42 @@ BGTab
         .byte $C4
         .byte $C4
         .byte $C4
-        .byte $74
-        .byte $74
-        .byte $74
-        .byte $74
-        .byte $88
-        .byte $88
-        .byte $88
-        .byte $88
-        .byte $7A
-        .byte $7A
-        .byte $7A
-        .byte $7A
-        .byte $7C
-        .byte $7C
-        .byte $7C
-        .byte $7C
-        .byte $9A
-        .byte $9A
-        .byte $9A
-        .byte $9A
-        .byte $94
-        .byte $94
-        .byte $94
-        .byte $94
-        .byte $9A
-        .byte $9A
-        .byte $9A
-        .byte $9A
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
+        .byte $C4
 
         org $FFFC
         .word Start

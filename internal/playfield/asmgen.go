@@ -696,6 +696,12 @@ DD:
         lda OnPad
         bne ChkWin
         dec Lives
+        bne DrownReset  ; まだ残機あり → frog だけ start へ
+        lda #3          ; game over → 全リスタート
+        sta Lives
+        lda #0
+        sta Score
+DrownReset:
         lda #144
         sta FrogY
         jmp HMlogic
