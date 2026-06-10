@@ -1,0 +1,11 @@
+{
+  "rom": "roms/litmus/litmus_pal.asm",
+  "tv_spec": "PAL",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "ram.0x80", "op": "==", "value": 90}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 312
+  }
+}

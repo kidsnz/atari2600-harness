@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.27.0] - 2026-06-10
+
+### Added
+- **PAL frame verification (hardening-roadmap F-3).** `roms/litmus/litmus_pal.asm` emits a proper PAL frame
+  (VSYNC 3 / VBLANK 45 / visible 228 / Overscan 36 = 312 lines) and `scenarios/pal.json` (with
+  `tv_spec: "PAL"`) asserts the harness drives/counts it as **312 lines** (plus a RAM sentinel). Confirms the
+  harness is not NTSC-only; `ntsc_frame_lines` counts the actual per-frame line total (312 for PAL).
+
 ## [0.26.0] - 2026-06-10
 
 ### Added
