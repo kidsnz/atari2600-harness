@@ -6,8 +6,6 @@ package main
 import (
 	"fmt"
 	"os"
-
-	"github.com/kidsnz/atari2600-dev/internal/playfield"
 )
 
 func main() {
@@ -53,12 +51,12 @@ func genFrogger() {
 	for i := range pad {
 		grp0[80+i] = pad[i] // 川レーン scanline 80-87（frog の FrogY=80 と一致）
 	}
-	src, err := playfield.GenerateFroggerASM(bg, grp0, frog, 0x03, 0xC8, 0x1C, 0xF0)
+	src, err := GenerateFroggerASM(bg, grp0, frog, 0x03, 0xC8, 0x1C, 0xF0)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
 	}
-	const out = "roms/frogger.asm"
+	const out = "roms/frogger/frogger.asm"
 	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
 		os.Exit(1)
@@ -81,12 +79,12 @@ func genMonetCollide() {
 		grp0[76+i] = pad[i]
 		grp1[76+i] = frog[i] // カエルも同じレーンに（衝突検証）
 	}
-	src, err := playfield.GenerateMonetFullASM(bg, grp0, grp1, 0x03, 0x00, 0xC8, 0x1C, 0xF0)
+	src, err := GenerateMonetFullASM(bg, grp0, grp1, 0x03, 0x00, 0xC8, 0x1C, 0xF0)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
 	}
-	const out = "roms/monet_collide.asm"
+	const out = "roms/frogger/monet_collide.asm"
 	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
 		os.Exit(1)
@@ -112,12 +110,12 @@ func genMonetFull() {
 		grp1[150+i] = b
 	}
 	// player0=3コピー緑(右1px/f drift), player1=単体カエル黄緑
-	src, err := playfield.GenerateMonetFullASM(bg, grp0, grp1, 0x03, 0x00, 0xC8, 0x1C, 0xF0)
+	src, err := GenerateMonetFullASM(bg, grp0, grp1, 0x03, 0x00, 0xC8, 0x1C, 0xF0)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
 	}
-	const out = "roms/monet_full.asm"
+	const out = "roms/frogger/monet_full.asm"
 	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
 		os.Exit(1)
@@ -145,12 +143,12 @@ func genMonetSprite() {
 	for i, b := range pad {
 		grp0[padTop+i] = b
 	}
-	src, err := playfield.GenerateMonetSpriteASM(bg, grp0, 0x03, 0xC8, 0xF0) // NUSIZ=3コピー, 緑, 右1px/frame
+	src, err := GenerateMonetSpriteASM(bg, grp0, 0x03, 0xC8, 0xF0) // NUSIZ=3コピー, 緑, 右1px/frame
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
 	}
-	const out = "roms/monet_sprite.asm"
+	const out = "roms/frogger/monet_sprite.asm"
 	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
 		os.Exit(1)
@@ -202,13 +200,13 @@ func buildMonetScene() (art []string, water []byte, lily byte) {
 // genMonetAnim は Monet 静止画を「水面きらめき」アニメ化（M2 ステップ1）→ roms/monet_anim.asm。
 func genMonetAnim() {
 	art, water, lily := buildMonetScene()
-	src, err := playfield.GenerateAsymmetricShimmerASM(art, water, lily,
-		playfield.SceneOpts{LineHeight: 4, Speed: 5})
+	src, err := GenerateAsymmetricShimmerASM(art, water, lily,
+		SceneOpts{LineHeight: 4, Speed: 5})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
 	}
-	const out = "roms/monet_anim.asm"
+	const out = "roms/frogger/monet_anim.asm"
 	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
 		os.Exit(1)
@@ -233,12 +231,12 @@ func genAsymTest() {
 		water[r] = 0x84 // 青（位置が読みやすいよう単色背景）
 	}
 	const lily = 0x0E // 白の前景ストライプ（定数 COLUPF）
-	src, err := playfield.GenerateAsymmetricASM(art, water, lily, playfield.SceneOpts{LineHeight: 4})
+	src, err := GenerateAsymmetricASM(art, water, lily, SceneOpts{LineHeight: 4})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
 	}
-	const out = "roms/asym_test.asm"
+	const out = "roms/frogger/asym_test.asm"
 	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
 		os.Exit(1)
@@ -249,12 +247,12 @@ func genAsymTest() {
 // genMonetM1 は非対称 Monet 静止画 → roms/monet_m1.asm。
 func genMonetM1() {
 	art, water, lily := buildMonetScene()
-	src, err := playfield.GenerateAsymmetricASM(art, water, lily, playfield.SceneOpts{LineHeight: 4})
+	src, err := GenerateAsymmetricASM(art, water, lily, SceneOpts{LineHeight: 4})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
 	}
-	const out = "roms/monet_m1.asm"
+	const out = "roms/frogger/monet_m1.asm"
 	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
 		os.Exit(1)

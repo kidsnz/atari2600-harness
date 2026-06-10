@@ -1,8 +1,10 @@
-package playfield
+package main
 
 import (
 	"fmt"
 	"strings"
+
+	"github.com/kidsnz/atari2600-dev/internal/playfield"
 )
 
 // SceneOpts は生成するカーネルのパラメータ。
@@ -42,7 +44,7 @@ func GenerateSymmetricASM(art []string, water, lily []byte, opts SceneOpts) (str
 	pf1 := make([]byte, rows)
 	pf2 := make([]byte, rows)
 	for i, line := range art {
-		a, b, c := EncodeSymmetric(ParseASCIIRow(line))
+		a, b, c := playfield.EncodeSymmetric(playfield.ParseASCIIRow(line))
 		pf0[i], pf1[i], pf2[i] = a, b, c
 	}
 
@@ -188,7 +190,7 @@ func GenerateAsymmetricASM(art []string, water []byte, lily byte, opts SceneOpts
 	pf1b := make([]byte, rows)
 	pf2b := make([]byte, rows)
 	for i, line := range art {
-		r := EncodeAsymmetric(ParseASCIIRow(line))
+		r := playfield.EncodeAsymmetric(playfield.ParseASCIIRow(line))
 		pf0a[i], pf1a[i], pf2a[i] = r.PF0A, r.PF1A, r.PF2A
 		pf0b[i], pf1b[i], pf2b[i] = r.PF0B, r.PF1B, r.PF2B
 	}
@@ -817,7 +819,7 @@ func GenerateAsymmetricShimmerASM(art []string, waterCycle []byte, lily byte, op
 	pf1b := make([]byte, rows)
 	pf2b := make([]byte, rows)
 	for i, line := range art {
-		r := EncodeAsymmetric(ParseASCIIRow(line))
+		r := playfield.EncodeAsymmetric(playfield.ParseASCIIRow(line))
 		pf0a[i], pf1a[i], pf2a[i] = r.PF0A, r.PF1A, r.PF2A
 		pf0b[i], pf1b[i], pf2b[i] = r.PF0B, r.PF1B, r.PF2B
 	}

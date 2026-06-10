@@ -19,6 +19,6 @@
 /preview/
 
 # assembled ROM binaries (built from roms/*.asm via DASM)
-/roms/*.bin
-/roms/*.lst
-/roms/*.sym
+/roms/**/*.bin
+/roms/**/*.lst
+/roms/**/*.sym

@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+### 追加
+- **改善ロードマップ文書（`docs/improvement-roadmap.md`）。** 「制作をさらに正確にする」次の打ち手を
+  あらゆる角度から優先度付きで整理。中心的所見＝**位置の litmus は閉じたが、タイミング*予算*の検証は
+  開いたまま**（欠落B が実制作ループでは最大の穴）。P0=サイクル露出＋per-scanline 予算ガード、
+  P1=TIA シャドウ／衝突レジスタ読み、P2=検証自動化、P3=ビルドループ短縮。各項目に検証済み
+  Gopher2600 API シンボル（`CPU.LastResult.Cycles`・`TIA.Video.*`・`Collisions`）を併記。
+  ルーティング表にも追加。実装は伴わないため tag は打たない。
+  - **「参照資料の未採掘脈」節を追記。** 旧 Pong の `docs_atari` トローブ（`tool-landscape.md` で
+    カタログ済）を Frogger 段階で再評価。R-1 Freeway アーキテクチャ移植（lane/複数オブジェクト/lane単位衝突の
+    実証済み設計）・R-2 音声レシピ（Slocum ガイド＋`za2600/audio.asm`、音声を「範囲外」→「着手可能」へ格上げ、
+    `TIA.Audio` シャドウ読みを P1 に同梱提案）・R-3 サイクルコスト表（Bensema、書く側の予測を補強）・
+    R-4 実ゲーム構造の索引化。新規発見ではなく未採掘脈の採掘という位置づけ。
+
 ### 追加予定
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
@@ -12,6 +25,20 @@
   システムとして育てる方針。北極星ロム（Monet Frogger）が一段落したら、`internal/emu`・`cmd/harness`・MCP
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
+
+## [0.11.0] - 2026-06-10
+
+### 変更
+- **モノレポ再編：root=ハーネス基盤 / `roms/<game>/`=ロム（独立化 Phase 1）。** 依存が game→harness の
+  一方通行（harness は game にゼロ依存）であることを実証し、外科手術なしで分離。
+  - **共通(root)**: `cmd/harness`・`cmd/probe`・`internal/emu`・`internal/annotate`・`internal/playfield/playfield.go`
+    （汎用エンコーダ `EncodeSymmetric` 等）。
+  - **ゲーム固有**: `cmd/genpf` ＋ `internal/playfield/asmgen.go`（カーネル生成）を **`roms/frogger/gen/`（package main、
+    `playfield` を import）** へ統合移動。`roms/frogger/*.asm`、検証用は `roms/litmus/`。
+  - `cmd/probe` の既定 ROM・`.gitignore`（`/roms/**/*.bin` 等）・CLAUDE.md 構成節・roadmap のパス参照を更新。
+  - **検証:** `go build/test/vet ./...` 全グリーン、`go run ./roms/frogger/gen frogger` で再生成、全 15 ROM を
+    新パスでアセンブル、`litmus_pf` を新パスからロード→read_row が再編前と完全一致（基盤無傷）。
+  - 今後のゲームは `roms/<name>/`(＋`gen/`)の規約。次フェーズ＝望む場所への移動（要メモリ移行＋再起動）。
 
 ## [0.10.1] - 2026-06-10
 

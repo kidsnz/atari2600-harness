@@ -1,7 +1,7 @@
 // Command probe は MCP に包む前の配管検証 CLI。Gopher2600 を自前 Go から headless
 // 駆動できることを「数値で」確認する（鉄則: 判定はスクショでなく数値）。
 //
-//	go run ./cmd/probe [rom.bin]   (default: roms/smoke.bin)
+//	go run ./cmd/probe [rom.bin]   (default: roms/litmus/smoke.bin)
 package main
 
 import (
@@ -27,7 +27,7 @@ func writePNG(path string, img image.Image) {
 }
 
 func main() {
-	rom := "roms/smoke.bin"
+	rom := "roms/litmus/smoke.bin"
 	if len(os.Args) > 1 {
 		rom = os.Args[1]
 	}
