@@ -7,8 +7,11 @@ package scenario
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -35,6 +38,7 @@ type Assert struct {
 type Checks struct {
 	NTSCFrameLines *int `json:"ntsc_frame_lines,omitempty"` // StepFrame() == この値（NTSC は 262）
 	MaxLineBudget  *int `json:"max_line_budget,omitempty"`  // RunUntilBudget が超過しない（既定予算 76）
+	GoldenFrame    bool `json:"golden_frame,omitempty"`     // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
 }
 
 // Scenario は 1 本のシナリオ定義。
@@ -45,6 +49,8 @@ type Scenario struct {
 	Inputs       []Input  `json:"inputs,omitempty"`
 	Asserts      []Assert `json:"asserts,omitempty"`
 	Checks       *Checks  `json:"checks,omitempty"`
+
+	srcPath string // Load 時のファイルパス（golden ファイルの場所決めに使う。空＝プログラム生成）
 }
 
 // AssertResult は 1 アサーションの評価結果。
@@ -56,8 +62,9 @@ type AssertResult struct {
 
 // Result はシナリオ全体の結果。
 type Result struct {
-	Asserts []AssertResult
-	Pass    bool
+	Asserts    []AssertResult
+	GoldenHash string // golden_frame 指定時に算出した描画連鎖ハッシュ（決定性確認用）
+	Pass       bool
 }
 
 // Load はファイルからシナリオを読む。
@@ -73,11 +80,17 @@ func Load(path string) (*Scenario, error) {
 	if s.Rom == "" {
 		return nil, fmt.Errorf("%s: \"rom\" is required", path)
 	}
+	s.srcPath = path
 	return &s, nil
 }
 
-// Run はシナリオを実行し pass/fail を返す。
-func Run(s *Scenario) (*Result, error) {
+// goldenPath は scenario ファイルパスから対応する .golden ファイルのパスを返す。
+func goldenPath(srcPath string) string {
+	return strings.TrimSuffix(srcPath, filepath.Ext(srcPath)) + ".golden"
+}
+
+// Run はシナリオを実行し pass/fail を返す。updateGoldens=true なら golden_frame の基準ハッシュを書き直す。
+func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 	spec := s.TVSpec
 	if spec == "" {
 		spec = "NTSC"
@@ -89,12 +102,23 @@ func Run(s *Scenario) (*Result, error) {
 	if err := e.LoadROM(s.Rom); err != nil {
 		return nil, fmt.Errorf("load %s: %w", s.Rom, err)
 	}
+
+	golden := s.Checks != nil && s.Checks.GoldenFrame
+	if golden {
+		if err := e.EnableVideoDigest(); err != nil {
+			return nil, err
+		}
+	}
+
 	warmup := s.WarmupFrames
 	if warmup == 0 {
 		warmup = 2
 	}
 	if err := e.RunFrames(warmup); err != nil {
 		return nil, err
+	}
+	if golden {
+		e.ResetVideoDigest() // warmup を除外＝タイムラインのフレームだけで決定的なハッシュにする
 	}
 
 	// フレーム別にインデックス化。
@@ -150,6 +174,14 @@ func Run(s *Scenario) (*Result, error) {
 
 	// run 全体の性質（副作用のある計測はここでまとめて）。
 	if s.Checks != nil {
+		// ゴールデンは副作用計測（StepFrame/RunUntilBudget）より先にハッシュ確定。
+		if golden {
+			hash := e.VideoHash()
+			res.GoldenHash = hash
+			if err := evalGolden(s, hash, updateGoldens, res); err != nil {
+				return nil, err
+			}
+		}
 		if s.Checks.NTSCFrameLines != nil {
 			lines, err := e.StepFrame()
 			if err != nil {
@@ -181,6 +213,35 @@ func Run(s *Scenario) (*Result, error) {
 	}
 
 	return res, nil
+}
+
+// evalGolden は算出ハッシュを <scenario>.golden と照合する。ファイルが無い／updateGoldens なら記録。
+// srcPath が空（プログラム生成）ならファイル照合はスキップ（ハッシュは Result.GoldenHash に入る）。
+func evalGolden(s *Scenario, hash string, update bool, res *Result) error {
+	if s.srcPath == "" {
+		res.Asserts = append(res.Asserts, AssertResult{Desc: "golden_frame (no file; hash computed)", Pass: true})
+		return nil
+	}
+	gp := goldenPath(s.srcPath)
+	existing, err := os.ReadFile(gp)
+	switch {
+	case update || errors.Is(err, fs.ErrNotExist):
+		if err := os.WriteFile(gp, []byte(hash+"\n"), 0o644); err != nil {
+			return err
+		}
+		res.Asserts = append(res.Asserts, AssertResult{Desc: "golden_frame recorded " + filepath.Base(gp), Pass: true})
+		return nil
+	case err != nil:
+		return err
+	default:
+		want := strings.TrimSpace(string(existing))
+		ok := want == hash
+		res.Asserts = append(res.Asserts, AssertResult{Desc: "golden_frame matches", Pass: ok})
+		if !ok {
+			res.Pass = false
+		}
+		return nil
+	}
 }
 
 // compare は got <op> want を評価する。

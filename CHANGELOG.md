@@ -32,6 +32,21 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.19.0] - 2026-06-10
+
+### 追加
+- **ゴールデンフレーム回帰（P2 D-3 / 欠落D を完全クローズ）。** シナリオに `checks.golden_frame: true` を
+  足すと、タイムラインの**描画フレーム連鎖ハッシュ**を `<scenario>.golden` と照合する＝「描画ピクセルが
+  変わってないか」をピクセル単位で回帰検知（D-1/D-2 のロジック/タイミング回帰を補完）。
+  - **実装**: Gopher2600 の exported `digest.Video`（`NewVideo`/`Hash`/`ResetDigest`、フレーム毎 sha1 連鎖）を
+    `internal/emu` に配線（`EnableVideoDigest`/`ResetVideoDigest`/`VideoHash`、任意・冪等）。`internal/scenario`
+    は golden 有効時に digest を有効化 → warmup 後にリセット（warmup を除外し決定的化）→ タイムライン →
+    副作用計測の前にハッシュ確定 → `.golden` と照合。`cmd/scenario -update` で基準を記録/更新。
+  - **サンプル**: `roms/frogger/scenarios/golden.json` ＋ committed `golden.golden`。
+  - **検証**: `scenario_test.go` — 同一 ROM/入力でハッシュ決定的（再現）、committed 基準と一致（陽性）、
+    基準が違えば fail（陰性）。
+  - 注: golden を使うシナリオのみ per-frame sha1 コスト。CLI のみ＝`bin/harness`（MCP）は不変。
+
 ## [0.18.0] - 2026-06-10
 
 ### 追加

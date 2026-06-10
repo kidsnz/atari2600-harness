@@ -7,6 +7,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -14,20 +15,23 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: scenario <scenario.json> [more.json ...]")
+	update := flag.Bool("update", false, "(re)write golden_frame baselines instead of comparing")
+	flag.Parse()
+	files := flag.Args()
+	if len(files) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: scenario [-update] <scenario.json> [more.json ...]")
 		os.Exit(2)
 	}
 
 	allPass := true
-	for _, path := range os.Args[1:] {
+	for _, path := range files {
 		s, err := scenario.Load(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR %s: %v\n", path, err)
 			allPass = false
 			continue
 		}
-		res, err := scenario.Run(s)
+		res, err := scenario.Run(s, *update)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR %s: %v\n", path, err)
 			allPass = false

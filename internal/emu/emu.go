@@ -10,6 +10,7 @@ import (
 	"image/color"
 
 	"github.com/jetsetilly/gopher2600/cartridgeloader"
+	"github.com/jetsetilly/gopher2600/digest"
 	"github.com/jetsetilly/gopher2600/environment"
 	"github.com/jetsetilly/gopher2600/hardware"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports"
@@ -30,6 +31,37 @@ type Emu struct {
 
 	cpuCycles int64 // ROM ロード以降に実行した CPU サイクルの累積（命令完了ごとに加算）
 	cycleMark int64 // 区間計測の基準点（MarkCycles で現在の cpuCycles に揃える）
+
+	vdigest *digest.Video // ゴールデンフレーム回帰用の連鎖ハッシュ（任意・EnableVideoDigest で有効化）
+}
+
+// EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。
+// per-frame sha1 のコストがあるため任意。冪等。
+func (e *Emu) EnableVideoDigest() error {
+	if e.vdigest != nil {
+		return nil
+	}
+	d, err := digest.NewVideo(e.TV) // TV に PixelRenderer として自己登録する
+	if err != nil {
+		return err
+	}
+	e.vdigest = d
+	return nil
+}
+
+// ResetVideoDigest はハッシュ連鎖をゼロから取り直す（warmup を除外して決定的にするため）。
+func (e *Emu) ResetVideoDigest() {
+	if e.vdigest != nil {
+		e.vdigest.ResetDigest()
+	}
+}
+
+// VideoHash は現在までのフレーム連鎖ハッシュを返す（未有効なら ""）。
+func (e *Emu) VideoHash() string {
+	if e.vdigest == nil {
+		return ""
+	}
+	return e.vdigest.Hash()
 }
 
 // stepInstr は VCS を 1 ステップ進め、実際に 1 命令が実行された場合だけその実サイクル数を

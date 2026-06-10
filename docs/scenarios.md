@@ -29,7 +29,8 @@ go run ./cmd/scenario roms/<game>/scenarios/*.json   # 全 pass で exit 0 / 失
 
   "checks": {                           // run 全体の性質（副作用のある計測。タイムライン後に評価）
     "ntsc_frame_lines": 262,            // StepFrame() == 262
-    "max_line_budget": 76               // 予算ガードが超過しない（assert_line_budget 相当）
+    "max_line_budget": 76,              // 予算ガードが超過しない（assert_line_budget 相当）
+    "golden_frame": true               // D-3: 描画フレーム連鎖ハッシュを <scenario>.golden と照合
   }
 }
 ```
@@ -56,7 +57,22 @@ go run ./cmd/scenario roms/<game>/scenarios/*.json   # 全 pass で exit 0 / 失
 | `collisions.<pair>`（p0_p1, m0_p0, p0_pf, bl_pf …） | `ReadCollisions` |
 | `audio.ch0\|ch1.control\|freq\|volume` | `ReadAudio` |
 
-`checks`（run 全体）: `ntsc_frame_lines`（`StepFrame`）/ `max_line_budget`（`RunUntilBudget`）。
+`checks`（run 全体）: `ntsc_frame_lines`（`StepFrame`）/ `max_line_budget`（`RunUntilBudget`）/
+`golden_frame`（描画連鎖ハッシュ＝下記）。
+
+## ゴールデンフレーム回帰（D-3, v0.19.0）
+
+`checks.golden_frame: true` で、warmup を除いたタイムラインの**描画フレーム連鎖ハッシュ**（Gopher2600
+`digest.Video` の sha1 連鎖）を `<scenario>.golden`（隣のファイル）と照合する＝描画ピクセルの回帰検知。
+
+```
+go run ./cmd/scenario -update roms/<game>/scenarios/foo.json   # 基準 .golden を記録/更新
+go run ./cmd/scenario         roms/<game>/scenarios/foo.json   # 基準と照合（不一致で fail）
+```
+
+`.golden` が無い／`-update` 指定時は現在のハッシュを記録。ハッシュは warmup を除外して決定的
+（同一 ROM＋同一入力＋同一フレーム数で再現）。ロジック/タイミング回帰（D-1/D-2）とは別レイヤの、
+**描画そのものの回帰**を守る。`.golden` は git 追跡（基準として commit する）。
 
 ## 同梱サンプル
 
@@ -64,8 +80,8 @@ go run ./cmd/scenario roms/<game>/scenarios/*.json   # 全 pass で exit 0 / 失
 - `roms/litmus/scenarios/collide.json` — `collisions.bl_pf==1`（ball×全点灯 PF）。
 - `roms/frogger/scenarios/boot.json` — FrogY 初期 144 ＋ 残機 3 ＋ 262 行 ＋ 予算超過なし。
 - `roms/frogger/scenarios/hop.json` — `up` 入力で FrogY 144→128（入力タイムラインが実ゲームで効く実証）。
+- `roms/frogger/scenarios/golden.json`（＋ `golden.golden`）— 描画フレーム連鎖ハッシュの回帰。
 
 ## スコープ外（次段）
-- D-3 ゴールデンフレーム回帰（Gopher2600 `digest`/`regression` 配線＝描画ピクセルのハッシュ比較）。
 - MCP ツール版 `run_scenario`（CLI とロジック共有で追加可能）。
-- 範囲演算子・scanline 指定アサート。
+- 範囲演算子・scanline 指定アサート・音声ゴールデン（`digest.Audio`）。
