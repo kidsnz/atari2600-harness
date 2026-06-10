@@ -34,7 +34,10 @@ domains (sprites, audio)**, and **shore up the public repo's defenses (CI, trust
 
 ### S. Sprites
 
-#### S-1. `pkg/sprite` (ASCII → GRP)  — size: small–medium
+#### S-1. `pkg/sprite` (ASCII → GRP)  — size: small–medium — ✅ DONE (v0.23.0)
+Implemented: `pkg/sprite` `EncodeRow`/`Encode`/`Reflect`; `roms/litmus/litmus_sprite.asm` + `scenarios/sprite.json`
+prove a ramp sprite byte-exact via `read_row` (white span widens 1→8 px from clock 3).
+
 - **Problem:** no encoder for player graphics; sprites are hand-coded byte arrays.
 - **Proposal:** a mirror of `pkg/playfield`. Convert an 8px-wide × N-row ASCII design (`.`/`X`) into a GRP
   byte table + a kernel fragment. Support REFP (reflect) and VDEL (vertical delay). One byte per scanline,
@@ -44,7 +47,10 @@ domains (sprites, audio)**, and **shore up the public repo's defenses (CI, trust
 - **Verify:** `read_tia_registers.GfxNew` equals the encoded byte per scanline; `read_row` shows the lit
   span matching the design. A `roms/litmus/litmus_sprite.asm` proving an ASCII shape renders byte-exact.
 
-#### S-2. NUSIZ helper  — size: small
+#### S-2. NUSIZ helper  — size: small — ✅ DONE (v0.25.0)
+Implemented: `PlayerSize`/`MissileSize` + `NUSIZ()`/`NUSIZPlayer()`; `litmus_nusiz.asm` + `scenarios/nusiz.json`
+prove DoubleWidth (`NUSIZ0=$05`) renders 16px (`read_row` len 16, `player0.nusiz=5`).
+
 - **Problem:** NUSIZ (copies/width) is set by raw value; intent ("3 copies, wide spacing", "double/quad
   width") is opaque.
 - **Proposal:** a helper mapping design intent → NUSIZ value (and back), covering the 8 size/copy modes for
@@ -52,7 +58,11 @@ domains (sprites, audio)**, and **shore up the public repo's defenses (CI, trust
 - **Where to touch:** `pkg/sprite` (or `pkg/tia` constants). 
 - **Verify:** `read_tia_registers.SizeAndCopies` + `read_tia` positions of each rendered copy.
 
-#### S-3. ★ Two-sprite combine (P0+P1) = up to 16px / multicolor characters — size: medium — FLAGSHIP
+#### S-3. ★ Two-sprite combine (P0+P1) = up to 16px / multicolor characters — size: medium — FLAGSHIP — ✅ DONE (v0.24.0)
+Implemented: `pkg/sprite.SplitWide`; `litmus_p0p1.asm` + `scenarios/p0p1.json` place P1 exactly +8px from P0
+(RESP0→RESP1 3cy apart in the visible region = +9px, HMOVE −1 = +8) and prove a **seamless continuous 16px run**
+(`read_row` clock 69–84 len 16; `read_tia` player0=69/player1=77).
+
 - **Problem:** a single player is 8px wide and one color. Wider or multicolor characters require combining
   P0 and P1 — the classic technique — but there is no tooling to lay out and **place them seamlessly**.
 - **Proposal:** author a ≤16px (or multicolor) design as two 8px halves — P0 = left 8, P1 = right 8 — and
@@ -159,11 +169,14 @@ Low cost, high leverage — already noted in `improvement-roadmap.md` G-1:
 ---
 
 ## Recommended order of attack
-1. **F-1 CI** (cheapest defense, right after going public; consider F-2 to simplify it).
-2. **S-1 / S-2 / S-3 sprites** — especially **S-3 P0+P1 16px**, the flagship capability.
-3. **A-1 / A-2 audio verification deepening** (in-tree `tracker` / `digest.Audio` = cheap).
-4. **A-3 audio authoring.**
-5. **F-3 PAL / S-4 shape verification / F-5 stubs / F-4 Stella cross-check / Theme C wiring.**
+1. ~~**S-1 / S-2 / S-3 sprites** — especially **S-3 P0+P1 16px**, the flagship.~~ ✅ DONE (v0.23.0–v0.25.0).
+   The sprite authoring trio is complete and hardware-verified.
+2. **F-1 CI** (cheapest defense, now that the repo is public; consider F-2 to simplify it).
+3. **A-1 / A-2 audio verification deepening** — note: Gopher2600's `tracker.lookupMusicalNote`/`lookupDistortion`
+   are **unexported**, so A-1 is not a trivial wiring job (re-estimate: implement the AUDC→timbre / AUDF→note
+   mapping ourselves, which overlaps A-3). `digest.Audio` (A-2) is still a clean win.
+4. **A-3 audio authoring** / **S-4 sprite shape verification** / use pkg/sprite in the Frogger ROM (roms repo).
+5. **F-3 PAL / F-5 stubs / F-4 Stella cross-check / Theme C wiring.**
 
 > Sprites (S-3) is the highest-value capability gain; CI (F-1) is the highest-value defense. Audio
 > verification (A-1/A-2) is the cheapest meaningful win because the upstream pieces are already vendored.
