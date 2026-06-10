@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.28.0] - 2026-06-10
+
+### Added
+- **CI via GitHub Actions (hardening-roadmap F-1).** `.github/workflows/ci.yml` runs on every push/PR:
+  Ubuntu + Go (from `go.mod`) + DASM, clones Gopher2600 at the pinned commit `5d532e88` into `./Gopher2600`
+  (the `replace` target), assembles the litmus ROMs (`.bin` are gitignored), then `CGO_ENABLED=0`
+  build/vet/test and runs all litmus regression scenarios. No SDL needed — the harness only imports the
+  SDL-free Gopher2600 packages, so a static (cgo-off) build covers it. A CI badge is on the README.
+  Verified green on Actions (build/vet/test + 9 scenarios, ~1m).
+
 ## [0.27.0] - 2026-06-10
 
 ### Added

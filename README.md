@@ -1,5 +1,7 @@
 # atari2600-harness
 
+[![CI](https://github.com/kidsnz/atari2600-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/kidsnz/atari2600-harness/actions/workflows/ci.yml)
+
 A **verification harness** that lets an LLM (Claude) build Atari 2600 games in 6502 assembly
 *accurately*. It is not a game-generation app — it is the loop substrate the model hammers on every
 iteration: **assemble → run → inspect numerically**.
