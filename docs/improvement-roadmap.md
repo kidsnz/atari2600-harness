@@ -243,11 +243,12 @@ debugger driver は外したまま、下記ライブラリを単体利用（expo
 
 ## 推奨着手順
 
-1. **B-1 `read_cycles`**（小・即効） → **B-3 予算ガード**（本丸）。ここで欠落B が実ループで初めて閉じる。
-2. **P1 `read_tia_registers` + `read_collisions`**（小・推論ゼロ化）。
-3. **B-2 `step_scanline/clock`**（B-3 の精密化に効く）。
-4. **P3 `assemble_and_load`**（小・摩擦低減、いつ入れても効く）。
-5. **P2 検証自動化**（中・回帰の土台）。
+1. ~~**B-1 `read_cycles`** → **B-3 予算ガード**（本丸）~~ ✅ v0.12.0–v0.13.0。欠落B が実ループで閉じた。
+2. ~~**P1 `read_tia_registers` + `read_collisions`**（推論ゼロ化）~~ ✅ v0.14.0。欠落A クローズ。
+3. ~~**B-2 `step_scanline`**（+ `step_instruction`）~~ ✅ v0.15.0（`step_clock` は色クロック粒度で未着手）。
+4. ~~**P3 `assemble_and_load`**（摩擦低減）~~ ✅ v0.16.0。
+5. **P2 検証自動化**（中・回帰の土台）← 次の山。G-1 の `recorder`/`regression` 配線が最短路。
+6. その他の残り: **B-4 kernel 定数 自動較正** / **R-2 音声（`read_audio` 同梱）** / **R-1 Freeway 移植**。
 
 > 制作（Frogger）側では **R-1 Freeway アーキテクチャ**が最も即効。音声検証 **R-2** は P1
 > （`read_tia_registers`）に Audio シャドウを同梱する形で一緒に入れるのが自然。
