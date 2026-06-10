@@ -160,14 +160,17 @@ OScan:  sta WSYNC
 // 逐語転写（cycle 臨界・72サイクル/ライン）。`tay`/`sty` で B 書き換えの間合いを作る。
 //
 // art[i] は TOP から i 番目の行（40 列、'.'/'X'）。lily[i] は per-row COLUPF。
-// water は frame 固定の COLUBK（ループのサイクルを崩さぬよう per-row 化しない）。
-func GenerateAsymmetricASM(art []string, lily []byte, water byte, opts SceneOpts) (string, error) {
+// water[i] は per-row COLUBK（Monet の横色帯）。lily は frame 固定の COLUPF（前景）。
+// 非対称ループは 72 サイクルで余裕が無いため、per-row 化できる色は 1 チャンネルのみ＝面積の
+// 大きい水(COLUBK)を per-row に、睡蓮(COLUPF)を定数にする。タイミングは対称版と同じく、ループ
+// 先頭のロード先を COLUBK にするだけ（COLUPF は VBLANK で一度だけ設定）。
+func GenerateAsymmetricASM(art []string, water []byte, lily byte, opts SceneOpts) (string, error) {
 	rows := len(art)
 	if rows == 0 {
 		return "", fmt.Errorf("art is empty")
 	}
-	if len(lily) != rows {
-		return "", fmt.Errorf("lily(%d) length must equal art rows(%d)", len(lily), rows)
+	if len(water) != rows {
+		return "", fmt.Errorf("water(%d) length must equal art rows(%d)", len(water), rows)
 	}
 	if rows > 256 {
 		return "", fmt.Errorf("rows %d exceeds index range (max 256)", rows)
@@ -240,7 +243,7 @@ VBlank: sta WSYNC
         dex
         bne VBlank
         lda #$%02X
-        sta COLUBK      ; 水（frame 固定）
+        sta COLUPF      ; 睡蓮（frame 固定の前景色）
         lda #0
         sta VBLANK
 
@@ -249,8 +252,8 @@ VBlank: sta WSYNC
         sta PFHGT
 PFLoop:
         sta WSYNC                 ; (0)
-        lda PFColors,x            ; (4)
-        sta COLUPF                ; (7)
+        lda BGColors,x            ; (4)
+        sta COLUBK                ; (7)  水（per-row、HBLANK 中＝行全体に効く）
         lda PF0DataA,x            ; (11)
         sta PF0                   ; (14)
         lda PF1DataA,x            ; (18)
@@ -287,7 +290,7 @@ OScan:  sta WSYNC
         bne OScan
         jmp NextFrame
 
-`, rows, h, water, rows-1, h, h)
+`, rows, h, lily, rows-1, h, h)
 
 	b.WriteString(emit("PF0DataA", pf0a))
 	b.WriteString("\n")
@@ -301,7 +304,7 @@ OScan:  sta WSYNC
 	b.WriteString("\n")
 	b.WriteString(emit("PF2DataB", pf2b))
 	b.WriteString("\n")
-	b.WriteString(emit("PFColors", lily))
+	b.WriteString(emit("BGColors", water))
 	b.WriteString("\n")
 	b.WriteString("        org $FFFC\n        .word Start\n        .word Start\n")
 

@@ -9,6 +9,18 @@
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
 
+## [0.7.2] - 2026-06-09
+
+### 変更
+- **Monet 静止画(M1)を非対称版へ格上げ（有機的な睡蓮）。** 左右独立 playfield ＋ per-row 水色帯。
+  - `GenerateAsymmetricASM` を **per-row 水(COLUBK)＋定数睡蓮(COLUPF)** へ改良（シグネチャ
+    `(art, water []byte, lily byte, opts)`）。非対称ループは予算が無く per-row 色は1チャンネルのみ
+    → 面積の大きい水を色帯に回す（Monet の横反射に合致）。タイミングは ABB 転写のまま不変。
+  - `cmd/genpf`: デフォルト=非対称 Monet（40列・有機配置・中央またぎ可）、`asym`=非対称 litmus。
+  - **検証:** read_row(scanline58) で緑パッド clock132-151（右半 cols33-37）のみ＝設計一致・片側のみ＝
+    非対称確定。水の横色帯（青/シアン/マゼンタ/紫/緑）の上に睡蓮が左右非対称で浮かぶ。
+  - トレードオフ記録: per-row 色1チャンネル制約で当面ピンクの花は不可（将来 2-line kernel で両立余地）。
+
 ## [0.7.1] - 2026-06-09
 
 ### 追加

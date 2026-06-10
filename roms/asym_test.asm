@@ -38,8 +38,8 @@ NextFrame:
 VBlank: sta WSYNC
         dex
         bne VBlank
-        lda #$84
-        sta COLUBK      ; 水（frame 固定）
+        lda #$0E
+        sta COLUPF      ; 睡蓮（frame 固定の前景色）
         lda #0
         sta VBLANK
 
@@ -48,8 +48,8 @@ VBlank: sta WSYNC
         sta PFHGT
 PFLoop:
         sta WSYNC                 ; (0)
-        lda PFColors,x            ; (4)
-        sta COLUPF                ; (7)
+        lda BGColors,x            ; (4)
+        sta COLUBK                ; (7)  水（per-row、HBLANK 中＝行全体に効く）
         lda PF0DataA,x            ; (11)
         sta PF0                   ; (14)
         lda PF1DataA,x            ; (18)
@@ -386,55 +386,55 @@ PF2DataB
         .byte $00
         .byte $00
 
-PFColors
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
-        .byte $0E
+BGColors
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
+        .byte $84
 
         org $FFFC
         .word Start

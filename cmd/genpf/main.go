@@ -24,7 +24,7 @@ func main() {
 func genAsymTest() {
 	const rows = 48
 	art := make([]string, rows)
-	lily := make([]byte, rows)
+	water := make([]byte, rows)
 	for r := 0; r < rows; r++ {
 		start := r * 36 / rows                                    // 0..35 を掃引
 		row := []byte("........................................") // 40 dots
@@ -32,10 +32,10 @@ func genAsymTest() {
 			row[start+dx] = 'X'
 		}
 		art[r] = string(row)
-		lily[r] = 0x0E // 白（位置が読みやすいよう単色）
+		water[r] = 0x84 // 青（位置が読みやすいよう単色背景）
 	}
-	const water = 0x84 // 青
-	src, err := playfield.GenerateAsymmetricASM(art, lily, water, playfield.SceneOpts{LineHeight: 4})
+	const lily = 0x0E // 白の前景ストライプ（定数 COLUPF）
+	src, err := playfield.GenerateAsymmetricASM(art, water, lily, playfield.SceneOpts{LineHeight: 4})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
@@ -55,39 +55,32 @@ func genMonetM1() {
 	seed := uint32(0x2600)
 	next := func() uint32 { seed = seed*1664525 + 1013904223; return seed >> 16 }
 
+	// 水: per-row COLUBK。上→下にブルー→バイオレット→グリーンへ漂う wash＋輝度揺らぎ。
+	// （非対称ループは予算が無く per-row 色は1チャンネルのみ → 面積の大きい水を per-row に。）
 	water := make([]byte, rows)
-	lily := make([]byte, rows)
-
-	// 水: 上→下にブルー→バイオレット→グリーンへ漂う wash＋行ごとの輝度揺らぎ（NTSC: 上位=色相/下位=輝度）。
 	hues := []byte{0x70, 0x80, 0x90, 0x50, 0x60, 0xB0, 0xC0} // blue, blue, lightblue, violet, blue-violet, cyan-green, green
 	for y := 0; y < rows; y++ {
 		hue := hues[(y/3+int(next()%2))%len(hues)]
 		lum := byte(4 + (next()%5)*2) // 4..12
 		water[y] = hue | lum
-
-		lhue := byte(0xC0) // 既定: 緑のパッド
-		switch next() % 6 {
-		case 0:
-			lhue = 0x40 // ピンクの花
-		case 1:
-			lhue = 0xF0 // 黄のハイライト
-		}
-		lily[y] = lhue | byte(6+(next()%4)*2) // 輝度 6..12
 	}
+	const lily = 0xC8 // 睡蓮パッド（定数 COLUPF・緑）
 
-	// アート: 一面の水（'.'）に睡蓮パッド（'X'）を散布。左半 20 列、reflect で左右対称になる。
+	// アート: 40 列の有機的・非対称な睡蓮パッド散布（左右独立。中央 col~20 をまたぐパッドも）。
 	grid := make([][]byte, rows)
 	for y := range grid {
-		grid[y] = []byte("....................") // 20 dots
+		grid[y] = []byte("........................................") // 40 dots
 	}
-	pads := []struct{ row, col, w int }{
-		{4, 2, 4}, {7, 11, 3}, {12, 5, 5}, {16, 14, 4},
-		{21, 1, 3}, {25, 8, 4}, {30, 12, 5}, {34, 3, 4},
-		{39, 9, 3}, {43, 15, 4},
+	pads := []struct{ row, col, w, h int }{
+		{2, 5, 4, 2}, {3, 18, 5, 2}, {6, 28, 4, 1}, {8, 9, 3, 2},
+		{11, 33, 5, 2}, {13, 1, 4, 1}, {15, 20, 6, 3}, {18, 12, 4, 2},
+		{21, 30, 4, 2}, {24, 3, 5, 2}, {26, 22, 4, 1}, {30, 15, 5, 3},
+		{33, 35, 3, 2}, {35, 7, 4, 2}, {38, 25, 5, 2}, {41, 17, 4, 2},
+		{44, 2, 3, 1},
 	}
 	for _, p := range pads {
-		for dy := 0; dy < 2 && p.row+dy < rows; dy++ { // 縦に少し厚みを
-			for dx := 0; dx < p.w && p.col+dx < 20; dx++ {
+		for dy := 0; dy < p.h && p.row+dy < rows; dy++ {
+			for dx := 0; dx < p.w && p.col+dx < 40; dx++ {
 				grid[p.row+dy][p.col+dx] = 'X'
 			}
 		}
@@ -97,7 +90,7 @@ func genMonetM1() {
 		art[y] = string(grid[y])
 	}
 
-	src, err := playfield.GenerateSymmetricASM(art, water, lily, playfield.SceneOpts{LineHeight: 4})
+	src, err := playfield.GenerateAsymmetricASM(art, water, lily, playfield.SceneOpts{LineHeight: 4})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "generate:", err)
 		os.Exit(1)
