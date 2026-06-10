@@ -1,133 +1,153 @@
-# Gap Analysis — Claude が Atari 2600 アセンブリで失敗する構造
+# Gap analysis — how an LLM fails at Atari 2600 assembly
 
-このプロジェクトの**仕様の土台**となる文書。「専用ソフトを作る」前に、
-*何を補えば Claude がより的確に制作できるか* を欠落として特定する。
+This is the **specification bedrock** of the project. Before "building a custom tool," it identifies
+*what must be supplied so the model can author more accurately* as a set of gaps.
 
-失敗は能力のムラではなく、**特定の情報が Claude に与えられていない**ことから来る。
-5 つに分ける。前半（A〜C）は「真実が見えない」系、後半（D〜E）は「ループが遅い／壊れても気づかない」系。
-
----
-
-## A. 実行結果が見えない（知覚の欠落）
-
-Claude はコードを**目隠しで書いている**。さらにスクリーンショット 1 枚は「ある一瞬」でしかなく、
-動き（フレーム間）も描画タイミング（1 ライン内）もそこには写らない。
-
-- **必要なもの:** ピクセルではなく**フレーム単位の数値状態**
-  （RAM 128 バイト / A・X・Y・SP・PC・フラグ / TIA レジスタ / 入力 / scanline / cycle）。
-- スクショは補助。判断の基準は数値にする。
-- **注釈付きスクショ（`get_screen_annotated`）:** Stella の 1x スナップショットに、
-  2600 の実座標系で校正した **XY 二次元グリッド＋軸ラベル**を重ねる
-  （**横 = 0–159 カラークロック / 縦 = 0–191 scanline**。X 専用ではない。両軸とも常に描く）。
-  さらに Stella の **Fixed Debug Colors**（PF/P0/P1/M0/M1/BL を固定色で塗り分け）と、
-  レジスタ／カーネルから読んだオブジェクトの **(X 位置, Y=描画 scanline 範囲) 両方**のマーカーを描き込み、
-  **画像と数値を必ず一致させる**。X と Y は 2600 では正体が違う:
-  - **X（横）** = RESPx ストローブ時のビーム位置（連続値＋ハード固有オフセット）。
-    グリッドが映すのは「書いた位置値 → 実際の表示列」のズレ ＝ Pong で魔法定数の総当たりを招いた**失敗 #1** を観測対象化。
-  - **Y（縦）** = 何 scanline 目で描画を有効化したか（カーネルのライン数え）。
-    グリッドが映すのはスプライトの上下ズレと**ゾーン境界の scanline**＝`sta WSYNC` 数え漏れによる**画面ロール（失敗 #3）**を観測対象化。
-  - 判定基準: **X の最終判定は画像のピクセル数えでなく Gopher2600 の TIA レジスタ数値**（アナログで誤差が出るため）。
-    **Y は scanline 番号として整数で正確に読める**ので画像依存度は低い。いずれも基準は数値、グリッドは視覚補助（B に従属）。
-
-## B. サイクルを頭の中で正確に数えられない（タイミング計算の欠落）★最重要
-
-これが本丸。1 スキャンライン = **76 CPU サイクル / 可視 160 ピクセル**、CPU 1 サイクル = 3 ピクセル。
-カーネルはこのサイクル数をぴったり合わせないと画面が崩れる。分岐はサイクル数が可変（ページ跨ぎで +1）で、
-Claude は「だいたい」で見積もる。だいたい = 崩壊。
-
-**横スプライト位置決めが失敗の典型例**（文献上 *"the most infamous aspect of the Atari 2600's hardware interface"*）：
-横位置は「RESPx をストローブした瞬間のビーム位置」で決まり、定石は
-**`/15` ループ（1 周 = 15 カラークロック = 5 CPU サイクル）で粗く合わせ、HMOVE で ±7px 微調整
-（HMOVE は WSYNC 直後必須）**。これは分岐を含むコード経路上の「正確なビーム位置」を知らないと合わない。
-Claude が計算下手なのではなく、**走らせずにこの値を確定できない**のが理由。
-
-- **必要なもの:** 「このコード領域の実サイクル数」と「ストローブした瞬間の (scanline, colorclock)」を
-  返す仕組み。さらに「カーネルがサイクル予算を超えたら止める」条件停止（breakIf 相当）。
-- **litmus test:** スプライトを任意 X に置く／1px ずつ動かす。ここが通れば環境は本物。
-
-## C. 6502/TIA の挙動を完全に内在化していない（知識の欠落）
-
-学習データが現代言語より薄く、Claude は NTSC/PAL のライン数、TIA レジスタのアドレス／ビット配置、
-VSYNC(3)/VBLANK(37)/可視(192)/オーバースキャン(30) の境界、HMOVE の comb 効果などを**しれっと取り違える**。
-
-> **重要な補正:** 欠落 C は「資料が無い」ことではない。
-> 参照資料はユーザーが既にほぼ揃えている（Nick Bensema の cycle counting guide、
-> Stella Programmer's Guide、Andrew Davie の Newbies、実ゲームの逆アセンブル、
-> woodgrain wiki の Playfield_Timing 等 → `docs/tool-landscape.md` の C 節に棚卸し）。
-> **問題は、フォルダに資料があること ≠ 制作の瞬間に正しい定数が Claude の文脈で効いていること。**
-> したがって C の対策は「資料を増やす」ではなく、
-> **(1) 核心定数を CLAUDE.md に蒸留して常時文脈に置く + (2) 記憶に頼らず B の検証で裏を取る**。
-> つまり C は単独では解けず、**B（検証）に従属**する。
-
-## D. 再現性・回帰がない（検証の欠落）
-
-A を直すと B のタイミングが黙って壊れる。手動プレイは再現不能。
-
-- **必要なもの:** **決定的な入力スクリプト + 自動アサーション**
-  （`scanline == 262` / カーネルがサイクル予算内 / フレーム N でスプライト X == 期待値）。
-- 6502 単体テスト基盤（純ロジックの決定的テスト）とエミュレータ上のフレーム単位アサーションの二層。
-
-## E. 反復コストが高い（摩擦）　✅ クローズ（v0.21）
-
-assemble → run → inspect が**Claude が即叩ける 1 コマンド**になっていないと、反復回数が足りず精度が上がらない。
-
-- **必要なもの:** 1 コマン／1 ツール呼び出しで「アセンブル → 実行 → 状態を数値で回収」まで完結する糊付け。
-- **解決:** `assemble_and_load`（asm→load 1 ショット, v0.16）＋ シナリオ回帰（入力＋数値アサート＋ゴールデン,
-  v0.18-19）＋ シナリオの `rom` に `.asm` 直指定（v0.21）→ `go run ./cmd/scenario foo.json` で
-  「ソース 1 枚 → アセンブル → 実行 → 数値で回収 → 合否」が 1 コマンドに到達。
+The failures are not uneven ability; they come from **specific information not being given to the model**.
+Five gaps. The first half (A–C) is "the truth is invisible"; the second half (D–E) is "the loop is slow /
+breakage goes unnoticed".
 
 ---
 
-## まとめ：何がどの層を埋めるか
+## A. Execution results are invisible (perception gap)
 
-| 層 | 埋めるもの | 配管 |
+The model writes code **blindfolded**. A single screenshot is only "one instant" — it captures neither
+motion (between frames) nor draw timing (within a line).
+
+- **What's needed:** not pixels but **per-frame numeric state**
+  (128 bytes of RAM / A·X·Y·SP·PC·flags / TIA registers / inputs / scanline / cycle).
+- Screenshots are a supplement; the basis for judgment is numbers.
+- **Annotated screenshot (`get_screen_annotated`):** overlay an **XY grid + axis labels** calibrated to
+  the 2600's real coordinate system onto a Stella 1x snapshot
+  (**horizontal = 0–159 color clocks / vertical = 0–191 scanlines**; not X-only — always draw both axes).
+  Also draw Stella's **Fixed Debug Colors** (PF/P0/P1/M0/M1/BL in fixed colors) and markers for the
+  **(X position, Y = drawn scanline range) of objects** read from registers/kernel, **always keeping image
+  and numbers consistent**. X and Y are fundamentally different on the 2600:
+  - **X (horizontal)** = the beam position at the RESPx strobe (continuous value + hardware-specific
+    offset). The grid shows the mismatch "written position value → actual displayed column" = the
+    observable for **failure #1**, which led to brute-forcing magic constants in Pong.
+  - **Y (vertical)** = on which scanline drawing was enabled (the kernel's line counting). The grid shows
+    sprite vertical drift and **zone-boundary scanlines** = the observable for the **screen roll
+    (failure #3)** caused by miscounting `sta WSYNC`.
+  - Judgment basis: **the final X verdict is the Gopher2600 TIA register value, not pixel-counting the
+    image** (analog rendering introduces error). **Y reads exactly as an integer scanline number**, so it
+    depends little on the image. In all cases the basis is numbers; the grid is a visual aid (subordinate
+    to B).
+
+## B. Cycles can't be counted exactly in your head (timing gap) ★ most critical
+
+This is the crux. One scanline = **76 CPU cycles / 160 visible pixels**, 1 CPU cycle = 3 pixels. The
+kernel must hit this cycle count exactly or the screen breaks. Branch cycle counts are variable (+1 on a
+page crossing), and the model estimates "roughly." Roughly = collapse.
+
+**Horizontal sprite positioning is the canonical failure** (in the literature, *"the most infamous aspect
+of the Atari 2600's hardware interface"*): horizontal position is set by "the beam position at the moment
+RESPx is strobed", and the idiom is **a `/15` loop (one turn = 15 color clocks = 5 CPU cycles) for coarse
+alignment, plus HMOVE for ±7 px fine adjust (HMOVE must come right after WSYNC)**. This can't be hit
+without knowing the "exact beam position" along a branchy code path. The model isn't bad at arithmetic —
+it simply **can't pin this value without running**.
+
+- **What's needed:** a mechanism that returns "the actual cycle count of this code region" and "the
+  (scanline, colorclock) at the strobe moment". Plus a conditional stop ("halt if the kernel exceeds the
+  cycle budget", a breakIf equivalent).
+- **litmus test:** place a sprite at an arbitrary X / move it 1 px at a time. If this passes, the
+  environment is real.
+
+## C. 6502/TIA behavior isn't fully internalized (knowledge gap)
+
+Training data is thinner than for modern languages, so the model **quietly misremembers** NTSC/PAL line
+counts, TIA register addresses / bit layouts, the VSYNC(3)/VBLANK(37)/visible(192)/overscan(30)
+boundaries, the HMOVE comb effect, and so on.
+
+> **Important correction:** gap C is not "there are no references."
+> The owner already has nearly all references (Nick Bensema's cycle counting guide, the Stella
+> Programmer's Guide, Andrew Davie's "Newbies", disassemblies of real games, the woodgrain wiki's
+> Playfield_Timing, etc. → inventoried in section C of `docs/tool-landscape.md`).
+> **The problem is: having references in a folder ≠ the correct constant being live in the model's context
+> at the moment of authoring.**
+> So the countermeasure for C is not "add more references" but
+> **(1) distill the core constants into CLAUDE.md so they're always in context + (2) verify with B instead
+> of trusting memory**.
+> In other words C is not solvable alone; it is **subordinate to B (verification)**.
+
+## D. No reproducibility / regression (verification gap)
+
+Fixing A silently breaks B's timing. Manual play is not reproducible.
+
+- **What's needed:** **deterministic input scripts + automatic assertions**
+  (`scanline == 262` / kernel within cycle budget / sprite X == expected at frame N).
+- Two layers: a 6502 unit-test base (deterministic tests of pure logic) and per-frame assertions on the
+  emulator.
+
+## E. High iteration cost (friction) ✅ closed (v0.21)
+
+If assemble → run → inspect isn't **one command the model can invoke immediately**, the iteration count
+is too low and accuracy doesn't rise.
+
+- **What's needed:** glue that completes "assemble → run → collect state numerically" in one command / one
+  tool call.
+- **Solution:** `assemble_and_load` (asm→load in one shot, v0.16) + scenario regression (inputs + numeric
+  asserts + golden, v0.18-19) + specifying a `.asm` directly as the scenario `rom` (v0.21) → with
+  `go run ./cmd/scenario foo.json`, "one source file → assemble → run → collect numerically → pass/fail"
+  reaches one command.
+
+---
+
+## Summary: what fills which layer
+
+| Layer | What it fills | Plumbing |
 |----|-----------|------|
-| A 知覚 / B タイミング | フレーム単位の数値状態・サイクル／ビーム位置 | **MCP / 検証ハーネス** |
-| C 知識 | 核心定数の常時文脈化 + 検証での裏取り | **CLAUDE.md への蒸留**（B に従属） |
-| D 検証 | 決定的入力 + 自動アサーション | **6502 テスト基盤 + フレームアサーション** |
-| E 摩擦 | 1 コマンド化 | **ツールの糊付け / IDE 連携** |
+| A perception / B timing | per-frame numeric state, cycle / beam position | **MCP / verification harness** |
+| C knowledge | always-in-context core constants + verification | **distillation into CLAUDE.md** (subordinate to B) |
+| D verification | deterministic inputs + automatic assertions | **6502 test base + frame assertions** |
+| E friction | one command | **tool glue / IDE integration** |
 
-- Stella 単体 MCP は A の一部しか埋めない。だから旧名 `Stella-MCP` は射程が狭い。
-- **最優先は B**（本丸かつ litmus test を持つ）。C は B に乗る。A は B の前提。
+- A Stella-only MCP fills only part of A; that's why the former name `Stella-MCP` was too narrow.
+- **B is the top priority** (the crux, and it has the litmus test). C rides on B. A is a prerequisite for B.
 
 ---
 
-## 過去 Pong 制作からの実証データ
+## Empirical data from past Pong work
 
-`260304_Claude-Code-Pong` の post-mortem（3 回の放棄 + 1 回の再起動）で観測された失敗は、欠落 A〜E に
-きれいに対応する。**全ての放棄が、検証されないタイミング／位置決めで死んでいる。**
-（証拠は同プロジェクトの memory および archive。詳細パスは下記。）
+In the post-mortem of `260304_Claude-Code-Pong` (3 abandonments + 1 restart), the observed failures map
+cleanly onto gaps A–E. **Every abandonment died on unverified timing / positioning.**
+(Evidence is in that project's memory and archive.)
 
-### B（タイミング）— 最多かつ致命
+### B (timing) — most frequent and fatal
 
-1. **横位置が「経験則の魔法定数」に頼った。** memory `feedback_asm_architecture.md` に
-   「理論式 `P1 = 160 - P0 - 幅` だが実際は数ピクセルずれる（ハード固有オフセット）」とあり、
-   確定値は試行錯誤で発見された：スコア `P0=48 / P1=124`（NUSIZ `$05`）、パドル `P0=16 / P1=143`。
-   → **Claude が導出できず総当たりした証拠**。欠落 B「走らせずに確定できない」そのもの。
-2. **手打ち NOP 位置決め**（`archive/claude.ai_ver/pong.asm` 243–281、31 連 NOP で "cycle ≈ 71" を狙う）は
-   前の命令が 1 つ変わると壊れる。正解の `PosObject`（divide-by-15）が存在するのに退行している。
-3. **スキャンライン数ドリフト → 画面ロール。** 多ゾーンカーネルで `PosObject` 内の `sta WSYNC` が
-   可視領域のライン予算に数えられず超過（`archive/terminal_02/02_step08.asm`）。
-   VBLANK 中の `PosObject`×3 が `TIM64T #43` 予算を圧迫（`archive/terminal_01/01_v2_step3.asm`）。
-   → 欠落 A（見えない）＋ B（数えられない）の複合。
+1. **Horizontal position relied on "empirical magic constants."** memory `feedback_asm_architecture.md`
+   notes "the theoretical formula `P1 = 160 - P0 - width`, but in practice it's off by a few pixels
+   (hardware-specific offset)", and the final values were found by trial and error: score `P0=48 / P1=124`
+   (NUSIZ `$05`), paddle `P0=16 / P1=143`. → **evidence the model couldn't derive them and brute-forced.**
+   This is exactly gap B, "can't pin it without running."
+2. **Hand-placed NOP positioning** (`archive/claude.ai_ver/pong.asm` 243–281, 31 NOPs targeting
+   "cycle ≈ 71") breaks if a preceding instruction changes by one. It regressed even though the correct
+   `PosObject` (divide-by-15) exists.
+3. **Scanline-count drift → screen roll.** In a multi-zone kernel, `sta WSYNC` inside `PosObject` wasn't
+   counted in the visible-region line budget and overran (`archive/terminal_02/02_step08.asm`). Three
+   `PosObject`s during VBLANK pressured the `TIM64T #43` budget (`archive/terminal_01/01_v2_step3.asm`).
+   → a compound of gap A (invisible) + B (uncountable).
 
-### D / E（検証・摩擦）
+### D / E (verification / friction)
 
-4. **一括変更でバグが切り分け不能に。** terminal_01 v2 は「上手く機能せず凍結」（`project_pong_status.md`）。
-   → 小ステップ build→確認、失敗時は前ステップへ revert（`feedback_dev_process.md`）。
-5. **確認が人間のスクショ目視に依存。** Step 2（net）未検証、step08 未確認のまま停滞。
-   → **ハーネス自身が検証する**必要。
+4. **Bulk changes made bugs un-bisectable.** terminal_01 v2 "didn't work well and was frozen"
+   (`project_pong_status.md`). → small-step build→check, revert to the previous step on failure
+   (`feedback_dev_process.md`).
+5. **Verification depended on human eyeballing of screenshots.** Step 2 (net) unverified, step08 stalled
+   unconfirmed. → **the harness itself must verify.**
 
-### 再利用できる資産
+### Reusable assets
 
-- 実証済み `PosObject`（divide-by-15）と `docs_atari/8bitworkshop_samples/sethorizpos.asm`（手打ち NOP の正解）。
-- 確定位置定数（上記）— 再発見を避ける出発点。
-- `cc-pong.asm` Step 1 スケルトン（TIM64T、正確な 262 行）。
-- `archive/terminal_01/01_v2_step3.asm` のゲームロジック（AI / 3 ゾーン反射角 / 衝突 `CXP0FB` / スコア / 音）
-  — 表示は不安定だったが**アルゴリズム移植元**として有用。
-- 参照資料コーパス（`docs_atari/`, `docs_pong/`）一式 → 欠落 C は収集済み。
+- The proven `PosObject` (divide-by-15) and `docs_atari/8bitworkshop_samples/sethorizpos.asm` (the correct
+  hand-placed-NOP version).
+- The established position constants (above) — a starting point to avoid rediscovery.
+- The `cc-pong.asm` Step 1 skeleton (TIM64T, exactly 262 lines).
+- The game logic in `archive/terminal_01/01_v2_step3.asm` (AI / 3-zone bounce angles / collision
+  `CXP0FB` / score / sound) — display was unstable but it's useful as an **algorithm port source**.
+- The reference corpus (`docs_atari/`, `docs_pong/`) — gap C is already collected.
 
-### 結論
+### Conclusion
 
-**最大レバレッジは「横位置とスキャンライン数を、Stella スクショの目視ではなくツール自身が検証すること」。**
-→ **欠落 B を埋める検証ハーネスが最優先**、で確定。C は B に乗せる（蒸留 + 裏取り）。A は B の前提。
+**The greatest leverage is "having the tool itself verify horizontal position and scanline counts, instead
+of eyeballing Stella screenshots."** → **a verification harness that closes gap B is the top priority**,
+settled. C rides on B (distill + verify). A is a prerequisite for B.
