@@ -32,6 +32,21 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.15.0] - 2026-06-10
+
+### 追加
+- **`step_instruction` / `step_scanline` MCP ツール（B-2 / フレーム内粒度）。** これまでフレーム単位
+  （`step_frame`）でしか進められず kernel の途中状態を覗けなかった。
+  - `step_instruction`: ちょうど 1 つの CPU 命令を実行（保留中の WSYNC stall を消化してから）。返却=その
+    命令のサイクル数＋座標。`read_cycles` と対で 1 命令ずつ追える。
+  - `step_scanline`: TV の scanline が 1 つ進むまで（フレーム境界では次フレーム scanline 0）。返却=その
+    scanline 区間で実行した CPU サイクル＋座標。ライン単位で kernel 状態を検分。
+  - **実装**: `internal/emu` `StepInstruction`/`StepScanline`（共通 `stepInstr` プリミティブの上）。
+    `cmd/harness/main.go` に handler 2 つ + `AddTool`。
+  - **検証**: `emu_step_test.go` — litmus_cycles で各 step の LastCycles が 2(NOP)/3(JMP)、累積がちょうど
+    その分進む。smoke で scanline がちょうど +1（フレーム境界で 0 折返し）・各ラインでサイクル消費 > 0。
+  - 注: 色クロック単位の `step_clock` は `Step` が命令単位のため未実装（finer hook が要る、将来）。
+
 ## [0.14.0] - 2026-06-10
 
 ### 追加

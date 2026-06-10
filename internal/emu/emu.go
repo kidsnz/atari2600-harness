@@ -163,6 +163,34 @@ func (e *Emu) StepFrame() (int, error) {
 	return maxScanline + 1, nil
 }
 
+// StepInstruction はちょうど 1 つの CPU 命令を実行して進める。WSYNC stall 中なら stall を消化して
+// 次の実命令まで進む（read_cycles と対で「1 命令ずつ覗く」フレーム内粒度。B-2）。
+func (e *Emu) StepInstruction() error {
+	for {
+		executed, err := e.stepInstr()
+		if err != nil {
+			return err
+		}
+		if executed || e.VCS.CPU.Jammed {
+			return nil
+		}
+	}
+}
+
+// StepScanline は TV の scanline がちょうど 1 つ進むまでステップする（フレーム境界では次フレームの
+// scanline 0 で停止）。kernel の途中状態をライン単位で覗くための粒度（B-2）。
+func (e *Emu) StepScanline() error {
+	start := e.VCS.TV.GetCoords().Scanline
+	for {
+		if _, err := e.stepInstr(); err != nil {
+			return err
+		}
+		if e.VCS.CPU.Jammed || e.VCS.TV.GetCoords().Scanline != start {
+			return nil
+		}
+	}
+}
+
 // PeekRAM は副作用なしでメモリを読む（read_ram / peek の土台）。
 func (e *Emu) PeekRAM(addr uint16) (uint8, error) {
 	return e.VCS.Mem.Peek(addr)

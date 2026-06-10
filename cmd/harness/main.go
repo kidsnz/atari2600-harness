@@ -106,6 +106,47 @@ func handleStepFrame(ctx context.Context, req *mcp.CallToolRequest, in StepFrame
 	return nil, StepFrameOut{Coords: coordsOf(e)}, nil
 }
 
+// --- step_instruction / step_scanline（B-2: フレーム内粒度）---
+
+type StepInstructionOut struct {
+	LastInstructionCycles int    `json:"last_instruction_cycles"`
+	Coords                Coords `json:"coords"`
+}
+
+func handleStepInstruction(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, StepInstructionOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, StepInstructionOut{}, err
+	}
+	if err := e.StepInstruction(); err != nil {
+		return nil, StepInstructionOut{}, fmt.Errorf("step instruction: %w", err)
+	}
+	return nil, StepInstructionOut{LastInstructionCycles: e.LastCycles(), Coords: coordsOf(e)}, nil
+}
+
+type StepScanlineOut struct {
+	CyclesConsumed int64  `json:"cycles_consumed"` // この scanline 区間で実行した CPU サイクル
+	Coords         Coords `json:"coords"`
+}
+
+func handleStepScanline(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, StepScanlineOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, StepScanlineOut{}, err
+	}
+	before := e.TotalCycles()
+	if err := e.StepScanline(); err != nil {
+		return nil, StepScanlineOut{}, fmt.Errorf("step scanline: %w", err)
+	}
+	return nil, StepScanlineOut{CyclesConsumed: e.TotalCycles() - before, Coords: coordsOf(e)}, nil
+}
+
 // --- read_cpu ---
 
 type CPUFlags struct {
@@ -536,6 +577,8 @@ func main() {
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
 	mcp.AddTool(server, &mcp.Tool{Name: "step_frame", Description: "Run the emulator for N frames."}, handleStepFrame)
+	mcp.AddTool(server, &mcp.Tool{Name: "step_instruction", Description: "Execute exactly one CPU instruction (consuming any pending WSYNC stall first). Returns its cycle count and beam coords — pairs with read_cycles to step through a kernel one instruction at a time."}, handleStepInstruction)
+	mcp.AddTool(server, &mcp.Tool{Name: "step_scanline", Description: "Advance until the TV scanline increments once (stops at the next scanline, or scanline 0 of the next frame). Returns CPU cycles consumed across that scanline and beam coords — for inspecting kernel state line by line."}, handleStepScanline)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_cpu", Description: "Read 6507 registers, status flags, and beam coords."}, handleReadCPU)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_cycles", Description: "Read CPU cycle counts from the simulator (rule #2: never count cycles by hand): the last instruction's cycles, cycles since the last mark, and total cycles since ROM load. Set reset=true to mark a new measurement baseline (cycles_since_mark restarts at 0)."}, handleReadCycles)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_ram", Description: "Dump the 128 bytes of RAM ($80-$FF) as hex."}, handleReadRAM)

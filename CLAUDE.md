@@ -29,8 +29,10 @@
   **`read_cycles`**(v0.12.0, CPU サイクル数値露出＝鉄則2を実ループへ。直近命令/区間/累積) /
   **`assert_line_budget`**(v0.13.0, per-scanline 予算ガード＝WSYNC 間が予算超過＝ロール要因で halt) /
   **`read_tia_registers`**(v0.14.0, 書込専用レジスタ現在値の実測＝色推論を廃す) /
-  **`read_collisions`**(v0.14.0, CXxx を名前付き真偽ペアで構造化)。
-  未実装(予定): `step_scanline|clock` / `watch|trap`。
+  **`read_collisions`**(v0.14.0, CXxx を名前付き真偽ペアで構造化) /
+  **`step_scanline`**(v0.15.0, scanline +1 まで進めて停止) / **`step_instruction`**(v0.15.0, 1 命令ずつ)。
+  未実装(予定): `step_clock`（色クロック単位＝Step が命令単位のため要 finer hook） / `watch|trap`
+  （予算系は `assert_line_budget` で実質カバー済）。
 
 ## 絶対に取り違えてはいけない定数（出典: `docs/resources.md`）
 **フレーム** — 1 ライン = 228 カラークロック（HBLANK 68 + 可視 160）= **76 CPU サイクル**（3 クロック/サイクル）。

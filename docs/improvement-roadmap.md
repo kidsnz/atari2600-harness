@@ -35,7 +35,7 @@
 - **検証:** 既知サイクルの命令列 ROM（例 `LDA#`=2cy ×N）で累積が一致するか。`cpu/cpu_test.go:554` が前例。
 - **規模:** 小。最小の追加で鉄則2を実ループに初めて実体化。
 
-### B-2. `step_scanline` / `step_clock` ツール（フレーム内粒度）
+### B-2. `step_scanline` / `step_clock` ツール（フレーム内粒度）　✅ step_scanline + step_instruction 実装済 v0.15.0（step_clock は色クロック粒度で未着手）
 - **問題:** 現状フレーム単位ステップのみ。kernel の途中状態を覗けない。
 - **提案:** scanline+1 / color-clock+1 で前進。CLAUDE.md・CHANGELOG で「未実装(予定)」明記済。
 - **触る場所:** `emu.go` に既にある `RunUntilBeam(maxFrames, scanline, clock)`（`emu.go:197`）と

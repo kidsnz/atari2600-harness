@@ -61,6 +61,15 @@ type Coords struct {
 - Out: `{ Coords }`
 - 補足: scanline 数を返したいなら最後の 1 フレームだけ `emu.StepFrame()` で計測可（任意）。
 
+### 2b. `step_instruction` / `step_scanline`  ★フレーム内粒度（B-2, v0.15.0）
+- `step_instruction` In: `struct{}` / 動作: `emu.StepInstruction`（保留 WSYNC stall を消化して 1 命令実行）/
+  Out: `{ LastInstructionCycles int; Coords }`。`read_cycles` と対で 1 命令ずつ追う。
+- `step_scanline` In: `struct{}` / 動作: `emu.StepScanline`（scanline が +1 するまで、フレーム境界は次フレーム
+  scanline 0 で停止）/ Out: `{ CyclesConsumed int64; Coords }`。
+  - 注: 命令単位ステップのため、`CyclesConsumed` は次 scanline 先頭の最初の命令境界まで（1 命令分わずかに
+    超過しうる）。色クロック単位の `step_clock` は `Step` が命令単位のため未実装。
+- 検証: `internal/emu/emu_step_test.go`（litmus_cycles で 2/3cy・smoke で scanline +1 折返し）。
+
 ### 3. `read_cpu`
 - In: `struct{}`
 - 動作: `cpu := emu.VCS.CPU`。
