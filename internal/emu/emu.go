@@ -27,7 +27,29 @@ type Emu struct {
 	TV  *television.Television
 	VCS *hardware.VCS
 	cap *capture // 最新フレームを image.RGBA に取り込む PixelRenderer
+
+	cpuCycles int64 // ROM ロード以降に実行した CPU サイクルの累積（命令完了ごとに加算）
+	cycleMark int64 // 区間計測の基準点（MarkCycles で現在の cpuCycles に揃える）
 }
+
+// accumCycle は直近に完了した命令のサイクル数を累積へ加える。CPU の命令境界
+// （Step 1回 / RunForFrameCount の continueCheck = いずれも 1 命令ごと）で呼ぶこと。
+// LastResult.Cycles は PageFault/分岐の +1 を含む実サイクル数（出典: docs/improvement-roadmap B-1）。
+func (e *Emu) accumCycle() {
+	e.cpuCycles += int64(e.VCS.CPU.LastResult.Cycles)
+}
+
+// LastCycles は直近に完了した 1 命令のサイクル数を返す。
+func (e *Emu) LastCycles() int { return e.VCS.CPU.LastResult.Cycles }
+
+// TotalCycles は ROM ロード以降に実行した CPU サイクルの累積を返す。
+func (e *Emu) TotalCycles() int64 { return e.cpuCycles }
+
+// CyclesSinceMark は直近の MarkCycles 以降に実行した CPU サイクル数を返す（区間計測）。
+func (e *Emu) CyclesSinceMark() int64 { return e.cpuCycles - e.cycleMark }
+
+// MarkCycles は区間計測の基準点を現在に揃える（以後 CyclesSinceMark は 0 から数え直す）。
+func (e *Emu) MarkCycles() { e.cycleMark = e.cpuCycles }
 
 // New は指定 TV 仕様（"NTSC" / "PAL" / "AUTO" 等）で headless な VCS を作る。
 func New(spec string) (*Emu, error) {
@@ -88,9 +110,13 @@ func (e *Emu) Coords() coords.TelevisionCoords {
 	return e.VCS.TV.GetCoords()
 }
 
-// RunFrames は n フレーム実行する（条件停止なし）。
+// RunFrames は n フレーム実行する（条件停止なし）。continueCheck は命令完了ごとに
+// 呼ばれる（run.go RunForFrameCount）ので、そこで CPU サイクルを累積する。
 func (e *Emu) RunFrames(n int) error {
-	return e.VCS.RunForFrameCount(n, nil)
+	return e.VCS.RunForFrameCount(n, func() (govern.State, error) {
+		e.accumCycle()
+		return govern.Running, nil
+	})
 }
 
 // StepFrame はちょうど 1 フレーム分カラークロック単位でステップし、そのフレームに
@@ -102,6 +128,7 @@ func (e *Emu) StepFrame() (int, error) {
 		if err := e.VCS.Step(nil); err != nil {
 			return 0, err
 		}
+		e.accumCycle() // Step は 1 命令ぶん進む
 		c := e.VCS.TV.GetCoords()
 		if c.Frame != start {
 			break
@@ -196,6 +223,7 @@ func (e *Emu) ReadRow(scanline int) (runs []RowRun, width int, err error) {
 // 早期停止する。条件で止まったとき halted=true（breakif の土台）。
 func (e *Emu) RunUntilBeam(maxFrames, scanline, clock int) (halted bool, err error) {
 	check := func() (govern.State, error) {
+		e.accumCycle() // continueCheck は命令完了ごと
 		c := e.VCS.TV.GetCoords()
 		if c.Scanline == scanline && c.Clock == clock {
 			halted = true

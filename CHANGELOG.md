@@ -32,6 +32,22 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.12.0] - 2026-06-10
+
+### 追加
+- **`read_cycles` MCP ツール（欠落B＝タイミングを実制作ループに通す P0 第1段 / B-1）。** CPU サイクルを
+  シミュレータから数値で取得する（鉄則2を litmus 限定から実ループへ初めて実体化）。返却＝直近1命令の
+  サイクル数 `last_instruction_cycles`・直近 mark 以降の `cycles_since_mark`・ROM ロード以降の `total_cycles`。
+  `reset=true` で区間計測の基準点を今に揃える。
+  - **実装**: `internal/emu/emu.go` に累積カウンタ `cpuCycles` と `LastCycles/TotalCycles/CyclesSinceMark/
+    MarkCycles`。`CPU.LastResult.Cycles`（PageFault/分岐の +1 込み実サイクル）を命令境界で加算。全進行経路で
+    一貫させるため `RunFrames`/`RunUntilBeam` の continueCheck（命令完了ごと, `run.go`）と `StepFrame` の
+    自前ループ双方に hook。`cmd/harness/main.go` に `handleReadCycles` + `AddTool`。
+  - **検証ロム**: `roms/litmus/litmus_cycles.asm`（WSYNC 不使用の無限ループ＝CPU 無停止）。命令境界では
+    「実行 CPU サイクル × 3 == 進んだカラークロック数」が普遍則として厳密成立する性質を利用。
+  - **検証**: white-box テスト `internal/emu/emu_cycles_test.go` が上記普遍則を全命令境界で照合（PASS）。
+    MCP end-to-end でも 1 フレーム = 263 lines × 76 cy = `total_cycles 19988` を確認（無停止 263×228/3 と一致）。
+
 ## [0.11.0] - 2026-06-10
 
 ### 変更

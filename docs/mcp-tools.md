@@ -76,6 +76,24 @@ type Coords struct {
   }
   ```
 
+### 3b. `read_cycles`  ★鉄則2 を実ループへ（B-1, v0.12.0）
+- In: `{ Reset bool }`（`reset=true` で区間計測の基準点を今に揃える＝以後 `cycles_since_mark` は 0 から）
+- 動作: `emu` が命令境界で累積する CPU サイクルを返す。累積源 = `CPU.LastResult.Cycles`
+  （PageFault/分岐の +1 込み実サイクル）。全進行経路で一貫させるため `RunFrames`/`RunUntilBeam` の
+  continueCheck（命令完了ごと, `run.go`）と `StepFrame` 自前ループ双方で `e.accumCycle()` を呼ぶ。
+- Out:
+  ```go
+  type ReadCyclesOut struct {
+      LastInstructionCycles int   // 直近 1 命令のサイクル数（= LastResult.Cycles）
+      CyclesSinceMark       int64 // 直近 MarkCycles 以降の累積
+      TotalCycles           int64 // ROM ロード以降の累積
+      Coords
+  }
+  ```
+  - **検証根拠**: WSYNC 不使用 ROM（`roms/litmus/litmus_cycles.bin`）では CPU 無停止のため命令境界で
+    「実行サイクル × 3 == 進んだカラークロック数」が普遍則として厳密成立。`internal/emu/emu_cycles_test.go`
+    で照合済み。1 フレーム = 263 lines × 76 cy = `TotalCycles 19988`。
+
 ### 4. `read_ram`
 - In: `struct{}`
 - 動作: RAM 128 バイト = `$80–$FF`。`emu.PeekRAM(addr)` を 0x80..0xFF でループ。

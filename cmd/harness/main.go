@@ -153,6 +153,37 @@ func handleReadCPU(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*
 	}, nil
 }
 
+// --- read_cycles（鉄則2: サイクルはシミュレータから取る）---
+
+type ReadCyclesIn struct {
+	Reset bool `json:"reset,omitempty" jsonschema:"mark a new measurement baseline before reading (cycles_since_mark resets to 0)"`
+}
+type ReadCyclesOut struct {
+	LastInstructionCycles int    `json:"last_instruction_cycles"` // 直近 1 命令のサイクル数
+	CyclesSinceMark       int64  `json:"cycles_since_mark"`        // 直近 mark 以降の累積
+	TotalCycles           int64  `json:"total_cycles"`            // ROM ロード以降の累積
+	Coords                Coords `json:"coords"`
+}
+
+func handleReadCycles(ctx context.Context, req *mcp.CallToolRequest, in ReadCyclesIn) (*mcp.CallToolResult, ReadCyclesOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ReadCyclesOut{}, err
+	}
+	if in.Reset {
+		e.MarkCycles()
+	}
+	return nil, ReadCyclesOut{
+		LastInstructionCycles: e.LastCycles(),
+		CyclesSinceMark:       e.CyclesSinceMark(),
+		TotalCycles:           e.TotalCycles(),
+		Coords:                coordsOf(e),
+	}, nil
+}
+
 // --- read_ram ---
 
 type ReadRAMOut struct {
@@ -434,6 +465,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
 	mcp.AddTool(server, &mcp.Tool{Name: "step_frame", Description: "Run the emulator for N frames."}, handleStepFrame)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_cpu", Description: "Read 6507 registers, status flags, and beam coords."}, handleReadCPU)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_cycles", Description: "Read CPU cycle counts from the simulator (rule #2: never count cycles by hand): the last instruction's cycles, cycles since the last mark, and total cycles since ROM load. Set reset=true to mark a new measurement baseline (cycles_since_mark restarts at 0)."}, handleReadCycles)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_ram", Description: "Dump the 128 bytes of RAM ($80-$FF) as hex."}, handleReadRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_tia", Description: "Read TIA sprite positions (ResetPixel/HmovedPixel) and HBLANK. Authoritative for horizontal-position checks."}, handleReadTIA)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
