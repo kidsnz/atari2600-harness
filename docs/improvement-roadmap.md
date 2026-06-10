@@ -16,7 +16,7 @@
 
 | 欠落 | 内容 | 状態 | 残り |
 |---|---|---|---|
-| A 知覚 | 実行結果が見えない | **ほぼ閉** | 書込専用 TIA レジスタの現在値は色推論止まり（P1で解消） |
+| A 知覚 | 実行結果が見えない | **閉** | `read_tia_registers`/`read_collisions`（P1, v0.14.0）で書込専用レジスタ・衝突を実測。色推論を廃した |
 | B タイミング | サイクル計算が合わない | **ほぼ閉** | 位置は閉。**サイクル露出（B-1, v0.12）＋予算ガード（B-3, v0.13）実装済**。残り = フレーム内粒度（B-2）・kernel定数自動較正（B-4） |
 | C 知識 | 6502/TIA 詳細の誤り | **閉** | kernel 依存定数（missile式 N・HBLANK境界）が未formalize |
 | D 検証 | 再現・回帰が無い | **部分** | アサーション/入力リプレイ/ゴールデン回帰 未配線（P2） |
@@ -62,7 +62,7 @@
 
 ## P1 — TIA シャドウレジスタ読み（欠落A の残り）
 
-### `read_tia_registers`（書込専用レジスタの現在値を実測）
+### `read_tia_registers`（書込専用レジスタの現在値を実測）　✅ 実装済 v0.14.0
 - **問題:** COLUP0/1・COLUPF・COLUBK・NUSIZ0/1・CTRLPF・PF0/1/2・REFP・HMxx は**書込専用**で、
   現状 `poke` も持続しない（CLAUDE.md「poke の癖」）。Claude は `read_row` の**色から推論**するしかない
   ＝「`sta COLUP0` は本当に効いたか？」を間接的にしか確かめられない。
@@ -76,7 +76,7 @@
 - **検証:** ROM で `sta COLUP0,#$1C` → `read_tia_registers` が `0x1C` を返す。`read_row` の色と突き合わせ。
 - **規模:** 小〜中。**Gap A を「推論ゼロ」へ。**
 
-### `read_collisions`（CXxx の構造化）
+### `read_collisions`（CXxx の構造化）　✅ 実装済 v0.14.0
 - **問題:** Frogger の `OnPad` 判定は CXPPMM を **raw peek（$30–$37）** で読んでいる。
 - **提案:** 衝突ラッチを構造化 JSON（P0-P1 / M0-P0 等のペア真偽）で返す。
 - **触る場所:** `Gopher2600/hardware/tia/video/collisions.go:25` の `Collisions` 構造体／`chipbus.CXPPMM` 等。

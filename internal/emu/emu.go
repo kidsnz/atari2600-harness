@@ -16,6 +16,7 @@ import (
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports/plugging"
 	"github.com/jetsetilly/gopher2600/hardware/television"
 	"github.com/jetsetilly/gopher2600/hardware/television/coords"
+	"github.com/jetsetilly/gopher2600/hardware/tia/video"
 	"github.com/jetsetilly/gopher2600/setup"
 
 	"github.com/kidsnz/atari2600-dev/internal/annotate"
@@ -239,6 +240,147 @@ func (e *Emu) ReadRow(scanline int) (runs []RowRun, width int, err error) {
 		runs = append(runs, RowRun{Clock: x, Len: 1, Hex: hx})
 	}
 	return runs, w, nil
+}
+
+// --- P1: TIA 書込専用レジスタの現在値読み（色推論を実測へ）---
+
+// PlayerRegs は 1 プレイヤーの書込専用レジスタ現在値（Gopher2600 内部保持の実測値）。
+type PlayerRegs struct {
+	Color         uint8 `json:"color"`           // COLUP0/1
+	Nusiz         uint8 `json:"nusiz"`           // NUSIZ raw
+	SizeAndCopies uint8 `json:"size_and_copies"` // NUSIZ 下位3bit
+	GfxNew        uint8 `json:"gfx_new"`         // GRP（新）
+	GfxOld        uint8 `json:"gfx_old"`         // GRP（VDEL 用 旧）
+	Reflected     bool  `json:"reflected"`       // REFP
+	VerticalDelay bool  `json:"vertical_delay"`  // VDELP
+}
+
+// MissileRegs は 1 ミサイルの書込専用レジスタ現在値。
+type MissileRegs struct {
+	Color         uint8 `json:"color"`
+	Nusiz         uint8 `json:"nusiz"`
+	Size          uint8 `json:"size"`
+	Copies        uint8 `json:"copies"`
+	Enabled       bool  `json:"enabled"`         // ENAM
+	ResetToPlayer bool  `json:"reset_to_player"` // RESMP
+}
+
+// BallRegs はボールの書込専用レジスタ現在値。
+type BallRegs struct {
+	Color         uint8 `json:"color"`
+	Size          uint8 `json:"size"`
+	Enabled       bool  `json:"enabled"`        // ENABL
+	VerticalDelay bool  `json:"vertical_delay"` // VDELBL
+}
+
+// PlayfieldRegs は playfield の書込専用レジスタ現在値。
+type PlayfieldRegs struct {
+	PF0             uint8 `json:"pf0"`
+	PF1             uint8 `json:"pf1"`
+	PF2             uint8 `json:"pf2"`
+	ForegroundColor uint8 `json:"foreground_color"` // COLUPF
+	BackgroundColor uint8 `json:"background_color"` // COLUBK
+	Ctrlpf          uint8 `json:"ctrlpf"`
+	Reflected       bool  `json:"reflected"` // CTRLPF D0
+	Priority        bool  `json:"priority"`  // CTRLPF D2
+	Scoremode       bool  `json:"scoremode"` // CTRLPF D1
+}
+
+// TIARegisters は書込専用 TIA レジスタの現在値一式（read_tia_registers の戻り）。
+type TIARegisters struct {
+	Player0   PlayerRegs    `json:"player0"`
+	Player1   PlayerRegs    `json:"player1"`
+	Missile0  MissileRegs   `json:"missile0"`
+	Missile1  MissileRegs   `json:"missile1"`
+	Ball      BallRegs      `json:"ball"`
+	Playfield PlayfieldRegs `json:"playfield"`
+}
+
+// ReadTIARegisters は書込専用 TIA レジスタの現在値を Gopher2600 の内部保持から直接読む。
+// 「sta COLUP0 は本当に効いたか」を色推論でなく実測で確かめるための窓（欠落A の残りを閉じる）。
+func (e *Emu) ReadTIARegisters() TIARegisters {
+	v := e.VCS.TIA.Video
+	player := func(p *video.PlayerSprite) PlayerRegs {
+		return PlayerRegs{
+			Color: p.Color, Nusiz: p.Nusiz, SizeAndCopies: p.SizeAndCopies,
+			GfxNew: p.GfxDataNew, GfxOld: p.GfxDataOld,
+			Reflected: p.Reflected, VerticalDelay: p.VerticalDelay,
+		}
+	}
+	missile := func(m *video.MissileSprite) MissileRegs {
+		return MissileRegs{
+			Color: m.Color, Nusiz: m.Nusiz, Size: m.Size, Copies: m.Copies,
+			Enabled: m.Enabled, ResetToPlayer: m.ResetToPlayer,
+		}
+	}
+	pf := v.Playfield
+	return TIARegisters{
+		Player0:  player(v.Player0),
+		Player1:  player(v.Player1),
+		Missile0: missile(v.Missile0),
+		Missile1: missile(v.Missile1),
+		Ball: BallRegs{
+			Color: v.Ball.Color, Size: v.Ball.Size,
+			Enabled: v.Ball.Enabled, VerticalDelay: v.Ball.VerticalDelay,
+		},
+		Playfield: PlayfieldRegs{
+			PF0: pf.PF0, PF1: pf.PF1, PF2: pf.PF2,
+			ForegroundColor: pf.ForegroundColor, BackgroundColor: pf.BackgroundColor,
+			Ctrlpf: pf.Ctrlpf, Reflected: pf.Reflected, Priority: pf.Priority, Scoremode: pf.Scoremode,
+		},
+	}
+}
+
+// --- P1: 衝突（CXxx）の構造化読み ---
+
+// Collisions は 8 本の CXxx レジスタ（$30–$37, 各 D7/D6 ラッチ・sticky）を意味づけした真偽集合。
+// CXCLR まで保持される。出典のビット割当は Gopher2600 collisions.go tick() で裏取り済み。
+type Collisions struct {
+	P0P1 bool `json:"p0_p1"` // CXPPMM D7
+	M0M1 bool `json:"m0_m1"` // CXPPMM D6
+	M0P0 bool `json:"m0_p0"` // CXM0P  D6
+	M0P1 bool `json:"m0_p1"` // CXM0P  D7
+	M1P0 bool `json:"m1_p0"` // CXM1P  D7
+	M1P1 bool `json:"m1_p1"` // CXM1P  D6
+	P0PF bool `json:"p0_pf"` // CXP0FB D7
+	P0BL bool `json:"p0_bl"` // CXP0FB D6
+	P1PF bool `json:"p1_pf"` // CXP1FB D7
+	P1BL bool `json:"p1_bl"` // CXP1FB D6
+	M0PF bool `json:"m0_pf"` // CXM0FB D7
+	M0BL bool `json:"m0_bl"` // CXM0FB D6
+	M1PF bool `json:"m1_pf"` // CXM1FB D7
+	M1BL bool `json:"m1_bl"` // CXM1FB D6
+	BLPF bool `json:"bl_pf"` // CXBLPF D7
+}
+
+// decodeCollisions は CXM0P,CXM1P,CXP0FB,CXP1FB,CXM0FB,CXM1FB,CXBLPF,CXPPMM（$30..$37 の順）の
+// 生バイト 8 本から各衝突ペアを取り出す純関数（単体テスト対象）。D7=0x80 / D6=0x40。
+func decodeCollisions(r [8]byte) Collisions {
+	d7 := func(b byte) bool { return b&0x80 != 0 }
+	d6 := func(b byte) bool { return b&0x40 != 0 }
+	return Collisions{
+		M0P1: d7(r[0]), M0P0: d6(r[0]), // CXM0P
+		M1P0: d7(r[1]), M1P1: d6(r[1]), // CXM1P
+		P0PF: d7(r[2]), P0BL: d6(r[2]), // CXP0FB
+		P1PF: d7(r[3]), P1BL: d6(r[3]), // CXP1FB
+		M0PF: d7(r[4]), M0BL: d6(r[4]), // CXM0FB
+		M1PF: d7(r[5]), M1BL: d6(r[5]), // CXM1FB
+		BLPF: d7(r[6]),                 // CXBLPF（D6 なし）
+		P0P1: d7(r[7]), M0M1: d6(r[7]), // CXPPMM
+	}
+}
+
+// ReadCollisions は衝突レジスタ $30–$37 を副作用なしで読み、構造化して返す。
+func (e *Emu) ReadCollisions() (Collisions, error) {
+	var r [8]byte
+	for i := 0; i < 8; i++ {
+		b, err := e.PeekRAM(uint16(0x30 + i))
+		if err != nil {
+			return Collisions{}, fmt.Errorf("peek CX %02X: %w", 0x30+i, err)
+		}
+		r[i] = b
+	}
+	return decodeCollisions(r), nil
 }
 
 // RunUntilBeam は最大 maxFrames フレーム実行し、ビームが (scanline, clock) に達したら

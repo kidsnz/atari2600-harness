@@ -27,7 +27,9 @@
 - MCP ツール(**実装済**, `cmd/harness`): `load_rom` / `step_frame` / `read_cpu` / `read_ram` /
   `read_tia` / `peek` / `poke` / `breakif` / **`get_screen_annotated`**(v0.5.0, 画像＋数値を同時返却) /
   **`read_cycles`**(v0.12.0, CPU サイクル数値露出＝鉄則2を実ループへ。直近命令/区間/累積) /
-  **`assert_line_budget`**(v0.13.0, per-scanline 予算ガード＝WSYNC 間が予算超過＝ロール要因で halt)。
+  **`assert_line_budget`**(v0.13.0, per-scanline 予算ガード＝WSYNC 間が予算超過＝ロール要因で halt) /
+  **`read_tia_registers`**(v0.14.0, 書込専用レジスタ現在値の実測＝色推論を廃す) /
+  **`read_collisions`**(v0.14.0, CXxx を名前付き真偽ペアで構造化)。
   未実装(予定): `step_scanline|clock` / `watch|trap`。
 
 ## 絶対に取り違えてはいけない定数（出典: `docs/resources.md`）

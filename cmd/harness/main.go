@@ -247,6 +247,46 @@ func handleReadTIA(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*
 	}, nil
 }
 
+// --- read_tia_registers（P1: 書込専用レジスタの現在値を実測）---
+
+type ReadTIARegsOut struct {
+	emu.TIARegisters
+	Coords Coords `json:"coords"`
+}
+
+func handleReadTIARegisters(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, ReadTIARegsOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ReadTIARegsOut{}, err
+	}
+	return nil, ReadTIARegsOut{TIARegisters: e.ReadTIARegisters(), Coords: coordsOf(e)}, nil
+}
+
+// --- read_collisions（P1: CXxx を構造化）---
+
+type ReadCollisionsOut struct {
+	emu.Collisions
+	Coords Coords `json:"coords"`
+}
+
+func handleReadCollisions(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, ReadCollisionsOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ReadCollisionsOut{}, err
+	}
+	cx, err := e.ReadCollisions()
+	if err != nil {
+		return nil, ReadCollisionsOut{}, err
+	}
+	return nil, ReadCollisionsOut{Collisions: cx, Coords: coordsOf(e)}, nil
+}
+
 // --- read_row（playfield 点灯列 / per-scanline 色を数値で読む）---
 
 type ReadRowIn struct {
@@ -500,6 +540,8 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_cycles", Description: "Read CPU cycle counts from the simulator (rule #2: never count cycles by hand): the last instruction's cycles, cycles since the last mark, and total cycles since ROM load. Set reset=true to mark a new measurement baseline (cycles_since_mark restarts at 0)."}, handleReadCycles)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_ram", Description: "Dump the 128 bytes of RAM ($80-$FF) as hex."}, handleReadRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_tia", Description: "Read TIA sprite positions (ResetPixel/HmovedPixel) and HBLANK. Authoritative for horizontal-position checks."}, handleReadTIA)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_tia_registers", Description: "Read the current values of the write-only TIA registers (COLUP0/1, COLUPF, COLUBK, NUSIZ, CTRLPF, PF0/1/2, REFP, VDEL, ENAM/ENABL, GRP, etc.) straight from emulator state. Use this to confirm a 'sta COLUP0' actually took effect instead of inferring from pixel colors."}, handleReadTIARegisters)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_collisions", Description: "Read the 8 TIA collision latches (CXxx, $30-$37; sticky until CXCLR) as named boolean pairs (p0_p1, m0_p0, p0_pf, bl_pf, ...). Structured replacement for raw peeks of the collision registers."}, handleReadCollisions)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
 	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject joystick input (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. action left|right|up|down|fire|center. pressed=true holds, false releases; state persists until changed. center releases all directions."}, handleSetInput)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)

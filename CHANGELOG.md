@@ -32,6 +32,23 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.14.0] - 2026-06-10
+
+### 追加
+- **`read_tia_registers` MCP ツール（P1 / 欠落A の残りを閉じる）。** 書込専用 TIA レジスタ
+  （COLUP0/1・COLUPF・COLUBK・NUSIZ・CTRLPF・PF0/1/2・REFP・VDEL・ENAM/ENABL・GRP 等）の現在値を
+  Gopher2600 内部保持から直接数値返却。「`sta COLUP0` は本当に効いたか」を `read_row` の色推論でなく
+  実測で確かめられる。`internal/emu` に exported 型（`PlayerRegs`/`MissileRegs`/`BallRegs`/`PlayfieldRegs`/
+  `TIARegisters`）と `ReadTIARegisters()`。確認済みシンボル: `TIA.Video.{Player0/1,Missile0/1,Ball,Playfield}`
+  の各 exported フィールド（`player.go`/`missile.go`/`ball.go`/`playfield.go`）。
+  - 検証: smoke の `COLUBK=$1E`、litmus_pf の PF 非ゼロを実測一致。MCP 実測で **PF0=$F0**（PF0 は上位
+    ニブルのみ＝実 TIA 挙動）も確認。
+- **`read_collisions` MCP ツール（P1）。** 8 本の衝突ラッチ（CXxx, `$30–$37`, 各 D7/D6・sticky）を
+  名前付き真偽ペア（`p0_p1`/`m0_p0`/`p0_pf`/`bl_pf` …）に構造化。Frogger の OnPad 判定が使っていた
+  raw peek の置換。ビット割当は Gopher2600 `collisions.go` の `tick()` で裏取り（純関数 `decodeCollisions`）。
+  - 検証: `decodeCollisions` の D7/D6 全ペア単体テスト、無スプライト ROM で all-false、新規
+    `roms/litmus/litmus_collide.asm`（PF 全点灯＋ボール有効）で **BL-PF を陽性検出**。
+
 ## [0.13.0] - 2026-06-10
 
 ### 追加

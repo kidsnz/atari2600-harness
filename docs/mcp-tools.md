@@ -115,6 +115,28 @@ type Coords struct {
   - 衝突は `v.Collisions`（`*video.Collisions`）。最小版では省略可、余裕あれば CXxx を bool 化。
   - **判定基準**: プレイヤー `HmovedPixel` が `X = 3N−54` に一致するか（横位置検証）。
 
+### 5b. `read_tia_registers`  ★欠落A の残りを閉じる（P1, v0.14.0）
+- In: `struct{}`
+- 動作: 書込専用 TIA レジスタの現在値を `e.VCS.TIA.Video` の exported フィールドから直接読む（`emu.ReadTIARegisters`）。
+  色推論（`read_row`）でなく実測で「`sta COLUPx` は効いたか」を確かめる。
+- Out: `emu.TIARegisters` ＋ `Coords`。内訳:
+  - Player0/1（`PlayerRegs`）: `color`(COLUP) / `nusiz` / `size_and_copies` / `gfx_new` / `gfx_old`(GRP) /
+    `reflected`(REFP) / `vertical_delay`(VDELP)。
+  - Missile0/1（`MissileRegs`）: `color` / `nusiz` / `size` / `copies` / `enabled`(ENAM) / `reset_to_player`(RESMP)。
+  - Ball（`BallRegs`）: `color` / `size` / `enabled`(ENABL) / `vertical_delay`(VDELBL)。
+  - Playfield（`PlayfieldRegs`）: `pf0`/`pf1`/`pf2` / `foreground_color`(COLUPF) / `background_color`(COLUBK) /
+    `ctrlpf` / `reflected`(D0) / `priority`(D2) / `scoremode`(D1)。
+- 注: PF0 は上位ニブルのみ保持（`$FF` 書込→読みは `$F0`）＝実 TIA 挙動。
+- 検証: smoke の COLUBK=$1E / litmus_pf の PF 非ゼロ。`internal/emu/emu_tia_test.go`。
+
+### 5c. `read_collisions`  ★CXxx 構造化（P1, v0.14.0）
+- In: `struct{}`
+- 動作: 衝突レジスタ `$30–$37`（各 D7/D6 ラッチ・sticky・CXCLR まで保持）を副作用なし peek して名前付き
+  真偽ペアへデコード（`emu.ReadCollisions` / 純関数 `decodeCollisions`）。
+- Out: `emu.Collisions`（`p0_p1`/`m0_m1`/`m0_p0`/`m0_p1`/`m1_p0`/`m1_p1`/`p0_pf`/`p0_bl`/`p1_pf`/`p1_bl`/
+  `m0_pf`/`m0_bl`/`m1_pf`/`m1_bl`/`bl_pf`）＋ `Coords`。ビット割当は Gopher2600 `collisions.go` `tick()` 裏取り。
+- 検証: D7/D6 全ペア単体テスト、無スプライトで all-false、`litmus_collide.bin`（PF全点灯＋ball）で BL-PF 陽性。
+
 ### 6. `peek` / `poke`
 - `peek` In: `{ Addr uint16 }` → Out: `{ Value uint8; Coords }`（`emu.VCS.Mem.Peek`）。
 - `poke` In: `{ Addr uint16; Value uint8 }` → Out: `{ Coords }`（`emu.VCS.Mem.Poke`）。
