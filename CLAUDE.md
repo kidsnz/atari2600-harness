@@ -30,7 +30,8 @@
   **`assert_line_budget`**(v0.13.0, per-scanline 予算ガード＝WSYNC 間が予算超過＝ロール要因で halt) /
   **`read_tia_registers`**(v0.14.0, 書込専用レジスタ現在値の実測＝色推論を廃す) /
   **`read_collisions`**(v0.14.0, CXxx を名前付き真偽ペアで構造化) /
-  **`step_scanline`**(v0.15.0, scanline +1 まで進めて停止) / **`step_instruction`**(v0.15.0, 1 命令ずつ)。
+  **`step_scanline`**(v0.15.0, scanline +1 まで進めて停止) / **`step_instruction`**(v0.15.0, 1 命令ずつ) /
+  **`assemble_and_load`**(v0.16.0, dasm→load 1ショット・失敗は dasm 出力を構造化返却)。
   未実装(予定): `step_clock`（色クロック単位＝Step が命令単位のため要 finer hook） / `watch|trap`
   （予算系は `assert_line_budget` で実質カバー済）。
 

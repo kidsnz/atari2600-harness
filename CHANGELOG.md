@@ -32,6 +32,16 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.16.0] - 2026-06-10
+
+### 追加
+- **`assemble_and_load` MCP ツール（P3 / ビルドループ短縮）。** asm パスを受け `dasm -f3` を `os/exec` で
+  実行し、成功なら出力 .bin を即ロードする 1 ショット（`edit→dasm→load_rom` の多段を畳む）。失敗時は MCP
+  エラーにせず `ok=false` ＋ `dasm_output`（失敗行＋理由を含む）で構造化返却＝Claude がその場で直せる。
+  `bin_path` 省略時は asm 拡張子を `.bin` に。`cmd/harness` 内に閉じる。
+  - **検証**: MCP e2e で成功（smoke.asm → `ok=true`/`loaded=true`）と失敗（不正 asm → `ok=false`、
+    `dasm_output` に `"... (3): error: Unknown Mnemonic 'lda'."`）の両経路を確認。
+
 ## [0.15.0] - 2026-06-10
 
 ### 追加

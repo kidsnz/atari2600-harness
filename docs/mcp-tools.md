@@ -55,6 +55,14 @@ type Coords struct {
 - 動作: `TVSpec` 空なら `"NTSC"`。`emu.New` → `emu.LoadROM(Path)`。グローバルへ格納。
 - Out: `{ Coords; Message string }`
 
+### 1b. `assemble_and_load`  ★ビルドループ短縮（P3, v0.16.0）
+- In: `{ AsmPath string; BinPath string (省略時 asm を .bin に); TVSpec string (default NTSC) }`
+- 動作: `exec.Command("dasm", asm, "-f3", "-o"+bin).CombinedOutput()`。成功なら `emu.New`+`LoadROM` で即ロード。
+- Out: `{ Ok bool; BinPath string; DasmOutput string; Loaded bool; Coords }`。
+  - 失敗時は **MCP エラーにせず** `Ok=false` ＋ `DasmOutput`（`"file (N): error: ..."` の失敗行）を返す＝
+    Claude がその場で直して再投入できる。`cmd/harness` 内に閉じる（dasm は PATH 前提）。
+- 検証: MCP e2e で smoke.asm 成功ロード / 不正 asm で Ok=false＋失敗行。
+
 ### 2. `step_frame`
 - In: `{ Count int `jsonschema:"frames to run (default 1)"` }`
 - 動作: `Count<=0` なら 1。`emu.RunFrames(Count)`。

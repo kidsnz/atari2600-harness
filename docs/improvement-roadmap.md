@@ -20,7 +20,7 @@
 | B タイミング | サイクル計算が合わない | **ほぼ閉** | 位置は閉。**サイクル露出（B-1, v0.12）＋予算ガード（B-3, v0.13）実装済**。残り = フレーム内粒度（B-2）・kernel定数自動較正（B-4） |
 | C 知識 | 6502/TIA 詳細の誤り | **閉** | kernel 依存定数（missile式 N・HBLANK境界）が未formalize |
 | D 検証 | 再現・回帰が無い | **部分** | アサーション/入力リプレイ/ゴールデン回帰 未配線（P2） |
-| E 摩擦 | edit→run→inspect が多段 | **弱** | assemble→load が 1 ショットでない（P3） |
+| E 摩擦 | edit→run→inspect が多段 | **改善** | `assemble_and_load`（P3, v0.16.0）で assemble→load を 1 ショット化。残り = 検証自動化（P2） |
 
 ---
 
@@ -107,7 +107,7 @@
 
 ## P3 — 欠落E: ビルドループ短縮
 
-### `assemble_and_load`（多段を 1 ショット化）
+### `assemble_and_load`（多段を 1 ショット化）　✅ 実装済 v0.16.0
 - **問題:** `edit asmgen` → `go run ./roms/<game>/gen` → `dasm -f3` → `load_rom` の多段。摩擦が反復速度を削る。
 - **提案:** asm パスを受け、`os/exec` で `dasm` 実行 → **エラーをツール面に構造化表面化**（失敗行ハイライト）→
   成功なら即ロード。`cmd/harness` 内に閉じる。

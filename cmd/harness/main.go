@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -77,6 +78,55 @@ func handleLoadROM(ctx context.Context, req *mcp.CallToolRequest, in LoadROMIn) 
 		Coords:  coordsOf(e),
 		Message: fmt.Sprintf("loaded %s (%s)", in.Path, spec),
 	}, nil
+}
+
+// --- assemble_and_load（P3: edit→dasm→load を 1 ショット化）---
+
+type AssembleIn struct {
+	AsmPath string `json:"asm_path" jsonschema:"path to .asm source"`
+	BinPath string `json:"bin_path,omitempty" jsonschema:"output .bin path (default: asm path with .bin extension)"`
+	TVSpec  string `json:"tv_spec,omitempty" jsonschema:"NTSC|PAL|AUTO (default NTSC)"`
+}
+type AssembleOut struct {
+	Ok         bool   `json:"ok"`          // dasm 成功
+	BinPath    string `json:"bin_path"`    // 出力 .bin
+	DasmOutput string `json:"dasm_output"` // dasm の stdout+stderr（失敗時は失敗行を含む）
+	Loaded     bool   `json:"loaded"`      // 成功して VCS にロードしたか
+	Coords     Coords `json:"coords"`      // ロード時のみ有効
+}
+
+func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in AssembleIn) (*mcp.CallToolResult, AssembleOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if in.AsmPath == "" {
+		return nil, AssembleOut{}, fmt.Errorf("asm_path is required")
+	}
+	bin := in.BinPath
+	if bin == "" {
+		bin = strings.TrimSuffix(in.AsmPath, filepath.Ext(in.AsmPath)) + ".bin"
+	}
+
+	// dasm -f3（DASM の生バイナリ出力）。CombinedOutput で失敗行を含む診断をそのまま返す。
+	out, err := exec.Command("dasm", in.AsmPath, "-f3", "-o"+bin).CombinedOutput()
+	if err != nil {
+		// アセンブル失敗は MCP エラーにせず Ok=false＋dasm 出力で構造化返却（Claude が失敗行を見て直す）。
+		return nil, AssembleOut{Ok: false, BinPath: bin, DasmOutput: string(out)}, nil
+	}
+
+	spec := in.TVSpec
+	if spec == "" {
+		spec = "NTSC"
+	}
+	e, err := emu.New(spec)
+	if err != nil {
+		return nil, AssembleOut{}, fmt.Errorf("new emu: %w", err)
+	}
+	if err := e.LoadROM(bin); err != nil {
+		return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: string(out)}, fmt.Errorf("assembled ok but load failed: %w", err)
+	}
+	current = e
+	return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: string(out), Loaded: true, Coords: coordsOf(e)}, nil
 }
 
 // --- step_frame ---
@@ -576,6 +626,7 @@ func main() {
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
+	mcp.AddTool(server, &mcp.Tool{Name: "assemble_and_load", Description: "Assemble a .asm with DASM (-f3) and, on success, load the resulting ROM in one shot. On failure returns ok=false with the DASM output (including the failing line) instead of an error — collapses the edit->dasm->load loop."}, handleAssembleAndLoad)
 	mcp.AddTool(server, &mcp.Tool{Name: "step_frame", Description: "Run the emulator for N frames."}, handleStepFrame)
 	mcp.AddTool(server, &mcp.Tool{Name: "step_instruction", Description: "Execute exactly one CPU instruction (consuming any pending WSYNC stall first). Returns its cycle count and beam coords — pairs with read_cycles to step through a kernel one instruction at a time."}, handleStepInstruction)
 	mcp.AddTool(server, &mcp.Tool{Name: "step_scanline", Description: "Advance until the TV scanline increments once (stops at the next scanline, or scanline 0 of the next frame). Returns CPU cycles consumed across that scanline and beam coords — for inspecting kernel state line by line."}, handleStepScanline)
