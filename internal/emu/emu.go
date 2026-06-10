@@ -13,6 +13,8 @@ import (
 	"github.com/jetsetilly/gopher2600/debugger/govern"
 	"github.com/jetsetilly/gopher2600/environment"
 	"github.com/jetsetilly/gopher2600/hardware"
+	"github.com/jetsetilly/gopher2600/hardware/riot/ports"
+	"github.com/jetsetilly/gopher2600/hardware/riot/ports/plugging"
 	"github.com/jetsetilly/gopher2600/hardware/television"
 	"github.com/jetsetilly/gopher2600/hardware/television/coords"
 	"github.com/jetsetilly/gopher2600/setup"
@@ -119,6 +121,43 @@ func (e *Emu) PeekRAM(addr uint16) (uint8, error) {
 // Poke はメモリへ 1 バイト書き込む（poke ツール）。
 func (e *Emu) Poke(addr uint16, val uint8) error {
 	return e.VCS.Mem.Poke(addr, val)
+}
+
+// SetInput はジョイスティック入力を注入する（headless ハーネスの入力経路。poke は入力に効かない）。
+// player 0=PortLeft / 1=PortRight。action は left/right/up/down/fire/center。
+// pressed=true で押下保持・false で解除（次に変えるまで状態は持続）。center は全方向解除。
+func (e *Emu) SetInput(player int, action string, pressed bool) error {
+	port := plugging.PortLeft
+	if player == 1 {
+		port = plugging.PortRight
+	}
+	var ev ports.Event
+	var d ports.EventData
+	switch action {
+	case "center", "centre":
+		ev, d = ports.Centre, nil
+	case "fire":
+		ev, d = ports.Fire, pressed
+	case "left":
+		ev = ports.Left
+	case "right":
+		ev = ports.Right
+	case "up":
+		ev = ports.Up
+	case "down":
+		ev = ports.Down
+	default:
+		return fmt.Errorf("unknown action %q (want left/right/up/down/fire/center)", action)
+	}
+	if ev != ports.Centre && ev != ports.Fire {
+		if pressed {
+			d = ports.DataStickTrue
+		} else {
+			d = ports.DataStickFalse
+		}
+	}
+	_, err := e.VCS.RIOT.Ports.HandleInputEvent(ports.InputEvent{Port: port, Ev: ev, D: d})
+	return err
 }
 
 // RowRun は ReadRow の連長エンコード 1 区間。可視 clock [Clock, Clock+Len) が同色 Hex。

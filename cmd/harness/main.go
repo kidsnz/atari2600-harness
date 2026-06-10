@@ -248,6 +248,31 @@ func handleReadRow(ctx context.Context, req *mcp.CallToolRequest, in ReadRowIn) 
 	}, nil
 }
 
+// --- set_input（ジョイスティック注入。poke は入力に効かない）---
+
+type SetInputIn struct {
+	Player  int    `json:"player,omitempty" jsonschema:"player port (0 left/P0 default, 1 right/P1)"`
+	Action  string `json:"action" jsonschema:"one of left|right|up|down|fire|center"`
+	Pressed bool   `json:"pressed,omitempty" jsonschema:"press/hold when set, release when unset (ignored for center)"`
+}
+type SetInputOut struct {
+	Coords Coords `json:"coords"`
+}
+
+func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn) (*mcp.CallToolResult, SetInputOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, SetInputOut{}, err
+	}
+	if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
+		return nil, SetInputOut{}, err
+	}
+	return nil, SetInputOut{Coords: coordsOf(e)}, nil
+}
+
 // --- peek / poke ---
 
 type PeekIn struct {
@@ -403,7 +428,7 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "0.6.0",
+		Version: "0.9.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -412,6 +437,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_ram", Description: "Dump the 128 bytes of RAM ($80-$FF) as hex."}, handleReadRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_tia", Description: "Read TIA sprite positions (ResetPixel/HmovedPixel) and HBLANK. Authoritative for horizontal-position checks."}, handleReadTIA)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
+	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject joystick input (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. action left|right|up|down|fire|center. pressed=true holds, false releases; state persists until changed. center releases all directions."}, handleSetInput)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)

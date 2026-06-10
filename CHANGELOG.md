@@ -9,6 +9,21 @@
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
 
+## [0.9.0] - 2026-06-09
+
+### 追加
+- **`set_input` ツール＝ジョイスティック入力注入（Frogger 操作系の土台）。** ヘッドレスで入力を与える経路。
+  `poke` は入力に効かない（RIOT ポートが毎フレーム駆動するため SWCHA が $FF に戻る）ことが判明 → 正攻法として
+  Gopher2600 の `Ports.HandleInputEvent` 経由で注入。`internal/emu.SetInput(player, action, pressed)`。
+  action=left/right/up/down/fire/center、pressed で押下保持/解除（次に変えるまで持続）。
+- **カエル操作の検証 ROM（`roms/frog_control.asm`）。** player0 をカエルとして表示、SWCHA を読んで HMOVE で
+  左右移動。**検証:** set_input 右 hold で 21→39（+2px/frame）、center で停止、左 hold で 41→23（−2px/frame）。
+  「入力→カエルが動く」をヘッドレスで数値実証。
+
+### 修正
+- `set_input` の jsonschema タグが `0=…`/`true=…` で始まり go-sdk が WORD= タグと誤認して AddTool でパニック →
+  タグ文言を修正（起動時パニックの回避）。サーバ版 0.6.0→0.9.0。
+
 ## [0.8.1] - 2026-06-09
 
 ### 追加
