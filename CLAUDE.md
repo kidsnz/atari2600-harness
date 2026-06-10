@@ -99,6 +99,7 @@ round trip. Also return `png_path` in JSON.
 | MCP tool implementation spec (go-sdk API, per-tool I/O) | `docs/mcp-tools.md` |
 | Scenario regression format (input timeline + numeric assertions) | `docs/scenarios.md` |
 | litmus measurements (authoritative horizontal-position / HMOVE data) | `docs/litmus-results.md` |
+| verified coverage (what each litmus proves on hardware) | `docs/verified-coverage.md` |
 | Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
 | Strengthening roadmap (sprites / audio / CI hardening) | `docs/hardening-roadmap.md` |
 | Decision history and changelog | `CHANGELOG.md` |
