@@ -13,6 +13,19 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.10.0] - 2026-06-10
+
+### 追加
+- **🎉 遊べる Monet Frogger 完成（M5）。** Monet 水面の上で、流れる睡蓮を足場にカエルが川を渡る。
+  Claude が `set_input`＋`peek/read_tia` で**自分でプレイして全メカニクスを数値裏取り**。
+  - `internal/playfield.GenerateFroggerASM`: 状態機械で ride/drown/win/lives を処理する完全な game kernel。
+    水面(per-scanline COLUBK)＋睡蓮(player0/NUSIZ/HMP0 ドリフト)＋カエル(player1/可変 FrogY)。衝突は CXPPMM。
+    `cmd/genpf frogger` → `roms/frogger.asm`。RAM: FrogY/Lives/Score/OnPad/PrevY を peek で観測可能。
+  - **検証（自プレイ）:** 川で葉を外す→Lives 3→2・start へ（drown）／葉に着地→OnPad=128・frog が葉と +1px/frame
+    で流れる・無死（ride）／上端到達→Score 0→1・start へ（win）。
+  - **自プレイでバグ発見・修正:** 「川に入った瞬間、前フレーム(川の手前)の衝突=0 で即溺れ→絶対渡れない」致命的
+    タイミングバグを、自分でプレイして発見。着地 1 フレームの猶予（`PrevY`）で修正。
+
 ## [0.9.3] - 2026-06-09
 
 ### 追加
