@@ -1,0 +1,9 @@
+{
+  "rom": "roms/litmus/litmus_collide_mp.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "collisions.m0_p0", "op": "==", "value": 1},
+    {"at_frame": 2, "field": "collisions.m0_pf", "op": "==", "value": 0}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+}

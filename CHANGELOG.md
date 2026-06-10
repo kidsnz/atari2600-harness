@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.33.0] - 2026-06-10
+
+### Added
+- **Coverage batch: NUSIZ quad-width + missile-player collision.**
+  - `litmus_nusiz_quad.asm` (`NUSIZ0=$07`, QuadWidth) → `read_row` shows a **32px** continuous span (8px ×4),
+    completing the NUSIZ width modes (double/quad) and copy modes (close/three).
+  - `litmus_collide_mp.asm` overlaps an 8px-wide missile0 with player0 → `read_collisions` reports
+    **`m0_p0=true`** (CXM0P), extending collision coverage to the missile-player pair. (Also documents the
+    1px left-edge offset between missile clamp X=2 and player clamp X=3.)
+  - Locked by `scenarios/nusiz_quad.json` and `scenarios/collide_mp.json`. 15 litmus scenarios pass.
+
 ## [0.32.0] - 2026-06-10
 
 ### Added
