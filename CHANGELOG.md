@@ -12,6 +12,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.24.0] - 2026-06-10
+
+### Added
+- **`pkg/sprite.SplitWide` + P0+P1 16px combine litmus (hardening-roadmap S-3 — flagship).** Split a
+  16-wide ASCII design into P0 (left 8) + P1 (right 8) GRP tables, then place P1 exactly +8px to the right
+  of P0 for a seamless up-to-16px (or multicolor) character. `roms/litmus/litmus_p0p1.asm` positions the two
+  sprites by strobing RESP0→RESP1 three cycles apart in the visible region (= +9px; an HBLANK strobe would
+  clamp both to the left edge) then HMOVE P1 left 1 → exactly +8px.
+  **Verified on Gopher2600:** `read_tia` shows player0=69 / player1=77 (exactly +8); `read_row` shows the
+  solid-16 rows as a **single continuous 16px white run (clock 69–84, no seam gap/overlap)**, with P0-only /
+  P1-only / far-edge rows byte-exact. Locked for regression by `scenarios/p0p1.json` (position asserts 69/77
+  + golden frame). This proves sprite placement is as numerically trustworthy as playfield — the headline
+  capability of the sprite track.
+
 ## [0.23.0] - 2026-06-10
 
 ### Added

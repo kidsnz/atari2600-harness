@@ -38,6 +38,30 @@ func Encode(art []string) []byte {
 	return gfx
 }
 
+// WideWidth は P0+P1 連結スプライトの最大横幅（px）。P0=左8列・P1=右8列。
+const WideWidth = 16
+
+// SplitWide は 16 列幅の ASCII 設計を P0(左 col0..7)・P1(右 col8..15)の GRP バイト列へ分割する。
+// 表示側で P1 を P0 のちょうど +8px に隣接配置すると、2 枚のスプライトが 1 体の最大 16px 幅キャラに見える
+// （多色にしたい場合は P0/P1 に別 COLUP を与える）。各行 16 文字・最上段が先頭。p0[i]/p1[i] は設計順（上→下）。
+// 行が 16 文字未満なら足りない列は消灯、8 文字以下なら p1 は全消灯。
+func SplitWide(art []string) (p0, p1 []byte) {
+	p0 = make([]byte, len(art))
+	p1 = make([]byte, len(art))
+	for i, line := range art {
+		cells := playfield.ParseASCIIRow(line)
+		left := cells
+		if len(cells) > Width {
+			left = cells[:Width]
+		}
+		p0[i] = EncodeRow(left)
+		if len(cells) > Width {
+			p1[i] = EncodeRow(cells[Width:])
+		}
+	}
+	return p0, p1
+}
+
 // Reflect は GRP バイトのビットを左右反転する（D7↔D0, D6↔D1, …）。
 // REFP を使わず素データ側で鏡像にしたい場合や、P0+P1 連結で右半を作る場合に使う。
 func Reflect(b byte) byte {

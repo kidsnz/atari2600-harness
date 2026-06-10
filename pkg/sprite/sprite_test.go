@@ -45,6 +45,26 @@ func TestEncode_TopToBottom(t *testing.T) {
 	}
 }
 
+// TestSplitWide は 16 列設計が P0(左8)・P1(右8)に正しく割れることを固定する。
+func TestSplitWide(t *testing.T) {
+	art := []string{
+		"XXXXXXXXXXXXXXXX", // solid 16  -> P0=$FF P1=$FF
+		"XXXXXXXX........", // left half -> P0=$FF P1=$00
+		"........XXXXXXXX", // right half-> P0=$00 P1=$FF
+		"X..............X", // far edges -> P0=$80 P1=$01
+		"X...............", // P0 のみ最左 -> P0=$80 P1=$00
+	}
+	wantP0 := []byte{0xFF, 0xFF, 0x00, 0x80, 0x80}
+	wantP1 := []byte{0xFF, 0x00, 0xFF, 0x01, 0x00}
+	p0, p1 := SplitWide(art)
+	for i := range art {
+		if p0[i] != wantP0[i] || p1[i] != wantP1[i] {
+			t.Errorf("row %d %q: got P0=%02X P1=%02X, want P0=%02X P1=%02X",
+				i, art[i], p0[i], p1[i], wantP0[i], wantP1[i])
+		}
+	}
+}
+
 // TestReflect は左右反転が対称になることを確認する（reflect(reflect(b)) == b）。
 func TestReflect(t *testing.T) {
 	cases := []struct{ in, want byte }{
