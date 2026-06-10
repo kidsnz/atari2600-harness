@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.32.0] - 2026-06-10
+
+### Added
+- **P0-P1 collision litmus (CXPPMM) — extends collision coverage.** `roms/litmus/litmus_collide_pp.asm`
+  overlaps player0 and player1 (both clamped to X=3 via HBLANK strobes) drawing `$FF`; `read_collisions`
+  reports **`p0_p1=true`**. Verifies the player-player pair the Frogger `OnPad` check actually uses (previously
+  only BL-PF was litmus-verified). Locked by `scenarios/collide_pp.json`. 13 litmus pass.
+
 ## [0.31.0] - 2026-06-10
 
 ### Added
