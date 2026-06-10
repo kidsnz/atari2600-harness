@@ -24,9 +24,39 @@ func main() {
 		genMonetSprite()
 	case "full":
 		genMonetFull()
+	case "collide":
+		genMonetCollide()
 	default:
 		genMonetM1()
 	}
+}
+
+// genMonetCollide は衝突検証用: カエルを睡蓮と同じレーン(scanline76-83)に置く → 横で重なると CXPPMM D7。
+func genMonetCollide() {
+	_, water48, _ := buildMonetScene()
+	bg := make([]byte, 192)
+	for y := 0; y < 192; y++ {
+		bg[y] = water48[y/4]
+	}
+	pad := []byte{0x3C, 0x7E, 0xFF, 0xFF, 0xFF, 0xFF, 0x7E, 0x3C}
+	frog := []byte{0x24, 0x7E, 0xFF, 0xFF, 0xBD, 0x7E, 0x24, 0x42}
+	grp0 := make([]byte, 192)
+	grp1 := make([]byte, 192)
+	for i := range pad {
+		grp0[76+i] = pad[i]
+		grp1[76+i] = frog[i] // カエルも同じレーンに（衝突検証）
+	}
+	src, err := playfield.GenerateMonetFullASM(bg, grp0, grp1, 0x03, 0x00, 0xC8, 0x1C, 0xF0)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "generate:", err)
+		os.Exit(1)
+	}
+	const out = "roms/monet_collide.asm"
+	if err := os.WriteFile(out, []byte(src), 0o644); err != nil {
+		fmt.Fprintln(os.Stderr, "write:", err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s (frog in lily lane — collision test)\n", out)
 }
 
 // genMonetFull はフルシーン: Monet 水面＋流れる睡蓮(player0)＋操作カエル(player1) → roms/monet_full.asm。

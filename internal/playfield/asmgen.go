@@ -452,6 +452,8 @@ GRP1    = $1C
 HMP0    = $20
 HMP1    = $21
 HMOVE   = $2A
+CXCLR   = $2C
+CXPPMM  = $37
 SWCHA   = $0280
 
         org $F000
@@ -510,6 +512,7 @@ SetH:   stx HMP1
 
         sta WSYNC
         sta HMOVE        ; 両プレイヤーへ累積モーション適用
+        sta CXCLR        ; 衝突ラッチをクリア（この frame の衝突を新たに取る）
         ldx #36
 VB:     sta WSYNC
         dex

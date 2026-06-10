@@ -9,6 +9,16 @@
 - 実ゲーム制作（ハーネスを使った本番。Pong 再挑戦など）
 - `step_scanline|clock` / `watch|trap` ツールの拡充
 
+## [0.9.2] - 2026-06-09
+
+### 追加
+- **衝突判定（Frogger の核：カエルが葉の上か水中か）。** `GenerateMonetFullASM` に毎フレーム `CXCLR`
+  ストローブを追加（衝突ラッチを毎フレーム新規取得）。衝突は `peek $37`（CXPPMM）で読める＝新ツール不要。
+  - `cmd/genpf collide` → `roms/monet_collide.asm`（カエルを睡蓮レーンに置いた検証シーン）。
+  - **検証:** frog をレーン内で動かし、葉と重なった frame33 で CXPPMM=128（D7=P0-P1 衝突）、離れた frame45 で
+    0。CXCLR が効き毎フレーム正しく set/clear。CXPPMM セット=葉に乗っている / クリア=水中、の判定が成立。
+  - 本番 `roms/monet_full.asm` も CXCLR 入りで再生成。
+
 ## [0.9.1] - 2026-06-09
 
 ### 追加
