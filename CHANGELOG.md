@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### 変更
+- **ドキュメント鮮度監査（spinoff 前段）.** `README.md` を v0.21.0 の実態へリライト（旧構成図＝`cmd/probe`＋
+  `internal/emu` のみ → cmd 4本・internal 6本・roms/<game>・MCP 19ツール・欠落A〜E全閉を反映、smoke.asm パスを
+  `roms/litmus/` に修正）。軽微 stale も是正：`improvement-roadmap` に「基盤系は全クローズ」注記、`mcp-tools` の
+  Phase 表記を現状化、`tool-landscape` の Gopher2600 行を「ライブラリ埋め込みに確定（terminal 不要）」へ、
+  `roms/frogger/gen/asmgen.go` の `cmd/genpf`（統合済で不在）コメントを `roms/frogger/gen` に。
+
 ### 追加
 - **改善ロードマップ文書（`docs/improvement-roadmap.md`）。** 「制作をさらに正確にする」次の打ち手を
   あらゆる角度から優先度付きで整理。中心的所見＝**位置の litmus は閉じたが、タイミング*予算*の検証は

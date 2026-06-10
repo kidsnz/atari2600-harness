@@ -1,8 +1,8 @@
-# MCP Tools — 実装仕様（Phase 2.2）
+# MCP Tools — 実装仕様
 
 `cmd/harness` の MCP サーバが露出するツールの確定仕様。**ここに書いた API は
-全て installed SDK / Gopher2600 nightly で裏取り済み**（推測ゼロ）。Sonnet がこの
-通りに実装すれば動く。数値ファースト＝画像（`get_screen_annotated`）は Phase 2.3 へ繰り延べ。
+全て installed SDK / Gopher2600 nightly で裏取り済み**（推測ゼロ）。
+（注：本書は数値ツールの実装期に書かれた仕様。画像の `get_screen_annotated` は v0.5.0 で実装済み。）
 
 ## SDK ブートストラップ（go-sdk v1.6.1）
 
