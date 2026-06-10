@@ -1,119 +1,142 @@
 # CLAUDE.md — atari2600-harness
 
-このファイルは**毎セッション自動で全文ロードされる唯一の常時文脈**。ここには「不変の前提・確定した決定・
-絶対に取り違えてはいけない定数・どの作業でどの doc を読むか」だけを置く。深掘りは `docs/`（下のルーティング表）。
-ここに無いものは読まれていないと思え。常に成り立つべき事実は doc に"だけ"置かず、ここかメモリに焼く。
+This file is **the only always-on context, auto-loaded in full every session**. Put only "invariant
+premises, settled decisions, constants you must never get wrong, and which doc to read for which task" here.
+Deep dives go in `docs/` (routing table below). Assume anything not here is unread. Don't put facts that
+must always hold *only* in a doc — burn them here or into memory.
 
-## 不変の前提
-- 目的: Claude が Atari 2600 を 6502 アセンブリで的確に制作できる**検証ハーネス**を作る（ゲーム生成専用アプリではない）。
-- **主たる作者は Claude。** ユーザーはアセンブリを読まない。環境は Claude の制作ループの精度・速度を最適化する。
-- **最優先は欠落 B（タイミング）。** 過去の Pong は全放棄が「未検証のタイミング／位置決め」で死んだ。
+> **Language policy:** the published repo is English-only. The author works in Japanese and communicates in
+> Japanese; Japanese copies of each `*.md` are kept locally as `*.ja.md` (gitignored, never published). When
+> editing docs, keep the English `*.md` as the source of truth for the public repo.
 
-## 鉄則（毎回守る）
-1. **判定は数値。スクショは補助。** 横位置の最終判定は TIA レジスタ値、縦は scanline 整数。目視のピクセル数えで決めない。
-2. **サイクルはシミュレータから取る**（Gopher2600 / sim65）。DASM のリストにも頭の暗算にも頼らない。
-3. **小ステップ。** 編集→アセンブル→実行→数値確認→commit。失敗したら前ステップへ revert。一括変更しない。
-4. **litmus test:** スプライトを任意 X に置く／1px 動かすが `X = 3N − 55` どおりに通ること。これが通れば環境は本物。
+## Invariant premises
+- Goal: build a **verification harness** so Claude can author the Atari 2600 in 6502 assembly accurately
+  (not a game-generation app).
+- **The primary author is Claude.** The user doesn't read assembly. The environment optimizes Claude's
+  authoring-loop precision and speed.
+- **Top priority is gap B (timing).** Every past-Pong abandonment died on "unverified timing / positioning."
 
-## 確定アーキテクチャ
-- エンジン = **Gopher2600**(Go) を**ライブラリとして自プロセスに埋め込み**、薄い **Go MCP**
-  （公式 `modelcontextprotocol/go-sdk` v1.6.1, stdio）で包む。`hardware`/`television`/`setup` は
-  SDL 非依存の純 Go なので headless 数値駆動が成立。terminal/PushedFunction は不要だった（v0.3.0 確定）。
-- 各ツールは結果を**数値（typed JSON, Coords 同梱）**で返す。画像（`get_screen_annotated`）は別格＝下記注釈スクショ。
-- 回帰 = **Gopher2600 の `regress` + 録画/再生**。純 6502 のサイクル = sim65 / 6502profiler。
-- 照合オラクル = **Stella**（`-sssingle -ss1x`, `-tia.dbgcolors roygbp`, `-dbg.script`+`dump`）。
-- 画像オーバーレイ = **Go 内製**（`image/draw` + `fogleman/gg`）。ImageMagick へシェルアウトしない。
-- アセンブラ = **DASM**（`-f3`）。**BizHawk は macOS 不可で不採用。**
-- MCP ツール(**実装済**, `cmd/harness`): `load_rom` / `step_frame` / `read_cpu` / `read_ram` /
-  `read_tia` / `peek` / `poke` / `breakif` / **`get_screen_annotated`**(v0.5.0, 画像＋数値を同時返却) /
-  **`read_cycles`**(v0.12.0, CPU サイクル数値露出＝鉄則2を実ループへ。直近命令/区間/累積) /
-  **`assert_line_budget`**(v0.13.0, per-scanline 予算ガード＝WSYNC 間が予算超過＝ロール要因で halt) /
-  **`read_tia_registers`**(v0.14.0, 書込専用レジスタ現在値の実測＝色推論を廃す) /
-  **`read_collisions`**(v0.14.0, CXxx を名前付き真偽ペアで構造化) /
-  **`step_scanline`**(v0.15.0, scanline +1 まで進めて停止) / **`step_instruction`**(v0.15.0, 1 命令ずつ) /
-  **`assemble_and_load`**(v0.16.0, dasm→load 1ショット・失敗は dasm 出力を構造化返却) /
-  **`read_audio`**(v0.17.0, TIA 音声 AUDC/AUDF/AUDV を数値読み＝音も数値で検証)。
-  未実装(予定): `step_clock`（色クロック単位＝Step が命令単位のため要 finer hook） / `watch|trap`
-  （予算系は `assert_line_budget` で実質カバー済）。
+## Iron rules (follow every time)
+1. **Judgment is numeric; screenshots are a supplement.** The final horizontal verdict is the TIA register
+   value; vertical is the integer scanline. Don't decide by eyeballing pixel counts.
+2. **Get cycles from the simulator** (Gopher2600 / sim65). Don't trust the DASM listing or mental arithmetic.
+3. **Small steps.** edit → assemble → run → numeric check → commit. Revert to the previous step on failure.
+   No bulk changes.
+4. **litmus test:** place a sprite at an arbitrary X / move it 1px and have it match `X = 3N − 55`. If this
+   passes, the environment is real.
 
-## 絶対に取り違えてはいけない定数（出典: `docs/resources.md`）
-**フレーム** — 1 ライン = 228 カラークロック（HBLANK 68 + 可視 160）= **76 CPU サイクル**（3 クロック/サイクル）。
-NTSC **262** = VSYNC 3 / VBLANK 37 / 可視 **192** / Overscan 30。PAL・SECAM 312 = 3/45/228/36。
-実ゲームは逸脱するので「厳密 262」を決め打ちせず範囲＋警告で扱う。
+## Settled architecture
+- Engine = **Gopher2600** (Go) **embedded in-process as a library**, wrapped by a thin **Go MCP** (official
+  `modelcontextprotocol/go-sdk` v1.6.1, stdio). `hardware`/`television`/`setup` are pure Go (no SDL), so
+  headless numeric driving works. terminal/PushedFunction turned out unnecessary (settled v0.3.0).
+- Every tool returns results as **numbers (typed JSON, with Coords)**. The image (`get_screen_annotated`) is
+  a special case = the annotated screenshot below.
+- Regression = **Gopher2600's `regress` + record/replay**. Pure-6502 cycles = sim65 / 6502profiler.
+- Reference oracle = **Stella** (`-sssingle -ss1x`, `-tia.dbgcolors roygbp`, `-dbg.script`+`dump`).
+- Image overlay = **in-house Go** (`image/draw` + `fogleman/gg`). No shelling out to ImageMagick.
+- Assembler = **DASM** (`-f3`). **BizHawk not adopted (not on macOS).**
+- MCP tools (**implemented**, `cmd/harness`): `load_rom` / `step_frame` / `read_cpu` / `read_ram` /
+  `read_tia` / `peek` / `poke` / `breakif` / **`get_screen_annotated`** (v0.5.0, image + numbers together) /
+  **`read_cycles`** (v0.12.0, exposes CPU cycles = rule 2 into the real loop; last instruction/interval/total) /
+  **`assert_line_budget`** (v0.13.0, per-scanline budget guard = halt when a WSYNC interval overruns = a roll cause) /
+  **`read_tia_registers`** (v0.14.0, measures current write-only register values = drops color inference) /
+  **`read_collisions`** (v0.14.0, structures CXxx into named boolean pairs) /
+  **`step_scanline`** (v0.15.0, advance until scanline +1) / **`step_instruction`** (v0.15.0, one instruction at a time) /
+  **`assemble_and_load`** (v0.16.0, dasm→load in one shot; on failure returns structured dasm output) /
+  **`read_audio`** (v0.17.0, reads TIA audio AUDC/AUDF/AUDV numerically = verify sound with numbers too).
+  Unimplemented (planned): `step_clock` (color-clock unit; `Step` is per-instruction, needs a finer hook) /
+  `watch|trap` (the budget case is effectively covered by `assert_line_budget`).
 
-**ビーム座標(Gopher2600 `GetCoords`, 実機裏取り済 v0.3.0)** — `Clock` 規約は **HBLANK = −68..−1 / 可視 = 0..159**
-（可視先頭ピクセル = clock 0）。スプライト `ResetPixel`/`HmovedPixel` と**同一座標系**＝直接比較可。`Scanline` は 0 起点整数。
+## Constants you must never get wrong (source: `docs/resources.md`)
+**Frame** — 1 line = 228 color clocks (HBLANK 68 + visible 160) = **76 CPU cycles** (3 clocks/cycle).
+NTSC **262** = VSYNC 3 / VBLANK 37 / visible **192** / Overscan 30. PAL · SECAM 312 = 3/45/228/36.
+Real games deviate, so don't hardcode "exactly 262" — handle as a range + warning.
 
-**横位置** — ミサイル/ボール `X = 3N − 55`、**プレイヤーは +1px → `X = 3N − 54`**
-（N = 同期点から RESPx ストローブまでの CPU サイクル数）。最左 X=2（プレイヤー 3）。
-ズレの正体 = TIA 約 5 カラークロック遅延 + HBLANK 68。粒度 3px。粗調整は divide-by-15（5 サイクルループ）。
-**litmus 実機裏取り済(v0.4.0):** 傾き 3px/CPUサイクル・粗 15px/5サイクル・160 折返し・最左 X=3 を確認。
-ただし式の**オフセット定数は kernel 固有**（プロローグのサイクル数を含む）→ N の絶対値は決め打ちせず、
-位置の最終判定は **`read_tia` の `HmovedPixel`**（可視 0–159 座標）で実測する。HMOVE 未発火時は `ResetPixel` と一致。
+**Beam coords (Gopher2600 `GetCoords`, hardware-verified v0.3.0)** — the `Clock` convention is
+**HBLANK = −68..−1 / visible = 0..159** (first visible pixel = clock 0). **Same coordinate system** as a
+sprite's `ResetPixel`/`HmovedPixel` = directly comparable. `Scanline` is a 0-based integer.
 
-**HMOVE** — 上位ニブルのみ・2 の補数・**正=左 / 負=右**・範囲 +7〜−8。動くのは HMOVE ストローブ時のみ。HMOVE は **WSYNC 直後**。
-（litmus v0.4.0 で全 16 ニブル実機裏取り: `$70`=左7 … `$00`=0 … `$F0`=右1 … `$80`=右8。1px 粒度。）
+**Horizontal position** — missile/ball `X = 3N − 55`, **player is +1px → `X = 3N − 54`**
+(N = CPU cycles from the sync point to the RESPx strobe). Leftmost X=2 (player 3).
+The offset is TIA's ~5-color-clock delay + HBLANK 68. Granularity 3px. Coarse adjust is divide-by-15
+(5-cycle loop). **litmus hardware-verified (v0.4.0):** slope 3px/CPU-cycle, coarse 15px/5cy, 160 wrap,
+leftmost X=3. But the formula's **offset constant is kernel-specific** (includes the prologue's cycle count)
+→ don't hardcode the absolute N; make the final position verdict by measuring **`read_tia`'s `HmovedPixel`**
+(visible 0–159). When HMOVE hasn't fired, it equals `ResetPixel`.
 
-**衝突(CXxx)** — 各 D7/D6 に 2 ラッチ・sticky。`BIT CXxx` → `BMI`(D7)/`BVS`(D6)。
-**CXCLR**=全衝突クリア、**HMCLR**=動きレジスタクリア（別物）。
+**HMOVE** — upper nibble only, two's complement, **positive = left / negative = right**, range +7 to −8.
+Moves only at the HMOVE strobe. HMOVE is **right after WSYNC**. (All 16 nibbles hardware-verified in litmus
+v0.4.0: `$70`=left7 … `$00`=0 … `$F0`=right1 … `$80`=right8. 1px granularity.)
 
-**playfield（ビット順・実機裏取り済 v0.6.0）** — 左→右に40列、各列=4カラークロック幅。**2ソース(ABB/falukropp)一致＋`read_row`実測**。
-`PF0`=上ニブルのみ col0→D4..col3→D7 ／ `PF1`=MSB先 col4→D7..col11→D0 ／ `PF2`=LSB先 col12→D0..col19→D7。
-左半=clock 0–79・右半=80–159。`CTRLPF` D0: 0=repeat（右半複製）/ 1=reflect（鏡像）。検証は `read_row`（数値・目視に頼らない）。
+**Collisions (CXxx)** — two latches in each D7/D6, sticky. `BIT CXxx` → `BMI`(D7)/`BVS`(D6).
+**CXCLR** = clear all collisions; **HMCLR** = clear the motion registers (a different thing).
 
-**ハード** — RAM 128 バイト。ROM `$F000`(4K)、ベクタ `$FFFA`。
-**poke の癖** — `poke` は RAM 向け。TIA 書込専用レジスタ($0D PF0 等)は poke で安定して持続しない → レンダリング変更は ROM/kernel の `sta` で。
+**playfield (bit order, hardware-verified v0.6.0)** — 40 columns left→right, each 4 color clocks wide. **Two
+sources (ABB/falukropp) agree + `read_row` measured.** `PF0` = upper nibble only, col0→D4..col3→D7 / `PF1` =
+MSB first, col4→D7..col11→D0 / `PF2` = LSB first, col12→D0..col19→D7. Left half = clock 0–79, right half =
+80–159. `CTRLPF` D0: 0=repeat (right half copies left) / 1=reflect (mirror). Verify with `read_row` (numeric,
+not by eye).
 
-**注釈スクショ(`get_screen_annotated`)** — Claude 専用補助ではなく**ユーザー↔Claude の主要通信回線**＝一級市民。
-ユーザーが画像を見て「P0 を clock 80 へ」と視覚的にデータ指示 → Claude が register に直訳する往復ループ。
-よってグリッドは **TIA 実座標で校正**（横 clock 0–159 / 縦 scanline 0–191、両軸常時）＝ユーザーの座標がそのまま
-register 値へ直結すること。現在位置を**数値ラベル**で焼く。人間可読性最優先（×3–4 拡大・軸ラベル）。
-画像はインライン返却に加え**毎回ファイルへ上書き保存**（env `ATARI2600_SCREEN_PATH`、既定は `.mcp.json` で
-`preview/screen.png`）＝VS Code プレビューが自動リロードし往復できる。`png_path` を JSON でも返す。
+**Hardware** — 128 bytes of RAM. ROM `$F000` (4K), vectors `$FFFA`.
+**poke quirk** — `poke` is for RAM. Write-only TIA registers ($0D PF0 etc.) don't persist stably under poke →
+change rendering with a `sta` in the ROM/kernel.
 
-## ルーティング表（作業前に読む）
-| 作業 | 先に読む |
+**Annotated screenshot (`get_screen_annotated`)** — not a Claude-only aid but **the primary user↔Claude comms
+channel** = a first-class citizen. The user looks at the image and gives data visually ("move P0 to clock
+80") → Claude translates directly to registers, a round-trip loop. So the grid is **calibrated to TIA real
+coordinates** (horizontal clock 0–159 / vertical scanline 0–191, both axes always) so the user's coordinates
+map straight to register values. Burn the current position as a **numeric label**. Human readability first
+(×3–4 scale, axis labels). Besides the inline image, **overwrite a file each call** (env
+`ATARI2600_SCREEN_PATH`, default `preview/screen.png` in `.mcp.json`) = VS Code preview auto-reloads for the
+round trip. Also return `png_path` in JSON.
+
+## Routing table (read before working)
+| Task | Read first |
 |---|---|
-| なぜこの設計か / 失敗の構造 | `docs/gap-analysis.md` |
-| ツール選定理由・代替案 | `docs/tool-landscape.md` |
-| 実装仕様（Gopher2600 API / MCP / Stella flags）・定数の出典 | `docs/resources.md` |
-| MCP ツール実装仕様（go-sdk API・各ツール I/O） | `docs/mcp-tools.md` |
-| シナリオ回帰の形式（入力タイムライン＋数値アサーション） | `docs/scenarios.md` |
-| litmus 実測値（横位置・HMOVE の権威データ） | `docs/litmus-results.md` |
-| 改善方針・次の打ち手（優先度付きロードマップ） | `docs/improvement-roadmap.md` |
-| 決定の経緯・変更履歴 | `CHANGELOG.md` |
+| Why this design / anatomy of failure | `docs/gap-analysis.md` |
+| Tool selection rationale / alternatives | `docs/tool-landscape.md` |
+| Implementation spec (Gopher2600 API / MCP / Stella flags) / source of constants | `docs/resources.md` |
+| MCP tool implementation spec (go-sdk API, per-tool I/O) | `docs/mcp-tools.md` |
+| Scenario regression format (input timeline + numeric assertions) | `docs/scenarios.md` |
+| litmus measurements (authoritative horizontal-position / HMOVE data) | `docs/litmus-results.md` |
+| Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
+| Decision history and changelog | `CHANGELOG.md` |
 
-## リポジトリ構成（v0.22.0 spinoff・独立リポ）
-**この repo = ハーネス基盤のみ（汎用・全ゲームで再利用）。** ロム成果物は**別リポ**へ分離した。
-依存は **game → harness の一方通行**（harness は game にゼロ依存。テストも自前 `roms/litmus` のみ参照）。
-- モジュール = `github.com/kidsnz/atari2600-harness`。Gopher2600 は `go.mod` の `replace => ./Gopher2600`。
-- 物理配置（傘フォルダ `260609_atari2600-dev/` の下に2リポを兄弟で並べ `go.work` で束ねる）:
+## Repository layout (v0.22.0 spinoff, standalone repo)
+**This repo = the harness base only (general-purpose, reused across all games).** Game ROM artifacts are
+split into a **separate repo**. Dependency is **one-way game → harness** (the harness has zero dependence on
+any game; even its tests reference only its own `roms/litmus`).
+- Module = `github.com/kidsnz/atari2600-harness`. Gopher2600 via `go.mod` `replace => ./Gopher2600`.
+- Physical layout (under the umbrella folder `260609_atari2600-dev/`, two sibling repos bound by `go.work`):
   ```
-  260609_atari2600-dev/        ← 傘（Claude Code が開くフォルダ。.mcp.json/.claude はここ）
-  ├── go.work                   ← harness + roms をローカル束ね
-  ├── harness/                  ← この repo（atari2600-harness）
-  └── roms/                     ← 別 repo（atari2600-roms）。frogger 等はこの中
+  260609_atari2600-dev/        ← umbrella (the folder Claude Code opens; .mcp.json/.claude live here)
+  ├── go.work                   ← binds harness + roms locally
+  ├── harness/                  ← this repo (atari2600-harness)
+  └── roms/                     ← separate repo (atari2600-roms); frogger etc. live here
   ```
-- 基盤の中身: `cmd/harness`(MCPサーバ) / `cmd/probe`(配管) / `cmd/scenario`(回帰ランナー CLI) /
-  `cmd/calibrate`(横位置 X(N) 掃引フィット) / `internal/emu`(駆動) / `internal/annotate`(注釈) /
-  `internal/scenario`(シナリオ回帰=入力タイムライン＋数値アサーション, ROM 非依存) /
-  `internal/calibrate`(位置キャリブレーション=poke 掃引＋直線回帰) /
-  **`pkg/playfield`**(公開エンコーダ `EncodeSymmetric` 等＝Atari 2600 普遍知識。roms 側 `gen` が import)。
-- 検証用ロム: `roms/litmus/`（litmus_* / smoke / golden）＝**基盤の持ち物**としてこの repo に残す。
-- ロム成果物（別 repo `atari2600-roms`）: `<game>/`（`*.asm`/`*.bin`）＋ `<game>/gen/`（シーン定義＋カーネル生成、
-  `atari2600-harness/pkg/playfield` を import）＋ `<game>/scenarios/*.json`。例: `frogger/`（Monet Frogger）。
-- 新ゲームは roms repo の `<name>/`（＋`gen/`）規約で増やす。汎用化したいカーネルは encoder 同様 `pkg/` へ"昇格"（YAGNI）。
+- Base contents: `cmd/harness` (MCP server) / `cmd/probe` (plumbing) / `cmd/scenario` (regression runner CLI) /
+  `cmd/calibrate` (horizontal X(N) sweep-fit) / `internal/emu` (driving) / `internal/annotate` (annotation) /
+  `internal/scenario` (scenario regression = input timeline + numeric assertions, ROM-agnostic) /
+  `internal/calibrate` (position calibration = poke sweep + linear regression) /
+  **`pkg/playfield`** (public encoder `EncodeSymmetric` etc. = universal Atari 2600 knowledge; the roms-side `gen` imports it).
+- Verification ROMs: `roms/litmus/` (litmus_* / smoke / golden) = **the base's own property**, kept in this repo.
+- Game artifacts (separate repo `atari2600-roms`): `<game>/` (`*.asm`/`*.bin`) + `<game>/gen/` (scene
+  definitions + kernel generation, importing `atari2600-harness/pkg/playfield`) + `<game>/scenarios/*.json`.
+  Example: `frogger/` (Monet Frogger).
+- Add new games under the roms repo as `<name>/` (+`gen/`). Promote kernels you want to generalize to `pkg/`
+  (like the encoder; YAGNI).
 
-## 開発環境（macOS / Apple Silicon）
-`brew install dasm cc65 pkg-config go` / Stella: `brew install --cask stella`。
-Gopher2600 は **harness/** ルートへ clone（git 管理外, `go.mod` の `replace` で参照）。
-**コマンドは各 repo のルートで実行**（harness 自前は `harness/`、ロムは `roms/`）。`go.work` 前提。
-- ROM ビルド: `dasm x.asm -f3 -ox.bin`。
-- 配管検証（harness/）: `go run ./cmd/probe`。MCP サーバ: `go build -o bin/harness ./cmd/harness`。
-- litmus 回帰（harness/）: `go run ./cmd/scenario roms/litmus/scenarios/*.json`（全 pass で exit 0）。
-- 位置較正（harness/）: `go run ./cmd/calibrate`（litmus_pos を掃引→ slope 3 px/CPU-cycle を再現）。
-- ロム生成（roms/）: `go run ./<game>/gen [scene]`。
-- ロム回帰（roms/）: `go run github.com/kidsnz/atari2600-harness/cmd/scenario <game>/scenarios/*.json`。
+## Development environment (macOS / Apple Silicon)
+`brew install dasm cc65 pkg-config go` / Stella: `brew install --cask stella`.
+Clone Gopher2600 into the **harness/** root (untracked, referenced via `go.mod` `replace`).
+**Run commands from each repo's root** (harness's own from `harness/`, ROMs from `roms/`). `go.work` assumed.
+- ROM build: `dasm x.asm -f3 -ox.bin`.
+- Plumbing check (harness/): `go run ./cmd/probe`. MCP server: `go build -o bin/harness ./cmd/harness`.
+- litmus regression (harness/): `go run ./cmd/scenario roms/litmus/scenarios/*.json` (exit 0 on all pass).
+- Calibration (harness/): `go run ./cmd/calibrate` (sweeps litmus_pos → reproduces slope 3 px/CPU-cycle).
+- ROM generation (roms/): `go run ./<game>/gen [scene]`.
+- ROM regression (roms/): `go run github.com/kidsnz/atari2600-harness/cmd/scenario <game>/scenarios/*.json`.
 
-## バージョン管理
-意味ある変更ごとに `CHANGELOG.md`（Keep a Changelog）へ追記し SemVer でタグ。決定は CHANGELOG の「決定」節に残す。
+## Version control
+For each meaningful change, append to `CHANGELOG.md` (Keep a Changelog) and tag with SemVer. Record decisions
+in the CHANGELOG's "Decisions" section.
