@@ -42,8 +42,7 @@ func TestRunSamples(t *testing.T) {
 		"roms/litmus/scenarios/smoke.json",
 		"roms/litmus/scenarios/smoke_src.json",
 		"roms/litmus/scenarios/collide.json",
-		"roms/frogger/scenarios/boot.json",
-		"roms/frogger/scenarios/hop.json",
+		"roms/litmus/scenarios/golden.json",
 	} {
 		t.Run(filepath.Base(f), func(t *testing.T) {
 			s, err := Load(f)
@@ -142,9 +141,9 @@ func TestGoldenDeterministic(t *testing.T) {
 	t.Chdir("../..")
 	mk := func() *Scenario {
 		return &Scenario{
-			Rom:          "roms/frogger/frogger.bin",
+			Rom:          "roms/litmus/smoke.bin",
 			WarmupFrames: 2,
-			Asserts:      []Assert{{AtFrame: 8, Field: "ram.0x81", Op: "==", Value: 144}},
+			Asserts:      []Assert{{AtFrame: 2, Field: "ram.0x80", Op: "==", Value: 66}},
 			Checks:       &Checks{GoldenFrame: true},
 		}
 	}
@@ -167,7 +166,7 @@ func TestGoldenDeterministic(t *testing.T) {
 // TestGoldenSampleMatches は同梱の golden.json が committed の .golden と一致する（描画回帰なし）ことを確認する。
 func TestGoldenSampleMatches(t *testing.T) {
 	t.Chdir("../..")
-	s, err := Load("roms/frogger/scenarios/golden.json")
+	s, err := Load("roms/litmus/scenarios/golden.json")
 	if err != nil {
 		t.Fatal(err)
 	}

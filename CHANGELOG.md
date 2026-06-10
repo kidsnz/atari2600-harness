@@ -6,6 +6,13 @@
 ## [Unreleased]
 
 ### 変更
+- **物理 spinoff：基盤を独立リポ `atari2600-harness` に分離（ロムは別リポ `atari2600-roms` へ）.** 傘フォルダ
+  `260609_atari2600-dev/` の下に `harness/`（この repo・既存履歴を維持）と `roms/`（新 repo）を兄弟配置し
+  `go.work` で束ねる。`roms/frogger` を harness から除去し roms repo へ移設、`roms/litmus` は基盤の持ち物として残留。
+  **harness の game 依存を根絶**：scenario/emu のユニットテストが参照していた frogger ROM を litmus へ付け替え、
+  新フィクスチャ `roms/litmus/scenarios/golden.json`(+`.golden`) を追加。`.mcp.json`/`.claude` は傘直下へ
+  （Claude Code のプロジェクトルートで読まれるため）。CLAUDE.md の構成・開発環境節を spinoff 後の実態へ更新。
+  検証：harness `go vet`/`go test` 緑・litmus 4 シナリオ PASS、roms 側 `gen`＋frogger 3 シナリオ PASS。
 - **Go モジュール名を `github.com/kidsnz/atari2600-dev` → `github.com/kidsnz/atari2600-harness` にリネーム
   （spinoff 準備）.** 基盤が独立リポ `atari2600-harness` になる前提に合わせ、`go.mod` と import 9 ファイルを
   一括置換。build/vet/test 緑、全シナリオ PASS。

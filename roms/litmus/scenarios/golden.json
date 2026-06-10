@@ -1,0 +1,10 @@
+{
+  "rom": "roms/litmus/smoke.bin",
+  "warmup_frames": 2,
+  "asserts": [
+    {"at_frame": 2, "field": "ram.0x80", "op": "==", "value": 66}
+  ],
+  "checks": {
+    "golden_frame": true
+  }
+}

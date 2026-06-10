@@ -32,11 +32,12 @@ func TestBudgetGuardCatchesOverrun(t *testing.T) {
 }
 
 // TestBudgetGuardNoFalsePositive は、毎ライン規律正しく WSYNC する正常 ROM で予算ガードが
-// 誤発火しない（over=false）ことを裏取りする。smoke=合成 litmus / frogger=実ゲーム。
+// 誤発火しない（over=false）ことを裏取りする。いずれも harness 自前の litmus ROM
+// （smoke=最小合成・litmus_pf=実 playfield カーネル）＝game にゼロ依存。
 func TestBudgetGuardNoFalsePositive(t *testing.T) {
 	for _, rom := range []string{
 		"../../roms/litmus/smoke.bin",
-		"../../roms/frogger/frogger.bin",
+		"../../roms/litmus/litmus_pf.bin",
 	} {
 		e, err := New("NTSC")
 		if err != nil {
