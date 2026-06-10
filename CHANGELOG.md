@@ -32,6 +32,21 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.20.0] - 2026-06-10
+
+### 追加
+- **横位置 X(N) の自動キャリブレーション（B-4 / 欠落B を完全クローズ）。** litmus を「一度きりの手作業」から
+  「掃引→自動フィットで再現可能」へ。協調 ROM（`litmus_pos`: 遅延 `DELAY=$80`・SBC/BCS=5 CPU サイクル/ユニット）
+  の遅延を poke で振り、各フレームの `player0.ResetPixel` を実測 → 直線回帰して傾きとオフセットを数値で復元。
+  - **実装**: `internal/calibrate`（`Sweep` = poke 掃引＋ResetPixel 実測 / `Fit` = 純関数の直線回帰）。
+    `Fit` は **160 折返しと左端飽和に頑健**：mod-160 デルタの中央値で 1 ユニット前進量を推定し、その前進を保つ
+    **最長連続区間だけ**を unwrap して最小二乗（strobe が有効域外で X=3 に張り付く飽和点を除外）。
+    `cmd/calibrate [rom] [lo] [hi]` で表＋傾き＋R² を表示。
+  - **実測結果（litmus_pos）**: DELAY 2..11 で X = 12,27,…,147（+15px/ユニット）→ **slope = 3.0000 px/CPU-cycle**
+    （実機権威値 3 と一致）・R²=1.0・kernel offset（unwrap 後 DELAY=0 外挿）= −18。
+  - **検証**: `calibrate_test.go` — 折返し＋飽和混在の合成データで slope 復元、実 ROM 掃引で 3 px/cycle 再現、
+    無変化データはエラー。
+
 ## [0.19.0] - 2026-06-10
 
 ### 追加
