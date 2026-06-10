@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.31.0] - 2026-06-10
+
+### Added
+- **REFP (reflected sprite) litmus — rounds out the sprite track.** `roms/litmus/litmus_refp.asm` draws the
+  asymmetric ramp with `REFP0=$08`; `read_tia_registers` shows `player0.reflected=true` and `read_row` shows
+  the ramp mirrored (row0 `0x80` lights clock 10 = the right end; row4 `0xF8` lights clock 6–10 = right 5px) —
+  the mirror image of the non-reflected `litmus_sprite`. Confirms REFP and `pkg/sprite.Reflect` (data-side
+  mirror) are equivalent. Locked by `scenarios/refp.json`. 12 litmus pass.
+
 ## [0.30.0] - 2026-06-10
 
 ### Added

@@ -1,0 +1,11 @@
+{
+  "rom": "roms/litmus/litmus_refp.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tiareg.player0.reflected", "op": "==", "value": 1}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
