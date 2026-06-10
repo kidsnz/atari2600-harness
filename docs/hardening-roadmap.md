@@ -96,7 +96,10 @@ Implemented: `pkg/sprite.SplitWide`; `litmus_p0p1.asm` + `scenarios/p0p1.json` p
   `lookupDistortion`), `Gopher2600/tracker/pianokeys.go`.
 - **Verify:** known writes on `roms/litmus/litmus_audio.asm` map to expected note/timbre names.
 
-#### A-2. `digest.Audio` golden  — size: small–medium (digest/audio.go in-tree)
+#### A-2. `digest.Audio` golden  — size: small–medium (digest/audio.go in-tree) — ✅ DONE (v0.26.0)
+Implemented: `checks.golden_audio` compares a `digest.Audio` chain hash against `<scenario>.audio.golden`
+(emu `Enable/Reset/AudioHash`, shared golden eval). Verified on `litmus_audio`.
+
 - **Problem:** golden regression covers only video (`digest.Video`, v0.19); audio has no golden.
 - **Proposal:** mirror the video golden for audio. Add `checks.golden_audio` to scenarios, comparing a
   sha1 audio-chain against `<scenario>.audio.golden`.
@@ -117,7 +120,11 @@ Implemented: `pkg/sprite.SplitWide`; `litmus_p0p1.asm` + `scenarios/p0p1.json` p
 
 ## Theme B — harden the foundation (robustness / trust)
 
-#### F-1. ★ CI (GitHub Actions)  — size: small–medium — HIGH PRIORITY now that the repo is public
+#### F-1. ★ CI (GitHub Actions)  — size: small–medium — HIGH PRIORITY — ✅ DONE (v0.28.0)
+Implemented: `.github/workflows/ci.yml` (ubuntu + go-from-go.mod + DASM, clones Gopher2600 at the pinned
+commit, assembles litmus ROMs, `CGO_ENABLED=0` build/vet/test + litmus scenarios). No SDL needed. Badge on
+README. (Already paid off: it immediately surfaced a flaky `TestStepScanline`, fixed in v0.29.1.)
+
 - **Problem:** no automated verification; regressions can land silently on a public repo.
 - **Proposal:** a workflow running `go build ./...` + `go vet ./...` + `go test ./...` + the litmus
   scenarios on push/PR.
@@ -134,7 +141,10 @@ Implemented: `pkg/sprite.SplitWide`; `litmus_p0p1.asm` + `scenarios/p0p1.json` p
 - **Where to touch:** `go.mod` (drop `replace`, add a pinned `require`); README setup section.
 - **Verify:** `go build ./... && go test ./...` green against the pinned version; all litmus scenarios PASS.
 
-#### F-3. PAL/SECAM verification  — size: small–medium
+#### F-3. PAL/SECAM verification  — size: small–medium — ✅ DONE (v0.27.0, PAL)
+Implemented: `litmus_pal.asm` (312 = 3/45/228/36) + `scenarios/pal.json` (tv_spec PAL) assert 312 lines.
+(SECAM not separately covered; same mechanism.)
+
 - **Problem:** the harness is NTSC-centric; constants list PAL (312 lines) but there's no PAL litmus/tests.
 - **Proposal:** a PAL litmus ROM and tests asserting the 312-line / 3/45/228/36 budget, plus position
   behavior under PAL.
@@ -169,16 +179,17 @@ Low cost, high leverage — already noted in `improvement-roadmap.md` G-1:
 ---
 
 ## Recommended order of attack
-1. ~~**S-1 / S-2 / S-3 sprites** — especially **S-3 P0+P1 16px**, the flagship.~~ ✅ DONE (v0.23.0–v0.25.0).
-   The sprite authoring trio is complete and hardware-verified.
-2. **F-1 CI** (cheapest defense, now that the repo is public; consider F-2 to simplify it).
-3. **A-1 / A-2 audio verification deepening** — note: Gopher2600's `tracker.lookupMusicalNote`/`lookupDistortion`
-   are **unexported**, so A-1 is not a trivial wiring job (re-estimate: implement the AUDC→timbre / AUDF→note
-   mapping ourselves, which overlaps A-3). `digest.Audio` (A-2) is still a clean win.
-4. **A-3 audio authoring** / **S-4 sprite shape verification** / use pkg/sprite in the Frogger ROM (roms repo).
-5. **F-3 PAL / F-5 stubs / F-4 Stella cross-check / Theme C wiring.**
+1. ~~**S-1 / S-2 / S-3 sprites** (flagship S-3 P0+P1 16px).~~ ✅ DONE (v0.23.0–v0.25.0). Sprite trio complete.
+2. ~~**F-1 CI**.~~ ✅ DONE (v0.28.0). Reliable after fixing a flaky test it surfaced (v0.29.1).
+3. ~~**A-2 audio golden** / **F-3 PAL** / use pkg/sprite in Frogger.~~ ✅ DONE (v0.26.0 / v0.27.0 / roms v0.1.2).
+4. **Remaining (need the user or more design):**
+   - **A-3 audio authoring + A-1 note/timbre names** — parked: needs authoritative Slocum reference data to
+     name notes/timbres correctly, and SFX quality is best judged by ear (Stella) with the user.
+   - **F-5 `run_scenario` MCP** — parked: rom-path resolution when invoked from the MCP server's CWD is a
+     design fork for the user.
+   - **S-4 sprite shape / Theme C `reflection` annotation** — image-side; harder to verify numerically autonomously.
+   - **F-2 Gopher2600 version pin / F-4 Stella oracle cross-check / VDEL & more collision-pair litmus** — open.
 
-> Sprites (S-3) is the highest-value capability gain; CI (F-1) is the highest-value defense. Audio
-> verification (A-1/A-2) is the cheapest meaningful win because the upstream pieces are already vendored.
-> When implementing any MCP-tool change, follow CLAUDE.md "Smoke-test harness before reconnect":
-> after modifying `bin/harness`, smoke-test with MCP `initialize` before asking to reconnect.
+> Verified coverage added this phase also includes: NUSIZ double-width (v0.25) + multi-copy (v0.29),
+> missile/ball position (v0.30), REFP reflect (v0.31). The sprite/object verification surface is now broad.
+> When implementing any MCP-tool change, follow CLAUDE.md "Smoke-test harness before reconnect".
