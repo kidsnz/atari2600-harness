@@ -12,6 +12,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.22.1] - 2026-06-10
+
+### Added
+- **GPL-3.0 `LICENSE`.** The harness embeds Gopher2600 (GPL-3.0) as a library, so the combined work is
+  GPL-3.0-or-later. Added copyright and an Acknowledgements section to the README.
+
+### Changed
+- **Public-readiness: the published repo is now English-only.** Translated the public surface
+  (README + `docs/`×7 + CHANGELOG + CLAUDE.md) to English. The author works in Japanese, so Japanese copies
+  are kept locally as `*.ja.md` sidecars (gitignored, never published). Calibrated the prior-art wording to
+  "no Atari 2600 MCP found in a public search (2026-06; Atari Lynx = gearlynx exists)" rather than claiming
+  "first". Removed the README provenance section. No code changes; build/vet/test green.
+
 ## [0.22.0] - 2026-06-10
 
 ### Changed
