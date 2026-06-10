@@ -41,6 +41,40 @@ func Encode(art []string) []byte {
 // WideWidth は P0+P1 連結スプライトの最大横幅（px）。P0=左8列・P1=右8列。
 const WideWidth = 16
 
+// PlayerSize は NUSIZx レジスタ下位 3bit（D2..D0）が表すプレイヤーのコピー数／横幅モード。
+// 実機の number-size 表（Stella Programmer's Guide）どおり。
+type PlayerSize uint8
+
+const (
+	OneCopy           PlayerSize = 0 // 1 コピー・通常幅(8px)
+	TwoCopiesClose    PlayerSize = 1 // 2 コピー（近接・間隔 16）
+	TwoCopiesMedium   PlayerSize = 2 // 2 コピー（中・間隔 32）
+	ThreeCopiesClose  PlayerSize = 3 // 3 コピー（近接）
+	TwoCopiesWide     PlayerSize = 4 // 2 コピー（広・間隔 64）
+	DoubleWidth       PlayerSize = 5 // 1 コピー・2 倍幅(16px)
+	ThreeCopiesMedium PlayerSize = 6 // 3 コピー（中）
+	QuadWidth         PlayerSize = 7 // 1 コピー・4 倍幅(32px)
+)
+
+// MissileSize はミサイル/ボール幅（NUSIZx D5..D4 / CTRLPF・ENABL 系の D5..D4）。
+type MissileSize uint8
+
+const (
+	Missile1px MissileSize = 0
+	Missile2px MissileSize = 1
+	Missile4px MissileSize = 2
+	Missile8px MissileSize = 3
+)
+
+// NUSIZ は「プレイヤーのコピー/幅」と「ミサイル幅」を 1 つの NUSIZx バイトへ合成する。
+// 下位 3bit = PlayerSize、D5..D4 = MissileSize（他ビットは 0）。
+func NUSIZ(p PlayerSize, m MissileSize) byte {
+	return byte(p)&0x07 | (byte(m)&0x03)<<4
+}
+
+// NUSIZPlayer は PlayerSize だけを NUSIZx バイトに（ミサイル幅 0）。
+func NUSIZPlayer(p PlayerSize) byte { return byte(p) & 0x07 }
+
 // SplitWide は 16 列幅の ASCII 設計を P0(左 col0..7)・P1(右 col8..15)の GRP バイト列へ分割する。
 // 表示側で P1 を P0 のちょうど +8px に隣接配置すると、2 枚のスプライトが 1 体の最大 16px 幅キャラに見える
 // （多色にしたい場合は P0/P1 に別 COLUP を与える）。各行 16 文字・最上段が先頭。p0[i]/p1[i] は設計順（上→下）。

@@ -65,6 +65,27 @@ func TestSplitWide(t *testing.T) {
 	}
 }
 
+// TestNUSIZ は player size / missile size の合成が正しいことを固定する。
+func TestNUSIZ(t *testing.T) {
+	if got := NUSIZPlayer(OneCopy); got != 0x00 {
+		t.Errorf("OneCopy = %02X, want 00", got)
+	}
+	if got := NUSIZPlayer(DoubleWidth); got != 0x05 {
+		t.Errorf("DoubleWidth = %02X, want 05", got)
+	}
+	if got := NUSIZPlayer(QuadWidth); got != 0x07 {
+		t.Errorf("QuadWidth = %02X, want 07", got)
+	}
+	// 3 コピー近接 + ミサイル 8px = $30 | $03 = $33
+	if got := NUSIZ(ThreeCopiesClose, Missile8px); got != 0x33 {
+		t.Errorf("NUSIZ(ThreeCopiesClose, Missile8px) = %02X, want 33", got)
+	}
+	// 倍幅 + ミサイル 2px = $10 | $05 = $15
+	if got := NUSIZ(DoubleWidth, Missile2px); got != 0x15 {
+		t.Errorf("NUSIZ(DoubleWidth, Missile2px) = %02X, want 15", got)
+	}
+}
+
 // TestReflect は左右反転が対称になることを確認する（reflect(reflect(b)) == b）。
 func TestReflect(t *testing.T) {
 	cases := []struct{ in, want byte }{

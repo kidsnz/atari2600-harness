@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.25.0] - 2026-06-10
+
+### Added
+- **`pkg/sprite` NUSIZ helper (hardening-roadmap S-2).** `PlayerSize` (OneCopy … DoubleWidth … QuadWidth) /
+  `MissileSize` enums and `NUSIZ(player, missile)` / `NUSIZPlayer(player)` compose a NUSIZx byte from intent
+  instead of raw bits. **Verified on Gopher2600** with `roms/litmus/litmus_nusiz.asm`: an 8px solid sprite at
+  `NUSIZ0=$05` (DoubleWidth) renders **16px wide** (`read_row` clock 4–19 = white len 16) and
+  `read_tia_registers` shows `player0.nusiz=5`. Locked by `scenarios/nusiz.json`. Completes the sprite
+  authoring trio (S-1 encoder + S-2 NUSIZ + S-3 P0+P1 combine).
+
 ## [0.24.0] - 2026-06-10
 
 ### Added
