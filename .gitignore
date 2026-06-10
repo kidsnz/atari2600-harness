@@ -2,6 +2,11 @@
 .DS_Store
 .vscode/
 
+# Japanese-language local sidecars (the author works in Japanese; the
+# published repo is English-only). The English *.md are tracked; the
+# Japanese originals are kept locally as *.ja.md and never published.
+*.ja.md
+
 # build output
 /build/
 /bin/
