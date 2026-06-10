@@ -19,7 +19,7 @@
 | A 知覚 | 実行結果が見えない | **閉** | `read_tia_registers`/`read_collisions`（P1, v0.14.0）で書込専用レジスタ・衝突を実測。色推論を廃した |
 | B タイミング | サイクル計算が合わない | **ほぼ閉** | 位置は閉。**サイクル露出（B-1, v0.12）＋予算ガード（B-3, v0.13）実装済**。残り = フレーム内粒度（B-2）・kernel定数自動較正（B-4） |
 | C 知識 | 6502/TIA 詳細の誤り | **閉** | kernel 依存定数（missile式 N・HBLANK境界）が未formalize |
-| D 検証 | 再現・回帰が無い | **部分** | アサーション/入力リプレイ/ゴールデン回帰 未配線（P2） |
+| D 検証 | 再現・回帰が無い | **ほぼ閉** | シナリオランナー（D-1 アサーション + D-2 入力リプレイ, v0.18.0）実装済。残り = D-3 ゴールデン回帰（`digest` 配線） |
 | E 摩擦 | edit→run→inspect が多段 | **改善** | `assemble_and_load`（P3, v0.16.0）で assemble→load を 1 ショット化。残り = 検証自動化（P2） |
 
 ---
@@ -86,14 +86,14 @@
 
 ## P2 — 欠落D: 検証自動化（手動 MCP 連打の置換）
 
-### D-1. アサーション仕様ファイル + ランナー
+### D-1. アサーション仕様ファイル + ランナー　✅ 実装済 v0.18.0（`cmd/scenario` / `internal/scenario`, `docs/scenarios.md`）
 - **問題:** 全チェックが手動 MCP 呼び出し。回帰が人手依存。
 - **提案:** ROM ごとに宣言ファイル（JSON）で `scanline == 262` / `P0.HmovedPixel <= 159` /
   `FrogY ∈ [24,160]` 等を記述 → 自動実行・pass/fail 報告。
 - **触る場所:** 既存 `internal/playfield/playfield_test.go` の自己検証パターンを **ROM レベル**へ拡張。
 - **規模:** 中。
 
-### D-2. 入力リプレイのタイムライン
+### D-2. 入力リプレイのタイムライン　✅ 実装済 v0.18.0（シナリオの `inputs[]`。frogger hop で実証）
 - **問題:** `set_input`（`emu.go:129`）は**単発イベント**。シナリオ再現ができない。
 - **提案:** 「フレーム N で up、N+30 で fire」等のスクリプトを流して hop→drown→win を再現テスト化。
 - **規模:** 中。
@@ -247,8 +247,8 @@ debugger driver は外したまま、下記ライブラリを単体利用（expo
 2. ~~**P1 `read_tia_registers` + `read_collisions`**（推論ゼロ化）~~ ✅ v0.14.0。欠落A クローズ。
 3. ~~**B-2 `step_scanline`**（+ `step_instruction`）~~ ✅ v0.15.0（`step_clock` は色クロック粒度で未着手）。
 4. ~~**P3 `assemble_and_load`**（摩擦低減）~~ ✅ v0.16.0。
-5. **P2 検証自動化**（中・回帰の土台）← 次の山。G-1 の `recorder`/`regression` 配線が最短路。
-6. その他の残り: **B-4 kernel 定数 自動較正** / **R-2 音声（`read_audio` 同梱）** / **R-1 Freeway 移植**。
+5. ~~**P2 検証自動化**（回帰の土台）~~ ✅ D-1+D-2 = シナリオランナー v0.18.0。残り D-3 ゴールデン回帰。
+6. その他の残り: **D-3 ゴールデン回帰**（`digest` 配線）/ **B-4 kernel 定数 自動較正** / **R-2 音声"制作"側** / **R-1 Freeway 移植**。
 
 > 制作（Frogger）側では **R-1 Freeway アーキテクチャ**が最も即効。音声検証 **R-2** は P1
 > （`read_tia_registers`）に Audio シャドウを同梱する形で一緒に入れるのが自然。

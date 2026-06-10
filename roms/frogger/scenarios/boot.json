@@ -1,0 +1,11 @@
+{
+  "rom": "roms/frogger/frogger.bin",
+  "asserts": [
+    {"at_frame": 0, "field": "ram.0x81", "op": "==", "value": 144},
+    {"at_frame": 0, "field": "ram.0x84", "op": "==", "value": 3}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "max_line_budget": 76
+  }
+}

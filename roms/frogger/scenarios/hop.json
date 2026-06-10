@@ -1,0 +1,11 @@
+{
+  "rom": "roms/frogger/frogger.bin",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 1, "player": 0, "action": "up", "pressed": true}
+  ],
+  "asserts": [
+    {"at_frame": 0, "field": "ram.0x81", "op": "==", "value": 144},
+    {"at_frame": 1, "field": "ram.0x81", "op": "==", "value": 128}
+  ]
+}

@@ -32,6 +32,25 @@
   ツール群・`internal/playfield` 等を**独立リポジトリ/プロジェクトへ切り出す**。ロム制作物（`roms/`・各シーン
   generator）と制作基盤を分離し、基盤側を単体で進化させる。
 
+## [0.18.0] - 2026-06-10
+
+### 追加
+- **シナリオ・ランナー（P2 / 欠落D = 検証自動化の第一歩。D-1 アサーション + D-2 入力リプレイ）。**
+  「入力タイムライン＋数値アサーション」を 1 つの JSON で宣言し、ROM に対して自動 pass/fail する。
+  `go run ./cmd/scenario <file.json> ...`（全 pass で exit 0／失敗で exit 1）＝ **MCP 不要で CI に乗る**回帰土台。
+  - **設計の肝**: アサーションの語彙（`field` 文字列）が `internal/emu` の read 系メソッドに 1 対 1 で対応
+    ＝今日まで積んだ観測ツールをそのまま回帰の語彙として使う（ドッグフーディング）。
+    瞬時フィールド: `frame`/`scanline`/`clock`/`cycles_total`/`cpu.*`/`ram.0xNN`/`tia.<obj>.<reset|hmoved>_pixel`/
+    `tiareg.<obj>.<reg>`/`collisions.<pair>`/`audio.<ch>.<reg>`。未知フィールドはエラー（タイポを握り潰さない）。
+    副作用のある計測は run 全体の `checks{ntsc_frame_lines, max_line_budget}` に分離（評価順の破壊を回避）。
+  - **構成**: `internal/scenario`（パース＋語彙解決＋Run、ROM 非依存）/ `cmd/scenario`（薄い CLI、`cmd/probe` 規約）。
+  - **サンプル**: `roms/litmus/scenarios/`（smoke=`ram.0x80==$42`+262行+予算、collide=`bl_pf==1`）、
+    `roms/frogger/scenarios/`（boot=FrogY初期144+残機3+262行+予算、**hop=`up`入力で FrogY 144→128**＝入力タイムライン
+    が実ゲームで効くことを実証）。
+  - **検証**: `internal/scenario/scenario_test.go` — 全サンプル pass（陽性）、故意に外したアサーションで
+    `Result.Pass=false` を検出（陰性）、演算子テーブル、未知/不正フィールドはエラー。
+  - 注: 本機能は CLI のみで `bin/harness`（MCP）は不変＝MCP 再接続は不要。
+
 ## [0.17.0] - 2026-06-10
 
 ### 追加

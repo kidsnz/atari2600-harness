@@ -1,0 +1,8 @@
+{
+  "rom": "roms/litmus/litmus_collide.bin",
+  "asserts": [
+    {"at_frame": 1, "field": "collisions.bl_pf", "op": "==", "value": 1},
+    {"at_frame": 1, "field": "collisions.p0_pf", "op": "==", "value": 0},
+    {"at_frame": 1, "field": "tiareg.ball.enabled", "op": "==", "value": 1}
+  ]
+}
