@@ -215,7 +215,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-4 Input litmus (joystick + latch).** ✅ DONE (v0.42.0, `litmus_input` + input-timeline scenario).
 - [ ] **V2-4b Paddles.** Add a paddle path to `set_input` (plug Gopher2600 paddle peripheral), then verify
   INPT0–3 dump/charge (VBLANK D7) with a scanline-count calibration of the transfer curve.
-- [ ] **V2-5 Bankswitch F8 litmus + `read_bank` MCP tool.** 8K two-bank ROM (per-bank sentinels/colors,
+- [x] **V2-5 Bankswitch F8 litmus + `read_bank` MCP tool.** ✅ DONE (v0.43.0, `litmus_bank` + `bank.*` scenario fields). 8K two-bank ROM (per-bank sentinels/colors,
   vectors+stub+trampoline in both banks); assert bank via RAM sentinels and the new tool
   (Gopher2600 `Cartridge.GetBank()` already exposes it). Then F6 variant; F8SC later.
 - [ ] **V2-6 6502 precision litmus.** STA abs,X fixed-5 vs LDA abs,X +1 page-cross; branch +1/+2 (measured

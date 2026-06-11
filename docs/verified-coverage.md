@@ -57,6 +57,11 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | INPT4 fire (D7, 0=pressed; low bits = open-bus noise) | `litmus_input` | $BC released / $3C pressed |
 | VBLANK D6 latch: INPT4 stays pressed after release; directions don't latch | `litmus_input` | $3C persists ≥3 frames post-release; SWCHA returns to $FF |
 
+## Bank switching
+| Behavior | ROM | Evidence |
+|---|---|---|
+| F8 (8K): AUTO fingerprint, hotspots $FFF8/9, cross-bank instruction flow, per-bank vectors/stub | `litmus_bank` | per-bank RAM sentinels + lockstep frame counters + `bank.number==0` at frame end |
+
 ## Audio
 | Behavior | ROM | Evidence |
 |---|---|---|

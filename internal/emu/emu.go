@@ -268,6 +268,13 @@ func (e *Emu) Poke(addr uint16, val uint8) error {
 	return e.VCS.Mem.Poke(addr, val)
 }
 
+// Bank は「現在 PC が指すアドレス」のカートリッジバンク情報を返す（bankswitch ROM の検証用）。
+// Gopher2600 の Cartridge.GetBank をそのまま使う（4K 非バンク ROM では常に 0, false）。
+func (e *Emu) Bank() (number int, isRAM bool) {
+	info := e.VCS.Mem.Cart.GetBank(e.VCS.CPU.PC.Value())
+	return info.Number, info.IsRAM
+}
+
 // SetInput はジョイスティック入力を注入する（headless ハーネスの入力経路。poke は入力に効かない）。
 // player 0=PortLeft / 1=PortRight。action は left/right/up/down/fire/center。
 // pressed=true で押下保持・false で解除（次に変えるまで状態は持続）。center は全方向解除。

@@ -38,11 +38,11 @@ packages are pure Go (no SDL), so headless numeric driving works. Every tool ret
 - Assembler = **DASM** (`-f3`); pure 6502 cycle counts = sim65 / 6502profiler.
 - Reference oracle = **Stella**; image overlay = in-house Go (`image/draw` + `fogleman/gg`).
 
-### MCP tools (19, in `cmd/harness`)
+### MCP tools (20, in `cmd/harness`)
 
 `load_rom` / `step_frame` / `step_scanline` / `step_instruction` / `assemble_and_load` /
 `read_cpu` / `read_ram` / `read_tia` / `read_tia_registers` / `read_cycles` / `read_collisions` /
-`read_row` / `read_audio` / `peek` / `poke` / `breakif` / `set_input` / `assert_line_budget` /
+`read_row` / `read_audio` / `read_bank` / `peek` / `poke` / `breakif` / `set_input` / `assert_line_budget` /
 **`get_screen_annotated`** (returns image + numbers together — the primary user↔model comms channel).
 
 Implementation spec: [`docs/mcp-tools.md`](docs/mcp-tools.md).

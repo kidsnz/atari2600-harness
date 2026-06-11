@@ -339,6 +339,19 @@ func resolve(e *emu.Emu, field string) (int64, error) {
 		return resolveCollision(e, parts)
 	case "audio":
 		return resolveAudio(e, parts)
+	case "bank":
+		// bank.number / bank.is_ram — 現在 PC のカートリッジバンク（bankswitch 検証用）
+		if len(parts) != 2 {
+			return 0, fmt.Errorf("bank field needs bank.number or bank.is_ram")
+		}
+		n, isRAM := e.Bank()
+		switch parts[1] {
+		case "number":
+			return int64(n), nil
+		case "is_ram":
+			return b2i(isRAM), nil
+		}
+		return 0, fmt.Errorf("unknown bank field %q", parts[1])
 	default:
 		return 0, fmt.Errorf("unknown field %q", field)
 	}

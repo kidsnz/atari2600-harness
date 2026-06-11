@@ -43,7 +43,8 @@ must always hold *only* in a doc — burn them here or into memory.
   **`read_collisions`** (v0.14.0, structures CXxx into named boolean pairs) /
   **`step_scanline`** (v0.15.0, advance until scanline +1) / **`step_instruction`** (v0.15.0, one instruction at a time) /
   **`assemble_and_load`** (v0.16.0, dasm→load in one shot; on failure returns structured dasm output) /
-  **`read_audio`** (v0.17.0, reads TIA audio AUDC/AUDF/AUDV numerically = verify sound with numbers too).
+  **`read_audio`** (v0.17.0, reads TIA audio AUDC/AUDF/AUDV numerically = verify sound with numbers too) /
+  **`read_bank`** (v0.43.0, current cartridge bank at PC + is_ram; F8 verified, scenario fields `bank.number`/`bank.is_ram`).
   Unimplemented (planned): `step_clock` (color-clock unit; `Step` is per-instruction, needs a finer hook) /
   `watch|trap` (the budget case is effectively covered by `assert_line_budget`).
 

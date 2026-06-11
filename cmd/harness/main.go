@@ -208,6 +208,26 @@ type CPUFlags struct {
 	Z bool `json:"z"`
 	C bool `json:"c"`
 }
+// --- read_bank（bankswitch ROM の現在バンク。4K 非バンクでは常に 0/false）---
+
+type ReadBankOut struct {
+	Bank   int    `json:"bank" jsonschema:"current cartridge bank at PC"`
+	IsRAM  bool   `json:"is_ram,omitempty" jsonschema:"true when PC is executing from cartridge RAM"`
+	Coords Coords `json:"coords"`
+}
+
+func handleReadBank(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, ReadBankOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ReadBankOut{}, err
+	}
+	n, isRAM := e.Bank()
+	return nil, ReadBankOut{Bank: n, IsRAM: isRAM, Coords: coordsOf(e)}, nil
+}
+
 type ReadCPUOut struct {
 	PC     uint16   `json:"pc"`
 	A      uint8    `json:"a"`
@@ -649,6 +669,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "step_instruction", Description: "Execute exactly one CPU instruction (consuming any pending WSYNC stall first). Returns its cycle count and beam coords — pairs with read_cycles to step through a kernel one instruction at a time."}, handleStepInstruction)
 	mcp.AddTool(server, &mcp.Tool{Name: "step_scanline", Description: "Advance until the TV scanline increments once (stops at the next scanline, or scanline 0 of the next frame). Returns CPU cycles consumed across that scanline and beam coords — for inspecting kernel state line by line."}, handleStepScanline)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_cpu", Description: "Read 6507 registers, status flags, and beam coords."}, handleReadCPU)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_bank", Description: "Read the current cartridge bank at PC (bankswitched ROMs; 0 for flat 2K/4K). Returns is_ram=true when executing from cartridge RAM."}, handleReadBank)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_cycles", Description: "Read CPU cycle counts from the simulator (rule #2: never count cycles by hand): the last instruction's cycles, cycles since the last mark, and total cycles since ROM load. Set reset=true to mark a new measurement baseline (cycles_since_mark restarts at 0)."}, handleReadCycles)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_ram", Description: "Dump the 128 bytes of RAM ($80-$FF) as hex."}, handleReadRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_tia", Description: "Read TIA sprite positions (ResetPixel/HmovedPixel) and HBLANK. Authoritative for horizontal-position checks."}, handleReadTIA)

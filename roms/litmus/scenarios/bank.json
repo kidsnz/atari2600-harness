@@ -1,0 +1,40 @@
+{
+  "rom": "roms/litmus/litmus_bank.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 2,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 177
+    },
+    {
+      "at_frame": 2,
+      "field": "ram.0x81",
+      "op": ">=",
+      "value": 4
+    },
+    {
+      "at_frame": 2,
+      "field": "ram.0x82",
+      "op": ">=",
+      "value": 4
+    },
+    {
+      "at_frame": 2,
+      "field": "bank.number",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 2,
+      "field": "bank.is_ram",
+      "op": "==",
+      "value": 0
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

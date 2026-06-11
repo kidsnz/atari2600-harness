@@ -12,6 +12,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.43.0] - 2026-06-11
+
+### Added
+- **F8 bankswitching verified + `read_bank` MCP tool + `bank.*` scenario fields (v2 backlog V2-5).**
+  `litmus_bank.asm` is a best-practices 8K F8 ROM (vectors + an identical reset stub in *both* banks, a
+  same-address switch zone whose instruction stream stays valid across the hotspot): every frame bank 0
+  marks RAM and hotspot-reads $FFF9 → bank 1 writes its own sentinel and returns via $FFF8. Verified:
+  Gopher2600 AUTO fingerprints the plain 8K dasm binary as F8; $80 ends every frame as bank 1's sentinel;
+  both per-bank frame counters advance in lockstep; the kernel executes in bank 0 at the frame boundary.
+  New `read_bank` MCP tool (20 tools now; `Cartridge.GetBank` at PC, with `is_ram`) and `bank.number` /
+  `bank.is_ram` scenario fields; `bin/harness` rebuilt and smoke-tested (initialize + tools/list, no panic).
+  Locked by `scenarios/bank.json`. 21 scenarios pass.
+
 ## [0.42.0] - 2026-06-11
 
 ### Added
