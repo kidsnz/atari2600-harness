@@ -212,8 +212,9 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-3 Asymmetric-PF write-window litmus.** ✅ DONE (v0.41.0, `litmus_pf_async`). Boundary probes around woodgrain's conservative table
   (LPF0≤21, LPF1≤27, LPF2≤37, RPF0 27–48, RPF1 37–53, RPF2 48–64; reflected RPF2 == 48 exactly); verify
   per-pixel split on late writes; settle the SpiceWare Step3(66) vs Step7(71) discrepancy.
-- [ ] **V2-4 Input litmus.** Joystick SWCHA via set_input; INPT4/5 latch mode (VBLANK D6 semantics);
-  paddle INPT0–3 dump/charge (VBLANK D7) with a scanline-count calibration of Gopher2600's transfer curve.
+- [x] **V2-4 Input litmus (joystick + latch).** ✅ DONE (v0.42.0, `litmus_input` + input-timeline scenario).
+- [ ] **V2-4b Paddles.** Add a paddle path to `set_input` (plug Gopher2600 paddle peripheral), then verify
+  INPT0–3 dump/charge (VBLANK D7) with a scanline-count calibration of the transfer curve.
 - [ ] **V2-5 Bankswitch F8 litmus + `read_bank` MCP tool.** 8K two-bank ROM (per-bank sentinels/colors,
   vectors+stub+trampoline in both banks); assert bank via RAM sentinels and the new tool
   (Gopher2600 `Cartridge.GetBank()` already exposes it). Then F6 variant; F8SC later.

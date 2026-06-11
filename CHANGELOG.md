@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.42.0] - 2026-06-11
+
+### Added
+- **Input-port litmus with an input-timeline scenario (v2 backlog V2-4).** `litmus_input.asm` samples
+  SWCHA/INPT4 to RAM every frame; `scenarios/input.json` drives a press/release timeline and asserts the
+  numeric readback: no input = SWCHA $FF, INPT4 $BC (D7=1 + open-bus noise — the documented reason to test
+  with N only); P0 left = $BF (D6→0); fire = INPT4 $3C (D7→0); **the VBLANK D6 latch holds INPT4 at $3C
+  frames after fire is released** while directions release immediately (the control). 20 scenarios pass.
+  Paddle charge-timing verification split off as **V2-4b** (needs a paddle path in `set_input`).
+
 ## [0.41.0] - 2026-06-11
 
 ### Added

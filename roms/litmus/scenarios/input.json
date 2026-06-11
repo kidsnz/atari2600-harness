@@ -1,0 +1,21 @@
+{
+  "rom": "roms/litmus/litmus_input.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 2, "player": 0, "action": "left", "pressed": true},
+    {"frame": 2, "player": 0, "action": "fire", "pressed": true},
+    {"frame": 5, "player": 0, "action": "fire", "pressed": false},
+    {"frame": 7, "player": 0, "action": "left", "pressed": false}
+  ],
+  "asserts": [
+    {"at_frame": 1, "field": "ram.0x80", "op": "==", "value": 255},
+    {"at_frame": 1, "field": "ram.0x81", "op": "==", "value": 188},
+    {"at_frame": 3, "field": "ram.0x80", "op": "==", "value": 191},
+    {"at_frame": 3, "field": "ram.0x81", "op": "==", "value": 60},
+    {"at_frame": 6, "field": "ram.0x80", "op": "==", "value": 191},
+    {"at_frame": 6, "field": "ram.0x81", "op": "==", "value": 60},
+    {"at_frame": 9, "field": "ram.0x80", "op": "==", "value": 255},
+    {"at_frame": 9, "field": "ram.0x81", "op": "==", "value": 60}
+  ],
+  "checks": {"ntsc_frame_lines": 262}
+}

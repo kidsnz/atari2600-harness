@@ -50,6 +50,13 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | Player0–Player1 (CXPPMM) — the pair Frogger uses | `litmus_collide_pp` | `read_collisions.p0_p1 == true` |
 | Missile0–Player0 (CXM0P) | `litmus_collide_mp` | `read_collisions.m0_p0 == true` |
 
+## Input
+| Behavior | ROM | Evidence |
+|---|---|---|
+| SWCHA joystick bits (P0 left → D6=0), no-input $FF | `litmus_input` | RAM-sampled readback under a scenario input timeline |
+| INPT4 fire (D7, 0=pressed; low bits = open-bus noise) | `litmus_input` | $BC released / $3C pressed |
+| VBLANK D6 latch: INPT4 stays pressed after release; directions don't latch | `litmus_input` | $3C persists ≥3 frames post-release; SWCHA returns to $FF |
+
 ## Audio
 | Behavior | ROM | Evidence |
 |---|---|---|
@@ -57,6 +64,6 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | Audio-chain golden regression (`digest.Audio`) | `litmus_audio` | `checks.golden_audio` deterministic record→match |
 
 ## Not yet covered (open)
-Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, input ports, SECAM, and a
-Stella-oracle cross-check of the rendered pixels.
+Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, paddles (INPT0–3 charge timing),
+SECAM, and a Stella-oracle cross-check of the rendered pixels.
 See `docs/hardening-roadmap.md` § v2 backlog.
