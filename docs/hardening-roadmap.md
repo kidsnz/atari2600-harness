@@ -193,3 +193,63 @@ Low cost, high leverage — already noted in `improvement-roadmap.md` G-1:
 > Verified coverage added this phase also includes: NUSIZ double-width (v0.25) + multi-copy (v0.29),
 > missile/ball position (v0.30), REFP reflect (v0.31). The sprite/object verification surface is now broad.
 > When implementing any MCP-tool change, follow CLAUDE.md "Smoke-test harness before reconnect".
+
+---
+
+## v2 backlog — from the 2026-06 fundamentals audit
+
+Distilled from `fundamentals-audit.md` (six research squads over the local corpus + ~22 owner links + web).
+Priority = general/foundational value × cost × how much it unlocks. Each item ships via the usual pipeline
+(branch → litmus/numeric verify → CI → tag).
+
+### Tier 1 — foundational gaps that block techniques
+- [ ] **V2-1 VDEL litmus.** Verify the write-triggered cross-copies (GRP0→P1 shadow; GRP1→P0 *and* ENABL
+  shadows), VDELxx D0 selecting the old copy, and the 2LK alignment relation (VDELP0=1/VDELP1=0 → same Y;
+  0/1 → Y+1). Prereq for 48px score and vertical positioning. Src: Stella PG §6.D; SpiceWare Step 4/5.
+- [ ] **V2-2 HMOVE side-effects litmus.** (a) 8px left blank on HMOVE-after-WSYNC lines (incl. all-HMxx=0);
+  (b) mid-line HMOVE calibration sweep (expect rightward "plugging" ≈1px/4CLK; Cosmic Ark family);
+  (c) HMxx writes inside the 24-cycle freeze — capture Gopher2600's table. Src: Towers TIA_HW_Notes.
+- [ ] **V2-3 Asymmetric-PF write-window litmus.** Boundary probes around woodgrain's conservative table
+  (LPF0≤21, LPF1≤27, LPF2≤37, RPF0 27–48, RPF1 37–53, RPF2 48–64; reflected RPF2 == 48 exactly); verify
+  per-pixel split on late writes; settle the SpiceWare Step3(66) vs Step7(71) discrepancy.
+- [ ] **V2-4 Input litmus.** Joystick SWCHA via set_input; INPT4/5 latch mode (VBLANK D6 semantics);
+  paddle INPT0–3 dump/charge (VBLANK D7) with a scanline-count calibration of Gopher2600's transfer curve.
+- [ ] **V2-5 Bankswitch F8 litmus + `read_bank` MCP tool.** 8K two-bank ROM (per-bank sentinels/colors,
+  vectors+stub+trampoline in both banks); assert bank via RAM sentinels and the new tool
+  (Gopher2600 `Cartridge.GetBank()` already exposes it). Then F6 variant; F8SC later.
+- [ ] **V2-6 6502 precision litmus.** STA abs,X fixed-5 vs LDA abs,X +1 page-cross; branch +1/+2 (measured
+  from next instruction); NMOS BCD (C valid, Z/N counterexample, SED/CLD); JMP ($xxFF) bug; skipdraw
+  18-cycle constancy incl. illegal `dcp` (also certifies illegal-opcode support).
+
+### Tier 2 — completing the matrix
+- [ ] **V2-7 CTRLPF litmus.** SCORE mode colors, PFP priority, ball width bits; measure the unspecified
+  SCORE×PFP interaction.
+- [ ] **V2-8 Collision pairs batch 2.** Remaining 12 CXxx pairs; verify the BIT N/V two-pairs-per-read idiom.
+- [ ] **V2-9 LFSR litmus.** Pitfall Fibonacci both directions from $C4 (verified prefixes, period 255,
+  N-right-then-N-left identity) + Galois `eor #$8E` / `eor #$B4` periods. Pure read_ram asserts.
+- [ ] **V2-10 RIOT timer litmus.** TIM64T expiry timing, post-underflow $FF/1-per-cycle behavior, TIMINT D7
+  (+ does INTIM read clear it), first-decrement offset.
+- [ ] **V2-11 RESPx/RESBL edge litmus.** Double-strobe in one line; RESBL mid-line restart (vs RESPx wrap);
+  missile-unlock offset from RESMP.
+- [ ] **V2-12 Mirrors litmus.** TIA via $0040/$2000, RAM via the $0180 stack page, ROM odd-$x000 mirrors.
+- [ ] **V2-13 48px GRP window litmus.** Derive the 6-store cycle map ourselves (score6.asm recipe; no source
+  documents it) — after V2-1.
+
+### Tier 3 — capabilities (tools/packages)
+- [ ] **V2-14 Audio: duplicate-AUDC digest-equality scenarios** ({4,5} {6,10} {7,9} {12,13} {0,11} hash-equal)
+  — possible today, zero new code.
+- [ ] **V2-15 Audio sample capture.** Second `AddAudioMixer` hook capturing raw per-channel samples →
+  zero-crossing/autocorrelation pitch measurement → falsify Slocum note tables in CI (±cents asserts,
+  calibrated to the emulator's actual sample rate). Unlocks A-3/pkg/audio with verification.
+- [ ] **V2-16 `pkg/audio`.** AUDC names+duplicate map, `freq(audc,audf,spec)`, Slocum's three tuning setups,
+  note-byte codec (Sequencer Kit/slocum-tracker interop), SFX recipe helpers. (Resumes parked A-3 — the
+  authoritative data was in our `reference/` all along.)
+- [ ] **V2-17 F-4 Stella oracle automation v1.** `<rom>.script` (`frame N / tia / riot / dump 80 ff 7 /
+  saveSes`) + driver that launches `Stella -debug`, scrapes the session file, kills the process; compare
+  RAM + TIA registers vs harness at frame N. One-time frame-numbering calibration probe. Image compare = v2.
+- [ ] **V2-18 RAM-map audit helper.** Symbols → read/write coverage (catches dead variables à la Pitfall's
+  `cxHarry`); cheap pass over existing trace hooks.
+
+### Constants to adopt into CLAUDE.md (from the audit)
+24-cycle HMxx freeze after HMOVE · stores never pay page-cross penalties (deterministic kernels) ·
+NMOS decimal mode: only C valid · CLD mandatory at init · never cite cycle_counting_guide for positions.

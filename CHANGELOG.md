@@ -12,6 +12,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.38.0] - 2026-06-11
+
+### Added (docs)
+- **Fundamentals audit — `docs/fundamentals-audit.md`.** Six parallel research passes over the local corpus
+  (Stella Programmer's Guide, woodgrain wiki, Davie's *Newbies*, SpiceWare's Collect, 8bitworkshop,
+  21 real-game disassemblies, DaveC's Random-Dungeon), ~22 owner-supplied links (AtariAge threads, 6502.org,
+  Slocum's music guide, Stella debugger docs, Pitfall analyses), and independent web research (Towers'
+  *TIA Hardware Notes*, Stolberg). Every domain is classified **verified / documented / unknown / caution**
+  with sources. Headline corrections: the local cycle-counting guide's position math is approximate (never
+  cite); Pitfall disassembly's LeftRandom comment is wrong (bit0, proven by simulation); SpiceWare Step 3
+  vs 7 PF-window discrepancy (to settle by measurement); HMOVE comb/late-HMOVE behavior absent from the
+  local shelf (Towers adopted as authority). Headline finds: VDEL's write-triggered cross-copy semantics;
+  woodgrain's definitive asymmetric-PF write-window tables; Slocum's complete AUDC/tuning data (the parked
+  audio-authoring blocker was already on our shelf); F8-first bankswitching consensus + Gopher2600 already
+  auto-fingerprints 8K as F8 and exposes `GetBank()` (a `read_bank` tool candidate); Stella debugger is
+  scriptable for automated oracle cross-checks (F-4 design v1).
+- **`hardening-roadmap.md` § v2 backlog** — 18 prioritized follow-ups (V2-1…V2-18) in three tiers
+  (VDEL, HMOVE side effects, asymmetric-PF windows, input, bankswitch + `read_bank`, 6502 precision; then
+  matrix completion; then capabilities: audio sample capture, `pkg/audio`, Stella oracle automation).
+- **CLAUDE.md constants hardened**: 24-cycle HMxx freeze after HMOVE; stores never pay page-cross
+  penalties; NMOS decimal mode C-only; CLD mandatory at init; cycle-counting-guide caution. Routing tables
+  link the audit.
+
 ## [0.37.1] - 2026-06-11
 
 ### Changed (docs)

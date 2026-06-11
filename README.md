@@ -120,6 +120,7 @@ go build -o bin/harness ./cmd/harness   # produce the binary referenced by .mcp.
 | Litmus measurements (horizontal position, HMOVE) | [`docs/litmus-results.md`](docs/litmus-results.md) |
 | Verified coverage (what each litmus proves on hardware) | [`docs/verified-coverage.md`](docs/verified-coverage.md) |
 | Techniques catalog (verified 2600 authoring techniques) | [`docs/techniques/`](docs/techniques/) |
+| Fundamentals audit (verified vs documented vs unknown, sourced) | [`docs/fundamentals-audit.md`](docs/fundamentals-audit.md) |
 | Roadmap / next moves | [`docs/improvement-roadmap.md`](docs/improvement-roadmap.md) |
 | Strengthening roadmap (sprites / audio / CI) | [`docs/hardening-roadmap.md`](docs/hardening-roadmap.md) |
 | Decisions and changelog | [`CHANGELOG.md`](CHANGELOG.md) |

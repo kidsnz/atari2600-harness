@@ -67,6 +67,15 @@ leftmost X=3. But the formula's **offset constant is kernel-specific** (includes
 **HMOVE** — upper nibble only, two's complement, **positive = left / negative = right**, range +7 to −8.
 Moves only at the HMOVE strobe. HMOVE is **right after WSYNC**. (All 16 nibbles hardware-verified in litmus
 v0.4.0: `$70`=left7 … `$00`=0 … `$F0`=right1 … `$80`=right8. 1px granularity.)
+**Do not write HMxx within 24 CPU cycles after HMOVE** (Stella PG; unpredictable motion). HMOVE-after-WSYNC
+extends HBLANK by 8 clocks = the left-side 8px blank on HMOVE lines; mid-line HMOVE moves objects RIGHT
+~1px/4CLK (Towers TIA_HW_Notes; documented, not yet litmus-verified — see `docs/fundamentals-audit.md`).
+
+**6502 timing/BCD (source: 6502.org)** — **stores never take page-cross penalties** (STA abs,X always 5,
+(ind),Y always 6) = kernel store timing is deterministic; reads take +1 on page cross; branches 2/+1
+taken/+1 page-cross. **NMOS decimal mode: only the C flag is valid** after ADC/SBC; D is unknown at
+power-up → `CLD` in init is mandatory. ⚠️ `reference/docs_atari/cycle_counting_guide.html`'s position
+math is approximate — never cite it for positions; use our calibrated X(N).
 
 **Collisions (CXxx)** — two latches in each D7/D6, sticky. `BIT CXxx` → `BMI`(D7)/`BVS`(D6).
 **CXCLR** = clear all collisions; **HMCLR** = clear the motion registers (a different thing).
@@ -101,6 +110,7 @@ round trip. Also return `png_path` in JSON.
 | litmus measurements (authoritative horizontal-position / HMOVE data) | `docs/litmus-results.md` |
 | verified coverage (what each litmus proves on hardware) | `docs/verified-coverage.md` |
 | techniques catalog (verified 2600 authoring techniques: zone multiplexing, …) | `docs/techniques/` |
+| fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
 | Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
 | Strengthening roadmap (sprites / audio / CI hardening) | `docs/hardening-roadmap.md` |
 | Decision history and changelog | `CHANGELOG.md` |
