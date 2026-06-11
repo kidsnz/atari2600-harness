@@ -19,7 +19,7 @@ with confidence, from basics to advanced tricks.
 
 | # | Technique | Level | Doc | Demo ROM | Status |
 |---|---|---|---|---|---|
-| 1 | Zone (vertical) sprite multiplexing — many sprites past the 2-player limit | intermediate | [zone-multiplexing.md](zone-multiplexing.md) | `roms/techniques/zone_multiplex.asm` | ✅ 12 sprites, CI-locked |
+| 1 | Sprite multiplexing (vertical zones) — many players past the 2-per-line limit | intermediate | [zone-multiplexing.md](zone-multiplexing.md) | `roms/techniques/zone_multiplex.asm` | ✅ 12 moving sprites, CI-locked |
 
-(Ideas for next: 48-pixel score/sprite, 6-digit BCD score, LFSR pseudo-random, smooth scrolling, playfield
-priority tricks, sound effects/music driver, bank switching.)
+What to absorb next (prioritized, with sources): **[roadmap.md](roadmap.md)** — e.g. 48-px score / 2-line
+kernel / vertical positioning / sound / animation / playfield tricks / general flicker kernel / bank switching.

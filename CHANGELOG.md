@@ -12,6 +12,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.37.0] - 2026-06-11
+
+### Added / Changed (docs)
+- **Technique #1 promoted to its formal name + a sourced techniques roadmap.** Researched AtariAge / the
+  local `reference/docs_atari/` corpus and Wikipedia: confirmed the formal name is **sprite multiplexing**
+  (the loop is a **multi-sprite kernel**); DaveC's "zone" is the common vertical-band term, and our demo is
+  the *static-zones* form of the general *sort/position/display + flicker* kernel. Rewrote
+  `docs/techniques/zone-multiplexing.md` with a formal-name/taxonomy section, a "Refinements & limits"
+  section (2-per-line limit, flicker, single- vs 2-line kernel, positioning cost), See-also (48-px sprite,
+  Venetian Blinds), and a sourced References list — marking *documented* vs *verified*. Added
+  `docs/techniques/roadmap.md`: a prioritized survey of ~12 next techniques (48-px score, 2-line kernel,
+  vertical positioning/VDEL, sound, animation, playfield tricks, LFSR, general flicker kernel, Venetian
+  Blinds, bank switching) ranked by North-Star (Frogger) value, difficulty, and prereq-verified status.
+  Catalog index links the roadmap. Docs-only; no code change (tests/scenarios unchanged).
+
 ## [0.36.1] - 2026-06-11
 
 ### Fixed
