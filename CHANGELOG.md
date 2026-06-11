@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.36.1] - 2026-06-11
+
+### Fixed
+- **Deterministic emulator power-on state — eliminates CI test flakiness at the root.** Gopher2600
+  randomizes the CPU/RAM power-on state (`vcs.Env.Random`, used by `CPU.Reset`), so a fresh `emu.New`
+  varied run-to-run; cycle/timing tests (`TestCycleCounterExcludesWsyncStall`, `TestStepScanline`) passed
+  locally but flaked in CI. `emu.New` now calls Gopher2600's official `vcs.Env.Normalise()`
+  (`Random.ZeroSeed = true` + prefs defaults), the method intended for regression testing, before the
+  cartridge-attach reset. Result: identical initial state every run (verified 5×/10× stable). Goldens are
+  unaffected (the ROMs clear RAM on boot).
+
 ## [0.36.0] - 2026-06-11
 
 ### Changed

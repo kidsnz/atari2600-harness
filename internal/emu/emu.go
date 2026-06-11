@@ -141,6 +141,11 @@ func New(spec string) (*Emu, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 決定化（regression 用）: 既定では電源投入時状態が乱数化され（vcs.Env.Random、CPU.Reset で使用）、
+	// 起動直後のサイクル/タイミングが run ごとに揺れて一部テストが CI で flaky になる。Normalise() は
+	// Gopher2600 公式の「毎回同じ初期状態にする」メソッド（Random.ZeroSeed=true ＋ prefs デフォルト）。
+	// AttachCartridge（LoadROM）でのリセット前に立てるので、以後の状態は決定的になる。
+	vcs.Env.Normalise()
 	return &Emu{TV: tv, VCS: vcs, cap: cap}, nil
 }
 
