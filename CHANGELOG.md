@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.44.0] - 2026-06-11
+
+### Added
+- **6502/6507 precision litmus — Tier 1 of the v2 backlog complete (V2-6).** `litmus_6502.asm` measures
+  instruction facts *on the machine itself* via RIOT TIM1T (1 cycle/tick) and pins them in
+  `scenarios/cpu6502.json`, all matching 6502.org exactly: **NMOS BCD** $99+$01 → A=$00 with C=1 correct
+  while **Z=0 lies** (the documented NMOS unreliability, recorded); **JMP ($xxFF)** takes the page-bug path;
+  **LDA abs,X** 4→5 cycles on page cross while **STA abs,X stays 5 fixed** (why store timing in kernels is
+  deterministic); **BNE** 2/3/4 (not taken / taken / taken+cross); illegal **DCP zp = 5 cycles** (also
+  certifies illegal-opcode support). 22 scenarios pass.
+
 ## [0.43.0] - 2026-06-11
 
 ### Added

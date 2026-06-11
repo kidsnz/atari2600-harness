@@ -1,0 +1,18 @@
+{
+  "rom": "roms/litmus/litmus_6502.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    {"at_frame": 0, "field": "ram.0x90", "op": "==", "value": 0},
+    {"at_frame": 0, "field": "ram.0x91", "op": "==", "value": 189},
+    {"at_frame": 0, "field": "ram.0x92", "op": "==", "value": 165},
+    {"at_frame": 0, "field": "ram.0x93", "op": "==", "value": 135},
+    {"at_frame": 0, "field": "ram.0x94", "op": "==", "value": 136},
+    {"at_frame": 0, "field": "ram.0x95", "op": "==", "value": 136},
+    {"at_frame": 0, "field": "ram.0x96", "op": "==", "value": 136},
+    {"at_frame": 0, "field": "ram.0x97", "op": "==", "value": 135},
+    {"at_frame": 0, "field": "ram.0x98", "op": "==", "value": 136},
+    {"at_frame": 0, "field": "ram.0x99", "op": "==", "value": 136},
+    {"at_frame": 0, "field": "ram.0x9a", "op": "==", "value": 137}
+  ],
+  "checks": {"ntsc_frame_lines": 262}
+}

@@ -57,6 +57,14 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | INPT4 fire (D7, 0=pressed; low bits = open-bus noise) | `litmus_input` | $BC released / $3C pressed |
 | VBLANK D6 latch: INPT4 stays pressed after release; directions don't latch | `litmus_input` | $3C persists ≥3 frames post-release; SWCHA returns to $FF |
 
+## 6502/6507 precision
+| Behavior | ROM | Evidence |
+|---|---|---|
+| NMOS BCD: A and C correct, Z unreliable ($99+$01 → $00, C=1, Z=0) | `litmus_6502` | self-measured, status pushed to RAM |
+| JMP ($xxFF) page bug (high byte from $xx00) | `litmus_6502` | buggy-path marker |
+| Reads +1 on page cross; **stores fixed** (STA abs,X always 5) | `litmus_6502` | TIM1T-windowed cycle deltas |
+| Branch 2/3/4 (not taken / taken / +page-cross) ; illegal DCP zp = 5 | `litmus_6502` | TIM1T windows |
+
 ## Bank switching
 | Behavior | ROM | Evidence |
 |---|---|---|
