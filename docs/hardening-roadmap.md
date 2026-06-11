@@ -243,9 +243,9 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-16 `pkg/audio` (core).** ✅ DONE (v0.53.0; names/dups/freq/period/codec). Slocum 3-setup note tables = follow-up when composing. AUDC names+duplicate map, `freq(audc,audf,spec)`, Slocum's three tuning setups,
   note-byte codec (Sequencer Kit/slocum-tracker interop), SFX recipe helpers. (Resumes parked A-3 — the
   authoritative data was in our `reference/` all along.)
-- [~] **V2-17 F-4 Stella oracle automation.** ATTEMPTED & PARKED (2026-06-11, see `docs/stella-oracle.md`):
-  design validated, but headless script auto-execution doesn't trigger (`<rom>.script`/`autoexec.script`
-  produce no session file). Resume interactively with the author watching the debugger window.
+- [x] **V2-17 F-4 Stella oracle.** ✅ DONE v1 (v0.55.0, `cmd/stellacheck`; one human keypress): RAM
+  cross-checks PASS for smoke and the litmus_6502 measurement suite — two independent emulators agree.
+  v2 = TIA/pixel compare + full keystroke automation (see `docs/stella-oracle.md`).
 - [ ] **V2-18 RAM-map audit helper.** Symbols → read/write coverage (catches dead variables à la Pitfall's
   `cxHarry`); cheap pass over existing trace hooks.
 

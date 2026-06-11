@@ -91,7 +91,13 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | AUDC duplicates: {0,11}{4,5}{12,13} sample-exact; **{6,10}{7,9} inverted twins** | Go test (hand-built ROMs) | digest equality / exact periodicity + complementary duty |
 | Pitch = base/(AUDF+1)/D verified by raw-sample capture (square 30/62, lead 90, bass 310) | Go test | `EnableAudioCapture` + period measurement |
 
+## Cross-emulator oracle (Stella)
+| Behavior | Evidence |
+|---|---|
+| RAM $80–$FF agreement at frame 5, `smoke` | `cmd/stellacheck` PASS (128/128 bytes) |
+| RAM agreement for the **6502-precision measurement suite** (`litmus_6502`): BCD/Z-flag, JMP($xxFF) bug, page-cross/store cycles, DCP, timer | `cmd/stellacheck` PASS (128/128) — two independent emulators agree |
+
 ## Not yet covered (open)
 Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, paddles (INPT0–3 charge timing),
-SECAM, and a Stella-oracle cross-check of the rendered pixels.
+SECAM, and a Stella-oracle *pixel* cross-check (RAM cross-check now works via `cmd/stellacheck`).
 See `docs/hardening-roadmap.md` § v2 backlog.

@@ -15,15 +15,26 @@ implementations agree".
 5. One-time calibration: a probe ROM writing its frame counter to RAM aligns Stella's `_fCount` with
    Gopher2600 frame numbering.
 
-## Status — PARKED (needs an interactive session)
-Headless attempts (2026-06-11) did not trigger script auto-execution: `<rom>.script`, `<rom.bin>.script`
-and `autoexec.script` (in `-userdir`) all produced no session file, with empty console logs; the debugger
-window opens but the scripted commands appear not to run unattended. The remaining unknowns (exact
-auto-script naming/location, where `saveSes` writes, whether the debugger needs focus/input) are best
-resolved **with the author watching the debugger window** — type `exec <script>` / `saveSes` in the prompt
-once, observe the output location, then encode that into the driver. The driver itself is mechanical once
-the invocation is known.
+## Status — ✅ WORKING (v1, one human keypress) — `cmd/stellacheck`
+The interactive session (2026-06-11) resolved every unknown:
+- **Auto-script location**: `~/Library/Application Support/Stella/autoexec.script` (runs at *debugger
+  entry* — observed `autoExec(): Executed 3 commands`). The `-userdir` flag does **not** redirect this.
+- **`-debug` does not enter the debugger** on this setup; entry needs the debugger key/button once.
+  **Frame alignment is solved with `reset` + `frame N` in the script** — the snapshot is exactly N frames
+  from power-on regardless of when the human enters the debugger.
+- **`dump 80 ff 7` writes a file directly**: `~/Desktop/<rom>_dbg_<hash>.dump` (RAM rows + CPU `XC:` row +
+  switches/input `XS:` row); `saveSes` writes `~/Desktop/session_<timestamp>.txt`. Both readable by the
+  harness. `exec <path>` also works from the prompt.
+- Launching Stella from the harness's sandboxed shell does not reliably show a window; the working flow is
+  **the author launches Stella (one command) and presses the debugger key once** — everything else is
+  automated by `cmd/stellacheck` (script setup, dump polling, parsing, comparison).
 
-Confirmed so far: Stella 7.0 launches into the debugger with `-debug`; `-userdir` relocates user files;
-the prompt supports `frame/dump/tia/riot/saveSes/breakIf/trapWrite` and pseudo-registers (`_fCount`,
-`_scan`…) per the official docs — the capability exists; only the unattended trigger is unresolved.
+### Results (2026-06-11)
+- `smoke.bin` @ frame 5: **RAM $80–$FF all 128 bytes match** (sentinel $42 + zeros).
+- `litmus_6502.bin` @ frame 5: **all 128 bytes match** — i.e. the NMOS BCD results (incl. the unreliable Z),
+  the JMP ($xxFF) bug path marker, the TIM1T-windowed cycle measurements (read +1 page-cross, store fixed-5,
+  branch 2/3/4, illegal DCP=5) and timer behavior are **agreed by two independent emulator implementations**.
+
+### v2 (future)
+TIA write-register compare (needs a `tia` text parse), pixel compare (palette→TIA-index mapping +
+2:1 downsample of `-ss1x` snapshots), full automation via an accessibility-granted keystroke.
