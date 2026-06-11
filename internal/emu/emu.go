@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math/rand"
 
 	"github.com/jetsetilly/gopher2600/cartridgeloader"
 	"github.com/jetsetilly/gopher2600/digest"
@@ -141,11 +142,15 @@ func New(spec string) (*Emu, error) {
 	if err != nil {
 		return nil, err
 	}
-	// 決定化（regression 用）: 既定では電源投入時状態が乱数化され（vcs.Env.Random、CPU.Reset で使用）、
-	// 起動直後のサイクル/タイミングが run ごとに揺れて一部テストが CI で flaky になる。Normalise() は
-	// Gopher2600 公式の「毎回同じ初期状態にする」メソッド（Random.ZeroSeed=true ＋ prefs デフォルト）。
-	// AttachCartridge（LoadROM）でのリセット前に立てるので、以後の状態は決定的になる。
+	// 決定化（regression 用）。電源投入時状態には乱数源が2系統ある:
+	//  (1) Random.Rewindable（座標ベース）… Normalise() の ZeroSeed=true で決定化される（RAM open-bus 等）。
+	//  (2) 埋め込み *math/rand.Rand（time.Now() 種）… CPU.Reset が rnd.Intn() で PC/A/X/Y/Status/SP を
+	//      ランダム初期化する経路。**ZeroSeed は (2) に効かない**ため、同一プラットフォーム同一コードでも
+	//      run ごとに CPU 初期状態が変わり、smoke 系テストが稀に flaky になっていた（TIA レジスタ/衝突）。
+	// → 両系統を潰す: Normalise() で (1) を、固定種の rand へ差し替えで (2) を決定化。AttachCartridge
+	//    （LoadROM）でのリセット前に行うので、以後の CPU 初期状態は毎 run・全プラットフォームで同一になる。
 	vcs.Env.Normalise()
+	vcs.Env.Random.Rand = rand.New(rand.NewSource(0))
 	return &Emu{TV: tv, VCS: vcs, cap: cap}, nil
 }
 
