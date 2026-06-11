@@ -27,3 +27,4 @@
 /roms/**/*.bin
 /roms/**/*.lst
 /roms/**/*.sym
+/stellacheck
