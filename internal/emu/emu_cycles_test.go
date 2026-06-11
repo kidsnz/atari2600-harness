@@ -87,9 +87,7 @@ func TestCycleCounterExcludesWsyncStall(t *testing.T) {
 	if err := e.LoadROM("../../roms/litmus/smoke.bin"); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.RunFrames(2); err != nil { // 起動を安定させてフレーム境界に揃える
-		t.Fatal(err)
-	}
+	warmupStable(t, e) // 電源投入過渡を除外（CI flake 根本対策）
 
 	e.MarkCycles()
 	lines, err := e.StepFrame()

@@ -52,9 +52,7 @@ func TestReadTIARegisters(t *testing.T) {
 	if err := e.LoadROM("../../roms/litmus/smoke.bin"); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.RunFrames(2); err != nil {
-		t.Fatal(err)
-	}
+	warmupStable(t, e) // 電源投入過渡を除外（CI flake 根本対策）
 	if got := e.ReadTIARegisters().Playfield.BackgroundColor; got != 0x1E {
 		t.Fatalf("COLUBK = 0x%02X, want 0x1E (smoke sets it in the visible region)", got)
 	}
@@ -67,9 +65,7 @@ func TestReadTIARegisters(t *testing.T) {
 	if err := e2.LoadROM("../../roms/litmus/litmus_pf.bin"); err != nil {
 		t.Fatal(err)
 	}
-	if err := e2.RunFrames(2); err != nil {
-		t.Fatal(err)
-	}
+	warmupStable(t, e2) // 電源投入過渡を除外（CI flake 根本対策）
 	pf := e2.ReadTIARegisters().Playfield
 	if pf.PF0 == 0 && pf.PF1 == 0 && pf.PF2 == 0 {
 		t.Fatalf("litmus_pf: PF0/PF1/PF2 all zero, expected a lit pattern (%+v)", pf)
@@ -85,9 +81,7 @@ func TestReadCollisionsNoSprites(t *testing.T) {
 	if err := e.LoadROM("../../roms/litmus/smoke.bin"); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.RunFrames(2); err != nil {
-		t.Fatal(err)
-	}
+	warmupStable(t, e) // 電源投入過渡を除外（CI flake 根本対策）
 	cx, err := e.ReadCollisions()
 	if err != nil {
 		t.Fatal(err)
@@ -107,9 +101,7 @@ func TestReadCollisionsBallPlayfield(t *testing.T) {
 	if err := e.LoadROM("../../roms/litmus/litmus_collide.bin"); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.RunFrames(2); err != nil {
-		t.Fatal(err)
-	}
+	warmupStable(t, e) // 電源投入過渡を除外（CI flake 根本対策）
 	cx, err := e.ReadCollisions()
 	if err != nil {
 		t.Fatal(err)

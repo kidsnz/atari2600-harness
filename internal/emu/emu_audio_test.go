@@ -12,9 +12,7 @@ func TestReadAudio(t *testing.T) {
 	if err := e.LoadROM("../../roms/litmus/litmus_audio.bin"); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.RunFrames(2); err != nil {
-		t.Fatal(err)
-	}
+	warmupStable(t, e) // 電源投入過渡を除外（CI flake 根本対策）
 
 	got := e.ReadAudio()
 	want := AudioState{
