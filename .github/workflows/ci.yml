@@ -40,7 +40,7 @@ jobs:
           go vet ./...
           go test ./...
 
-      - name: Litmus regression scenarios
+      - name: Regression scenarios (litmus + techniques)
         env:
           CGO_ENABLED: "0"
-        run: go run ./cmd/scenario roms/litmus/scenarios/*.json
+        run: go run ./cmd/scenario roms/litmus/scenarios/*.json roms/techniques/scenarios/*.json

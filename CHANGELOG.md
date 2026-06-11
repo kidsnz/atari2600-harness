@@ -12,6 +12,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.34.0] - 2026-06-11
+
+### Added
+- **Techniques catalog + #1 Zone (vertical) sprite multiplexing.** Establishes a repeatable pipeline for
+  absorbing 2600 authoring techniques: learn (from `reference/`, local) → clean-room implement
+  (`roms/techniques/`) → verify numerically (harness) → cross-check (Stella) → lock in (scenario + golden +
+  CI) → optionally promote to `pkg/`. First entry: `roms/techniques/zone_multiplex.asm` puts **12 sprites**
+  on screen (6 zones × P0+P1) from a 2-player machine by repositioning P0/P1 per zone (divide-by-15 + HMOVE,
+  the harness-verified method). Verified on Gopher2600 + cross-checked in Stella; locked by
+  `scenarios/zone_multiplex.json`. CI now runs `roms/techniques/scenarios/` too. Catalog index at
+  `docs/techniques/`, linked from the routing tables.
+
 ## [0.33.0] - 2026-06-10
 
 ### Added

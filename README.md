@@ -119,6 +119,7 @@ go build -o bin/harness ./cmd/harness   # produce the binary referenced by .mcp.
 | Scenario regression format | [`docs/scenarios.md`](docs/scenarios.md) |
 | Litmus measurements (horizontal position, HMOVE) | [`docs/litmus-results.md`](docs/litmus-results.md) |
 | Verified coverage (what each litmus proves on hardware) | [`docs/verified-coverage.md`](docs/verified-coverage.md) |
+| Techniques catalog (verified 2600 authoring techniques) | [`docs/techniques/`](docs/techniques/) |
 | Roadmap / next moves | [`docs/improvement-roadmap.md`](docs/improvement-roadmap.md) |
 | Strengthening roadmap (sprites / audio / CI) | [`docs/hardening-roadmap.md`](docs/hardening-roadmap.md) |
 | Decisions and changelog | [`CHANGELOG.md`](CHANGELOG.md) |
