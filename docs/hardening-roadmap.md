@@ -233,7 +233,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-11 RESPx/RESBL edge litmus.** ✅ DONE (v0.50.0, `litmus_resp_edge`; RESBL multi-ball vs RESPx single). Double-strobe in one line; RESBL mid-line restart (vs RESPx wrap);
   missile-unlock offset from RESMP.
 - [x] **V2-12 Mirrors litmus.** ✅ DONE (v0.49.0, `litmus_mirror`). TIA via $0040/$2000, RAM via the $0180 stack page, ROM odd-$x000 mirrors.
-- [x] **V2-13 48px sprite litmus.** ✅ DONE (v0.51.0, `litmus_48px`; 48 contiguous px via the score6 SLEEP recipe). Per-copy distinct graphics (VDEL 6-store) = optional follow-up.
+- [x] **V2-13 48px sprite litmus.** ✅ DONE (v0.51.0, `litmus_48px`; 48 contiguous px via the score6 SLEEP recipe). Per-copy distinct graphics ✅ DONE too (v0.52.0, `litmus_48px6` — the full 6-store kernel).
 
 ### Tier 3 — capabilities (tools/packages)
 - [ ] **V2-14 Audio: duplicate-AUDC digest-equality scenarios** ({4,5} {6,10} {7,9} {12,13} {0,11} hash-equal)
