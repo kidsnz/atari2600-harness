@@ -233,12 +233,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-11 RESPx/RESBL edge litmus.** ✅ DONE (v0.50.0, `litmus_resp_edge`; RESBL multi-ball vs RESPx single). Double-strobe in one line; RESBL mid-line restart (vs RESPx wrap);
   missile-unlock offset from RESMP.
 - [x] **V2-12 Mirrors litmus.** ✅ DONE (v0.49.0, `litmus_mirror`). TIA via $0040/$2000, RAM via the $0180 stack page, ROM odd-$x000 mirrors.
-- [~] **V2-13 48px GRP window litmus.** ATTEMPTED & PARKED (2026-06-11). A static-graphics shortcut (NUSIZ-3
-  on P0+P1, interleaved +8 via HMOVE) renders ~46px with stubborn 1px gaps — HMOVE fine-positioning here is
-  not cleanly 1px/nibble, so the static trick doesn't close the gaps. The honest 48px needs the full VDEL
-  6-store mid-line kernel (score6.asm choreography) with cycle-exact GRP0/GRP1 rewrites — a focused task, not
-  a marathon tail. **Prerequisites are all verified**: VDEL (V2-1), NUSIZ copies (v0.29), HMOVE incl. side
-  effects (V2-2). Resume with the dynamic 6-store kernel; don't ship a gappy static bar.
+- [x] **V2-13 48px sprite litmus.** ✅ DONE (v0.51.0, `litmus_48px`; 48 contiguous px via the score6 SLEEP recipe). Per-copy distinct graphics (VDEL 6-store) = optional follow-up.
 
 ### Tier 3 — capabilities (tools/packages)
 - [ ] **V2-14 Audio: duplicate-AUDC digest-equality scenarios** ({4,5} {6,10} {7,9} {12,13} {0,11} hash-equal)

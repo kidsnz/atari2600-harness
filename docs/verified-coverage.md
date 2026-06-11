@@ -36,6 +36,7 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | NUSIZ double-width (16px) | `litmus_nusiz` | `read_row` len 16; `player0.nusiz=5` |
 | NUSIZ quad-width (32px) | `litmus_nusiz_quad` | `read_row` len 32; `player0.nusiz=7` |
 | NUSIZ three copies (close, 16px spacing) | `litmus_nusiz_copies` | `read_row` 3×8px spans at clock 3/19/35 |
+| 48-pixel sprite (NUSIZ-3 × P0+P1 interleaved +8; score6 recipe) | `litmus_48px` | `read_row` 48 contiguous px (clock 24–71); P0=24/P1=32 |
 | REFP reflect (mirror) == `pkg/sprite.Reflect` | `litmus_refp` | `reflected=true`; ramp mirrored (right-anchored) |
 | VDEL write-triggered shadow copies (GRP0→P1 old, GRP1→P0+ENABL old; VDELxx shows old) | `litmus_vdel` | 6 bands: hidden until the cross-write, then appears (`read_row` per band) |
 
