@@ -12,6 +12,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.36.0] - 2026-06-11
+
+### Changed
+- **Zone multiplexing #1 gets per-zone background colors — a landscape look.** Each zone sets `COLUBK` from a
+  `ZoneBG` table (sky-blue → cyan → green → brown), set in HBLANK so it doesn't disturb the per-zone
+  positioning, giving 6 colored bands behind the 12 moving sprites. Golden regenerated; 262 lines preserved.
+
 ## [0.35.0] - 2026-06-11
 
 ### Changed

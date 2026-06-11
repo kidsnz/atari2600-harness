@@ -108,6 +108,8 @@ Div1:   sbc #15
         sta HMP1
         sta RESP1
         sta WSYNC
+        lda ZoneBG,x        ; ゾーン別の背景色（HBLANK 中に設定）
+        sta COLUBK
         sta HMOVE
         ldy #0
 Spr:    sta WSYNC
@@ -128,6 +130,8 @@ Blz:    sta WSYNC
         cpx #NZONES
         bne ZoneLoop
 
+        lda #0
+        sta COLUBK          ; ゾーン下は黒へ戻す
         ldy #96
 Fill:   sta WSYNC
         dey
@@ -145,6 +149,9 @@ ZoneX0_init:
         byte 20, 50, 90, 120, 110, 70
 ZoneX1_init:
         byte 100, 70, 30, 60, 95, 120
+; ゾーン別 背景色（上→下＝空→水/地のグラデ風）
+ZoneBG:
+        byte $84, $94, $A4, $B4, $C4, $24   ; blue, blue-cyan, cyan, cyan-green, green, brown
 Sprite:
         byte $18,$3C,$7E,$FF,$FF,$7E,$3C,$18
 
