@@ -2,9 +2,11 @@
 
 [![CI](https://github.com/kidsnz/atari2600-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/kidsnz/atari2600-harness/actions/workflows/ci.yml)
 
-A **verification harness** that lets an LLM (Claude) build Atari 2600 games in 6502 assembly
-*accurately*. It is not a game-generation app — it is the loop substrate the model hammers on every
-iteration: **assemble → run → inspect numerically**.
+A **verification harness** that lets an LLM (Claude) author the Atari 2600 in 6502 assembly *accurately*.
+It is not a game-generation app — it is two things: the loop substrate the model hammers on every iteration
+(**assemble → run → inspect numerically**), and a **growing, hardware-verified knowledge base** (a
+fundamentals audit + a techniques catalog) so 2600 capability *accrues* instead of being re-derived each
+session. The aim is general, verified competence on the machine — not any one game.
 
 ## Premises
 
@@ -27,6 +29,17 @@ See [`docs/gap-analysis.md`](docs/gap-analysis.md). **All of A–E are closed as
 | C | Knowledge | 6502/TIA constants and behavior get misremembered | ✅ closed (rides on B) |
 | D | Verification | No reproducibility / regression tests | ✅ closed |
 | E | Friction | build→run→inspect isn't one command | ✅ closed |
+
+Closing A–E (**phase 1**) made the loop trustworthy. **Phase 2 turns it into a general, verified 2600
+capability base**, two living documents kept honest by the same numeric loop:
+- a **[fundamentals audit](docs/fundamentals-audit.md)** — every TIA/6502 behavior classified *verified /
+  documented / unknown* with sources, and a prioritized backlog of what to nail down next;
+- a **[techniques catalog](docs/techniques/)** — each authoring technique re-implemented clean-room,
+  hardware-verified, and CI-locked (e.g. sprite multiplexing).
+
+Today the harness ships **20 MCP tools** and **20+ litmus/technique regression scenarios** (VDEL, HMOVE side
+effects, asymmetric-playfield write windows, input ports, F8 bankswitching, 6502 cycle/BCD precision, …),
+all green in CI on every push.
 
 ## Architecture
 

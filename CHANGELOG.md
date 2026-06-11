@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.44.1] - 2026-06-11
+
+### Changed (docs)
+- **README reframed to match the evolved goal.** The project is no longer just "a loop to build games" with
+  the five gaps A–E closed (phase 1); it is now a **general, verified 2600 capability base** (phase 2) — a
+  fundamentals audit + a techniques catalog, each kept honest by the same numeric loop. Updated the opening
+  and the gap-analysis section to name these two living documents and the current scope (20 tools, 20+
+  regression scenarios), and to state the aim as *general verified competence, not any one game*.
+
 ## [0.44.0] - 2026-06-11
 
 ### Added
