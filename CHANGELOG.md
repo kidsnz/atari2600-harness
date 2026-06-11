@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.47.0] - 2026-06-11
+
+### Added
+- **RIOT timer litmus — answers the audit's open INTIM question (v2 V2-10).** `litmus_timer.asm` records
+  INTIM/TIMINT snapshots to RAM: TIM1T counts down 1/cycle (consecutive reads −7 = the read-loop cost);
+  after underflow INTIM wraps into the $FF range and keeps decrementing 1/cycle; **TIMINT D7 (timer-expired)
+  is set before INTIM is read ($C0), and reading INTIM clears TIMINT ($00 afterward)** — the audit's open
+  "does reading INTIM clear D7?" is now answered **yes**. Locked by `scenarios/timer.json`. 25 scenarios pass.
+
 ## [0.46.0] - 2026-06-11
 
 ### Added

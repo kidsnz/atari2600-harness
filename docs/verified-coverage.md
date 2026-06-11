@@ -11,6 +11,7 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | Behavior | ROM | Evidence |
 |---|---|---|
 | NTSC 262-line frame (3/37/192/30) | `smoke` | `ntsc_frame_lines == 262`; RAM sentinel |
+| RIOT timer: 1/cycle countdown, post-underflow $FF wrap, TIMINT D7 set, **INTIM read clears it** | `litmus_timer` | INTIM/TIMINT snapshots to RAM |
 | PAL 312-line frame (3/45/228/36) | `litmus_pal` | `ntsc_frame_lines == 312` with `tv_spec: PAL` |
 | Cycle counting invariant (exec×3 == color clocks) | `litmus_cycles` | white-box test; 1 frame = 263×76 = 19988 |
 | Per-scanline budget guard (overrun → halt) | `litmus_overrun` | `over=true`, `line_cycles=152`; no false positive on smoke/frogger |
