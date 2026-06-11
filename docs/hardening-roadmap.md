@@ -232,7 +232,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
   (+ does INTIM read clear it), first-decrement offset.
 - [ ] **V2-11 RESPx/RESBL edge litmus.** Double-strobe in one line; RESBL mid-line restart (vs RESPx wrap);
   missile-unlock offset from RESMP.
-- [ ] **V2-12 Mirrors litmus.** TIA via $0040/$2000, RAM via the $0180 stack page, ROM odd-$x000 mirrors.
+- [x] **V2-12 Mirrors litmus.** ✅ DONE (v0.49.0, `litmus_mirror`). TIA via $0040/$2000, RAM via the $0180 stack page, ROM odd-$x000 mirrors.
 - [ ] **V2-13 48px GRP window litmus.** Derive the 6-store cycle map ourselves (score6.asm recipe; no source
   documents it) — after V2-1.
 

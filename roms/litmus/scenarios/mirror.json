@@ -1,0 +1,9 @@
+{
+  "rom": "roms/litmus/litmus_mirror.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    {"at_frame": 0, "field": "ram.0x90", "op": "==", "value": 90},
+    {"at_frame": 0, "field": "ram.0x91", "op": "==", "value": 165}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+}

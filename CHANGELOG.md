@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.49.0] - 2026-06-11
+
+### Added
+- **Address-mirror litmus (v2 V2-12).** `litmus_mirror.asm` proves the memory map's mirroring: writing $5A to
+  $0180 reads back at $0080 (and the reverse) — i.e. RAM $80–$FF is mirrored at $0180–$01FF, **which is why
+  the stack works**; and setting the background through the TIA mirror $0049 colours COLUBK ($84 blue in
+  `read_row`). Locked by `scenarios/mirror.json`. 27 scenarios pass.
+
 ## [0.48.0] - 2026-06-11
 
 ### Added
