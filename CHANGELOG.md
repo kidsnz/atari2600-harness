@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.37.1] - 2026-06-11
+
+### Changed (docs)
+- **Roadmap reframed as a general-capability TODO (de-anchored from any single game).** The main goal is a
+  general, verified, reusable technique toolkit — not one specific game. `docs/techniques/roadmap.md` now
+  prioritizes by **general/foundational value × difficulty × prereqs-verified** (instead of "relevance to a
+  particular game"), and is an explicit checklist (`- [ ]`) ordered foundational/easy-wins first
+  (animation → vertical positioning/VDEL → 2-line kernel → 48-px score → sound → …). A concrete game can be
+  picked flexibly as a per-technique testbed; it is no longer the organizing principle.
+
 ## [0.37.0] - 2026-06-11
 
 ### Added / Changed (docs)
