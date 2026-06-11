@@ -1,0 +1,8 @@
+{
+  "rom": "roms/litmus/litmus_pf_async.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tiareg.playfield.pf1", "op": "==", "value": 0}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+}

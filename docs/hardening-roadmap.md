@@ -209,7 +209,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-2 HMOVE side-effects litmus.** ✅ DONE (v0.40.0, `litmus_hmove_side`). (a) 8px left blank on HMOVE-after-WSYNC lines (incl. all-HMxx=0);
   (b) mid-line HMOVE calibration sweep (expect rightward "plugging" ≈1px/4CLK; Cosmic Ark family);
   (c) HMxx writes inside the 24-cycle freeze — capture Gopher2600's table. Src: Towers TIA_HW_Notes.
-- [ ] **V2-3 Asymmetric-PF write-window litmus.** Boundary probes around woodgrain's conservative table
+- [x] **V2-3 Asymmetric-PF write-window litmus.** ✅ DONE (v0.41.0, `litmus_pf_async`). Boundary probes around woodgrain's conservative table
   (LPF0≤21, LPF1≤27, LPF2≤37, RPF0 27–48, RPF1 37–53, RPF2 48–64; reflected RPF2 == 48 exactly); verify
   per-pixel split on late writes; settle the SpiceWare Step3(66) vs Step7(71) discrepancy.
 - [ ] **V2-4 Input litmus.** Joystick SWCHA via set_input; INPT4/5 latch mode (VBLANK D6 semantics);

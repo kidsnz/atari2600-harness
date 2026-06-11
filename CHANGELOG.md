@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.41.0] - 2026-06-11
+
+### Added
+- **Asymmetric-playfield write-window litmus (v2 backlog V2-3).** `litmus_pf_async.asm` verifies woodgrain's
+  `Playfield_Timing` tables to the pixel: **(A)** early PF1=$AA (cyc 5) + PF1=$55 at cyc 40 renders a true
+  asymmetric playfield — left bits at clocks 16–43, right bits at 100–127, exactly as predicted;
+  **(B)** a late write completing at cycle 33 while left PF1 is being drawn splits **per pixel**: the first
+  5 bits show the old $FF (clocks 16–35 lit) and the last 3 the new $00 — reproducing woodgrain's worked
+  example verbatim. Locked by `scenarios/pf_async.json`. 19 scenarios pass.
+
 ## [0.40.0] - 2026-06-11
 
 ### Added

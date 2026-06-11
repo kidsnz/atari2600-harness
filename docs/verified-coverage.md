@@ -41,6 +41,7 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 |---|---|---|
 | PF bit order (PF0 upper nibble / PF1 MSB-first / PF2 LSB-first) | `litmus_pf` | `read_row` per-column lit positions (2 sources agree) |
 | Per-scanline background color | `litmus_color` | `read_row` distinct single color per line |
+| Asymmetric PF via double-write (windows per woodgrain) + per-pixel split on late writes | `litmus_pf_async` | left $AA / right $55 exact clocks; cyc-33 write → 5 old + 3 new bits |
 
 ## Collisions (CXxx)
 | Behavior | ROM | Evidence |
