@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.46.0] - 2026-06-11
+
+### Added
+- **LFSR litmus — procedural-generation foundation (v2 V2-9).** `litmus_lfsr.asm` runs an 8-bit Galois LFSR
+  (`lsr / bcc / eor #$8E`, the form in DaveC's Random-Dungeon and common game RNGs) and proves its math
+  numerically (pure `read_ram`, no rendering): the first 8 values from seed $01 are
+  `01,8E,47,AD,D8,6C,36,1B` (matches hand calculation), it **never decays to $00** across a full sweep, and
+  its **period is exactly 255** (returns to the seed). Locked by `scenarios/lfsr.json`. 24 scenarios pass.
+
 ## [0.45.0] - 2026-06-11
 
 ### Added

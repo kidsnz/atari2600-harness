@@ -66,6 +66,11 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | Reads +1 on page cross; **stores fixed** (STA abs,X always 5) | `litmus_6502` | TIM1T-windowed cycle deltas |
 | Branch 2/3/4 (not taken / taken / +page-cross) ; illegal DCP zp = 5 | `litmus_6502` | TIM1T windows |
 
+## Procedural generation
+| Behavior | ROM | Evidence |
+|---|---|---|
+| 8-bit Galois LFSR (`eor #$8E`): exact sequence, never-zero, period 255 | `litmus_lfsr` | `read_ram` first-8 values + sweep flags |
+
 ## Bank switching
 | Behavior | ROM | Evidence |
 |---|---|---|
