@@ -41,6 +41,10 @@ HMCLR   = $2B
 VDELP0  = $25
 VDELP1  = $26
 INPT4   = $3C
+INPT0   = $38
+AUDC0   = $15
+AUDF0   = $17
+AUDV0   = $19
 SWCHA   = $0280
 ENAM0   = $1D
 ENABL   = $1F
@@ -54,7 +58,7 @@ CTRLPF  = $0A
 COLUPF  = $08
 PF1     = $0E
 
-NSCENES = 4
+NSCENES = 5
 
 scene    = $80
 prevFire = $81
@@ -81,6 +85,12 @@ p5       = $B2
 ; Zone シーン・ローカル（Title と排他オーバーレイ）
 zx0      = $A4      ; P0 X ×6（$A4-$A9）
 zx1      = $AA      ; P1 X ×6（$AA-$AF）
+; Paddle シーン・ローカル
+pdlCnt   = $B6      ; 今フレームの充電カウント
+pdlPos   = $B7      ; 前フレーム確定のカーソル X（描画用）
+pdlDone  = $B8
+; Gradient シーン・ローカル
+sfxTmr   = $B9      ; SFX 減衰タイマ
 ; Playground シーン・ローカル（排他オーバーレイ）
 px       = $A4      ; P0 X（10-140）
 py       = $A5      ; P0 Y（10-170）
@@ -144,7 +154,11 @@ VB:     sta WSYNC
         beq DoZone
         cmp #2
         beq DoPlay
-        jsr SceneBlue       ; scene 3（bank0）
+        cmp #3
+        beq DoPdl
+        jsr SceneGrad       ; scene 4（bank0）
+        jmp AfterScene
+DoPdl:  jsr ScenePaddle     ; scene 3（bank0）
         jmp AfterScene
 DoPlay: jsr ScenePlay       ; scene 2（bank0）
         jmp AfterScene
@@ -513,18 +527,143 @@ PNext:  inc lineCt          ; 29
         sta CTRLPF
         rts
 
-; --- S3: プレースホルダ（青背景, bank0）---
-SceneBlue:
-        lda #$A0
-        sta sent0
-        lda #$84
-        sta COLUBK
-        ldy #192
-SBL:    sta WSYNC
-        dey
-        bne SBL
+; --- S3: パドル（bank0）---
+; litmus_paddle の標準読み: 先頭 8 行 VBLANK D7=1 でダンプ（blank はせず $80）→ 充電 →
+; 毎行 INPT0 D7 をポーリングしてカウント。前フレームの確定値でカーソル（P0 バー）を描く。
+ScenePaddle:
+        lda #$E6
+        sta $9B             ; 実行センチネル
         lda #0
         sta COLUBK
+        sta NUSIZ0
+        lda #$5E
+        sta COLUP0
+        lda #$FF
+        sta GRP0
+        sta WSYNC           ; 1
+        ; カーソル位置決め（前フレームの pdlPos, 10..140 に clamp 済み）
+        lda pdlPos
+        sec
+QDv0:   sbc #15
+        bcs QDv0
+        tay
+        lda ZHmove,y
+        sta HMP0
+        sta RESP0
+        sta WSYNC           ; 2
+        sta HMOVE
+        ds 12, $EA
+        sta HMCLR
+        lda #0
+        sta pdlCnt
+        sta pdlDone
+        sta WSYNC           ; 3
+        ; --- ダンプ 8 行（VBLANK=$80: D7 ダンプ・blank せず）---
+        lda #$80
+        sta VBLANK
+        ldy #8
+QDmp:   sta WSYNC
+        dey
+        bne QDmp            ; 11 行目まで
+        lda #0
+        sta VBLANK          ; 充電開始
+        ; --- 計測 168 行: INPT0 を毎行ポーリング＋カーソル帯描画（90-105行目）---
+        ldy #0
+QKer:   sta WSYNC
+        lda pdlDone         ; 3
+        bne QSkip           ; 5
+        bit INPT0           ; 8
+        bpl QNoFire         ; 10
+        lda #1              ; 12
+        sta pdlDone         ; 15
+        jmp QDraw
+QNoFire:
+        inc pdlCnt          ; 17(別経路)
+        jmp QDraw
+QSkip:  nop
+        nop
+        nop
+QDraw:  ; カーソル帯: 行 90-105 で GRP0 表示
+        cpy #90
+        bcc QOff
+        cpy #106
+        bcs QOff
+        lda #$FF
+        sta GRP0
+        jmp QNext
+QOff:   lda #0
+        sta GRP0
+QNext:  iny
+        cpy #168
+        bne QKer
+        ; pdlPos 確定（count/2 + 10, clamp 140）
+        lda pdlCnt
+        lsr
+        clc
+        adc #10
+        cmp #141
+        bcc QPosOk
+        lda #140
+QPosOk: sta pdlPos
+        lda #0
+        sta GRP0
+        sta WSYNC           ; 180 行目
+        ; --- 残り 12 行 ---
+        ldy #12
+QPad:   sta WSYNC
+        dey
+        bne QPad
+        rts
+
+; --- S4: グラデーション＋SFX（bank0）---
+; per-scanline COLUBK 虹（litmus_color 系）＋ 進入時に kick（Buzz AUDC=15, AUDF=30, AUDV 減衰=Slocum レシピ）。
+SceneGrad:
+        lda #$F8
+        sta $9A             ; 実行センチネル
+        lda lastScene
+        cmp #4
+        beq GNoInit
+        lda #4
+        sta lastScene
+        ; SFX: kick 開始
+        lda #15
+        sta AUDC0
+        lda #30
+        sta AUDF0
+        lda #10
+        sta AUDV0
+        lda #40
+        sta sfxTmr
+GNoInit:
+        ; 減衰: 4 フレーム毎に AUDV--
+        lda sfxTmr
+        beq GSilent
+        dec sfxTmr
+        lda sfxTmr
+        and #$03
+        bne GVolOk
+        lda sfxTmr
+        lsr
+        lsr
+        sta AUDV0
+GVolOk: jmp GRun
+GSilent:
+        lda #0
+        sta AUDV0
+GRun:   sta WSYNC           ; 1
+        ; --- 虹 190 行: COLUBK = 行インデックス（луma 巡回）---
+        ldy #0
+GKer:   sta WSYNC
+        tya                 ; 行 → 色（hue が流れる）
+        clc
+        adc frameCt         ; フレームでスクロール
+        sta COLUBK
+        iny
+        cpy #190
+        bne GKer
+        lda #0
+        sta COLUBK
+        sta WSYNC           ; 192
         rts
 
         ; --- HMOVE 表（ページ跨ぎ回避の負インデックス, zone_multiplex と同型）---

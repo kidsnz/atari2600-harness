@@ -45,72 +45,36 @@
       "pressed": false
     },
     {
-      "frame": 9,
-      "player": 0,
-      "action": "fire",
-      "pressed": true
-    },
-    {
       "frame": 10,
       "player": 0,
-      "action": "fire",
-      "pressed": false
-    },
-    {
-      "frame": 11,
-      "player": 0,
-      "action": "fire",
-      "pressed": true
-    },
-    {
-      "frame": 12,
-      "player": 0,
-      "action": "fire",
-      "pressed": false
+      "action": "paddle",
+      "value": 0.3
     }
   ],
   "asserts": [
     {
-      "at_frame": 2,
-      "field": "ram.0x80",
-      "op": "==",
-      "value": 0
-    },
-    {
-      "at_frame": 4,
-      "field": "ram.0x80",
-      "op": "==",
-      "value": 1
-    },
-    {
-      "at_frame": 6,
-      "field": "ram.0x80",
-      "op": "==",
-      "value": 2
-    },
-    {
-      "at_frame": 8,
+      "at_frame": 9,
       "field": "ram.0x80",
       "op": "==",
       "value": 3
     },
     {
-      "at_frame": 10,
-      "field": "ram.0x80",
+      "at_frame": 9,
+      "field": "ram.0x9b",
       "op": "==",
-      "value": 4
+      "value": 230
     },
     {
-      "at_frame": 12,
-      "field": "ram.0x80",
-      "op": "==",
-      "value": 0
+      "at_frame": 30,
+      "field": "ram.0xb7",
+      "op": ">",
+      "value": 10
     },
     {
-      "at_frame": 12,
-      "field": "bank.number",
-      "op": "==",
-      "value": 0
+      "at_frame": 30,
+      "field": "ram.0xb7",
+      "op": "<",
+      "value": 141
     }
   ],
   "checks": {

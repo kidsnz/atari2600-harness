@@ -55,60 +55,42 @@
       "player": 0,
       "action": "fire",
       "pressed": false
-    },
-    {
-      "frame": 11,
-      "player": 0,
-      "action": "fire",
-      "pressed": true
-    },
-    {
-      "frame": 12,
-      "player": 0,
-      "action": "fire",
-      "pressed": false
     }
   ],
   "asserts": [
     {
-      "at_frame": 2,
-      "field": "ram.0x80",
-      "op": "==",
-      "value": 0
-    },
-    {
-      "at_frame": 4,
-      "field": "ram.0x80",
-      "op": "==",
-      "value": 1
-    },
-    {
-      "at_frame": 6,
-      "field": "ram.0x80",
-      "op": "==",
-      "value": 2
-    },
-    {
-      "at_frame": 8,
-      "field": "ram.0x80",
-      "op": "==",
-      "value": 3
-    },
-    {
-      "at_frame": 10,
+      "at_frame": 11,
       "field": "ram.0x80",
       "op": "==",
       "value": 4
     },
     {
-      "at_frame": 12,
-      "field": "ram.0x80",
+      "at_frame": 11,
+      "field": "ram.0x9a",
       "op": "==",
+      "value": 248
+    },
+    {
+      "at_frame": 11,
+      "field": "audio.ch0.control",
+      "op": "==",
+      "value": 15
+    },
+    {
+      "at_frame": 11,
+      "field": "audio.ch0.freq",
+      "op": "==",
+      "value": 30
+    },
+    {
+      "at_frame": 11,
+      "field": "audio.ch0.volume",
+      "op": ">",
       "value": 0
     },
     {
-      "at_frame": 12,
-      "field": "bank.number",
+      "at_frame": 60,
+      "field": "audio.ch0.volume",
       "op": "==",
       "value": 0
     }
