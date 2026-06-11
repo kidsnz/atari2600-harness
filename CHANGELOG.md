@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.50.0] - 2026-06-11
+
+### Added
+- **RESBL vs RESPx mid-line re-strobe litmus (v2 V2-11).** `litmus_resp_edge.asm` confirms Towers'
+  TIA_HW_Notes: strobing **RESBL twice on one scanline draws two balls** (clocks 38 and 140 — the ball
+  re-emits START, the multi-ball trick), while strobing **RESP0 twice draws a single 8px player** at the
+  last position only (clock 107 — the player does not re-emit START until the 160-clock wrap). Locked by
+  `scenarios/resp_edge.json` (position asserts + golden). 28 scenarios pass.
+
 ## [0.49.0] - 2026-06-11
 
 ### Added

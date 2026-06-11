@@ -230,7 +230,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
   N-right-then-N-left identity) + Galois `eor #$8E` / `eor #$B4` periods. Pure read_ram asserts.
 - [x] **V2-10 RIOT timer litmus.** ✅ DONE (v0.47.0, `litmus_timer`; reading INTIM clears TIMINT D7). TIM64T expiry timing, post-underflow $FF/1-per-cycle behavior, TIMINT D7
   (+ does INTIM read clear it), first-decrement offset.
-- [ ] **V2-11 RESPx/RESBL edge litmus.** Double-strobe in one line; RESBL mid-line restart (vs RESPx wrap);
+- [x] **V2-11 RESPx/RESBL edge litmus.** ✅ DONE (v0.50.0, `litmus_resp_edge`; RESBL multi-ball vs RESPx single). Double-strobe in one line; RESBL mid-line restart (vs RESPx wrap);
   missile-unlock offset from RESMP.
 - [x] **V2-12 Mirrors litmus.** ✅ DONE (v0.49.0, `litmus_mirror`). TIA via $0040/$2000, RAM via the $0180 stack page, ROM odd-$x000 mirrors.
 - [ ] **V2-13 48px GRP window litmus.** Derive the 6-store cycle map ourselves (score6.asm recipe; no source

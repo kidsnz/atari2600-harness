@@ -1,0 +1,9 @@
+{
+  "rom": "roms/litmus/litmus_resp_edge.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    {"at_frame": 0, "field": "tia.ball.reset_pixel", "op": "==", "value": 140},
+    {"at_frame": 0, "field": "tia.player0.reset_pixel", "op": "==", "value": 141}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+}
