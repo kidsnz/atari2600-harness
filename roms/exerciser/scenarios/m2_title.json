@@ -1,0 +1,66 @@
+{
+  "rom": "roms/exerciser/exerciser.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {
+      "frame": 12,
+      "player": 0,
+      "action": "fire",
+      "pressed": true
+    },
+    {
+      "frame": 14,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    }
+  ],
+  "asserts": [
+    {
+      "at_frame": 9,
+      "field": "ram.0x90",
+      "op": "==",
+      "value": 18
+    },
+    {
+      "at_frame": 9,
+      "field": "ram.0x9f",
+      "op": "==",
+      "value": 177
+    },
+    {
+      "at_frame": 9,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 24
+    },
+    {
+      "at_frame": 9,
+      "field": "tia.player1.hmoved_pixel",
+      "op": "==",
+      "value": 32
+    },
+    {
+      "at_frame": 9,
+      "field": "tiareg.player0.vertical_delay",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 13,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 13,
+      "field": "bank.number",
+      "op": "==",
+      "value": 0
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
