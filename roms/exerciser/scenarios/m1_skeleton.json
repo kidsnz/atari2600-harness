@@ -11,9 +11,10 @@
     {"at_frame": 0, "field": "ram.0x80", "op": "==", "value": 0},
     {"at_frame": 0, "field": "ram.0x9f", "op": "==", "value": 177},
     {"at_frame": 2, "field": "ram.0x80", "op": "==", "value": 1},
-    {"at_frame": 4, "field": "ram.0x9e", "op": "==", "value": 160},
-    {"at_frame": 6, "field": "ram.0x80", "op": "==", "value": 0},
-    {"at_frame": 6, "field": "bank.number", "op": "==", "value": 0}
+    {"at_frame": 4, "field": "ram.0x9d", "op": "==", "value": 194},
+    {"at_frame": 6, "field": "ram.0x80", "op": "==", "value": 2},
+    {"at_frame": 8, "field": "ram.0x9e", "op": "==", "value": 160},
+    {"at_frame": 8, "field": "bank.number", "op": "==", "value": 0}
   ],
   "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
 }
