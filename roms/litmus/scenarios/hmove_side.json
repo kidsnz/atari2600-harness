@@ -1,0 +1,9 @@
+{
+  "rom": "roms/litmus/litmus_hmove_side.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 26},
+    {"at_frame": 2, "field": "tia.player0.reset_pixel", "op": "==", "value": 9}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+}

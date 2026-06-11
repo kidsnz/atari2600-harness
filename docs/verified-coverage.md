@@ -22,6 +22,8 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | HMOVE nibble table (all 16, +7…−8, 1 px) | `litmus_hmove` | `HmovedPixel` matches CLAUDE.md for every nibble |
 | Missile / ball position family (`X = 3N − 55`) | `litmus_missile` | `read_tia` missile0=38 / ball=140; `read_row` 1px line at each |
 | Missile clamp X=2 vs player clamp X=3 (1px edge offset) | `litmus_collide_mp` | documented during m0-p0 setup |
+| HMOVE comb: left 8px blanked on strobe-after-WSYNC lines even with HMxx=0 | `litmus_hmove_side` | `read_row`: strobe lines clock 0–7 black, others not |
+| Late HMOVE: mid-visible (~cyc 39) = no-op; line-end (~cyc 74) = left (HM+8) px, no comb | `litmus_hmove_side` | cumulative P0 drift −9px/strobe measured (emulator-verified; Stella cross-check pending) |
 
 ## Sprites (player graphics)
 | Behavior | ROM | Evidence |
@@ -54,6 +56,6 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | Audio-chain golden regression (`digest.Audio`) | `litmus_audio` | `checks.golden_audio` deterministic record→match |
 
 ## Not yet covered (open)
-Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, HMOVE side effects (comb /
-mid-line), input ports, SECAM, and a Stella-oracle cross-check of the rendered pixels.
+Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, input ports, SECAM, and a
+Stella-oracle cross-check of the rendered pixels.
 See `docs/hardening-roadmap.md` § v2 backlog.

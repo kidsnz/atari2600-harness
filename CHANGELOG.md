@@ -12,6 +12,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.40.0] - 2026-06-11
+
+### Added
+- **HMOVE side-effects litmus (v2 backlog V2-2).** `litmus_hmove_side.asm` measures three regimes in one
+  frame: **(a)** HMOVE right after WSYNC blanks the left 8px **even with all HMxx=0** (the comb — alternating
+  strobe/no-strobe lines compared by `read_row`), confirming Towers' HBLANK+8CLK extension; **(b)** HMOVE
+  mid-visible (~cycle 39) produces **zero displacement and no comb** for both HM=0 and HM=$10;
+  **(c)** HMOVE at line end (~cycle 74) with HMP0=$10 (+1) moves P0 **left 9px per strobe = value+8**
+  (the classic late-HMOVE +8 rule, measured numerically) with no comb. (b)/(c) are recorded as
+  Gopher2600-measured values pending the Stella oracle cross-check (V2-17). Locked by
+  `scenarios/hmove_side.json` (cumulative-position asserts + golden). 18 scenarios pass.
+
 ## [0.39.0] - 2026-06-11
 
 ### Added

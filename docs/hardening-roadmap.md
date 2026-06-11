@@ -206,7 +206,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-1 VDEL litmus.** ✅ DONE (v0.39.0, `litmus_vdel` + `scenarios/vdel.json`). Verify the write-triggered cross-copies (GRP0→P1 shadow; GRP1→P0 *and* ENABL
   shadows), VDELxx D0 selecting the old copy, and the 2LK alignment relation (VDELP0=1/VDELP1=0 → same Y;
   0/1 → Y+1). Prereq for 48px score and vertical positioning. Src: Stella PG §6.D; SpiceWare Step 4/5.
-- [ ] **V2-2 HMOVE side-effects litmus.** (a) 8px left blank on HMOVE-after-WSYNC lines (incl. all-HMxx=0);
+- [x] **V2-2 HMOVE side-effects litmus.** ✅ DONE (v0.40.0, `litmus_hmove_side`). (a) 8px left blank on HMOVE-after-WSYNC lines (incl. all-HMxx=0);
   (b) mid-line HMOVE calibration sweep (expect rightward "plugging" ≈1px/4CLK; Cosmic Ark family);
   (c) HMxx writes inside the 24-cycle freeze — capture Gopher2600's table. Src: Towers TIA_HW_Notes.
 - [ ] **V2-3 Asymmetric-PF write-window litmus.** Boundary probes around woodgrain's conservative table
