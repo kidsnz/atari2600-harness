@@ -15,6 +15,8 @@
 ; スコア kernel（2ライン交互=stage/draw, 縞表示）:
 ;  stage 行: (p0..p5),y から t0..t5 へ（76cy 内で余裕）
 ;  draw 行: zp 21cy プリロード → SLEEP4 → timed 34/37/40/43（litmus_48px6 と同一）
+; M3 実機裏取り済（v0.58.0）: 非対称山並み2種（PF1 早書き≤27/右38=pf_async 窓）＋6ゾーン12スプライト・ドリフト
+;（4行分割で各行≤76cy）＋地面。シーン進入初期化=lastScene 方式。264→262 は assert_line_budget 系の勘定で調整。
 ; 実機裏取り済（Gopher2600, v0.57.0）: 48px "EXRCSR" 可読（P0=24/P1=32, NUSIZ=3, VDEL, timed 34/37/40/43）。
 ; 6桁BCDスコアがフレーム毎 +1（frame123 で "000122" 表示・$90-92 BCD 一致）。スコアは stage/draw 交互（縞）。
 ; 修正史: ①ロゴ表 align 256（abs,y ページ跨ぎ+1cy のシアー） ②ループ折返し jmp を WSYNC 後 0-2cy に置く +3 シフト head
@@ -32,18 +34,23 @@ RESP0   = $10
 RESP1   = $11
 GRP0    = $1B
 GRP1    = $1C
+HMP0    = $20
 HMP1    = $21
 HMOVE   = $2A
 HMCLR   = $2B
 VDELP0  = $25
 VDELP1  = $26
 INPT4   = $3C
+CTRLPF  = $0A
+COLUPF  = $08
+PF1     = $0E
 
-NSCENES = 2
+NSCENES = 3
 
 scene    = $80
 prevFire = $81
 frameCt  = $82
+lastScene = $83     ; シーン進入検出（初期化 1 回/進入）
 score0   = $90      ; BCD 下2桁
 score1   = $91
 score2   = $92      ; BCD 上2桁
@@ -62,6 +69,9 @@ p2       = $AC
 p3       = $AE
 p4       = $B0
 p5       = $B2
+; Zone シーン・ローカル（Title と排他オーバーレイ）
+zx0      = $A4      ; P0 X ×6（$A4-$A9）
+zx1      = $AA      ; P1 X ×6（$AA-$AF）
 
 ; ================= bank 0: フレームワーク＋S1 =================
         ORG  $0000
@@ -114,7 +124,11 @@ VB:     sta WSYNC
         ; --- シーンディスパッチ ---
         lda scene
         beq DoTitle
-        jsr SceneBlue       ; scene 1（bank0）
+        cmp #1
+        beq DoZone
+        jsr SceneBlue       ; scene 2（bank0）
+        jmp AfterScene
+DoZone: jsr SceneZone       ; scene 1（bank0）
         jmp AfterScene
 DoTitle:
         jsr CallB1Scene     ; scene 0 = Title（bank1）
@@ -128,7 +142,175 @@ OS:     sta WSYNC
         bne OS
         jmp NextFrame
 
-; --- S1: プレースホルダ（青背景, bank0）---
+
+; --- S1: ゾーン風景（bank0）---
+; 合成: 非対称PF山並み(48行, pf_async の窓) + 6ゾーン×P0/P1=12個の動くスプライト(96行,
+; techniques/zone_multiplex の検証済み構造) + 地面(45行)。先頭 3 行=進入初期化 or ドリフト更新。
+SceneZone:
+        lda #$C2
+        sta $9D             ; 実行センチネル
+        lda #0
+        sta COLUBK
+        sta CTRLPF          ; repeat
+        lda #$0E
+        sta COLUP0
+        lda #$48
+        sta COLUP1
+        lda #0
+        sta NUSIZ0
+        sta NUSIZ1
+        sta VDELP0
+        sta VDELP1
+        lda #$D6
+        sta COLUPF          ; 山の色（黄緑）
+        sta WSYNC           ; 構成行を閉じる（1）
+        ; --- 行2-4: 進入初期化（X 初期値コピー）or ドリフト（P0右/P1左, and #$7F）---
+        lda lastScene
+        cmp #1
+        beq ZDrift
+        ; 初期化パス（4 行）
+        ldx #5
+ZI1:    lda ZoneXInit0,x
+        sta zx0,x
+        dex
+        bpl ZI1
+        sta WSYNC           ; 2
+        ldx #5
+ZI2:    lda ZoneXInit1,x
+        sta zx1,x
+        dex
+        bpl ZI2
+        sta WSYNC           ; 3
+        lda #1
+        sta lastScene
+        sta WSYNC           ; 4
+        sta WSYNC           ; 5
+        jmp ZMountains
+ZDrift: ; ドリフトパス（4 行: 3ゾーンずつ＝各行 ~65cy で 76 内）
+        ldx #5
+ZD1:    lda zx0,x
+        clc
+        adc #1
+        and #$7F
+        sta zx0,x
+        dex
+        cpx #2
+        bne ZD1
+        sta WSYNC           ; 2
+ZD2:    lda zx0,x
+        clc
+        adc #1
+        and #$7F
+        sta zx0,x
+        dex
+        bpl ZD2
+        sta WSYNC           ; 3
+        ldx #5
+ZD3:    lda zx1,x
+        sec
+        sbc #1
+        and #$7F
+        sta zx1,x
+        dex
+        cpx #2
+        bne ZD3
+        sta WSYNC           ; 4
+ZD4:    lda zx1,x
+        sec
+        sbc #1
+        and #$7F
+        sta zx1,x
+        dex
+        bpl ZD4
+        sta WSYNC           ; 5
+ZMountains:
+        ; --- 山並み 48 行: 非対称 PF1（左=MtnL 早書き≤27 / 右=MtnR cyc38 書き=窓37-53）---
+        ldy #0
+ZMt:    sta WSYNC
+        lda MtnL,y          ; 4
+        sta PF1             ; 7   左 PF1（窓 ≤27 ✓）
+        lda MtnR,y          ; 11
+        ds 12, $EA          ; 35
+        sta PF1             ; 38  右 PF1（窓 37-53 ✓）
+        iny
+        cpy #48
+        bne ZMt
+        lda #0
+        sta PF1
+        ; --- ゾーン 6×16 行（zone_multiplex の検証済み構造）---
+        ldx #0
+ZLoop:  sta WSYNC
+        lda zx0,x
+        sec
+ZDv0:   sbc #15
+        bcs ZDv0
+        tay
+        lda ZHmove,y
+        sta HMP0
+        sta RESP0
+        sta WSYNC
+        lda zx1,x
+        sec
+ZDv1:   sbc #15
+        bcs ZDv1
+        tay
+        lda ZHmove,y
+        sta HMP1
+        sta RESP1
+        sta WSYNC
+        lda ZoneBG,x
+        sta COLUBK
+        sta HMOVE
+        ldy #0
+ZSpr:   sta WSYNC
+        lda ZSprite,y
+        sta GRP0
+        sta GRP1
+        iny
+        cpy #8
+        bne ZSpr
+        lda #0
+        sta GRP0
+        sta GRP1
+        ldy #5
+ZPad:   sta WSYNC
+        dey
+        bne ZPad
+        inx
+        cpx #6
+        bne ZLoop
+        ; --- 地面 43 行（1+4+48+96+43 = 192）---
+        lda #$E4
+        sta COLUBK
+        ldy #43
+ZGnd:   sta WSYNC
+        dey
+        bne ZGnd
+        lda #0
+        sta COLUBK
+        sta HMCLR
+        rts
+
+ZoneXInit0:
+        .byte 20, 50, 90, 120, 110, 70
+ZoneXInit1:
+        .byte 100, 70, 30, 60, 95, 120
+ZoneBG:
+        .byte $84, $94, $A4, $B4, $C4, $24
+ZSprite:
+        .byte $18,$3C,$7E,$FF,$FF,$7E,$3C,$18
+MtnL:   ; 山シルエット左（PF1, きっかり 48 エントリ）
+        ds 12, $00
+        .byte $01,$01,$03,$03,$07,$07,$0F,$0F,$1F,$1F,$3F,$3F
+        .byte $7F,$7F,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+        ds 12, $FF
+MtnR:   ; 山シルエット右（別形状=非対称の証明・きっかり 48 エントリ）
+        ds 6, $00
+        .byte $80,$80,$C0,$C0,$E0,$E0,$F0,$F0,$F8,$F8,$FC,$FC,$FE,$FE
+        .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+        ds 14, $FF
+
+; --- S2: プレースホルダ（青背景, bank0）---
 SceneBlue:
         lda #$A0
         sta sent0
@@ -141,6 +323,14 @@ SBL:    sta WSYNC
         lda #0
         sta COLUBK
         rts
+
+        ; --- HMOVE 表（ページ跨ぎ回避の負インデックス, zone_multiplex と同型）---
+        ORG  $0E00
+        RORG $FE00
+ZHmoveTbl:
+        .byte $80,$70,$60,$50,$40,$30,$20,$10,$00,$F0,$E0,$D0,$C0,$B0,$A0,$90
+ZHmoveEnd:
+ZHmove = ZHmoveEnd - 256
 
         ; --- 切替ゾーン（bank0 側, $FF00）---
         ORG  $0F00
