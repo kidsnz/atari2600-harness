@@ -1,6 +1,7 @@
 ; zone_multiplex — 縦ゾーン多重化のクリーンルーム・デモ（technique #1, docs/techniques/zone-multiplexing.md）
-; 6 ゾーン、各ゾーンで player0/player1 を別 X に再配置して 8px スプライトを描く＝2スプライト機で 2×6＝12 個に見える。
-; （DaveC の Zone を学んだ自前実装。位置決めは divide-by-15＋HMOVE テーブル＝harness 裏取り済みの方式）
+; 6 ゾーン × player0/player1 を各ゾーンで別 X に再配置＝2スプライト機で 12 個。
+; さらに各ゾーンの X を毎フレーム更新（P0=右へ / P1=左へ流す）＝12 個がうねうね動く。
+; （DaveC の Zone を学んだ自前実装。位置決めは divide-by-15＋HMOVE テーブル＝harness 裏取り済み）
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
@@ -22,6 +23,10 @@ HMCLR   = $2B
 NZONES   = 6
 SPRITE_H = 8
 
+; RAM: 各ゾーンの現在 X（毎フレーム更新するので ROM でなく RAM）
+zx0     = $80          ; player0 X × NZONES
+zx1     = $86          ; player1 X × NZONES
+
         org $F000
 Start:
         sei
@@ -40,6 +45,14 @@ Clr:    sta $00,x
         sta COLUBK
         sta NUSIZ0
         sta NUSIZ1
+        ; 初期 X を ROM から RAM へコピー
+        ldx #NZONES-1
+InitX:  lda ZoneX0_init,x
+        sta zx0,x
+        lda ZoneX1_init,x
+        sta zx1,x
+        dex
+        bpl InitX
 
 NextFrame:
         lda #2
@@ -51,7 +64,22 @@ NextFrame:
         sta VSYNC
         lda #2
         sta VBLANK
-        ldx #37
+        ; --- 位置更新（P0 右へ +1 / P1 左へ -1、0..127 で巻く）---
+        ldx #NZONES-1
+Upd:    lda zx0,x
+        clc
+        adc #1
+        and #$7F
+        sta zx0,x
+        lda zx1,x
+        sec
+        sbc #1
+        and #$7F
+        sta zx1,x
+        dex
+        bpl Upd
+        ; --- VBLANK 残りを WSYNC で埋める（更新ぶんを引いて全体を 262 に保つ）---
+        ldx #35
 VB:     sta WSYNC
         dex
         bne VB
@@ -59,11 +87,10 @@ VB:     sta WSYNC
         sta VBLANK
 
         ; --- 6 ゾーン × (P0,P1) ---
-        ldx #0                  ; zone index
+        ldx #0
 ZoneLoop:
-        ; P0 位置決め
         sta WSYNC
-        lda ZoneX0,x
+        lda zx0,x
         sec
 Div0:   sbc #15
         bcs Div0
@@ -71,9 +98,8 @@ Div0:   sbc #15
         lda HMOVE_LUT,y
         sta HMP0
         sta RESP0
-        ; P1 位置決め
         sta WSYNC
-        lda ZoneX1,x
+        lda zx1,x
         sec
 Div1:   sbc #15
         bcs Div1
@@ -81,10 +107,8 @@ Div1:   sbc #15
         lda HMOVE_LUT,y
         sta HMP1
         sta RESP1
-        ; 微調整適用
         sta WSYNC
         sta HMOVE
-        ; スプライト 8 ライン（P0/P1 同形・別色）
         ldy #0
 Spr:    sta WSYNC
         lda Sprite,y
@@ -96,7 +120,6 @@ Spr:    sta WSYNC
         lda #0
         sta GRP0
         sta GRP1
-        ; ゾーン残り 5 ライン消灯
         ldy #5
 Blz:    sta WSYNC
         dey
@@ -105,7 +128,6 @@ Blz:    sta WSYNC
         cpx #NZONES
         bne ZoneLoop
 
-        ; 残り可視を埋める（6*16=96 使用 → 96 ライン消灯）
         ldy #96
 Fill:   sta WSYNC
         dey
@@ -119,14 +141,13 @@ OS:     sta WSYNC
         bne OS
         jmp NextFrame
 
-ZoneX0:
-        byte 20, 50, 90, 120, 140, 70    ; P0 の各ゾーン目標 X
-ZoneX1:
-        byte 100, 130, 30, 60, 95, 150   ; P1 の各ゾーン目標 X（P0 と交互にバラける）
+ZoneX0_init:
+        byte 20, 50, 90, 120, 110, 70
+ZoneX1_init:
+        byte 100, 70, 30, 60, 95, 120
 Sprite:
         byte $18,$3C,$7E,$FF,$FF,$7E,$3C,$18
 
-; divide-by-15 の余り（Y=$F1..$FF）→ HMOVE ニブル変換テーブル（DaveC 流の負インデックス）
 HMOVE_TBL:
         byte $80,$70,$60,$50,$40,$30,$20,$10,$00,$F0,$E0,$D0,$C0,$B0,$A0,$90
 HMOVE_TBL_END:

@@ -35,10 +35,12 @@ The building blocks are already hardware-verified (`litmus_pos` = positioning, `
 `read_tia` / `read_row` confirm a sprite appears at the expected X **in each zone** (i.e. the same P0/P1 land
 at different X on different scanlines), and `get_screen_annotated` + Stella show many sprites at once.
 
-## Status — ✅ verified
-- `roms/techniques/zone_multiplex.asm` puts **12 sprites on screen** (6 zones × P0+P1) from a 2-sprite
-  machine, each repositioned per zone. Hardware-verified on Gopher2600 (`get_screen_annotated` shows all 12;
-  `read_tia` reads the last zone's P0=69 / P1=149) and cross-checked in Stella. Locked by
-  `roms/techniques/scenarios/zone_multiplex.json` (position asserts + golden frame), run in CI.
-- Next: per-frame motion (move each zone's X), per-zone colors/tiles; then promote a reusable kernel
-  generator to `pkg/` (like `pkg/playfield` / `pkg/sprite`).
+## Status — ✅ verified (with motion)
+- `roms/techniques/zone_multiplex.asm` puts **12 moving sprites on screen** (6 zones × P0+P1) from a
+  2-sprite machine. Each zone's X lives in RAM (`zx0` $80…, `zx1` $86…) and is updated every frame
+  (P0 drifts right, P1 left, wrapping via `and #$7F`), so all 12 animate — verifiable purely by `read_ram`
+  (the position bytes change frame to frame). Hardware-verified on Gopher2600 (`get_screen_annotated` shows
+  all 12; `read_ram` shows the motion) and cross-checked in Stella. Locked by
+  `roms/techniques/scenarios/zone_multiplex.json` (golden frame — robust to the moving positions), run in CI.
+- Next: per-zone colors/tiles; then promote a reusable kernel generator to `pkg/`
+  (like `pkg/playfield` / `pkg/sprite`).

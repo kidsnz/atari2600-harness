@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.35.0] - 2026-06-11
+
+### Changed
+- **Zone multiplexing #1 now animates — 12 *moving* sprites.** Each zone's X moved from ROM tables into RAM
+  (`zx0`/`zx1`) and is updated every frame (P0 drifts right, P1 left, wrapping `and #$7F`), so all 12 sprites
+  animate. Demonstrates RAM-backed motion verifiable purely by `read_ram` (the position bytes change frame to
+  frame). VBLANK line count retuned to keep the frame at 262 (the per-frame update loop is absorbed). The
+  scenario now locks the frame by `golden_frame` only (robust to the moving positions); all scenarios pass.
+
 ## [0.34.0] - 2026-06-11
 
 ### Added
