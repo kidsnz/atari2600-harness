@@ -1,0 +1,17 @@
+{
+  "rom": "roms/litmus/litmus_paddle.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 1, "player": 0, "action": "paddle", "value": 0.1},
+    {"frame": 6, "player": 0, "action": "paddle", "value": 0.25},
+    {"frame": 11, "player": 0, "action": "paddle", "value": 0.5},
+    {"frame": 16, "player": 0, "action": "paddle", "value": 0.75}
+  ],
+  "asserts": [
+    {"at_frame": 4, "field": "ram.0x90", "op": "==", "value": 5},
+    {"at_frame": 9, "field": "ram.0x90", "op": "==", "value": 69},
+    {"at_frame": 14, "field": "ram.0x90", "op": "==", "value": 176},
+    {"at_frame": 19, "field": "ram.0x90", "op": "==", "value": 255}
+  ],
+  "checks": {"ntsc_frame_lines": 262}
+}

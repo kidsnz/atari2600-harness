@@ -452,8 +452,9 @@ func handleReadRow(ctx context.Context, req *mcp.CallToolRequest, in ReadRowIn) 
 
 type SetInputIn struct {
 	Player  int    `json:"player,omitempty" jsonschema:"player port (0 left/P0 default, 1 right/P1)"`
-	Action  string `json:"action" jsonschema:"one of left|right|up|down|fire|center"`
-	Pressed bool   `json:"pressed,omitempty" jsonschema:"press/hold when set, release when unset (ignored for center)"`
+	Action  string  `json:"action" jsonschema:"one of left|right|up|down|fire|center|paddle"`
+	Pressed bool    `json:"pressed,omitempty" jsonschema:"press/hold when set, release when unset (ignored for center/paddle)"`
+	Value   float64 `json:"value,omitempty" jsonschema:"paddle position 0.0..1.0 (action=paddle only; plugs the paddle peripheral on first use)"`
 }
 type SetInputOut struct {
 	Coords Coords `json:"coords"`
@@ -467,7 +468,11 @@ func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn
 	if err != nil {
 		return nil, SetInputOut{}, err
 	}
-	if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
+	if in.Action == "paddle" {
+		if err := e.SetPaddle(in.Player, in.Value); err != nil {
+			return nil, SetInputOut{}, err
+		}
+	} else if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
 		return nil, SetInputOut{}, err
 	}
 	return nil, SetInputOut{Coords: coordsOf(e)}, nil
@@ -677,7 +682,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_collisions", Description: "Read the 8 TIA collision latches (CXxx, $30-$37; sticky until CXCLR) as named boolean pairs (p0_p1, m0_p0, p0_pf, bl_pf, ...). Structured replacement for raw peeks of the collision registers."}, handleReadCollisions)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_audio", Description: "Read the current TIA audio register values for both channels: control (AUDC, waveform), freq (AUDF, divider), volume (AUDV). Lets you verify sound numerically — read_tia/read_row only cover video."}, handleReadAudio)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
-	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject joystick input (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. action left|right|up|down|fire|center. pressed=true holds, false releases; state persists until changed. center releases all directions."}, handleSetInput)
+	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject controller input (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. action left|right|up|down|fire|center|paddle. pressed=true holds, false releases (sticks). action=paddle uses value 0.0..1.0 and plugs the paddle peripheral on first use. center releases all directions."}, handleSetInput)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)

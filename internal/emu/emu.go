@@ -14,6 +14,7 @@ import (
 	"github.com/jetsetilly/gopher2600/digest"
 	"github.com/jetsetilly/gopher2600/environment"
 	"github.com/jetsetilly/gopher2600/hardware"
+	"github.com/jetsetilly/gopher2600/hardware/peripherals/controllers"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports/plugging"
 	"github.com/jetsetilly/gopher2600/hardware/television"
@@ -36,6 +37,7 @@ type Emu struct {
 	vdigest *digest.Video // ゴールデンフレーム回帰用の連鎖ハッシュ（任意・EnableVideoDigest で有効化）
 	adigest *digest.Audio // ゴールデン音声回帰用の連鎖ハッシュ（任意・EnableAudioDigest で有効化）
 	acap    *audioCapture // 生音声サンプル取得（任意・EnableAudioCapture で有効化, V2-15）
+	paddlePlugged [2]bool // SetPaddle がポートへ paddle peripheral を差したか（冪等化, V2-4b）
 }
 
 // EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。
@@ -272,6 +274,34 @@ func (e *Emu) PeekRAM(addr uint16) (uint8, error) {
 // Poke はメモリへ 1 バイト書き込む（poke ツール）。
 func (e *Emu) Poke(addr uint16, val uint8) error {
 	return e.VCS.Mem.Poke(addr, val)
+}
+
+// SetPaddle はパドル位置を注入する（V2-4b）。value は 0.0（最小=充電最速）〜1.0（最大）。
+// 初回呼び出しでポートに paddle peripheral を差す（デフォルトの stick を置換・冪等）。
+func (e *Emu) SetPaddle(player int, value float64) error {
+	port := plugging.PortLeft
+	idx := 0
+	if player == 1 {
+		port = plugging.PortRight
+		idx = 1
+	}
+	if !e.paddlePlugged[idx] {
+		if err := e.VCS.RIOT.Ports.Plug(port, controllers.NewPaddles); err != nil {
+			return err
+		}
+		e.paddlePlugged[idx] = true
+	}
+	if value < 0 {
+		value = 0
+	} else if value > 1 {
+		value = 1
+	}
+	motion := int16(value*65535 - 32768)
+	_, err := e.VCS.RIOT.Ports.HandleInputEvent(ports.InputEvent{
+		Port: port, Ev: ports.PaddleSet,
+		D: ports.EventDataPaddle{Paddle: -1, Motion: motion, Relative: false},
+	})
+	return err
 }
 
 // Bank は「現在 PC が指すアドレス」のカートリッジバンク情報を返す（bankswitch ROM の検証用）。

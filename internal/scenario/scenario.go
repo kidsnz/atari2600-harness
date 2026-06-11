@@ -23,8 +23,9 @@ import (
 type Input struct {
 	Frame   int    `json:"frame"`   // シナリオ開始（warmup 後）からの 0 起点フレーム。このフレームを走らせる前に適用
 	Player  int    `json:"player"`  // 0=P0/左, 1=P1/右
-	Action  string `json:"action"`  // left|right|up|down|fire|center
-	Pressed bool   `json:"pressed"` // 押下保持/解除（center では無視）
+	Action  string `json:"action"`  // left|right|up|down|fire|center|paddle
+	Pressed bool   `json:"pressed"` // 押下保持/解除（center/paddle では無視）
+	Value   float64 `json:"value,omitempty"` // action=paddle の位置 0.0〜1.0（V2-4b）
 }
 
 // Assert はあるフレーム終了時点の瞬時数値条件（D-1）。副作用のある計測は Checks 側で扱う。
@@ -176,7 +177,11 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 
 	for f := 0; f <= maxF; f++ {
 		for _, in := range inByFrame[f] { // このフレームを走らせる前に入力適用
-			if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
+			if in.Action == "paddle" {
+				if err := e.SetPaddle(in.Player, in.Value); err != nil {
+					return nil, fmt.Errorf("frame %d paddle: %w", f, err)
+				}
+			} else if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
 				return nil, fmt.Errorf("frame %d input: %w", f, err)
 			}
 		}

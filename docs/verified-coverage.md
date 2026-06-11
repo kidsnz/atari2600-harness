@@ -63,6 +63,7 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | SWCHA joystick bits (P0 left → D6=0), no-input $FF | `litmus_input` | RAM-sampled readback under a scenario input timeline |
 | INPT4 fire (D7, 0=pressed; low bits = open-bus noise) | `litmus_input` | $BC released / $3C pressed |
 | VBLANK D6 latch: INPT4 stays pressed after release; directions don't latch | `litmus_input` | $3C persists ≥3 frames post-release; SWCHA returns to $FF |
+| Paddle INPT0: dump (VBLANK D7) → charge; transfer curve 0.1→5 / 0.25→69 / 0.5→176 lines | `litmus_paddle` | scanline-count readback under a paddle input timeline |
 
 ## 6502/6507 precision
 | Behavior | ROM | Evidence |

@@ -213,8 +213,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
   (LPF0≤21, LPF1≤27, LPF2≤37, RPF0 27–48, RPF1 37–53, RPF2 48–64; reflected RPF2 == 48 exactly); verify
   per-pixel split on late writes; settle the SpiceWare Step3(66) vs Step7(71) discrepancy.
 - [x] **V2-4 Input litmus (joystick + latch).** ✅ DONE (v0.42.0, `litmus_input` + input-timeline scenario).
-- [ ] **V2-4b Paddles.** Add a paddle path to `set_input` (plug Gopher2600 paddle peripheral), then verify
-  INPT0–3 dump/charge (VBLANK D7) with a scanline-count calibration of the transfer curve.
+- [x] **V2-4b Paddles.** ✅ DONE (v0.54.0, `litmus_paddle` + `set_input action=paddle` + scenario `value`).
 - [x] **V2-5 Bankswitch F8 litmus + `read_bank` MCP tool.** ✅ DONE (v0.43.0, `litmus_bank` + `bank.*` scenario fields). 8K two-bank ROM (per-bank sentinels/colors,
   vectors+stub+trampoline in both banks); assert bank via RAM sentinels and the new tool
   (Gopher2600 `Cartridge.GetBank()` already exposes it). Then F6 variant; F8SC later.
