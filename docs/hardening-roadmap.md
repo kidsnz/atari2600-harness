@@ -223,7 +223,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
   18-cycle constancy incl. illegal `dcp` (also certifies illegal-opcode support).
 
 ### Tier 2 — completing the matrix
-- [ ] **V2-7 CTRLPF litmus.** SCORE mode colors, PFP priority, ball width bits; measure the unspecified
+- [x] **V2-7 CTRLPF litmus.** ✅ DONE (v0.45.0, `litmus_ctrlpf`; SCORE×PFP→COLUPF flagged for Stella). SCORE mode colors, PFP priority, ball width bits; measure the unspecified
   SCORE×PFP interaction.
 - [ ] **V2-8 Collision pairs batch 2.** Remaining 12 CXxx pairs; verify the BIT N/V two-pairs-per-read idiom.
 - [ ] **V2-9 LFSR litmus.** Pitfall Fibonacci both directions from $C4 (verified prefixes, period 255,

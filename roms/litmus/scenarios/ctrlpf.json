@@ -1,0 +1,8 @@
+{
+  "rom": "roms/litmus/litmus_ctrlpf.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tiareg.playfield.ctrlpf", "op": "==", "value": 48}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+}

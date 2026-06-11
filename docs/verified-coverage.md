@@ -42,6 +42,7 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | PF bit order (PF0 upper nibble / PF1 MSB-first / PF2 LSB-first) | `litmus_pf` | `read_row` per-column lit positions (2 sources agree) |
 | Per-scanline background color | `litmus_color` | `read_row` distinct single color per line |
 | Asymmetric PF via double-write (windows per woodgrain) + per-pixel split on late writes | `litmus_pf_async` | left $AA / right $55 exact clocks; cyc-33 write → 5 old + 3 new bits |
+| CTRLPF: SCORE (left=COLUP0/right=COLUP1), priority D2 (player↔PF), ball width 1/2/4/8 | `litmus_ctrlpf` | per-band `read_row`; SCORE+PFP→COLUPF flagged for Stella |
 
 ## Collisions (CXxx)
 | Behavior | ROM | Evidence |

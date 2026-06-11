@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.45.0] - 2026-06-11
+
+### Added
+- **CTRLPF litmus — SCORE / priority / ball width, incl. the audit's open SCORE×PFP question (v2 V2-7).**
+  `litmus_ctrlpf.asm` verifies five regimes: SCORE ($02) paints the left half COLUP0 / right half COLUP1
+  (split at clock 80); default priority ($00) draws P0 over the playfield; PFP ($04) draws the playfield over
+  P0 (player hidden); **SCORE+PFP ($06) renders the playfield as COLUPF — the SCORE colour substitution is
+  *suppressed* under PFP — with the player hidden** (this corner is unspecified in the docs and a likely
+  emulator-divergence point; recorded as a Gopher2600 measurement, flagged for the Stella oracle cross-check
+  V2-17); ball width D4–5 doubles 1/2/4/8 px. Locked by `scenarios/ctrlpf.json`. 23 scenarios pass.
+
 ## [0.44.1] - 2026-06-11
 
 ### Changed (docs)
