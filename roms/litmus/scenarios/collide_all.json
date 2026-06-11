@@ -1,0 +1,22 @@
+{
+  "rom": "roms/litmus/litmus_collide_all.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    {"at_frame": 0, "field": "collisions.p0_p1", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m0_m1", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m0_p0", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m0_p1", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m1_p0", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m1_p1", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.p0_pf", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.p0_bl", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.p1_pf", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.p1_bl", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m0_pf", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m0_bl", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m1_pf", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.m1_bl", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "collisions.bl_pf", "op": "==", "value": 1}
+  ],
+  "checks": {"ntsc_frame_lines": 262}
+}

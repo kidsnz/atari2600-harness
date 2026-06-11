@@ -51,6 +51,7 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | Ball–playfield (CXBLPF) | `litmus_collide` | `read_collisions.bl_pf == true` |
 | Player0–Player1 (CXPPMM) — the pair Frogger uses | `litmus_collide_pp` | `read_collisions.p0_p1 == true` |
 | Missile0–Player0 (CXM0P) | `litmus_collide_mp` | `read_collisions.m0_p0 == true` |
+| **All 15 pairs** at once (overlap P0/P1/M0/M1/BL + PF) | `litmus_collide_all` | every `read_collisions` field true |
 
 ## Input
 | Behavior | ROM | Evidence |

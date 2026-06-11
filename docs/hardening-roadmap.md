@@ -225,7 +225,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 ### Tier 2 — completing the matrix
 - [x] **V2-7 CTRLPF litmus.** ✅ DONE (v0.45.0, `litmus_ctrlpf`; SCORE×PFP→COLUPF flagged for Stella). SCORE mode colors, PFP priority, ball width bits; measure the unspecified
   SCORE×PFP interaction.
-- [ ] **V2-8 Collision pairs batch 2.** Remaining 12 CXxx pairs; verify the BIT N/V two-pairs-per-read idiom.
+- [x] **V2-8 Collision pairs (all 15).** ✅ DONE (v0.48.0, `litmus_collide_all`). Remaining 12 CXxx pairs; verify the BIT N/V two-pairs-per-read idiom.
 - [x] **V2-9 LFSR litmus.** ✅ DONE (v0.46.0, `litmus_lfsr`; Galois period 255 + never-zero). Pitfall Fibonacci both directions from $C4 (verified prefixes, period 255,
   N-right-then-N-left identity) + Galois `eor #$8E` / `eor #$B4` periods. Pure read_ram asserts.
 - [x] **V2-10 RIOT timer litmus.** ✅ DONE (v0.47.0, `litmus_timer`; reading INTIM clears TIMINT D7). TIM64T expiry timing, post-underflow $FF/1-per-cycle behavior, TIMINT D7

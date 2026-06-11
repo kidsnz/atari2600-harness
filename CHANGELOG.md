@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.48.0] - 2026-06-11
+
+### Added
+- **All 15 collision pairs verified in one ROM (v2 V2-8).** `litmus_collide_all.asm` overlaps P0/P1/M0/M1/BL
+  (missiles width-8, ball width-8) with a lit PF0 at the left edge so every CXxx pair fires at once;
+  `scenarios/collide_all.json` asserts all 15 (`p0_p1, m0_m1, m0_p0, m0_p1, m1_p0, m1_p1, p0_pf, p0_bl,
+  p1_pf, p1_bl, m0_pf, m0_bl, m1_pf, m1_bl, bl_pf`) true — superseding the three single-pair litmus in
+  coverage. 26 scenarios pass.
+
 ## [0.47.0] - 2026-06-11
 
 ### Added
