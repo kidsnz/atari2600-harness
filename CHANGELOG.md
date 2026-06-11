@@ -23,6 +23,14 @@ versions follow [Semantic Versioning](https://semver.org/).
   emulator-divergence point; recorded as a Gopher2600 measurement, flagged for the Stella oracle cross-check
   V2-17); ball width D4–5 doubles 1/2/4/8 px. Locked by `scenarios/ctrlpf.json`. 23 scenarios pass.
 
+### Fixed
+- **`smoke.asm` now clears collisions after init (CXCLR) — removes platform-dependent CI flakiness.** The
+  zero-page clear loop incidentally strobes the TIA strobe registers (RESxx, HMOVE) whose effect depends on
+  the power-on TIA state and reset beam timing, leaving sticky collision latches that differed across
+  platforms (CI caught `TestReadCollisionsNoSprites` reporting M1-PF / BL-PF on the runner while it passed
+  locally). A single CXCLR after init forces a clean, deterministic baseline; rendering (hence all goldens)
+  is unchanged.
+
 ## [0.44.1] - 2026-06-11
 
 ### Changed (docs)

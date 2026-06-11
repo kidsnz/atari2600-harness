@@ -12,6 +12,7 @@ VSYNC   = $00
 VBLANK  = $01
 WSYNC   = $02
 COLUBK  = $09
+CXCLR   = $2C
 
         org $F000
 
@@ -28,6 +29,8 @@ ClearMem:
 
         lda #$42
         sta $80         ; sentinel: read_ram($80) == $42 を期待
+        sta CXCLR       ; ゼロページ全クリアは RESxx/HMOVE ストローブを副作用で叩き、その timing が
+                        ; 電源投入時 TIA 状態に依存して衝突ラッチを platform 依存で残す。ここで一掃し決定化。
 
 MainLoop:
 ; --- VSYNC: 3 lines ---
