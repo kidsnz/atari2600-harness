@@ -32,6 +32,7 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | NUSIZ quad-width (32px) | `litmus_nusiz_quad` | `read_row` len 32; `player0.nusiz=7` |
 | NUSIZ three copies (close, 16px spacing) | `litmus_nusiz_copies` | `read_row` 3×8px spans at clock 3/19/35 |
 | REFP reflect (mirror) == `pkg/sprite.Reflect` | `litmus_refp` | `reflected=true`; ramp mirrored (right-anchored) |
+| VDEL write-triggered shadow copies (GRP0→P1 old, GRP1→P0+ENABL old; VDELxx shows old) | `litmus_vdel` | 6 bands: hidden until the cross-write, then appears (`read_row` per band) |
 
 ## Playfield
 | Behavior | ROM | Evidence |
@@ -53,5 +54,6 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | Audio-chain golden regression (`digest.Audio`) | `litmus_audio` | `checks.golden_audio` deterministic record→match |
 
 ## Not yet covered (open)
-Player vertical delay (VDELP), playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs,
-SECAM, and a Stella-oracle cross-check of the rendered pixels. See `docs/hardening-roadmap.md`.
+Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, HMOVE side effects (comb /
+mid-line), input ports, SECAM, and a Stella-oracle cross-check of the rendered pixels.
+See `docs/hardening-roadmap.md` § v2 backlog.

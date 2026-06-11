@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring (production use of the harness; e.g. a Pong rematch).
 - Extending the `step_scanline|clock` / `watch|trap` tools.
 
+## [0.39.0] - 2026-06-11
+
+### Added
+- **VDEL litmus — verifies vertical delay's write-triggered shadow copies (v2 backlog V2-1).**
+  `litmus_vdel.asm` proves all three paths in one frame, exactly as Stella PG §6.D describes:
+  with VDELP0=1 a fresh GRP0=$FF stays hidden until **a GRP1 write copies P0's new→old** (then P0 renders
+  $FF at X=3); with VDELBL=1 ENABL=on stays hidden until a GRP1 write (ball appears at X=2); with VDELP1=1
+  GRP1=$3C stays hidden until **a GRP0 write copies P1's new→old** ($3C renders as 4px at clock 41).
+  Locked by `scenarios/vdel.json` (vertical_delay asserts + golden). 17 scenarios pass. This is the
+  prerequisite for the 48px score kernel and 2-line-kernel vertical positioning.
+
 ## [0.38.0] - 2026-06-11
 
 ### Added (docs)
