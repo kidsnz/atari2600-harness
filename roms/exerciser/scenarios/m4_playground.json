@@ -1,0 +1,72 @@
+{
+  "rom": "roms/exerciser/exerciser.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {
+      "frame": 1,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    },
+    {
+      "frame": 3,
+      "player": 0,
+      "action": "fire",
+      "pressed": true
+    },
+    {
+      "frame": 4,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    },
+    {
+      "frame": 5,
+      "player": 0,
+      "action": "fire",
+      "pressed": true
+    },
+    {
+      "frame": 6,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    },
+    {
+      "frame": 8,
+      "player": 0,
+      "action": "left",
+      "pressed": true
+    }
+  ],
+  "asserts": [
+    {
+      "at_frame": 7,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 2
+    },
+    {
+      "at_frame": 7,
+      "field": "ram.0x9c",
+      "op": "==",
+      "value": 212
+    },
+    {
+      "at_frame": 75,
+      "field": "ram.0xa4",
+      "op": "==",
+      "value": 10
+    },
+    {
+      "at_frame": 75,
+      "field": "tiareg.player0.color",
+      "op": "==",
+      "value": 68
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

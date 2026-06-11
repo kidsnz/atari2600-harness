@@ -2,19 +2,113 @@
   "rom": "roms/exerciser/exerciser.asm",
   "warmup_frames": 3,
   "inputs": [
-    {"frame": 1, "player": 0, "action": "fire", "pressed": true},
-    {"frame": 3, "player": 0, "action": "fire", "pressed": false},
-    {"frame": 5, "player": 0, "action": "fire", "pressed": true},
-    {"frame": 7, "player": 0, "action": "fire", "pressed": false}
+    {
+      "frame": 1,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    },
+    {
+      "frame": 3,
+      "player": 0,
+      "action": "fire",
+      "pressed": true
+    },
+    {
+      "frame": 4,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    },
+    {
+      "frame": 5,
+      "player": 0,
+      "action": "fire",
+      "pressed": true
+    },
+    {
+      "frame": 6,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    },
+    {
+      "frame": 7,
+      "player": 0,
+      "action": "fire",
+      "pressed": true
+    },
+    {
+      "frame": 8,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    },
+    {
+      "frame": 9,
+      "player": 0,
+      "action": "fire",
+      "pressed": true
+    },
+    {
+      "frame": 10,
+      "player": 0,
+      "action": "fire",
+      "pressed": false
+    }
   ],
   "asserts": [
-    {"at_frame": 0, "field": "ram.0x80", "op": "==", "value": 0},
-    {"at_frame": 0, "field": "ram.0x9f", "op": "==", "value": 177},
-    {"at_frame": 2, "field": "ram.0x80", "op": "==", "value": 1},
-    {"at_frame": 4, "field": "ram.0x9d", "op": "==", "value": 194},
-    {"at_frame": 6, "field": "ram.0x80", "op": "==", "value": 2},
-    {"at_frame": 8, "field": "ram.0x9e", "op": "==", "value": 160},
-    {"at_frame": 8, "field": "bank.number", "op": "==", "value": 0}
+    {
+      "at_frame": 2,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 4,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 4,
+      "field": "ram.0x9d",
+      "op": "==",
+      "value": 194
+    },
+    {
+      "at_frame": 6,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 2
+    },
+    {
+      "at_frame": 8,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 3
+    },
+    {
+      "at_frame": 8,
+      "field": "ram.0x9e",
+      "op": "==",
+      "value": 160
+    },
+    {
+      "at_frame": 10,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 10,
+      "field": "bank.number",
+      "op": "==",
+      "value": 0
+    }
   ],
-  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
 }

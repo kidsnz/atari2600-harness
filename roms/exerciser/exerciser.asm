@@ -41,11 +41,20 @@ HMCLR   = $2B
 VDELP0  = $25
 VDELP1  = $26
 INPT4   = $3C
+SWCHA   = $0280
+ENAM0   = $1D
+ENABL   = $1F
+RESM0   = $12
+RESBL   = $14
+HMM0    = $22
+PF0     = $0D
+PF2     = $0F
+CXCLR   = $2C
 CTRLPF  = $0A
 COLUPF  = $08
 PF1     = $0E
 
-NSCENES = 3
+NSCENES = 4
 
 scene    = $80
 prevFire = $81
@@ -72,6 +81,13 @@ p5       = $B2
 ; Zone シーン・ローカル（Title と排他オーバーレイ）
 zx0      = $A4      ; P0 X ×6（$A4-$A9）
 zx1      = $AA      ; P1 X ×6（$AA-$AF）
+; Playground シーン・ローカル（排他オーバーレイ）
+px       = $A4      ; P0 X（10-140）
+py       = $A5      ; P0 Y（10-170）
+mx       = $A6      ; missile X
+mAct     = $A7      ; missile 飛行中フラグ
+hitCol   = $A9      ; 衝突フィードバック色
+lineCt   = $B4      ; kernel 行カウンタ
 
 ; ================= bank 0: フレームワーク＋S1 =================
         ORG  $0000
@@ -126,7 +142,11 @@ VB:     sta WSYNC
         beq DoTitle
         cmp #1
         beq DoZone
-        jsr SceneBlue       ; scene 2（bank0）
+        cmp #2
+        beq DoPlay
+        jsr SceneBlue       ; scene 3（bank0）
+        jmp AfterScene
+DoPlay: jsr ScenePlay       ; scene 2（bank0）
         jmp AfterScene
 DoZone: jsr SceneZone       ; scene 1（bank0）
         jmp AfterScene
@@ -310,7 +330,190 @@ MtnR:   ; 山シルエット右（別形状=非対称の証明・きっかり 48
         .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
         ds 14, $FF
 
-; --- S2: プレースホルダ（青背景, bank0）---
+
+; --- S2: 操作プレイグラウンド（bank0）---
+; ジョイスティックで P0 移動（SWCHA, litmus_input）/ ミサイル自動発射（32フレーム毎, 右へ 1px/フレーム=HMOVE ドリフト）
+; / PF 側壁＋中央 ball / 衝突ラッチで P0 色が変わる（litmus_collide_all の意味づけ）。CXCLR 毎フレーム。
+ScenePlay:
+        lda #$D4
+        sta $9C             ; 実行センチネル
+        lda lastScene
+        cmp #2
+        beq PNoInit
+        ; 進入初期化
+        lda #70
+        sta px
+        lda #80
+        sta py
+        lda #0
+        sta mAct
+        lda #2
+        sta lastScene
+PNoInit:
+        ; 構成: PF 側壁（reflect で左右対称・PF0 のみ）, ball 中央
+        lda #$F0
+        sta PF0
+        lda #0
+        sta PF1
+        sta PF2
+        lda #1
+        sta CTRLPF          ; reflect
+        lda #$3A
+        sta COLUPF
+        lda #0
+        sta COLUBK
+        sta NUSIZ0
+        lda #$1E
+        sta COLUP1
+        lda #0
+        sta GRP1
+        sta WSYNC           ; 1
+        ; --- 入力＋移動（行2）---
+        lda SWCHA
+        and #$80            ; right (0=押下)
+        bne PNotR
+        inc px
+PNotR:  lda SWCHA
+        and #$40            ; left
+        bne PNotL
+        dec px
+PNotL:  lda SWCHA
+        and #$20            ; down
+        bne PNotD
+        inc py
+PNotD:  lda SWCHA
+        and #$10            ; up
+        bne PNotU
+        dec py
+PNotU:  sta WSYNC           ; 2
+        ; --- クランプ＋衝突フィードバック（行3）---
+        lda px
+        cmp #10
+        bcs PXlo
+        lda #10
+        sta px
+PXlo:   lda px
+        cmp #141
+        bcc PXhi
+        lda #140
+        sta px
+PXhi:   lda py
+        cmp #10
+        bcs PYlo
+        lda #10
+        sta py
+PYlo:   lda py
+        cmp #170
+        bcc PYhi
+        lda #169
+        sta py
+PYhi:   sta WSYNC           ; 3b（クランプ行と衝突行を分離: 合算 >76cy 対策）
+        ; 衝突: 前フレームの描画で立ったラッチを「読んでから消す」（読み→CXCLR の順が肝）
+        lda #$0E
+        sta hitCol
+        bit $32             ; CXP0FB: D7=p0-pf（壁）
+        bpl PChkBL
+        lda #$44
+        sta hitCol          ; 赤=壁ヒット
+PChkBL: bit $32             ; CXP0FB D6 = p0-bl（ポール）
+        bvc PNoBL2
+        lda #$86
+        sta hitCol          ; 青=ポールヒット（CXP0FB D6 = p0-bl）
+PNoBL2: lda hitCol
+        sta COLUP0
+        sta CXCLR           ; 読了後にクリア（次フレームの描画で再蓄積）
+        sta WSYNC           ; 3
+        ; --- ミサイル管理（行4）---
+        lda mAct
+        bne PMfly
+        lda frameCt
+        and #$1F
+        bne PMnone          ; 32フレーム毎に発射
+        lda px
+        sta mx
+        lda #1
+        sta mAct
+        jmp PMnone
+PMfly:  inc mx
+        lda mx
+        cmp #150
+        bcc PMok
+        lda #0
+        sta mAct
+PMok:
+PMnone: lda mAct
+        asl                 ; 0/2
+        sta ENAM0           ; D1
+        lda #2
+        sta ENABL           ; ball 常時
+        sta WSYNC           ; 4
+        ; --- 位置決め: P0（行5）, M0（行6）, BL（行7, 中央固定 X=80）, HMOVE（行8）---
+        lda px
+        sec
+PDv0:   sbc #15
+        bcs PDv0
+        tay
+        lda ZHmove,y
+        sta HMP0
+        sta RESP0
+        sta WSYNC           ; 5
+        lda mx
+        sec
+PDv1:   sbc #15
+        bcs PDv1
+        tay
+        lda ZHmove,y
+        sta HMM0
+        sta RESM0
+        sta WSYNC           ; 6
+        lda #80
+        sec
+PDv2:   sbc #15
+        bcs PDv2
+        tay
+        lda ZHmove,y
+        sta $24             ; HMBL
+        sta RESBL
+        sta WSYNC           ; 7
+        sta HMOVE
+        ds 12, $EA          ; SLEEP 24（HMOVE 後の HMxx 凍結確保）
+        sta HMCLR
+        sta WSYNC           ; 8
+        ; --- kernel 180 行: py ウィンドウで P0 描画 ---
+        lda #0
+        sta lineCt
+PKer:   sta WSYNC
+        lda lineCt          ; 3
+        sec                 ; 5
+        sbc py              ; 8
+        cmp #8              ; 10
+        bcs PBlank          ; 12
+        tay                 ; 14
+        lda ZSprite,y       ; 18
+        sta GRP0            ; 21
+        jmp PNext           ; 24
+PBlank: lda #0              ; 15
+        sta GRP0            ; 18
+        nop
+        nop                 ; 22
+        nop                 ; 24（分岐を等長化）
+PNext:  inc lineCt          ; 29
+        lda lineCt          ; 32
+        cmp #180            ; 34
+        bne PKer            ; 37
+        lda #0
+        sta GRP0
+        sta ENAM0
+        sta ENABL
+        sta WSYNC           ; 188
+        ; --- 残り 1 行（合計 192）---
+        sta WSYNC           ; 192
+        lda #0
+        sta PF0
+        sta CTRLPF
+        rts
+
+; --- S3: プレースホルダ（青背景, bank0）---
 SceneBlue:
         lda #$A0
         sta sent0
