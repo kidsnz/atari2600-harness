@@ -35,6 +35,7 @@ type Emu struct {
 
 	vdigest *digest.Video // ゴールデンフレーム回帰用の連鎖ハッシュ（任意・EnableVideoDigest で有効化）
 	adigest *digest.Audio // ゴールデン音声回帰用の連鎖ハッシュ（任意・EnableAudioDigest で有効化）
+	acap    *audioCapture // 生音声サンプル取得（任意・EnableAudioCapture で有効化, V2-15）
 }
 
 // EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。

@@ -236,12 +236,12 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-13 48px sprite litmus.** ✅ DONE (v0.51.0, `litmus_48px`; 48 contiguous px via the score6 SLEEP recipe). Per-copy distinct graphics ✅ DONE too (v0.52.0, `litmus_48px6` — the full 6-store kernel).
 
 ### Tier 3 — capabilities (tools/packages)
-- [ ] **V2-14 Audio: duplicate-AUDC digest-equality scenarios** ({4,5} {6,10} {7,9} {12,13} {0,11} hash-equal)
+- [x] **V2-14 Audio duplicate-AUDC** ✅ DONE (v0.53.0; discovery: {6,10}{7,9} are inverted twins, not sample-exact) ({4,5} {6,10} {7,9} {12,13} {0,11} hash-equal)
   — possible today, zero new code.
-- [ ] **V2-15 Audio sample capture.** Second `AddAudioMixer` hook capturing raw per-channel samples →
+- [x] **V2-15 Audio sample capture.** ✅ DONE (v0.53.0, `EnableAudioCapture` + pitch verification). Second `AddAudioMixer` hook capturing raw per-channel samples →
   zero-crossing/autocorrelation pitch measurement → falsify Slocum note tables in CI (±cents asserts,
   calibrated to the emulator's actual sample rate). Unlocks A-3/pkg/audio with verification.
-- [ ] **V2-16 `pkg/audio`.** AUDC names+duplicate map, `freq(audc,audf,spec)`, Slocum's three tuning setups,
+- [x] **V2-16 `pkg/audio` (core).** ✅ DONE (v0.53.0; names/dups/freq/period/codec). Slocum 3-setup note tables = follow-up when composing. AUDC names+duplicate map, `freq(audc,audf,spec)`, Slocum's three tuning setups,
   note-byte codec (Sequencer Kit/slocum-tracker interop), SFX recipe helpers. (Resumes parked A-3 — the
   authoritative data was in our `reference/` all along.)
 - [ ] **V2-17 F-4 Stella oracle automation v1.** `<rom>.script` (`frame N / tia / riot / dump 80 ff 7 /

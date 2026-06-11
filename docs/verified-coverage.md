@@ -87,6 +87,8 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 |---|---|---|
 | AUDC/AUDF/AUDV read-back (both channels) | `litmus_audio` | exact match to known writes |
 | Audio-chain golden regression (`digest.Audio`) | `litmus_audio` | `checks.golden_audio` deterministic record→match |
+| AUDC duplicates: {0,11}{4,5}{12,13} sample-exact; **{6,10}{7,9} inverted twins** | Go test (hand-built ROMs) | digest equality / exact periodicity + complementary duty |
+| Pitch = base/(AUDF+1)/D verified by raw-sample capture (square 30/62, lead 90, bass 310) | Go test | `EnableAudioCapture` + period measurement |
 
 ## Not yet covered (open)
 Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, paddles (INPT0–3 charge timing),
