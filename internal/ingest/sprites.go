@@ -14,6 +14,7 @@ type Sprite struct {
 	Spacing int    `json:"spacing,omitempty"` // copies>1 のときの clock 間隔（16/32/64）
 	Confidence float64 `json:"confidence"`
 	Shape      int     `json:"shape,omitempty"` // 同形スプライトは同じ id（同定用）
+	Hint       string  `json:"hint,omitempty"`  // static_* の解釈支援（pf_fringe? / parked_object?）
 }
 
 // ExtractSprites は residual マスク（PF/背景以外）から連結成分を拾い分類する。

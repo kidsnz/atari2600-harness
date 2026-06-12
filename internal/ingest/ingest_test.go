@@ -518,8 +518,8 @@ func TestMultiFrameFlicker(t *testing.T) {
 		t.Fatalf("union colors %v, want 4 distinct", colors)
 	}
 	// 静的層は空（PF なし・駐機物なし）、各フレーム fidelity 100%
-	if len(mr.Playfield) != 0 || len(mr.Report.Sprites) != 0 {
-		t.Fatalf("static layer should be empty: pf=%d static=%d", len(mr.Playfield), len(mr.Report.Sprites))
+	if len(mr.Static.Playfield) != 0 || len(mr.Static.Sprites) != 0 {
+		t.Fatalf("static layer should be empty: pf=%d static=%d", len(mr.Static.Playfield), len(mr.Static.Sprites))
 	}
 	for i, fr := range mr.Frames {
 		if fr.Fidelity != 1.0 {
@@ -564,21 +564,21 @@ func TestMultiFrameStaticScene(t *testing.T) {
 		t.Fatal(err)
 	}
 	single := Analyze(frames[0], q)
-	if len(mr.Playfield) != len(single.Playfield) {
-		t.Fatalf("PF bands %d != single-frame %d", len(mr.Playfield), len(single.Playfield))
+	if len(mr.Static.Playfield) != len(single.Playfield) {
+		t.Fatalf("PF bands %d != single-frame %d", len(mr.Static.Playfield), len(single.Playfield))
 	}
 	for i := range single.Playfield {
-		if mr.Playfield[i] != single.Playfield[i] {
-			t.Fatalf("band %d differs: %+v vs %+v", i, mr.Playfield[i], single.Playfield[i])
+		if mr.Static.Playfield[i] != single.Playfield[i] {
+			t.Fatalf("band %d differs: %+v vs %+v", i, mr.Static.Playfield[i], single.Playfield[i])
 		}
 	}
 	// P0 柱（静止物）は static_* 側に出る（動的層には何も出ない）
-	for _, s := range mr.Report.Sprites {
+	for _, s := range mr.Static.Sprites {
 		if len(s.Kind) < 7 || s.Kind[:7] != "static_" {
 			t.Fatalf("static-layer sprite without static_ prefix: %+v", s)
 		}
 	}
-	if len(mr.Report.Sprites) == 0 {
+	if len(mr.Static.Sprites) == 0 {
 		t.Fatalf("static P0 column not found in static layer")
 	}
 	for i, fr := range mr.Frames {

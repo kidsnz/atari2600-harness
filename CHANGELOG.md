@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.17.0] - 2026-06-12
+
+### Added
+- **Image ingestion M9 — multi-frame everywhere.** `cmd/ingest -in a.png,b.png,c.png` and
+  `analyze_image {paths: [...]}` run the M8 separation end-to-end; static objects carry
+  interpretation hints (`pf_fringe?` when the color matches an adjacent PF band,
+  `parked_object?` otherwise); input contract v2 documented (2-3 consecutive F12 shots for
+  scenes with movement; N=3 recommended). MultiReport uses a named `static` field (Go embedded
+  structs and the MCP schema generator don't mix — second schema gotcha after []uint8).
+
 ## [1.16.0] - 2026-06-12
 
 ### Added

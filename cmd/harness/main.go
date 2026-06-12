@@ -667,34 +667,56 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 // --- analyze_image: スクリーンショット → TIA データ（ingest パイプライン） ---
 
 type AnalyzeImageIn struct {
-	Path  string `json:"path"`            // 解析する PNG（A ランク = Stella F12 無加工）
-	Scale int    `json:"scale,omitempty"` // overlay の拡大率（既定 3）
+	Path  string   `json:"path,omitempty"`  // 解析する PNG（A ランク = Stella F12 無加工）
+	Paths []string `json:"paths,omitempty"` // 複数枚（同一シーンの連続 F12）→ マルチフレーム分離
+	Scale int      `json:"scale,omitempty"` // overlay の拡大率（既定 3）
 }
 
 type AnalyzeImageOut struct {
-	Report      *ingest.Report `json:"report"`       // 正規化/色/playfield/sprites の全解析
-	OverlayPath string         `json:"overlay_path"` // グリッド付きオーバーレイの固定パス（毎回上書き）
+	Report      *ingest.Report      `json:"report"`          // 単一フレーム or 静的層の解析
+	Multi       *ingest.MultiReport `json:"multi,omitempty"` // 複数枚のとき: フレーム毎+union+flicker
+	OverlayPath string              `json:"overlay_path"`    // グリッド付きオーバーレイの固定パス（毎回上書き）
 }
 
 func handleAnalyzeImage(ctx context.Context, req *mcp.CallToolRequest, in AnalyzeImageIn) (*mcp.CallToolResult, AnalyzeImageOut, error) {
-	if in.Path == "" {
-		return nil, AnalyzeImageOut{}, fmt.Errorf("path is required")
+	paths := in.Paths
+	if len(paths) == 0 && in.Path != "" {
+		paths = []string{in.Path}
 	}
-	f, err := os.Open(in.Path)
-	if err != nil {
-		return nil, AnalyzeImageOut{}, err
-	}
-	defer f.Close()
-	src, _, err := image.Decode(f)
-	if err != nil {
-		return nil, AnalyzeImageOut{}, fmt.Errorf("decode %s: %w", in.Path, err)
+	if len(paths) == 0 {
+		return nil, AnalyzeImageOut{}, fmt.Errorf("path or paths is required")
 	}
 	q := ingest.NewNTSCQuantizer()
-	n, err := ingest.Normalize(src, q)
-	if err != nil {
-		return nil, AnalyzeImageOut{}, err
+	var frames []*ingest.Normalized
+	for _, pth := range paths {
+		f, err := os.Open(pth)
+		if err != nil {
+			return nil, AnalyzeImageOut{}, err
+		}
+		src, _, err := image.Decode(f)
+		f.Close()
+		if err != nil {
+			return nil, AnalyzeImageOut{}, fmt.Errorf("decode %s: %w", pth, err)
+		}
+		nn, err := ingest.Normalize(src, q)
+		if err != nil {
+			return nil, AnalyzeImageOut{}, err
+		}
+		frames = append(frames, nn)
 	}
-	rep := ingest.Analyze(n, q)
+	n := frames[0]
+	var rep *ingest.Report
+	var multi *ingest.MultiReport
+	if len(frames) > 1 {
+		var err error
+		multi, err = ingest.AnalyzeFrames(frames, q)
+		if err != nil {
+			return nil, AnalyzeImageOut{}, err
+		}
+		rep = multi.Static
+	} else {
+		rep = ingest.Analyze(n, q)
+	}
 
 	scale := in.Scale
 	if scale <= 0 {
@@ -719,7 +741,7 @@ func handleAnalyzeImage(ctx context.Context, req *mcp.CallToolRequest, in Analyz
 			&mcp.ImageContent{Data: buf.Bytes(), MIMEType: "image/png"},
 		},
 	}
-	return result, AnalyzeImageOut{Report: rep, OverlayPath: ovPath}, nil
+	return result, AnalyzeImageOut{Report: rep, Multi: multi, OverlayPath: ovPath}, nil
 }
 
 // --- main ---

@@ -27,8 +27,9 @@ type UnionObject struct {
 }
 
 // MultiReport は静的層レポート＋フレーム毎の動的層＋union。
+// （Report は埋め込みでなく named field: MCP の structured output スキーマ生成と相性が良い）
 type MultiReport struct {
-	*Report                  // 静的層（playfield / 色 / static_object 群）
+	Static          *Report       `json:"static"` // 静的層（playfield / 色 / static_object 群）
 	NumFrames       int           `json:"num_frames"`
 	UnresolvedShare float64       `json:"unresolved_share"` // 多数決が割れた画素率（背景アニメ等のサイン）
 	Frames          []FrameResult `json:"frames"`
@@ -85,10 +86,11 @@ func AnalyzeFrames(frames []*Normalized, q *Quantizer) (*MultiReport, error) {
 	rep := Analyze(static, q)
 	for i := range rep.Sprites {
 		rep.Sprites[i].Kind = "static_" + rep.Sprites[i].Kind // 動くスプライトと区別
+		rep.Sprites[i].Hint = staticHint(rep, rep.Sprites[i])
 	}
 
 	mr := &MultiReport{
-		Report:          rep,
+		Static:          rep,
 		NumFrames:       len(frames),
 		UnresolvedShare: float64(unresolved) / float64(h*tiaWidth),
 	}
@@ -122,6 +124,22 @@ func AnalyzeFrames(frames []*Normalized, q *Quantizer) (*MultiReport, error) {
 	// --- union: 同形・同色を 1 オブジェクトに（出現フレーム付き）---
 	mr.Union = unionObjects(mr.Frames)
 	return mr, nil
+}
+
+// staticHint は静的物の解釈支援: 隣接 PF バンドと同色なら「PF の縁飾り」寄り、
+// そうでなければ「駐機中の ball/missile/player」寄り。最終判断は作者。
+func staticHint(rep *Report, s Sprite) string {
+	for _, b := range rep.Playfield {
+		if b.Top > s.Y+s.H+1 || b.Top+b.Height < s.Y-1 {
+			continue
+		}
+		for _, c := range s.Colors {
+			if uint8(c) == b.ColorLeft || uint8(c) == b.ColorRight {
+				return "pf_fringe?"
+			}
+		}
+	}
+	return "parked_object?"
 }
 
 func trimStatic(k string) string {

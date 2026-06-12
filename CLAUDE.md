@@ -94,7 +94,7 @@ change rendering with a `sta` in the ROM/kernel.
 
 **Image input contract (user → Claude)** — for pixel-exact extraction ask for **Stella F12 snapshots
 (PNG, unmodified, TV effects off)** = guaranteed integer scale, Retina-proof. OS screenshots are
-conversation-grade only (non-integer scale → warnings). Hand-off point = umbrella `inbox/` (belongs to no repo). Size = any integer multiple of 160 (auto-detected). Details: `docs/ingest.md`.
+conversation-grade only (non-integer scale → warnings). Hand-off point = umbrella `inbox/` (belongs to no repo). Size = any integer multiple of 160 (auto-detected). **Scenes with movement: ask for 2-3 consecutive F12 shots** → multi-frame separation (static/dynamic layers + flicker union). Details: `docs/ingest.md`.
 
 **Annotated screenshot (`get_screen_annotated`)** — not a Claude-only aid but **the primary user↔Claude comms
 channel** = a first-class citizen. The user looks at the image and gives data visually ("move P0 to clock

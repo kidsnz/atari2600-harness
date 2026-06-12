@@ -55,6 +55,26 @@ Checklist for grade A:
   re-extracted, compared against the source constants (litmus_pf exact bytes; pf_modes score +
   wall; Exerciser mountains vs live RAM; ball/walker GRP bit-for-bit; NUSIZ 3-copy fold).
 
+## Multi-frame separation (M8/M9 — the general solution)
+
+Single screenshots have a principled limit: where a sprite overlaps playfield, pixel ownership
+is locally undecidable, and 30 Hz flicker objects are half-missing. **Feed 2–3 screenshots of
+the same scene instead** (`analyze_image {paths: [...]}` / `cmd/ingest -in a.png,b.png,c.png`):
+
+- per-pixel voting builds the **static layer** — playfield, backgrounds, parked objects
+  (ladders, pit holes, leaf fringes) come out as `static_*` with a hint (`pf_fringe?` /
+  `parked_object?`), never confused with moving sprites;
+- per-frame diffs give the **dynamic layer** — true sprites, per frame, plus a **union** with
+  `seen_frames` and **flicker detection** (multiplexed objects read completely);
+- no repeating-structure assumption (this is what the reference-based repair of M7 could not
+  promise); `unresolved_share` reports pixels that never settled (background animation).
+
+**Contract v2:** for scenes with movement, press F12 two-three times in a row (don't resize the
+window between shots) and drop the sequence into `inbox/`. N=3 resolves ties that N=2 cannot.
+Known limits: a sprite that never moves melts into the static layer (space the shots out);
+*animated playfield* (e.g. scrolling starfields) lands in the dynamic layer as objects — true
+to the pixels, noisy in semantics.
+
 ## Accuracy machinery (M5/M6)
 
 - **Reconstruction fidelity**: every report carries `fidelity` — the report rendered back to a
