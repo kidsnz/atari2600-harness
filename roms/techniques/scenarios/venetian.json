@@ -1,0 +1,13 @@
+{
+  "rom": "roms/techniques/venetian.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 9, "field": "ram.0x9e", "op": "==", "value": 247 },
+    { "at_frame": 9, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 80 },
+    { "at_frame": 9, "field": "tiareg.player0.color", "op": "==", "value": 66 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

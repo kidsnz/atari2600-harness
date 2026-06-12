@@ -12,6 +12,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.8.0] - 2026-06-12
+
+### Added
+- **Technique #12 — Venetian Blinds** (`docs/techniques/venetian-blinds.md`, demo
+  `roms/techniques/venetian.asm`, CI-locked; suite now 44). Intra-frame line interleaving: a white
+  diamond and a red frame coexist in one 64-line zone through P0 alone — even lines draw A, odd
+  lines B, shape *and* color swapped per line before the display window. Zero flicker (60 Hz
+  stable), striped look — the Video Chess (Whitehead, 1979) technique. Adjacent rows pixel-verified
+  (`[83+2 white]` ↔ `[80+8 red]`).
+
+### Milestone
+- **Techniques roadmap complete: 12 of 12 verified.** #1 zones, #2 animation, #3 vertical
+  positioning, #4 2-line kernel, #5 48px+score, #6 sound driver, #7 LFSR, #8 PF modes,
+  #9 ball+missiles, #10 flicker multiplexing, #11 F8 bank switching, #12 Venetian Blinds —
+  each with a CI-locked demo or verified inside the Exerciser. Documented refinements (VDEL
+  odd/even, dynamic Y-sort allocation, DCP skipDraw, F6+) remain on call for real games.
+
 ## [1.7.0] - 2026-06-12
 
 ### Added
