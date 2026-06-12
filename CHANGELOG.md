@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.32.0] - 2026-06-12
+
+### Added
+- **MCP `trace_clocks`** — sub-instruction beam anatomy: each of the next N instructions with
+  PC, opcode, CPU cycles, and start/end (scanline, color clock). The practical recovery of the
+  parked step_clock (observation without suspension). **First catch:** the mid-line HMOVE
+  table's strobe clocks were hand-estimates (≈1/73/130); trace_clocks measured 13/85/142 —
+  fundamentals-audit corrected. Rule 2 extended to clocks.
+
 ## [1.31.0] - 2026-06-12
 
 ### Added

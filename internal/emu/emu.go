@@ -659,3 +659,40 @@ func (e *Emu) WatchRAM(addr uint16, maxFrames int) (changed bool, oldVal, newVal
 	}
 	return false, oldVal, oldVal, 0, nil
 }
+
+// InstrTrace は 1 命令ぶんのビーム解剖（trace_clocks ツールの単位）。
+type InstrTrace struct {
+	PC         string `json:"pc"`
+	Opcode     uint8  `json:"opcode"`
+	Cycles     int    `json:"cycles"`      // CPU サイクル（WSYNC stall 含むときは大きくなる）
+	StartLine  int    `json:"start_line"`  // 開始 scanline
+	StartClock int    `json:"start_clock"` // 開始 color clock（-68..159）
+	EndLine    int    `json:"end_line"`
+	EndClock   int    `json:"end_clock"`
+}
+
+// TraceClocks は次の maxInstr 命令を実行しながら、各命令のビーム上の開始/終了位置を返す。
+// Gopher2600 は命令途中で停止できない（colorClockCallback は観測専用）ため、これは
+// 「サブ命令粒度の観測」を提供する step_clock の実用回収版（docs/mcp-tools.md 参照）。
+func (e *Emu) TraceClocks(maxInstr int) ([]InstrTrace, error) {
+	var out []InstrTrace
+	for i := 0; i < maxInstr; i++ {
+		c0 := e.Coords()
+		pc := e.VCS.CPU.PC.Address()
+		op, _ := e.VCS.Mem.Read(pc)
+		if err := e.StepInstruction(); err != nil {
+			return out, err
+		}
+		c1 := e.Coords()
+		out = append(out, InstrTrace{
+			PC:         fmt.Sprintf("$%04X", pc),
+			Opcode:     op,
+			Cycles:     e.LastCycles(),
+			StartLine:  c0.Scanline,
+			StartClock: c0.Clock,
+			EndLine:    c1.Scanline,
+			EndClock:   c1.Clock,
+		})
+	}
+	return out, nil
+}

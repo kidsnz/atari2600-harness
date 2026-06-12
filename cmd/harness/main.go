@@ -871,6 +871,39 @@ func handleWatchRAM(ctx context.Context, req *mcp.CallToolRequest, in WatchRAMIn
 	return nil, out, nil
 }
 
+
+// --- trace_clocks: 命令毎のビーム解剖（step_clock の観測版） ---
+
+type TraceClocksIn struct {
+	MaxInstructions int `json:"max_instructions,omitempty"` // 既定 16
+}
+
+type TraceClocksOut struct {
+	Trace  []emu.InstrTrace `json:"trace"`
+	Coords Coords           `json:"coords"`
+}
+
+func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceClocksIn) (*mcp.CallToolResult, TraceClocksOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	e, err := get()
+	if err != nil {
+		return nil, TraceClocksOut{}, err
+	}
+	n := in.MaxInstructions
+	if n <= 0 {
+		n = 16
+	}
+	if n > 200 {
+		n = 200
+	}
+	tr, err := e.TraceClocks(n)
+	if err != nil {
+		return nil, TraceClocksOut{}, err
+	}
+	return nil, TraceClocksOut{Trace: tr, Coords: coordsOf(e)}, nil
+}
+
 // --- main ---
 
 func main() {
@@ -898,6 +931,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed)."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "trace_clocks", Description: "Execute the next N instructions and return each one's beam anatomy: PC, opcode, CPU cycles (WSYNC stalls visible as large counts), and start/end (scanline, color clock). Sub-instruction OBSERVATION granularity — the practical recovery of step_clock (Gopher2600 cannot suspend mid-instruction; see docs/mcp-tools.md)."}, handleTraceClocks)
 	mcp.AddTool(server, &mcp.Tool{Name: "watch_ram", Description: "Run instruction-by-instruction until RAM[addr] CHANGES (returns old/new value and the PC of the writing instruction), bounded by max_frames. Granularity is per-instruction (Gopher2600 cannot suspend mid-instruction); same-value stores are invisible to change detection."}, handleWatchRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "run_scenario", Description: "Run regression scenario JSON files (input timeline + numeric assertions) in-process and return pass/fail with failing assertion details — the cmd/scenario verdict from the live loop."}, handleRunScenario)
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_screen", Description: "Run the ingest analyzer on the CURRENT emulator frame (no file needed): playfield bands as PF bytes, sprite candidates with GRP bytes + per-row colors, groups, fidelity, plus the TIA-grid overlay. The reverse-direction read of whatever is on screen right now."}, handleAnalyzeScreen)

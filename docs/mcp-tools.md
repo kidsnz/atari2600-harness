@@ -205,7 +205,14 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
 For a manual check, pipe the `initialize`/`tools/call` JSON into harness over stdin, or call it via an MCP
 client (registered in Claude Code's `.mcp.json`).
 
-## step_clock — parked (investigated 2026-06-12, overnight run)
+## step_clock → recovered as `trace_clocks` (v1.32.0)
+
+`trace_clocks {max_instructions}` executes N instructions and returns each one's beam anatomy
+(PC, opcode, cycles, start/end scanline+clock) — sub-instruction *observation* without the
+impossible mid-instruction suspension. First catch on day one: the mid-line HMOVE table's
+hand-estimated strobe clocks (≈1/73/130) were actually 13/85/142.
+
+## step_clock — original investigation (2026-06-12, overnight run)
 
 `VCS.Step(colorClockCallback)` fires the callback at every color clock (`isCycle` marks CPU-cycle
 boundaries) but **cannot suspend execution mid-instruction** — Step always completes one CPU

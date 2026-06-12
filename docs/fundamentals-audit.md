@@ -181,10 +181,14 @@ measured on Gopher2600 with pixel-level confirmation (bar edge above/below the s
 
 | strobe completion (visible clock) | shift |
 |---|---|
-| ≈ 1   | 0 px |
-| ≈ 73  | 0 px |
-| ≈ 130 | **−5 px (left)** |
+| 13  | 0 px |
+| 85  | 0 px |
+| 142 | **−5 px (left)** |
 | (control: no strobe) | 0 px |
+
+*(Clocks corrected in v1.32.0: the original ≈1/73/130 were hand-counted estimates; `trace_clocks`
+measured the actual strobe completions — rule 2, "get cycles from the simulator", applies to
+clocks too.)*
 
 The folk rule "objects move right ~1px/4CLK" did **not** reproduce at these sample points — the
 shift is a non-monotonic function of strobe time (consistent with Towers' per-cycle tables being
