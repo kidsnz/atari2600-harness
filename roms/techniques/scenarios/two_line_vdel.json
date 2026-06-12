@@ -1,0 +1,40 @@
+{
+  "rom": "roms/techniques/two_line_vdel.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 9,
+      "field": "ram.0x9e",
+      "op": "==",
+      "value": 197
+    },
+    {
+      "at_frame": 9,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 21
+    },
+    {
+      "at_frame": 9,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 60
+    },
+    {
+      "at_frame": 10,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 22
+    },
+    {
+      "at_frame": 196,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 132
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

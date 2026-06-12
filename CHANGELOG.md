@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.24.0] - 2026-06-12
+
+### Added
+- **VDEL odd/even verified** — `two_line_vdel.asm`: in a 2-line kernel (GRP0 on line A, GRP1 on
+  line B), setting `VDELP0 = y&1` parks the GRP0 write in the shadow register until the GRP1
+  write — the sprite starts on odd scanlines with the kernel unmodified. CI pixel proof: top
+  edge moves exactly +1 scanline per frame (TestVDELOddEven). Suite now 49.
+
 ## [1.23.0] - 2026-06-12
 
 ### Added

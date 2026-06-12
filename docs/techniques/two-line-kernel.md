@@ -27,10 +27,12 @@ final WSYNC — it applies every loaded HMxx register simultaneously.
 re-applies the earlier sprite's HMxx a second time (the registers keep their values until HMCLR
 or rewrite). One strobe, after everything is staged.
 
-### Known refinements (documented)
-- **VDEL odd/even trick:** writing GRPx through the vertical-delay shadow register lets a sprite
-  start on an odd scanline inside a 2-line kernel = 1-px vertical granularity back. We have VDEL
-  hardware-verified (litmus_vdel, Exerciser 48px) but haven't built the odd/even form yet.
+### VDEL odd/even — **verified** (v1.24.0, `two_line_vdel.asm`)
+The 2LK writes GRP0 on line A and GRP1 on line B — exactly the structure VDEL wants: with
+**VDELP0=1, the GRP0 write parks in the shadow register and becomes visible at the GRP1 write**
+(one line later). So `VDELP0 = y & 1` gives back 1-px vertical granularity with the kernel
+unmodified. CI proof: P0's top edge moves **exactly +1 scanline per frame** through even and odd
+positions (`TestVDELOddEven`, pixel-row measurement).
 - Carry hygiene in shared lines: an `adc` after the sprite compare inherits its carry/`lsr`
   residue — our gradient flickered at stripe edges until the add became an `ora` (valid since
   the operands can't overlap). Constant-input ops beat flag-dependent ones inside kernels.
