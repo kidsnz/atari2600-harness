@@ -76,7 +76,7 @@ func runInbox(dir string, warmup, shots, gap int) error {
 		}
 		fmt.Printf("== %s ==\n", base)
 		if err := run(dst, warmup, shots, gap, sub, "", true); err != nil {
-			fmt.Printf("  解析失敗: %v（ROM は %s/ に整理済み）\n", err, sub)
+			fmt.Printf("  analysis failed: %v (ROM organized into %s/)\n", err, sub)
 		}
 		n++
 	}

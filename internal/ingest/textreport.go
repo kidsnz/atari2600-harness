@@ -58,7 +58,7 @@ func spriteArt(s Sprite, indent string) string {
 func spriteHeader(idx int, s Sprite) string {
 	h := fmt.Sprintf("--- %d: %s x=%d y=%d %dx%d", idx, s.Kind, s.X, s.Y, s.W, s.H)
 	if s.Copies > 1 {
-		h += fmt.Sprintf(" copies=%d 間隔%d", s.Copies, s.Spacing)
+		h += fmt.Sprintf(" copies=%d spacing=%d", s.Copies, s.Spacing)
 	}
 	if s.Shape > 0 {
 		h += fmt.Sprintf(" shape=%d", s.Shape)
@@ -92,7 +92,7 @@ func TextReport(rep *Report, title string) string {
 	for _, w := range rep.Warnings {
 		fmt.Fprintf(&b, "WARN: %s\n", w)
 	}
-	fmt.Fprintf(&b, "\n=== sprites（%d 体）===\n", len(rep.Sprites))
+	fmt.Fprintf(&b, "\n=== sprites (%d) ===\n", len(rep.Sprites))
 	for i, s := range rep.Sprites {
 		fmt.Fprintln(&b, spriteHeader(i, s))
 		b.WriteString(spriteArt(s, "  "))
@@ -103,7 +103,7 @@ func TextReport(rep *Report, title string) string {
 			fmt.Fprintf(&b, "  %s: members=%v at (%d,%d) %dx%d\n", g.Label, g.Members, g.X, g.Y, g.W, g.H)
 		}
 	}
-	fmt.Fprintf(&b, "\n=== playfield（バンド毎 40列）===\n")
+	fmt.Fprintf(&b, "\n=== playfield (40 columns per band) ===\n")
 	for _, band := range rep.Playfield {
 		mode := band.Mode
 		if len(mode) > 4 {
@@ -123,19 +123,19 @@ func TextReport(rep *Report, title string) string {
 			fmt.Fprintf(&b, "        ; COLUPF timed write: clock %d -> $%02X\n", w.Clock, uint8(w.Color))
 		}
 	}
-	fmt.Fprintf(&b, "\n=== DASM 片 ===\n%s\n%s", rep.PlayfieldASM, rep.SpritesASM)
+	fmt.Fprintf(&b, "\n=== DASM fragments ===\n%s\n%s", rep.PlayfieldASM, rep.SpritesASM)
 	return b.String()
 }
 
 // TextReportMulti はマルチフレームの人間向けレポート（静的層＋フレーム毎動的層＋union）。
 func TextReportMulti(mr *MultiReport, title string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s — マルチフレーム %d 枚 (unresolved %.2f%%)\n%s\n",
+	fmt.Fprintf(&b, "%s — multi-frame x%d (unresolved %.2f%%)\n%s\n",
 		title, mr.NumFrames, mr.UnresolvedShare*100, strings.Repeat("=", 60))
 	for i, fr := range mr.Frames {
-		fmt.Fprintf(&b, "frame %d: 動的スプライト %d 体, fidelity %.2f%%\n", i, len(fr.Sprites), fr.Fidelity*100)
+		fmt.Fprintf(&b, "frame %d: %d dynamic sprites, fidelity %.2f%%\n", i, len(fr.Sprites), fr.Fidelity*100)
 	}
-	fmt.Fprintf(&b, "\n############ 動的層（フレーム毎・動くもの＝本物のスプライト）############\n")
+	fmt.Fprintf(&b, "\n############ dynamic layer (per frame; what moves = the real sprites) ############\n")
 	for i, fr := range mr.Frames {
 		if len(fr.Sprites) == 0 {
 			continue
@@ -147,16 +147,16 @@ func TextReportMulti(mr *MultiReport, title string) string {
 		}
 	}
 	if len(mr.Union) > 0 {
-		fmt.Fprintf(&b, "\n=== union（全フレーム通しのオブジェクト）===\n")
+		fmt.Fprintf(&b, "\n=== union (objects across all frames) ===\n")
 		for i, u := range mr.Union {
 			fl := ""
 			if u.Flicker {
-				fl = " ※一部フレームのみ（flicker かアニメ姿勢差）"
+				fl = " (some frames only: flicker or animation poses)"
 			}
 			fmt.Fprintf(&b, "  %d: %s %dx%d seen=%v%s\n", i, u.Kind, u.W, u.H, u.SeenFrames, fl)
 		}
 	}
-	fmt.Fprintf(&b, "\n############ 静的層（動かないもの＝PF/背景/駐機物）############\n\n")
+	fmt.Fprintf(&b, "\n############ static layer (what does not move = PF / background / parked objects) ############\n\n")
 	b.WriteString(TextReport(mr.Static, "static layer"))
 	return b.String()
 }

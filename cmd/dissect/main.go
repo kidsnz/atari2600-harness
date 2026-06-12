@@ -189,31 +189,31 @@ func run(rom string, warmup, frames int, out, distella string) error {
 		return err
 	}
 	var rep strings.Builder
-	fmt.Fprintf(&rep, "dissect %s — 実行トレース×ROM照合（%dフレーム, store %d 件, stream %d 本）\n",
+	fmt.Fprintf(&rep, "dissect %s — runtime trace × ROM matching (%d frames, %d stores, %d streams)\n",
 		filepath.Base(rom), frames, len(stores), len(streams))
 	fmt.Fprintf(&rep, "%s\n", strings.Repeat("=", 70))
 	romOrg := 0x10000 - len(romBytes) // 末尾が $FFFF に当たる素朴な ORG（4K=$F000）
 	annots := map[int]string{}        // ROM offset → 注釈
 	for _, st := range streams {
-		fmt.Fprintf(&rep, "\n%s frame%d 行%d-%d（%d値）: ", st.reg, st.frame, st.fromL, st.toL, len(st.vals))
+		fmt.Fprintf(&rep, "\n%s frame%d rows %d-%d (%d values): ", st.reg, st.frame, st.fromL, st.toL, len(st.vals))
 		if c := dedup(trim(st.vals)); len(c) <= 1 { // 全行同値＝テーブルではなく即値（ROM 検索すると偽陽性になる）
 			v := uint8(0)
 			if len(c) == 1 {
 				v = c[0]
 			}
-			fmt.Fprintf(&rep, "定数 $%02X（テーブルではなく即値/単色）\n", v)
+			fmt.Fprintf(&rep, "constant $%02X (an immediate / solid color, not a table)\n", v)
 			continue
 		}
 		seqs := [][]uint8{st.vals}
 		tags := []string{""}
 		if t := trim(st.vals); len(t) >= 4 && len(t) != len(st.vals) {
-			seqs, tags = append(seqs, t), append(tags, "（消灯行を除いた本体で一致）")
+			seqs, tags = append(seqs, t), append(tags, "(matched after trimming blank rows)")
 			if d := dedup(t); len(d) >= 4 && len(d) != len(t) {
-				seqs, tags = append(seqs, d), append(tags, "（消灯行除去＋行倍化を畳んで一致）")
+				seqs, tags = append(seqs, d), append(tags, "(matched after trimming blanks + collapsing doubled rows)")
 			}
 		}
 		if d := dedup(st.vals); len(d) >= 4 && len(d) != len(st.vals) {
-			seqs, tags = append(seqs, d), append(tags, "（行倍化を畳んで一致）")
+			seqs, tags = append(seqs, d), append(tags, "(matched after collapsing doubled rows)")
 		}
 		found := false
 		for si, seq := range seqs {
@@ -221,7 +221,7 @@ func run(rom string, warmup, frames int, out, distella string) error {
 				addr := romOrg + off
 				tag := tags[si]
 				if rev {
-					tag += "（逆順格納）"
+					tag += "(stored reversed)"
 				}
 				fmt.Fprintf(&rep, "ROM $%04X-$%04X %s\n", addr, addr+len(seq)-1, tag)
 				if st.reg == "GRP0" || st.reg == "GRP1" {
@@ -242,7 +242,7 @@ func run(rom string, warmup, frames int, out, distella string) error {
 			if len(show) > 32 {
 				show = show[:32]
 			}
-			fmt.Fprintf(&rep, "ROM 内に直接一致なし（計算生成 or 加工されたデータ）\n  値（先頭32まで・前後0除去後）: %v\n", show)
+			fmt.Fprintf(&rep, "no direct ROM match (computed or transformed data)\n  values (first 32, blanks trimmed): %v\n", show)
 		}
 	}
 
@@ -281,7 +281,7 @@ func run(rom string, warmup, frames int, out, distella string) error {
 					d := addr - lbls[best].addr
 					tag := ""
 					if d > 0 {
-						tag = fmt.Sprintf("（ラベル+%d＝$%04X から）", d, addr)
+						tag = fmt.Sprintf("(label+%d = from $%04X)", d, addr)
 					}
 					ins[lbls[best].line] = append(ins[lbls[best].line],
 						fmt.Sprintf("; ★dissect: %s %s", note, tag))
@@ -296,9 +296,9 @@ func run(rom string, warmup, frames int, out, distella string) error {
 				sb.WriteString(ln + "\n")
 			}
 			os.WriteFile(filepath.Join(out, "disassembly.asm"), []byte(strings.TrimRight(sb.String(), "\n")+"\n"), 0o644)
-			fmt.Fprintf(&rep, "\n（distella 逆アセンブル: disassembly.asm — %d 箇所に dissect 注釈）\n", hits)
+			fmt.Fprintf(&rep, "\n(distella disassembly: disassembly.asm — %d dissect annotations)\n", hits)
 		} else {
-			fmt.Fprintf(&rep, "\n（distella 実行失敗: %v — トレース照合のみ）\n", err)
+			fmt.Fprintf(&rep, "\n(distella failed: %v — trace matching only)\n", err)
 		}
 	}
 	os.WriteFile(filepath.Join(out, "dissect.txt"), []byte(rep.String()), 0o644)

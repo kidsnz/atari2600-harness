@@ -92,9 +92,9 @@ func run(romPath string, frames int, timeout time.Duration) error {
 		cmd.Process.Kill()
 		cmd.Wait()
 	}()
-	fmt.Println("Stella を起動しました。")
-	fmt.Println("★ Stella のウィンドウで【 ` （バッククォート）キー】を1回押してデバッガに入ってください。")
-	fmt.Println("  （autoexec が reset → frame", frames, "→ dump を自動実行します）")
+	fmt.Println("Stella launched.")
+	fmt.Println("★ In the Stella window, press the ` (backquote) key once to enter the debugger.")
+	fmt.Println("  (autoexec runs reset -> frame", frames, "-> dump automatically)")
 
 	// 4) dump 出現を待つ
 	var dumpFile string
@@ -113,10 +113,10 @@ func run(romPath string, frames int, timeout time.Duration) error {
 		}
 	}
 	if dumpFile == "" {
-		return fmt.Errorf("dump ファイルが %v 以内に出現しませんでした（キーは押しましたか?）", timeout)
+		return fmt.Errorf("dump file did not appear within %v (did you press the key?)", timeout)
 	}
 	time.Sleep(300 * time.Millisecond) // 書き込み完了待ち
-	fmt.Println("dump 取得:", dumpFile)
+	fmt.Println("dump captured:", dumpFile)
 	return compare(romPath, frames, dumpFile)
 }
 
@@ -152,9 +152,9 @@ func compare(romPath string, frames int, dumpFile string) error {
 		}
 	}
 	if diffs > 0 {
-		return fmt.Errorf("RAM 不一致 %d バイト（frame %d）", diffs, frames)
+		return fmt.Errorf("RAM mismatch in %d byte(s) (frame %d)", diffs, frames)
 	}
-	fmt.Printf("PASS: RAM $80-$FF 全128バイトが一致（電源投入から %d フレーム, Gopher2600 vs Stella）\n", frames)
+	fmt.Printf("PASS: RAM $80-$FF all 128 bytes match (%d frames from power-on, Gopher2600 vs Stella)\n", frames)
 	return nil
 }
 
@@ -187,7 +187,7 @@ func parseDump(path string) ([128]uint8, error) {
 		seen++
 	}
 	if seen != 8 {
-		return ram, fmt.Errorf("RAM 行が %d 行しか見つかりません（期待 8）", seen)
+		return ram, fmt.Errorf("found only %d RAM rows (expected 8)", seen)
 	}
 	return ram, nil
 }

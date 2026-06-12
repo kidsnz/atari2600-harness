@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.40.0] - 2026-06-12
+
+### Changed
+- **All generated output is now English**: ingest text reports (`internal/ingest/textreport.go`),
+  fieldtest/dissect/stellacheck CLI messages, and jingle-generated ASM comments. Go source comments
+  stay as-is (repo convention); only user-visible output strings changed. Existing inbox artifacts
+  were regenerated/rewritten in English (reports, summaries, READMEs).
+
 ## [1.39.0] - 2026-06-12
 
 ### Added
