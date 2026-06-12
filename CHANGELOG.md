@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.50.0] - 2026-06-12
+
+### Added
+- **Technique: bank-switched game structure** (`roms/techniques/banked_game.asm` +
+  `docs/techniques/bankswitching.md`): the F8 template — per-bank reset stubs/vectors, a
+  reusable `jsr $FF80` cross-bank trampoline, and the data-bank pattern (bank-1 loader copies
+  level tables into zero page; bank-0 kernel renders from RAM). CI: `scenarios/banked_game.json`
+  (load contents byte-exact, level switch, bank.number==0 at frame boundaries, golden).
+  Recorded trap: **instruction fetch on $FFF8/$FFF9 switches banks** — placing the trampoline's
+  `rts` on a hotspot caused a reboot loop (350-line frames); diagnosed via `watch_ram` writer PCs.
+
 ## [1.49.0] - 2026-06-12
 
 ### Added

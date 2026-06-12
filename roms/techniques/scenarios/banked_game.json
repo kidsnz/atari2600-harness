@@ -1,0 +1,58 @@
+{
+  "rom": "roms/techniques/banked_game.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 10,
+      "field": "bank.number",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 10,
+      "field": "ram.0x90",
+      "op": "==",
+      "value": 129
+    },
+    {
+      "at_frame": 10,
+      "field": "ram.0x93",
+      "op": "==",
+      "value": 24
+    },
+    {
+      "at_frame": 10,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 130,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 130,
+      "field": "ram.0x90",
+      "op": "==",
+      "value": 255
+    },
+    {
+      "at_frame": 130,
+      "field": "ram.0x97",
+      "op": "==",
+      "value": 255
+    },
+    {
+      "at_frame": 130,
+      "field": "bank.number",
+      "op": "==",
+      "value": 0
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
