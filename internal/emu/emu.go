@@ -691,6 +691,7 @@ type InstrTrace struct {
 	StartClock int    `json:"start_clock"` // 開始 color clock（-68..159）
 	EndLine    int    `json:"end_line"`
 	EndClock   int    `json:"end_clock"`
+	At         string `json:"at,omitempty"` // ソース位置（cmd/harness が srcmap で充填・emu は触らない）
 }
 
 // TraceClocks は次の maxInstr 命令を実行しながら、各命令のビーム上の開始/終了位置を返す。

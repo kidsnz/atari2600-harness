@@ -19,11 +19,18 @@ import (
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/srcmap"
 	"github.com/kidsnz/atari2600-harness/internal/ingest"
 	"github.com/kidsnz/atari2600-harness/internal/scenario"
 )
 
 // --- グローバル状態（stdio は逐次だが念のため mutex 保護）---
+
+// curMap は assemble_and_load 経由ロード時の PC→ソース行対応（load_rom ではクリア）。
+var curMap *srcmap.Map
+
+// locate は PC をソース位置文字列へ（対応なしは空文字）。
+func locate(pc uint16) string { return curMap.Locate(pc) }
 
 var (
 	mu      sync.Mutex
@@ -78,6 +85,7 @@ func handleLoadROM(ctx context.Context, req *mcp.CallToolRequest, in LoadROMIn) 
 		return nil, LoadROMOut{}, fmt.Errorf("load rom: %w", err)
 	}
 	current = e
+	curMap = nil // .bin 直ロードはソース対応なし
 	return nil, LoadROMOut{
 		Coords:  coordsOf(e),
 		Message: fmt.Sprintf("loaded %s (%s)", in.Path, spec),
@@ -111,12 +119,13 @@ func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in Ass
 		bin = build.BinPathFor(in.AsmPath)
 	}
 
-	// dasm -f3。失敗行を含む診断をそのまま返す。
-	out, err := build.Assemble(in.AsmPath, bin)
+	// dasm -f3（-l/-s 付き）。失敗行を含む診断をそのまま返す。
+	out, lst, sym, err := build.AssembleWithListing(in.AsmPath, bin)
 	if err != nil {
 		// アセンブル失敗は MCP エラーにせず Ok=false＋dasm 出力で構造化返却（Claude が失敗行を見て直す）。
 		return nil, AssembleOut{Ok: false, BinPath: bin, DasmOutput: out}, nil
 	}
+	curMap = srcmap.Parse(lst, sym, in.AsmPath) // U-M9: 以後のツール出力に at を併記
 
 	spec := in.TVSpec
 	if spec == "" {
@@ -234,6 +243,7 @@ func handleReadBank(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (
 
 type ReadCPUOut struct {
 	PC     uint16   `json:"pc"`
+	At     string   `json:"at,omitempty"` // ソース位置（assemble_and_load 経由時のみ）
 	A      uint8    `json:"a"`
 	X      uint8    `json:"x"`
 	Y      uint8    `json:"y"`
@@ -255,6 +265,7 @@ func handleReadCPU(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*
 	sr := cpu.Status
 	return nil, ReadCPUOut{
 		PC:     cpu.PC.Value(),
+		At:     locate(cpu.PC.Value()),
 		A:      cpu.A.Value(),
 		X:      cpu.X.Value(),
 		Y:      cpu.Y.Value(),
@@ -568,6 +579,7 @@ type BudgetIn struct {
 }
 type BudgetOut struct {
 	Over       bool   `json:"over"`        // true=ある論理ラインが予算超過（ロール要因）で停止
+	At         string `json:"at,omitempty"` // 停止時 PC のソース位置（assemble_and_load 経由時のみ）
 	AtScanline int    `json:"at_scanline"` // 超過した論理ラインの開始 scanline（over=true 時）
 	LineCycles int    `json:"line_cycles"` // そのラインが消費した概算 machine cycle（消費ライン数×76）
 	Coords     Coords `json:"coords"`
@@ -589,7 +601,11 @@ func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetI
 	if err != nil {
 		return nil, BudgetOut{}, fmt.Errorf("run until budget: %w", err)
 	}
-	return nil, BudgetOut{Over: over, AtScanline: atScanline, LineCycles: lineCycles, Coords: coordsOf(e)}, nil
+	out := BudgetOut{Over: over, AtScanline: atScanline, LineCycles: lineCycles, Coords: coordsOf(e)}
+	if over {
+		out.At = locate(e.PC())
+	}
+	return nil, out, nil
 }
 
 // --- get_screen_annotated（ユーザー↔Claude 通信回線）---
@@ -846,6 +862,7 @@ type WatchRAMOut struct {
 	Old     int    `json:"old"`
 	New     int    `json:"new"`
 	PC      string `json:"pc,omitempty"` // 変化を起こした命令のアドレス
+	At      string `json:"at,omitempty"` // 同・ソース位置（assemble_and_load 経由時のみ）
 	Coords  Coords `json:"coords"`
 }
 
@@ -867,6 +884,7 @@ func handleWatchRAM(ctx context.Context, req *mcp.CallToolRequest, in WatchRAMIn
 	out := WatchRAMOut{Changed: changed, Old: int(oldV), New: int(newV), Coords: coordsOf(e)}
 	if changed {
 		out.PC = fmt.Sprintf("$%04X", pc)
+		out.At = locate(pc)
 	}
 	return nil, out, nil
 }
@@ -898,6 +916,11 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 		n = 200
 	}
 	tr, err := e.TraceClocks(n)
+	for i := range tr {
+		var pc uint16
+		fmt.Sscanf(tr[i].PC, "$%04X", &pc)
+		tr[i].At = locate(pc)
+	}
 	if err != nil {
 		return nil, TraceClocksOut{}, err
 	}
@@ -909,7 +932,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.50.0",
+		Version: "1.51.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)

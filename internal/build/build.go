@@ -3,6 +3,7 @@
 package build
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -18,4 +19,20 @@ func BinPathFor(asmPath string) string {
 func Assemble(asmPath, binPath string) (output string, err error) {
 	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+binPath).CombinedOutput()
 	return string(out), err
+}
+
+// AssembleWithListing は -l/-s 付きでアセンブルし、リスティングとシンボル表の中身も返す
+// （U-M9 ソース行デバッグ用。失敗時は output に診断、lst/sym は空）。
+func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err error) {
+	lstPath := strings.TrimSuffix(binPath, ".bin") + ".lst"
+	symPath := strings.TrimSuffix(binPath, ".bin") + ".sym"
+	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+binPath, "-l"+lstPath, "-s"+symPath).CombinedOutput()
+	if err != nil {
+		return string(out), "", "", err
+	}
+	lb, _ := os.ReadFile(lstPath)
+	sb, _ := os.ReadFile(symPath)
+	os.Remove(lstPath)
+	os.Remove(symPath)
+	return string(out), string(lb), string(sb), nil
 }

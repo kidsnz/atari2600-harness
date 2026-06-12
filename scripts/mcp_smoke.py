@@ -27,5 +27,13 @@ r=call(6,"trace_clocks",{"max_instructions":4})
 assert not r["result"].get("isError"), r
 r=call(7,"run_scenario",{"paths":["roms/litmus/scenarios/hmove_mid.json"]})
 assert r["result"]["structuredContent"]["all_pass"], r
-print("smoke OK (load/step/analyze_screen/watch_ram/trace_clocks/run_scenario)")
+# U-M9: srcmap — assemble_and_load 経由なら予算超過の at にソース位置が載る
+r=call(8,"assemble_and_load",{"asm_path":"roms/litmus/litmus_overrun.asm","bin_path":"/tmp/smoke_overrun.bin"})
+assert r["result"]["structuredContent"]["ok"], r
+r=call(9,"assert_line_budget",{"budget":76,"max_frames":2})
+sc=r["result"]["structuredContent"]
+assert sc["over"] and "litmus_overrun.asm:" in sc.get("at",""), sc
+r=call(10,"trace_clocks",{"max_instructions":3})
+assert "at" in r["result"]["structuredContent"]["trace"][0], r
+print("smoke OK (load/step/analyze_screen/watch_ram/trace_clocks/run_scenario/srcmap)")
 p.terminate()

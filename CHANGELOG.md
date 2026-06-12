@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.51.0] - 2026-06-12
+
+### Added
+- **Source-line debugging** (`internal/srcmap`, U-M9): `assemble_and_load` now assembles with
+  DASM `-l`/`-s` and builds a PC → (nearest label + offset, source file:line) map. Tool outputs
+  gain an `at` field: `assert_line_budget` (the overrunning code's location — e.g.
+  `Burn+5 (litmus_overrun.asm:66)`), `trace_clocks` (every instruction), `watch_ram` (the
+  writing instruction), `read_cpu` (current PC). `.bin` direct loads are unaffected (no map).
+  Unit-tested parser + end-to-end coverage in `scripts/mcp_smoke.py` (overrun must report its
+  source line). Flat 2K/4K only (banked ROMs return no `at`).
+
 ## [1.50.0] - 2026-06-12
 
 ### Added
