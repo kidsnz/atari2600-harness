@@ -47,3 +47,11 @@ counters need sub-frame alignment (v2).
 Sub-frame boundary alignment for per-frame-mutating RAM; TIA write-register compare (needs a `tia` text
 parse), pixel compare (palette→TIA-index mapping + 2:1 downsample of `-ss1x` snapshots), full automation
 via an accessibility-granted keystroke.
+
+## Automation (v1.33.0)
+
+`scripts/stella_oracle.sh <rom.bin> [frames]` runs the whole loop hands-free: it launches
+stellacheck and, in parallel, sends the backquote key to Stella via AppleScript (System Events).
+**One-time setup:** grant your terminal Accessibility permission
+(System Settings → Privacy & Security → Accessibility). The script preflights the permission and
+prints instructions if missing — until then the manual-keypress flow keeps working unchanged.

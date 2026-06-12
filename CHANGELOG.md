@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.33.0] - 2026-06-12
+
+### Added
+- **`scripts/stella_oracle.sh` — the Stella cross-check, hands-free.** Launches stellacheck and
+  sends the debugger key to Stella via AppleScript in parallel; preflights the one-time
+  Accessibility permission and prints setup instructions when missing (the manual-keypress flow
+  remains as fallback). The last human step in the oracle loop is now a single one-time
+  permission grant.
+
 ## [1.32.0] - 2026-06-12
 
 ### Added
