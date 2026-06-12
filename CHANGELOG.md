@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.56.0] - 2026-06-12
+
+### Changed
+- Strengthening-run U wrap-up: summary section in `docs/improvement-roadmap.md` (P1-P4, 13
+  harness releases + starshot v1.0 dogfood in the roms repo). Techniques catalog now covers the
+  full real-game skeleton: score, SFX, sound driver, game states, bullets, paddle, procgen,
+  bank template — every entry with a verified ROM + scenario + golden.
+
 ## [1.55.0] - 2026-06-12
 
 ### Added

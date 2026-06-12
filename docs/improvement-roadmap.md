@@ -24,6 +24,22 @@ Everything below is done or reduced to a single pending user action:
   Stella launched, key sent by AppleScript, RAM 128/128 match, zero human input.**
 - ⏳ user: ROM files into inbox (field tests) ・ the listening session (inbox/fanfare.bin is waiting).
 
+## Strengthening run U — capability audit follow-through (v1.43.0–v1.55.0, 2026-06-12)
+
+A full audit of capabilities (techniques catalog vs. real-game needs, tooling ergonomics,
+remaining unverified facts, oracle depth) led to a 14-milestone run, all shipped:
+- **P1 game-skeleton techniques**: 6-digit score kernel (v1.43), SFX toolkit (v1.44), in-game
+  sound driver with music+SFX preemption (v1.45), game state machine + litmus_swchb (v1.46).
+- **P2 weapons/input**: missiles-as-bullets + litmus_resmp (v1.47), paddle technique (v1.48),
+  procedural generation (v1.49), bank-switched game template (v1.50).
+- **P3 dev-loop**: source-line debugging — `at Label+off (file:line)` in budget/trace/watch/cpu
+  outputs (v1.51); read_audio note names + GRP shape overlay (v1.52); verification sweep —
+  HMxx latch-at-HMOVE, SCORE×PFP dominance, VDEL 2LK alignment (v1.53).
+- **P4 trust/infra**: Stella oracle v2 pixel compare at 100.00% with a measured Stella palette
+  (v1.54); rammap audit tool + Gopher2600 pin check (v1.55).
+- **Testbed**: starshot v1.0 in the roms repo integrates score/sound/states/bullets/procgen and
+  was analyzed end-to-end by our own tools (fieldtest/dissect/rammap/transcription).
+
 ## Disassembly-driven extraction — DiStella research + `cmd/dissect` (v1.38.0)
 
 When the ROM itself is available, static disassembly + runtime tracing beats pixel analysis. Researched
