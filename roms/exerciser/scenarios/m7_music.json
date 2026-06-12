@@ -1,0 +1,65 @@
+{
+  "rom": "roms/exerciser/exerciser.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 2,
+      "field": "audio.ch0.control",
+      "op": "==",
+      "value": 4
+    },
+    {
+      "at_frame": 2,
+      "field": "audio.ch0.freq",
+      "op": "==",
+      "value": 14
+    },
+    {
+      "at_frame": 2,
+      "field": "audio.ch0.volume",
+      "op": "==",
+      "value": 8
+    },
+    {
+      "at_frame": 2,
+      "field": "audio.ch1.control",
+      "op": "==",
+      "value": 6
+    },
+    {
+      "at_frame": 2,
+      "field": "audio.ch1.freq",
+      "op": "==",
+      "value": 31
+    },
+    {
+      "at_frame": 20,
+      "field": "audio.ch0.freq",
+      "op": "==",
+      "value": 11
+    },
+    {
+      "at_frame": 36,
+      "field": "audio.ch0.freq",
+      "op": "==",
+      "value": 9
+    },
+    {
+      "at_frame": 40,
+      "field": "audio.ch1.freq",
+      "op": "==",
+      "value": 23
+    },
+    {
+      "at_frame": 70,
+      "field": "audio.ch0.freq",
+      "op": "==",
+      "value": 14
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_audio": true,
+    "golden_frame": true
+  }
+}

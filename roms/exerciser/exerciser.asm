@@ -45,6 +45,9 @@ INPT0   = $38
 AUDC0   = $15
 AUDF0   = $17
 AUDV0   = $19
+AUDC1   = $16
+AUDF1   = $18
+AUDV1   = $1A
 SWCHA   = $0280
 ENAM0   = $1D
 ENABL   = $1F
@@ -64,6 +67,10 @@ scene    = $80
 prevFire = $81
 frameCt  = $82
 lastScene = $83     ; シーン進入検出（初期化 1 回/進入）
+m0idx    = $84      ; 音楽: ch0 ノート index
+m0dur    = $85      ; 音楽: ch0 残フレーム
+m1idx    = $86
+m1dur    = $87
 score0   = $90      ; BCD 下2桁
 score1   = $91
 score2   = $92      ; BCD 上2桁
@@ -115,6 +122,8 @@ Clr:    sta $00,x
         dex
         bne Clr
         sta $2C             ; CXCLR
+        lda #$FF
+        sta lastScene       ; 全シーンの進入初期化を初回必ず発火させる
 
 NextFrame:
         lda #2
@@ -209,7 +218,10 @@ SceneZone:
         lda lastScene
         cmp #1
         beq ZDrift
-        ; 初期化パス（4 行）
+        ; 初期化パス（4 行）＋音楽ミュート
+        lda #0
+        sta AUDV0
+        sta AUDV1
         ldx #5
 ZI1:    lda ZoneXInit0,x
         sta zx0,x
@@ -368,6 +380,8 @@ ScenePlay:
         sta py
         lda #0
         sta mAct
+        sta AUDV0
+        sta AUDV1
         lda #2
         sta lastScene
 PNoInit:
@@ -541,6 +555,11 @@ ScenePaddle:
         lda #$E6
         sta $9B             ; 実行センチネル
         lda #0
+        sta AUDV0
+        sta AUDV1
+        lda #3
+        sta lastScene
+        lda #0
         sta COLUBK
         sta NUSIZ0
         lda #$5E
@@ -632,6 +651,8 @@ SceneGrad:
         beq GNoInit
         lda #4
         sta lastScene
+        lda #0
+        sta AUDV1
         ; SFX: kick 開始
         lda #15
         sta AUDC0
@@ -687,6 +708,9 @@ SceneProc:
         sta lastScene
         lda #$2F
         sta worldSeed       ; 初期世界
+        lda #0
+        sta AUDV0
+        sta AUDV1
 RNoInit:
         lda frameCt
         and #$3F
@@ -759,6 +783,17 @@ CallB1Scene:
 TitleScene:
         lda #$B1
         sta sent1
+        ; 音楽: タイトル進入で初期化（lastScene 方式）
+        lda lastScene
+        beq TMusOk
+        lda #0
+        sta lastScene
+        sta m0idx
+        sta m1idx
+        lda #1
+        sta m0dur
+        sta m1dur
+TMusOk:
         ; スプライト構成（48px: NUSIZ 3コピー, P0=24/P1=+8, VDEL on）
         lda #$03
         sta NUSIZ0
@@ -947,12 +982,88 @@ ScoreLoop:
         sta GRP0
         sta WSYNC           ; 閉じ行（86+32+1=119 行目）
 
-        ; --- 下余白: 72 行（合計 192）---
-        ldy #72
+        ; --- 音楽 tick（2 行: ch0 / ch1）---
+        sta WSYNC
+        ; ch0（square リード）
+        dec m0dur
+        bne TM0ok
+        ldy m0idx
+        lda Song0,y
+        cmp #$FF
+        bne TM0note
+        ldy #0              ; ループ
+        lda Song0,y
+TM0note:
+        pha
+        and #$1F
+        sta AUDF0
+        pla
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        lda MusTypes,x
+        sta AUDC0
+        lda #8
+        sta AUDV0
+        lda Song0+1,y
+        sta m0dur
+        iny
+        iny
+        sty m0idx
+TM0ok:  sta WSYNC
+        ; ch1（bass）
+        dec m1dur
+        bne TM1ok
+        ldy m1idx
+        lda Song1,y
+        cmp #$FF
+        bne TM1note
+        ldy #0
+        lda Song1,y
+TM1note:
+        pha
+        and #$1F
+        sta AUDF1
+        pla
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        lda MusTypes,x
+        sta AUDC1
+        lda #8
+        sta AUDV1
+        lda Song1+1,y
+        sta m1dur
+        iny
+        iny
+        sty m1idx
+TM1ok:
+        ; --- 下余白: 70 行（合計 192）---
+        ldy #70
 TB3:    sta WSYNC
         dey
         bne TB3
         rts
+
+        ; --- 音楽データ（Sequencer-Kit 互換 noteByte: 上位3bit=type idx, 下位5bit=AUDF / 第2バイト=持続フレーム）---
+MusTypes:
+        .byte 4, 6, 12, 8   ; idx0=square idx1=bass idx2=lead idx3=noise
+Song0:  ; リード（square, type idx0）: AUDF 14,11,9,11
+        .byte %00001110, 16
+        .byte %00001011, 16
+        .byte %00001001, 16
+        .byte %00001011, 16
+        .byte $FF
+Song1:  ; ベース（bass, type idx1=%001xxxxx）: AUDF 31,23 をゆっくり
+        .byte %00111111, 32
+        .byte %00110111, 32
+        .byte $FF
 
 ; --- フォント（8×8, 各行を2回置いた 16B/グリフ＝行倍化） ---
         ; ロゴ "EXRCSR": B0=E B1=X B2=R B3=C B4=S B5=R
