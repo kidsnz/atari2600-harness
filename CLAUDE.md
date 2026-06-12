@@ -91,6 +91,10 @@ not by eye).
 **poke quirk** — `poke` is for RAM. Write-only TIA registers ($0D PF0 etc.) don't persist stably under poke →
 change rendering with a `sta` in the ROM/kernel.
 
+**Image input contract (user → Claude)** — for pixel-exact extraction ask for **Stella F12 snapshots
+(PNG, unmodified, TV effects off)** = guaranteed integer scale, Retina-proof. OS screenshots are
+conversation-grade only (non-integer scale → warnings). Hand-off point = umbrella `inbox/` (belongs to no repo). Size = any integer multiple of 160 (auto-detected). Details: `docs/ingest.md`.
+
 **Annotated screenshot (`get_screen_annotated`)** — not a Claude-only aid but **the primary user↔Claude comms
 channel** = a first-class citizen. The user looks at the image and gives data visually ("move P0 to clock
 80") → Claude translates directly to registers, a round-trip loop. So the grid is **calibrated to TIA real
@@ -114,6 +118,7 @@ round trip. Also return `png_path` in JSON.
 | fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
+| Image ingestion (screenshot → TIA data) + **image input contract** | `docs/ingest.md` |
 | Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
 | Strengthening roadmap (sprites / audio / CI hardening) | `docs/hardening-roadmap.md` |
 | Decision history and changelog | `CHANGELOG.md` |

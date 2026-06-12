@@ -12,6 +12,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.9.0] - 2026-06-12
+
+### Added
+- **Image ingestion M1 — screenshot → TIA raster** (`internal/ingest`, `cmd/ingest`,
+  `docs/ingest.md`). The reverse pipeline begins: integer-scale auto-detection (any multiple of
+  the 160-clock raster — decided with the author; 320×228 Stella F12 → 2×1), cell-majority
+  normalization, palette quantization against the same Gopher2600 `Spec.GetColor` table the
+  harness renders with (distance reported; Stella inputs show the expected small constant),
+  TIA-coordinate grid overlay reusing `internal/annotate`. Round-trip CI tests: an emulator
+  Snapshot upscaled 2×1/2×2 normalizes back **pixel-identical** with distance 0.
+- **Image input contract** (docs/ingest.md + CLAUDE.md): grade A = Stella F12 PNG, unmodified,
+  TV effects off (integer scale guaranteed, Retina-proof); OS screenshots = conversation grade,
+  processed with warnings; hand-off point = umbrella `inbox/` (belongs to no repo).
+- Real-image smoke test: Pizza Boy F12 shot → scale 2×1 detected, full color inventory
+  (bg $00 79%, buildings $9E, score $FE, courier $CE, …).
+
 ## [1.8.0] - 2026-06-12
 
 ### Added
