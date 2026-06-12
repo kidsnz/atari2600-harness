@@ -43,10 +43,16 @@ structural state agrees — the diffs are boundary phase, not divergence. Conclu
 scope today is **frame-stable RAM** (`smoke` and `litmus_6502`: 128/128 PASS); ROMs with per-frame
 counters need sub-frame alignment (v2).
 
-### v2 (future)
-Sub-frame boundary alignment for per-frame-mutating RAM; TIA write-register compare (needs a `tia` text
-parse), pixel compare (palette→TIA-index mapping + 2:1 downsample of `-ss1x` snapshots), full automation
-via an accessibility-granted keystroke.
+### v2 — ✅ pixel compare WORKING (v1.54.0)
+`stellacheck -pixels` (or `scripts/stella_oracle.sh <rom> <frames> pixels`) adds `savesnap` to the
+debugger autoexec, captures Stella's frame PNG, and compares it cell-by-cell against Gopher2600's
+frame **as TIA color codes**: the Stella snapshot is quantized with a **measured Stella palette**
+(`internal/ingest/palette_stella.go`, all 128 colors captured live from `litmus_palette.bin` via
+savesnap — Stella's NTSC RGB differs slightly from Gopher2600's, which a shared quantizer
+misreads as ±1-luma code errors), the Gopher frame with the Gopher palette, and the grids matched
+over a ±8-line vertical-offset search. **Result: 100.00% agreement on litmus_pf (34,240 cells,
+offset +7)**. Offline re-checks: `stellacheck -snap <png>`. Still future: sub-frame boundary
+alignment for per-frame-mutating RAM; TIA write-register compare.
 
 ## Automation (v1.33.0)
 

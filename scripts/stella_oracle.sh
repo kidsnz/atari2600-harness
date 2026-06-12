@@ -6,8 +6,9 @@
 # 必要条件（初回のみ・人間の1クリック）:
 #   システム設定 → プライバシーとセキュリティ → アクセシビリティ → このターミナル(または iTerm 等)を許可
 set -u
-ROM="${1:?usage: stella_oracle.sh <rom.bin> [frames]}"
+ROM="${1:?usage: stella_oracle.sh <rom.bin> [frames] [pixels]}"
 FRAMES="${2:-5}"
+PIXELS="${3:-}"
 cd "$(dirname "$0")/.."
 
 # --- アクセシビリティ許可のプリフライト ---
@@ -25,7 +26,11 @@ fi
     -e 'delay 1' \
     -e 'tell application "System Events" to keystroke "`"' ) &
 KEYPID=$!
-go run ./cmd/stellacheck -rom "$ROM" -frames "$FRAMES"
+if [ "$PIXELS" = "pixels" ]; then
+  go run ./cmd/stellacheck -rom "$ROM" -frames "$FRAMES" -pixels
+else
+  go run ./cmd/stellacheck -rom "$ROM" -frames "$FRAMES"
+fi
 RC=$?
 kill "$KEYPID" 2>/dev/null
 exit $RC

@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.54.0] - 2026-06-12
+
+### Added
+- **Stella oracle v2 — pixel compare** (`stellacheck -pixels` / `-snap`, F-4 closed): captures a
+  Stella debugger `savesnap` PNG and compares it against Gopher2600's frame as TIA color codes,
+  using a **measured Stella NTSC palette** (`internal/ingest/palette_stella.go`,
+  `NewStellaNTSCQuantizer`) captured live from the new `litmus_palette.bin` (white marker + all
+  128 colors, one per line). A shared quantizer misreads Stella's slightly-different RGB as
+  ±1-luma errors (86.5%); with the measured palette: **100.00% agreement on litmus_pf
+  (34,240 cells)**. `scripts/stella_oracle.sh <rom> <frames> pixels` runs it hands-free.
+
 ## [1.53.0] - 2026-06-12
 
 ### Added

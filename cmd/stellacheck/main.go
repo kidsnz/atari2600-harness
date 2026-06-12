@@ -10,6 +10,11 @@
 package main
 
 import (
+	"image"
+	_ "image/png"
+
+	"github.com/kidsnz/atari2600-harness/internal/ingest"
+
 	"flag"
 	"fmt"
 	"os"
@@ -30,16 +35,20 @@ func main() {
 	frames := flag.Int("frames", 5, "frames from power-on to compare at")
 	timeout := flag.Duration("timeout", 60*time.Second, "wait for the human keypress + dump")
 	dumpFile := flag.String("dump", "", "compare against an existing Stella dump file (skip launching Stella)")
+	pixels := flag.Bool("pixels", false, "oracle v2: also capture a Stella debugger snapshot and compare pixels (TIA color codes)")
+	snapFile := flag.String("snap", "", "compare pixels against an existing snapshot PNG (skip launching Stella)")
 	flag.Parse()
 	if *romPath == "" {
 		fmt.Fprintln(os.Stderr, "usage: stellacheck -rom <path> [-frames N] [-dump <file>]")
 		os.Exit(2)
 	}
 	var err error
-	if *dumpFile != "" {
+	if *snapFile != "" {
+		err = comparePixels(*romPath, *frames, *snapFile)
+	} else if *dumpFile != "" {
 		err = compare(*romPath, *frames, *dumpFile)
 	} else {
-		err = run(*romPath, *frames, *timeout)
+		err = run(*romPath, *frames, *timeout, *pixels)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "FAIL:", err)
@@ -47,7 +56,7 @@ func main() {
 	}
 }
 
-func run(romPath string, frames int, timeout time.Duration) error {
+func run(romPath string, frames int, timeout time.Duration, pixels bool) error {
 	home, _ := os.UserHomeDir()
 	scriptDir := filepath.Join(home, "Library", "Application Support", "Stella")
 	scriptPath := filepath.Join(scriptDir, "autoexec.script")
@@ -62,6 +71,9 @@ func run(romPath string, frames int, timeout time.Duration) error {
 		backup, hadBackup = b, true
 	}
 	script := fmt.Sprintf("reset\nframe %d\ndump 80 ff 7\n", frames)
+	if pixels {
+		script = fmt.Sprintf("reset\nframe %d\nsavesnap\ndump 80 ff 7\n", frames)
+	}
 	if err := os.WriteFile(scriptPath, []byte(script), 0o644); err != nil {
 		return err
 	}
@@ -117,7 +129,106 @@ func run(romPath string, frames int, timeout time.Duration) error {
 	}
 	time.Sleep(300 * time.Millisecond) // 書き込み完了待ち
 	fmt.Println("dump captured:", dumpFile)
-	return compare(romPath, frames, dumpFile)
+	if err := compare(romPath, frames, dumpFile); err != nil {
+		return err
+	}
+	if pixels {
+		snapPat := filepath.Join(desktop, romBase+"*.png")
+		var snap string
+		var newest time.Time
+		if m, _ := filepath.Glob(snapPat); m != nil {
+			for _, f := range m {
+				if st, err := os.Stat(f); err == nil && st.ModTime().After(newest) {
+					newest, snap = st.ModTime(), f
+				}
+			}
+		}
+		if snap == "" {
+			return fmt.Errorf("snapshot png did not appear (savesnap)")
+		}
+		fmt.Println("snapshot captured:", snap)
+		return comparePixels(romPath, frames, snap)
+	}
+	return nil
+}
+
+// comparePixels は Stella のスナップショット PNG と harness の同フレーム描画を
+// TIA 色コード格子（ingest.Normalize+量子化）に落として突き合わせる（oracle v2）。
+// 縦オフセットは ±8 行で最良一致を探索（両者の可視開始行定義の差を吸収）。
+func comparePixels(romPath string, frames int, snapPath string) error {
+	f, err := os.Open(snapPath)
+	if err != nil {
+		return err
+	}
+	img, _, err := image.Decode(f)
+	f.Close()
+	if err != nil {
+		return fmt.Errorf("decode %s: %w", snapPath, err)
+	}
+	sq := ingest.NewStellaNTSCQuantizer() // Stella 実測パレット（litmus_palette 採取）
+	sn, err := ingest.Normalize(img, sq)
+	if err != nil {
+		return fmt.Errorf("normalize stella snap: %w", err)
+	}
+	q := ingest.NewNTSCQuantizer()
+	e, err := emu.New("NTSC")
+	if err != nil {
+		return err
+	}
+	if err := e.LoadROM(romPath); err != nil {
+		return err
+	}
+	if err := e.RunFrames(frames); err != nil {
+		return err
+	}
+	gimg, _ := e.Snapshot()
+	gn, err := ingest.Normalize(gimg, q)
+	if err != nil {
+		return fmt.Errorf("normalize gopher frame: %w", err)
+	}
+	bestOff, bestMatch, bestTotal := 0, -1, 1
+	for off := -8; off <= 8; off++ {
+		match, total := 0, 0
+		for y := 0; y < gn.Height; y++ {
+			sy := y + off
+			if sy < 0 || sy >= sn.Height {
+				continue
+			}
+			for x := 0; x < 160; x++ {
+				total++
+				if gn.Codes[y][x] == sn.Codes[sy][x] {
+					match++
+				}
+			}
+		}
+		if total > 0 && match*bestTotal > bestMatch*total {
+			bestOff, bestMatch, bestTotal = off, match, total
+		}
+	}
+	pct := 100 * float64(bestMatch) / float64(bestTotal)
+	fmt.Printf("pixel compare: %.2f%% of %d cells match (vertical offset %+d, stella H=%d gopher H=%d)\n",
+		pct, bestTotal, bestOff, sn.Height, gn.Height)
+	if pct < 99.0 {
+		// 最初の不一致行を列挙（診断）
+		shown := 0
+		for y := 0; y < gn.Height && shown < 5; y++ {
+			sy := y + bestOff
+			if sy < 0 || sy >= sn.Height {
+				continue
+			}
+			for x := 0; x < 160; x++ {
+				if gn.Codes[y][x] != sn.Codes[sy][x] {
+					fmt.Printf("  diff at (x=%d, gopherY=%d): gopher=$%02X stella=$%02X\n",
+						x, y, gn.Codes[y][x], sn.Codes[sy][x])
+					shown++
+					break
+				}
+			}
+		}
+		return fmt.Errorf("pixel mismatch %.2f%% < 99%%", pct)
+	}
+	fmt.Printf("PASS: pixels agree (Gopher2600 vs Stella, frame %d)\n", frames)
+	return nil
 }
 
 // compare は Stella の dump ファイルと harness 実行結果の RAM ($80-$FF) を突き合わせる。
