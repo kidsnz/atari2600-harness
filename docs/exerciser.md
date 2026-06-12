@@ -13,12 +13,16 @@ the bank-0 framework owns VSYNC/VBLANK/overscan and input.
 | 0 | **Title** | 48px "EXRCSR" (six-store VDEL kernel, one glyph/copy) + live 6-digit BCD score (indirect digit pointers = nibble×16 into a page-aligned 16-byte-stride font) + **2-channel music driver** (Sequencer-Kit note codec, per-frame tick) |
 | 1 | **Zone landscape** | Asymmetric-PF mountains (pf_async write windows) + 12 sprites via zone multiplexing with per-frame drift + per-zone colors |
 | 2 | **Playground** | Joystick-driven P0, auto-firing missile (per-frame HMOVE drift), ball pole, PF walls; **collision latches → live color feedback** (read-then-CXCLR) |
-| 3 | **Paddle** | Canonical INPT0 dump/charge read inside the visible region; one-frame-latent cursor |
-| 4 | **Gradient + SFX** | Per-scanline COLUBK rainbow + scene-entry kick drum (Slocum recipe, decaying AUDV) |
-| 5 | **Procedural** | Per-scanline starfield from the math-verified Galois LFSR; world seed evolves every 64 frames |
+| 3 | **Gradient + SFX** | Per-scanline COLUBK rainbow + scene-entry kick drum (Slocum recipe, decaying AUDV) |
+| 4 | **Procedural** | Per-scanline starfield from the math-verified Galois LFSR; world seed evolves every 64 frames |
+
+> A paddle scene existed briefly (v0.60.0–v1.0.0) but was removed in v1.0.1: Stella's controller
+> auto-detection sees the ROM's INPT0 reads, plugs paddles into the left port, and **paddles hold INPT4
+> high** — making the joystick fire (scene advance) dead on real-world players. Paddle capability remains
+> fully verified in `litmus_paddle` + the harness's paddle input path.
 
 ## How it is verified (CI, every push)
-`roms/exerciser/scenarios/`: a navigation scenario cycles all six scenes by input timeline; per-scene
+`roms/exerciser/scenarios/`: a navigation scenario cycles all five scenes by input timeline; per-scene
 scenarios assert sentinels, positions, colors, paddle counts, collision feedback, the **music note timeline
 register-by-register**, and lock video goldens (+ an audio golden for the title music). Every scenario also
 asserts a 262-line frame — which doubles as proof that no scene ever exceeds the 76-cycle line budget.

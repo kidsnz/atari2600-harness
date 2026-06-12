@@ -61,7 +61,7 @@ CTRLPF  = $0A
 COLUPF  = $08
 PF1     = $0E
 
-NSCENES = 6
+NSCENES = 5
 
 scene    = $80
 prevFire = $81
@@ -167,14 +167,10 @@ VB:     sta WSYNC
         cmp #2
         beq DoPlay
         cmp #3
-        beq DoPdl
-        cmp #4
         beq DoGrad
-        jsr SceneProc       ; scene 5（bank0）
+        jsr SceneProc       ; scene 4（bank0）
         jmp AfterScene
-DoGrad: jsr SceneGrad       ; scene 4（bank0）
-        jmp AfterScene
-DoPdl:  jsr ScenePaddle     ; scene 3（bank0）
+DoGrad: jsr SceneGrad       ; scene 3（bank0）
         jmp AfterScene
 DoPlay: jsr ScenePlay       ; scene 2（bank0）
         jmp AfterScene
@@ -548,98 +544,8 @@ PNext:  inc lineCt          ; 29
         sta CTRLPF
         rts
 
-; --- S3: パドル（bank0）---
-; litmus_paddle の標準読み: 先頭 8 行 VBLANK D7=1 でダンプ（blank はせず $80）→ 充電 →
-; 毎行 INPT0 D7 をポーリングしてカウント。前フレームの確定値でカーソル（P0 バー）を描く。
-ScenePaddle:
-        lda #$E6
-        sta $9B             ; 実行センチネル
-        lda #0
-        sta AUDV0
-        sta AUDV1
-        lda #3
-        sta lastScene
-        lda #0
-        sta COLUBK
-        sta NUSIZ0
-        lda #$5E
-        sta COLUP0
-        lda #$FF
-        sta GRP0
-        sta WSYNC           ; 1
-        ; カーソル位置決め（前フレームの pdlPos, 10..140 に clamp 済み）
-        lda pdlPos
-        sec
-QDv0:   sbc #15
-        bcs QDv0
-        tay
-        lda ZHmove,y
-        sta HMP0
-        sta RESP0
-        sta WSYNC           ; 2
-        sta HMOVE
-        ds 12, $EA
-        sta HMCLR
-        lda #0
-        sta pdlCnt
-        sta pdlDone
-        sta WSYNC           ; 3
-        ; --- ダンプ 8 行（VBLANK=$80: D7 ダンプ・blank せず）---
-        lda #$80
-        sta VBLANK
-        ldy #8
-QDmp:   sta WSYNC
-        dey
-        bne QDmp            ; 11 行目まで
-        lda #0
-        sta VBLANK          ; 充電開始
-        ; --- 計測 168 行: INPT0 を毎行ポーリング＋カーソル帯描画（90-105行目）---
-        ldy #0
-QKer:   sta WSYNC
-        lda pdlDone         ; 3
-        bne QSkip           ; 5
-        bit INPT0           ; 8
-        bpl QNoFire         ; 10
-        lda #1              ; 12
-        sta pdlDone         ; 15
-        jmp QDraw
-QNoFire:
-        inc pdlCnt          ; 17(別経路)
-        jmp QDraw
-QSkip:  nop
-        nop
-        nop
-QDraw:  ; カーソル帯: 行 90-105 で GRP0 表示
-        cpy #90
-        bcc QOff
-        cpy #106
-        bcs QOff
-        lda #$FF
-        sta GRP0
-        jmp QNext
-QOff:   lda #0
-        sta GRP0
-QNext:  iny
-        cpy #168
-        bne QKer
-        ; pdlPos 確定（count/2 + 10, clamp 140）
-        lda pdlCnt
-        lsr
-        clc
-        adc #10
-        cmp #141
-        bcc QPosOk
-        lda #140
-QPosOk: sta pdlPos
-        lda #0
-        sta GRP0
-        sta WSYNC           ; 180 行目
-        ; --- 残り 12 行 ---
-        ldy #12
-QPad:   sta WSYNC
-        dey
-        bne QPad
-        rts
+; （パドルシーンは v1.0.1 で撤去: ROM 内の INPT0 読取を Stella が「パドル用 ROM」と自動判別し、
+;   パドルが挿さると INPT4 が常時 High＝fire が効かなくなるため。パドル能力の検証は litmus_paddle に現存。）
 
 ; --- S4: グラデーション＋SFX（bank0）---
 ; per-scanline COLUBK 虹（litmus_color 系）＋ 進入時に kick（Buzz AUDC=15, AUDF=30, AUDV 減衰=Slocum レシピ）。
@@ -647,9 +553,9 @@ SceneGrad:
         lda #$F8
         sta $9A             ; 実行センチネル
         lda lastScene
-        cmp #4
+        cmp #3
         beq GNoInit
-        lda #4
+        lda #3
         sta lastScene
         lda #0
         sta AUDV1
@@ -702,9 +608,9 @@ SceneProc:
         lda #$E9
         sta $99             ; 実行センチネル
         lda lastScene
-        cmp #5
+        cmp #4
         beq RNoInit
-        lda #5
+        lda #4
         sta lastScene
         lda #$2F
         sta worldSeed       ; 初期世界

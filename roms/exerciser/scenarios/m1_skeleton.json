@@ -67,18 +67,6 @@
       "player": 0,
       "action": "fire",
       "pressed": false
-    },
-    {
-      "frame": 13,
-      "player": 0,
-      "action": "fire",
-      "pressed": true
-    },
-    {
-      "frame": 14,
-      "player": 0,
-      "action": "fire",
-      "pressed": false
     }
   ],
   "asserts": [
@@ -116,16 +104,10 @@
       "at_frame": 12,
       "field": "ram.0x80",
       "op": "==",
-      "value": 5
-    },
-    {
-      "at_frame": 14,
-      "field": "ram.0x80",
-      "op": "==",
       "value": 0
     },
     {
-      "at_frame": 16,
+      "at_frame": 14,
       "field": "bank.number",
       "op": "==",
       "value": 0

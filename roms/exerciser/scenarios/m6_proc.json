@@ -55,35 +55,23 @@
       "player": 0,
       "action": "fire",
       "pressed": false
-    },
-    {
-      "frame": 11,
-      "player": 0,
-      "action": "fire",
-      "pressed": true
-    },
-    {
-      "frame": 12,
-      "player": 0,
-      "action": "fire",
-      "pressed": false
     }
   ],
   "asserts": [
     {
-      "at_frame": 13,
+      "at_frame": 11,
       "field": "ram.0x80",
       "op": "==",
-      "value": 5
+      "value": 4
     },
     {
-      "at_frame": 13,
+      "at_frame": 11,
       "field": "ram.0x99",
       "op": "==",
       "value": 233
     },
     {
-      "at_frame": 13,
+      "at_frame": 11,
       "field": "ram.0xba",
       "op": ">",
       "value": 0

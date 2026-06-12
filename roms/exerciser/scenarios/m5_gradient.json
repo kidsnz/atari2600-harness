@@ -43,47 +43,35 @@
       "player": 0,
       "action": "fire",
       "pressed": false
-    },
-    {
-      "frame": 9,
-      "player": 0,
-      "action": "fire",
-      "pressed": true
-    },
-    {
-      "frame": 10,
-      "player": 0,
-      "action": "fire",
-      "pressed": false
     }
   ],
   "asserts": [
     {
-      "at_frame": 11,
+      "at_frame": 9,
       "field": "ram.0x80",
       "op": "==",
-      "value": 4
+      "value": 3
     },
     {
-      "at_frame": 11,
+      "at_frame": 9,
       "field": "ram.0x9a",
       "op": "==",
       "value": 248
     },
     {
-      "at_frame": 11,
+      "at_frame": 9,
       "field": "audio.ch0.control",
       "op": "==",
       "value": 15
     },
     {
-      "at_frame": 11,
+      "at_frame": 9,
       "field": "audio.ch0.freq",
       "op": "==",
       "value": 30
     },
     {
-      "at_frame": 11,
+      "at_frame": 9,
       "field": "audio.ch0.volume",
       "op": ">",
       "value": 0

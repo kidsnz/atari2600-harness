@@ -12,6 +12,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.0.1] - 2026-06-11
+
+### Fixed
+- **Exerciser: fire/scene-advance was dead in Stella — paddle scene removed.** Field report (the author,
+  playing in Stella): Space did nothing, though it worked before M5 and every Gopher2600 scenario passes,
+  including a real-user input-pattern probe. Root cause: **Stella's controller auto-detection** sees the
+  ROM's INPT0 reads (the paddle scene), plugs paddles into the left port — and plugged paddles **hold INPT4
+  permanently high**, so the joystick fire can never register (the property is also persisted per-ROM,
+  which is why `-lc JOYSTICK` didn't rescue the first binary). Per the author's call, the paddle scene is
+  removed from the Exerciser (5 scenes; paddle capability remains verified in `litmus_paddle` and the
+  harness paddle input path). 38 scenarios pass.
+
 ## [1.0.0] - 2026-06-11
 
 **The harness is 1.0.** The declared bar — a trustworthy loop (gaps A–E), a sourced fundamentals audit with
