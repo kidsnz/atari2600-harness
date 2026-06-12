@@ -1,0 +1,19 @@
+{
+  "rom": "roms/techniques/procgen_demo.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 40,  "field": "ram.0x80", "op": "==", "value": 45 },
+    { "at_frame": 40,  "field": "tia.player0.hmoved_pixel", "op": "==", "value": 61 },
+    { "at_frame": 70,  "field": "ram.0x80", "op": "==", "value": 152 },
+    { "at_frame": 70,  "field": "tia.player0.hmoved_pixel", "op": "==", "value": 40 },
+    { "at_frame": 100, "field": "ram.0x80", "op": "==", "value": 76 },
+    { "at_frame": 100, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 92 },
+    { "at_frame": 100, "field": "ram.0x82", "op": "==", "value": 3 },
+    { "at_frame": 130, "field": "ram.0x80", "op": "==", "value": 38 },
+    { "at_frame": 130, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 54 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

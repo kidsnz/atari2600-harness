@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.49.0] - 2026-06-12
+
+### Added
+- **Technique: procedural generation** (`roms/techniques/procgen_demo.asm` +
+  `docs/techniques/procedural.md`): event-driven Galois LFSR (the litmus_lfsr form) mapped to
+  spawn positions by mask+offset, with the sequence cross-checked against an off-target
+  reference implementation. CI: `scenarios/procgen_demo.json` — four spawns assert RAM state
+  AND rendered X exactly ($5A → $2D,$98,$4C,$26 / X 61,40,92,54), golden. Same seed = same world.
+
 ## [1.48.0] - 2026-06-12
 
 ### Added
