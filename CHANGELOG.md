@@ -12,6 +12,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.15.0] - 2026-06-12
+
+### Added
+- **Image ingestion M7 — overlap repair (sprite-guided PF inpainting).** Where sprites cross
+  playfield, ownership is locally undecidable; a clean reference band (the same structure
+  repeating elsewhere) resolves it both ways: sprite pixels absorbed into PF return to the
+  sprite's art, PF bits hidden under the sprite restore from the reference. Conservative: no
+  reference → no touch. Synthetic CI proof: a frame sprite over a 3-cycle building pattern
+  extracts bit-perfect with all bands repaired and fidelity 1.0.
+
+### Fixed
+- Context demotion (M6) demoted whole thin bands, dragging clean columns into the sprite layer
+  (caught by the synthetic overlap test) — now **per-column** with per-column color matching.
+
+### Result
+- Pizza Boy: **fidelity 100.0%** (from 99.93%), zero contaminated/asymmetric bands; the pizza
+  slice's body rows and the courier's belt row recovered exactly (author's two remaining
+  complaints). All sprite/PF colors were already real TIA codes (COLUxx values) per row/band.
+
 ## [1.14.1] - 2026-06-12
 
 ### Fixed

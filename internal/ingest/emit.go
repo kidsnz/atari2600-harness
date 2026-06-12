@@ -51,9 +51,14 @@ type Group struct {
 func Analyze(n *Normalized, q *Quantizer) *Report {
 	r := BuildReport(n, q)
 	bands, residual, rowBG := ExtractPlayfield(n)
+	sprites := ExtractSprites(n, residual)
+	// M7: 重なり修復（スプライトと交差する汚染/欠損 PF を参照バンドから復元）→ sprite 再抽出
+	if RepairOverlaps(n, bands, residual, sprites) {
+		sprites = ExtractSprites(n, residual)
+	}
 	r.Playfield = bands
 	r.PlayfieldASM = DASMPlayfield(bands)
-	r.Sprites = ExtractSprites(n, residual)
+	r.Sprites = sprites
 	r.SpritesASM = DASMSprites(r.Sprites)
 	for _, bg := range rowBG {
 		r.RowBG = append(r.RowBG, int(bg))

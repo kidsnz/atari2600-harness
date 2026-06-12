@@ -5,7 +5,12 @@ import (
 	"testing"
 
 	"github.com/kidsnz/atari2600-harness/internal/emu"
+	"github.com/kidsnz/atari2600-harness/pkg/playfield"
 )
+
+func playfieldEncode(cells []bool) (uint8, uint8, uint8) {
+	return playfield.EncodeSymmetric(cells)
+}
 
 // 疑似 Stella 化: TIA 画像を sx×sy の整数スケールで拡大する。
 func upscale(src *image.RGBA, sx, sy int) *image.RGBA {
@@ -383,4 +388,82 @@ func TestContextDemotionRings(t *testing.T) {
 			t.Fatalf("ring %+v, want 4x8 complete (top/bottom bars included)", s)
 		}
 	}
+}
+
+// --- M7: 重なり修復（正解既知の合成画像） ---
+// 繰り返すビル風 PF（3周期）の中央周期にスプライトを重ね、
+// ①スプライト GRP が重なり前の定義とビット単位一致 ②PF が参照周期どおりに修復
+// ③fidelity 100% を assert する。
+func TestRepairOverlap(t *testing.T) {
+	q := NewNTSCQuantizer()
+	cyan := q.Canonical(0x9E)
+	green := q.Canonical(0xCE)
+	img := image.NewRGBA(image.Rect(0, 0, 160, 40))
+	// PF: 屋根行(cols2-8)と窓行(cols2,4,6,8)を4行ずつ、8行周期×3（y=4..27）、repeat
+	pfRow := func(y int, cols []int) {
+		for _, c := range cols {
+			for _, base := range []int{0, 80} {
+				for dx := 0; dx < 4; dx++ {
+					img.SetRGBA(base+c*4+dx, y, q.RGB(cyan))
+				}
+			}
+		}
+	}
+	roof := []int{2, 3, 4, 5, 6, 7, 8}
+	win := []int{2, 4, 6, 8}
+	for cyc := 0; cyc < 3; cyc++ {
+		for r := 0; r < 4; r++ {
+			pfRow(4+cyc*8+r, roof)
+			pfRow(4+cyc*8+4+r, win)
+		}
+	}
+	// スプライト: 8px 枠 ($FF,$81,$BD,$A5,$A5,$BD,$81,$FF) を x=16, y=12（中央周期に重なる）
+	art := []uint8{0xFF, 0x81, 0xBD, 0xA5, 0xA5, 0xBD, 0x81, 0xFF}
+	for r, g := range art {
+		for bit := 0; bit < 8; bit++ {
+			if g&(1<<(7-uint(bit))) != 0 {
+				img.SetRGBA(16+bit, 12+r, q.RGB(green)) // PF を上書き＝sprite over PF
+			}
+		}
+	}
+	n, err := Normalize(img, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep := Analyze(n, q)
+	// ① スプライト完全復元
+	if len(rep.Sprites) != 1 {
+		t.Fatalf("found %d sprites, want 1: %+v", len(rep.Sprites), rep.Sprites)
+	}
+	s := rep.Sprites[0]
+	if s.X != 16 || s.Y != 12 || s.W != 8 || s.H != 8 {
+		t.Fatalf("sprite bbox %+v, want (16,12) 8x8", s)
+	}
+	for i, want := range art {
+		if s.GRP[i] != int(want) {
+			t.Fatalf("GRP[%d] = %%%08b, want %%%08b", i, s.GRP[i], want)
+		}
+	}
+	// ② 修復: 全バンドが屋根 or 窓のどちらかのバイト列（汚染パターンが残っていない）
+	wantRoof := bandBytes(roof)
+	wantWin := bandBytes(win)
+	for _, b := range rep.Playfield {
+		got := [3]uint8{b.PF0, b.PF1, b.PF2}
+		if got != wantRoof && got != wantWin {
+			t.Fatalf("contaminated band survived: %+v", b)
+		}
+	}
+	// ③ 完全再構成
+	if rep.Fidelity != 1.0 {
+		t.Fatalf("fidelity %.4f, want 1.0", rep.Fidelity)
+	}
+}
+
+func bandBytes(cols []int) [3]uint8 {
+	cells := make([]bool, 20)
+	for _, c := range cols {
+		cells[c] = true
+	}
+	pf0, pf1, pf2 := playfieldEncode(cells)
+	return [3]uint8{pf0, pf1, pf2}
 }

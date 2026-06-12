@@ -66,6 +66,13 @@ Checklist for grade A:
   conformance), empty-column splitting for digit strips, row-groups (score/gauge bundles),
   shape ids for identifying the same object appearing twice (the two cabs).
 - The overlay draws numbered bounding boxes for every sprite — answer-check by eye.
+- **Overlap repair (sprite-guided inpainting):** where a sprite crosses playfield, pixel
+  ownership is locally undecidable — but if the same PF structure repeats elsewhere on screen,
+  a clean reference band resolves it: sprite pixels absorbed into PF return to the sprite
+  (restoring its art), PF bits hidden under the sprite are restored from the reference. Context
+  demotion is per-column (a whole-band demotion dragged clean columns along — caught by the
+  synthetic overlap test). Repairs only when a reference exists; otherwise it leaves things
+  alone and says so via confidence. Pizza Boy: **fidelity 100.0%**, zero contaminated bands.
 
 ## MCP tool
 

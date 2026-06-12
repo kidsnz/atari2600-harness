@@ -23,15 +23,17 @@ type PFBand struct {
 	ScoreMode  bool  `json:"score_mode"` // 左右同パターン・別色
 	// 確信度: 1.0=全列が綺麗に 4clk 整列・単色。重なり等で列を捨てた行があると下がる。
 	Confidence float64 `json:"confidence"`
+	Repaired   bool    `json:"repaired,omitempty"` // M7: 参照バンドから重なり修復済み
 }
 
 // rowPF は 1 行ぶんの PF 解析結果。
 type rowPF struct {
-	bits   [40]bool
-	colorL uint8
-	colorR uint8
-	lit    bool    // 1 列でも点灯あり
-	conf   float64 // この行の確信度
+	bits     [40]bool
+	colColor [40]uint8 // 列毎の色（文脈降格の同色判定用）
+	colorL   uint8
+	colorR   uint8
+	lit      bool    // 1 列でも点灯あり
+	conf     float64 // この行の確信度
 }
 
 // pfMisaligned は「非背景なのに 4clk 整列・単色の列として読めなかった」ピクセル数を返しつつ
@@ -69,6 +71,7 @@ func analyzeRowPF(codes []uint8, bg uint8) (r rowPF, residual int) {
 		}
 		r.bits[c] = true
 		colColor[c] = col
+		r.colColor[c] = col
 		r.lit = true
 	}
 	// 半面ごとの色（最頻）。混色は確信度を下げる（重なり物が PF 色を侵食しているサイン）。
@@ -140,12 +143,33 @@ func ExtractPlayfield(n *Normalized) (bands []PFBand, residualMask [][]bool, row
 		}
 		b := makeBand(rows[top], top, y-top)
 		// 調停1: 高さ≤2 かつ点灯列≤2 の極小バンドは「4clk 整列したスプライト」の公算が高い。
-		// 調停2（文脈つき）: 高さ≤2 のバンドで、点灯列の直上/直下の行に同色の residual が
-		// 縦に接している＝スプライトの水平ストローク（スコア桁の上下棒など）。
-		// どちらも PF から降格し、ピクセルをスプライト層（residual）へ戻す。
+		// 調停2（文脈つき・列単位）: 高さ≤2 のバンドで、直上/直下の行に同色 residual が縦に
+		// 接している**列だけ**をスプライト層へ降格（バンド丸ごと降格すると、汚染と無関係な
+		// クリーン列まで巻き込む——合成オーバーラップテストで発覚）。
+		// 全点灯列が接触していれば従来どおり全降格（スコア桁の水平ストローク）。
 		demote := b.Height <= 2 && litCols(rows[top].bits) <= 2
 		if !demote && b.Height <= 2 {
-			demote = touchesResidualVertically(n, residualMask, rows[top], top, b.Height)
+			contact := contactColumns(n, residualMask, rows[top], top, b.Height)
+			if len(contact) > 0 {
+				if len(contact) == litCols(rows[top].bits) {
+					demote = true
+				} else {
+					// 部分降格: 接触列の画素を residual へ移し、残りでバンドを作り直す
+					r2 := rows[top]
+					for c := range contact {
+						for yy := top; yy < y; yy++ {
+							for dx := 0; dx < 4; dx++ {
+								x := c*4 + dx
+								if n.Codes[yy][x] != rowBG[yy] {
+									residualMask[yy][x] = true
+								}
+							}
+						}
+						r2.bits[c] = false
+					}
+					b = makeBand(r2, top, y-top)
+				}
+			}
 		}
 		if demote {
 			for yy := top; yy < top+b.Height; yy++ {
@@ -164,17 +188,15 @@ func ExtractPlayfield(n *Normalized) (bands []PFBand, residualMask [][]bool, row
 	return bands, residualMask, rowBG
 }
 
-// touchesResidualVertically は薄バンドの点灯列が、上下の行の同色 residual ピクセルと
-// 縦に接しているか（＝スプライトの一部である強い徴候）。
-func touchesResidualVertically(n *Normalized, residual [][]bool, r rowPF, top, height int) bool {
+// contactColumns は薄バンドの点灯列のうち「上下の行に同色の residual が縦に接している」
+// 列の集合（＝スプライトの水平ストロークである強い徴候を列単位で返す）。
+func contactColumns(n *Normalized, residual [][]bool, r rowPF, top, height int) map[int]bool {
+	out := map[int]bool{}
 	for c := 0; c < 40; c++ {
 		if !r.bits[c] {
 			continue
 		}
-		col := r.colorL
-		if c >= 20 {
-			col = r.colorR
-		}
+		col := r.colColor[c]
 		for _, yy := range []int{top - 1, top + height} {
 			if yy < 0 || yy >= n.Height {
 				continue
@@ -182,12 +204,12 @@ func touchesResidualVertically(n *Normalized, residual [][]bool, r rowPF, top, h
 			for dx := 0; dx < 4; dx++ {
 				x := c*4 + dx
 				if residual[yy][x] && n.Codes[yy][x] == col {
-					return true
+					out[c] = true
 				}
 			}
 		}
 	}
-	return false
+	return out
 }
 
 func litCols(bits [40]bool) int {
