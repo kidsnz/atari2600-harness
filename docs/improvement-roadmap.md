@@ -13,6 +13,41 @@ can start without guesswork.
 > gap-closing: deepening authoring + verification into thin domains (sprites incl. the P0+P1 16px technique,
 > audio) and hardening the foundation (CI, trust, completing stub tools).
 
+## Open backlog (2026-06-12, post-ingest — the durable TODO ledger)
+
+### Image ingestion (v1.9–1.18 shipped; field-testing continues)
+- [ ] **Field-test across game styles** (user-requested): vertical scrollers (River Raid), mazes
+  (Pac-Man = real flicker), wide-sprite games (Demon Attack), score-mode users, PAL titles.
+  Record weaknesses here and fix.
+- [ ] Union tracking by position continuity (an animating+moving object splits into per-pose
+  union entries all flagged "flicker" — Pitfall Harry; distinguish true same-position flicker
+  from animation+motion).
+- [ ] Static-layer reconstruction residual (Pitfall 98.5% vs Pizza Boy 100%) — canopy-fringe
+  modelling; consider PAL/Stella palette as a second quantizer table if avg_palette_dist
+  ever hurts.
+- [ ] Animated playfield (scrolling starfields) lands in the dynamic layer as objects —
+  semantic noise; possible "PF-shaped dynamic rows" classifier.
+
+### Techniques — documented refinements (build when a game needs them)
+- [ ] VDEL odd/even trick: 1-px vertical granularity inside a 2-line kernel (#4 note).
+- [ ] Full dynamic multi-sprite kernel: per-frame Y-sort + 2-of-N allocation + fairness rotation
+  (#10's general form; the flicker-pairs core is verified).
+- [ ] DCP skipDraw variant for cycle-starved kernels (#3 note).
+- [ ] F6/F4/larger bankswitch schemes (#11 verified F8 only).
+- [ ] Mid-line HMOVE (+1px/4CLK rightward) — documented in fundamentals-audit, not litmus-verified.
+- [ ] Real music composition with the author by ear (Slocum note tables; #6's joint session).
+
+### Harness (older parked items)
+- [ ] Stella oracle v2: sub-frame alignment, TIA/pixel-level compare, keystroke automation.
+- [ ] `step_clock` (color-clock stepping), `watch`/`trap` (budget case mostly covered by
+  assert_line_budget).
+- [ ] `run_scenario` as an MCP tool; `read_sprite_shape`.
+- [ ] V2-18 RAM-map audit (low).
+
+### The main arc
+- [ ] **Real game authoring** — the techniques catalog (12/12) + ingest pipeline exist to serve
+  this. Next session can start from "what do we build?".
+
 ## Central observation — position is closed, the timing budget is open
 
 The declared top priority, **gap B (timing), remained the biggest hole in the real authoring loop**. The
