@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.21.0] - 2026-06-12
+
+### Added
+- **litmus_bank_f6 / litmus_bank_f4 — F6 (16K/4-bank) and F4 (32K/8-bank) bankswitching
+  hardware-verified** (generalizing the proven F8 pattern: vectors + identical reset stub in
+  every bank, a byte-exact switch-zone chain at $FF00 visiting bank0→1→…→N→0 each frame).
+  Each bank stamps its ID and counter; scenarios assert the last bank's mark, equal counters,
+  and bank.number==0 at the frame boundary. Suite now 46. The F4 chain (~130 cycles) spills one
+  overscan line — compensated explicitly (ldx #29) to keep 262.
+- CLAUDE.md: bank constants note updated (F8/F6/F4 all verified).
+
 ## [1.20.0] - 2026-06-12
 
 ### Added
