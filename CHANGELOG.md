@@ -12,6 +12,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.2.0] - 2026-06-11
+
+### Changed
+- **Exerciser Procedural scene redesigned: starfield over mountains** (author feedback: the old
+  fixed-mask output "looks like a scrolling barcode" — the one-byte-seed magic wasn't visible).
+  - Top 111 lines: sparse starfield — draw = (pair of LFSR steps ANDed) & previous line's pair
+    (~6% density, any column), scrolling every frame. The old `and #$88/$11` masks confined stars
+    to four fixed columns, which is what read as barcode.
+  - Bottom 80 lines: a mirrored mountain ridge generated at scene entry from a one-byte seed by an
+    AND-cascade (`band[b] = band[b+1] & (r1|r2)`, 10 bands of 8 lines; harsher `r1&r2` masks for the
+    top bands, and the top two bands forced empty — consecutive LFSR steps are correlated, which
+    otherwise lets a lucky column survive to the ceiling as a tower). Zero picture bytes in ROM.
+  - The scene now owns all 192 scanlines explicitly (1+111+80). The old version only strobed 191
+    WSYNCs and silently relied on the dispatch line spilling past 76 cycles for the 262 total; the
+    rewrite's lighter pre-section broke that assumption (261 lines) before being caught by the
+    line-count probe. Generation is spread across entry-frame lines (≤75 cycles each, one extra
+    cycle over budget in an early draft was caught by the per-frame probe and moved to its own line).
+- docs/exerciser.md: scene-4 row rewritten accordingly. 38 scenarios pass; goldens regenerated.
+
 ## [1.1.0] - 2026-06-11
 
 ### Changed

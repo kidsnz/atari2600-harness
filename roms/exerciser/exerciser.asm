@@ -99,8 +99,14 @@ pdlDone  = $B8
 ; Gradient シーン・ローカル
 sfxTmr   = $B9      ; SFX 減衰タイマ
 ; Procedural シーン・ローカル
-worldSeed = $BA     ; 現在の世界シード（64 フレーム毎に進む）
+worldSeed = $BA     ; 現在の世界シード（毎フレーム進む＝星空スクロール）
 rnd      = $BB      ; 行毎 LFSR 作業用
+mPF0     = $C0      ; 山バンド PF0 ×10（$C0-$C9, 上→下）
+mPF1     = $CA      ; 山バンド PF1 ×10（$CA-$D3）
+mPF2     = $D4      ; 山バンド PF2 ×10（$D4-$DD）
+mrnd     = $DE      ; 山生成シード（進入時のみ使用）
+t6       = $DF      ; 星空パイプライン作業用（今行の描画値）
+t7       = $BC      ; 星空: 前行のペア値（2連ANDで密度 6.25% に間引く）
 ; Playground シーン・ローカル（排他オーバーレイ）
 px       = $A4      ; P0 X（10-140）
 py       = $A5      ; P0 Y（10-170）
@@ -636,52 +642,159 @@ GKer:   sta WSYNC
 SceneProc:
         lda #$E9
         sta $99             ; 実行センチネル
-        lda lastScene
-        cmp #4
-        beq RNoInit
-        lda #4
-        sta lastScene
-        lda #$2F
-        sta worldSeed       ; 初期世界
-        lda #0
-        sta AUDV0
-        sta AUDV1
-RNoInit:
-        ; 毎フレーム 1 ステップ進める＝星空が連続して上へ流れる（飛行スクロール）
+        ; 星空シード: 毎フレーム 1 ステップ＝連続して上へ流れる
         lda worldSeed
         lsr
         bcc RNoEor
         eor #$8E
 RNoEor: sta worldSeed
-        lda worldSeed
         sta rnd
         lda #$0E
-        sta COLUPF
+        sta COLUPF          ; 星=白
         lda #0
         sta COLUBK
-        sta CTRLPF
+        sta CTRLPF          ; 星空は repeat
         sta PF0
         sta WSYNC           ; 1
-        ; --- 星空 190 行: 行毎 LFSR → 疎な PF1/PF2 ---
-        ldy #0
-RKer:   sta WSYNC
-        lda rnd             ; 3
-        lsr                 ; 5
-        bcc RSk             ; 7
-        eor #$8E            ; 9
-RSk:    sta rnd             ; 12
-        and #$88            ; 14  疎マスク（点をまばらに）
-        sta PF1             ; 17
-        lda rnd             ; 20
-        and #$11            ; 22
-        sta PF2             ; 25
-        iny
-        cpy #190
-        bne RKer
+        lda lastScene
+        cmp #4
+        bne RInit
+        jmp RStars
+RInit:  ; --- 進入フレーム: 山脈を 1 バイトのシードから生成（以後静止・ROM に絵データ無し）---
+        lda #4
+        sta lastScene
+        lda #$2F
+        sta worldSeed       ; 星空の初期世界
+        lda #$5A
+        sta mrnd            ; 山の世界シード
         lda #0
+        sta AUDV0
+        sta AUDV1
         sta PF1
         sta PF2
-        rts                 ; 1+190+(framework) = 192 内: 末尾 WSYNC は不要だった
+        lda #$FF            ; 最下段 band9 = 地面（全 bit）
+        sta mPF0+9
+        sta mPF1+9
+        sta mPF2+9
+        ; band[b] = band[b+1] AND mask: 下が空いた列は上も必ず空く＝山形が必然。
+        ; 裾野（band8..3）= r1 OR r2（生存75%, なだらかに痩せる）／山頂（band2..0）= r1 AND r2
+        ;（生存25%, ほぼ届かない）→「裾野は広く頂はまれ」の山らしい高さ分布。
+        ldx #8
+RGenBand:
+        sta WSYNC           ; バンド毎に 3 行（PF1/PF2/PF0 を 1 行ずつ＝行予算内）
+        jsr MStep
+        sta t6
+        jsr MStep
+        cpx #3
+        bcc RH1
+        ora t6
+        jmp RJ1
+RH1:    and t6
+RJ1:    and mPF1+1,x
+        sta mPF1,x
+        sta WSYNC
+        jsr MStep
+        sta t6
+        jsr MStep
+        cpx #3
+        bcc RH2
+        ora t6
+        jmp RJ2
+RH2:    and t6
+RJ2:    and mPF2+1,x
+        sta mPF2,x
+        sta WSYNC
+        jsr MStep
+        sta t6
+        jsr MStep
+        cpx #3
+        bcc RH3
+        ora t6
+        jmp RJ3
+RH3:    and t6
+RJ3:    and mPF0+1,x
+        sta mPF0,x
+        sta WSYNC           ; ループ制御は専用行（PF0 行に dex/bpl を同居させると最悪 77cy）
+        dex
+        bpl RGenBand        ; 9 バンド × 4 行 = 36
+        lda #0              ; 上 2 バンドは常に空＝峰の上限（LFSR の連続ステップ相関で
+        sta mPF0            ;  特定 bit が生き残り続け、柱が天井まで届くのを防ぐ）
+        sta mPF0+1
+        sta mPF1
+        sta mPF1+1
+        sta mPF2
+        sta mPF2+1
+        ldx #75             ; 星空 111 行ぶんに揃える（36+75=111）
+RGenPad:
+        sta WSYNC
+        dex
+        bne RGenPad
+        jmp RMtn
+
+        ; --- 星空 111 行: 行毎ペア p=LFSR×2 の AND、描画=今行ペア&前行ペア（生存6.25%）---
+        ; ＝固定カラムに頼らず全カラムに出る、まばらな星。たまに p を共有して 2 行星（大きい星）になる。
+RStars: lda #0
+        sta t7
+        sta t6              ; 先頭行は空（パイプライン充填）
+        ldy #0
+RKer:   sta WSYNC
+        lda t6              ; 3
+        sta PF1             ; 6   表示窓(28cy)前 ✓
+        lsr                 ; 8
+        sta PF2             ; 11  表示窓(38.6cy)前 ✓
+        sta PF0             ; 14  上位ニブル, 表示窓(22.6cy)前 ✓
+        ; 次行の星を行末の空き時間に計算
+        lda rnd
+        lsr
+        bcc RSc
+        eor #$8E
+RSc:    sta rnd
+        sta t6
+        lsr
+        bcc RSd
+        eor #$8E
+RSd:    sta rnd
+        and t6              ; A = p = a&b（25%）
+        ldx t7              ; X = 前行ペア
+        sta t7              ; 次行のために保存
+        stx t6
+        and t6              ; A = p & 前行ペア（6.25%）
+        sta t6              ; = 次行の描画値
+        iny
+        cpy #111
+        bne RKer
+        ; --- 山脈 80 行: 10 バンド × 8 行（RAM の帯をロードするだけ）---
+RMtn:   ldy #0
+RMb:    sta WSYNC
+        lda #1
+        sta CTRLPF          ; 5   reflect=中央対称の山並み（冪等書き）
+        lda #$F4
+        sta COLUPF          ; 10  山=茶
+        lda mPF0,y
+        sta PF0             ; 17 ✓(22.6 前)
+        lda mPF1,y
+        sta PF1             ; 24 ✓(28 前)
+        lda mPF2,y
+        sta PF2             ; 31 ✓(38.6 前)
+        ldx #7
+RMw:    sta WSYNC
+        dex
+        bne RMw
+        iny
+        cpy #10
+        bne RMb
+        lda #0              ; 後始末（行 191 の予算内）
+        sta PF0
+        sta PF1
+        sta PF2
+        rts                 ; 1+111+80 = 192 WSYNC（旧版の「ディスパッチ行零れ」依存を廃し明示所有）
+
+MStep:  lda mrnd            ; 山生成 LFSR 1 ステップ（A=新値）
+        lsr
+        bcc MSx
+        eor #$8E
+MSx:    sta mrnd
+        rts
 
         ; --- HMOVE 表（ページ跨ぎ回避の負インデックス, zone_multiplex と同型）---
         ORG  $0E00

@@ -14,7 +14,7 @@ the bank-0 framework owns VSYNC/VBLANK/overscan and input.
 | 1 | **Zone landscape** | Asymmetric-PF mountains (pf_async write windows) + 12 sprites via zone multiplexing with per-frame drift + per-zone colors |
 | 2 | **Playground** | Joystick-driven P0, auto-firing missile (per-frame HMOVE drift), ball pole, PF walls; **collision latches → live color feedback** (read-then-CXCLR) |
 | 3 | **Gradient + SFX** | Per-scanline COLUBK rainbow + scene-entry kick drum (Slocum recipe, decaying AUDV) |
-| 4 | **Procedural** | Per-scanline starfield from the math-verified Galois LFSR; world seed evolves every 64 frames |
+| 4 | **Procedural** | A whole landscape computed from one-byte seeds, zero pixels stored in ROM: a sparse starfield (two LFSR streams ANDed per line, scrolling every frame) over a mirrored mountain ridge built at scene entry by an AND-cascade (`band[b] = band[b+1] & (r1\|r2)`, harsher masks near the summits) — the Pitfall!-style technique |
 
 > A paddle scene existed briefly (v0.60.0–v1.0.0) but was removed in v1.0.1: Stella's controller
 > auto-detection sees the ROM's INPT0 reads, plugs paddles into the left port, and **paddles hold INPT4
