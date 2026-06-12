@@ -1,0 +1,25 @@
+{
+  "rom": "roms/techniques/sound_driver.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 50, "player": 0, "action": "fire", "pressed": true},
+    {"frame": 52, "player": 0, "action": "fire", "pressed": false}
+  ],
+  "asserts": [
+    { "at_frame": 40, "field": "audio.ch0.control", "op": "==", "value": 4 },
+    { "at_frame": 40, "field": "audio.ch0.volume",  "op": "==", "value": 8 },
+    { "at_frame": 40, "field": "audio.ch1.control", "op": "==", "value": 12 },
+    { "at_frame": 40, "field": "audio.ch1.volume",  "op": "==", "value": 6 },
+    { "at_frame": 53, "field": "audio.ch1.control", "op": "==", "value": 4 },
+    { "at_frame": 53, "field": "audio.ch1.volume",  "op": "==", "value": 12 },
+    { "at_frame": 53, "field": "audio.ch0.control", "op": "==", "value": 4 },
+    { "at_frame": 53, "field": "audio.ch0.volume",  "op": "==", "value": 8 },
+    { "at_frame": 70, "field": "audio.ch1.control", "op": "==", "value": 12 },
+    { "at_frame": 70, "field": "audio.ch1.volume",  "op": "==", "value": 6 },
+    { "at_frame": 70, "field": "ram.0x85", "op": "==", "value": 0 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_audio": true
+  }
+}

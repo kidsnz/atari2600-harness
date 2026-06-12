@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.45.0] - 2026-06-12
+
+### Added
+- **Technique: in-game sound driver** (`roms/techniques/sound_driver.asm` +
+  `docs/techniques/sound-driver.md`): looping 2-voice music from jingle-compatible tables with
+  **SFX preemption of channel 1 and automatic restore**; driver tick runs in overscan under
+  TIM64T (constant calibrated by scenario line-count sweep). Verified by `dissect -audio`
+  round-trip (transcription == composition on both voices) and frame-exact preemption/restore
+  asserts. CI: `scenarios/sound_driver.json` (+ audio golden).
+
 ## [1.44.0] - 2026-06-12
 
 ### Added
