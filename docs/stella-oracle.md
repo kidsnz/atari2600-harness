@@ -35,6 +35,15 @@ The interactive session (2026-06-11) resolved every unknown:
   the JMP ($xxFF) bug path marker, the TIM1T-windowed cycle measurements (read +1 page-cross, store fixed-5,
   branch 2/3/4, illegal DCP=5) and timer behavior are **agreed by two independent emulator implementations**.
 
+### Frame-boundary phase (measured 2026-06-11, exerciser cross-check)
+The two emulators cut "frame N" at different points *within* the frame: comparing the Exerciser at
+`-frames 5`, **127/128 bytes match** and the only diff is the frame counter (+1); at `-frames 4` the
+counter matches and instead the four per-frame-mutating bytes differ by one step the other way. All
+structural state agrees — the diffs are boundary phase, not divergence. Conclusion: the oracle's proven
+scope today is **frame-stable RAM** (`smoke` and `litmus_6502`: 128/128 PASS); ROMs with per-frame
+counters need sub-frame alignment (v2).
+
 ### v2 (future)
-TIA write-register compare (needs a `tia` text parse), pixel compare (palette→TIA-index mapping +
-2:1 downsample of `-ss1x` snapshots), full automation via an accessibility-granted keystroke.
+Sub-frame boundary alignment for per-frame-mutating RAM; TIA write-register compare (needs a `tia` text
+parse), pixel compare (palette→TIA-index mapping + 2:1 downsample of `-ss1x` snapshots), full automation
+via an accessibility-granted keystroke.

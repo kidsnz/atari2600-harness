@@ -28,7 +28,9 @@ every capability** — is met:
   side effects, asymmetric-PF windows, inputs incl. paddles, F8 bankswitching + `read_bank`, 6502/BCD
   precision, all 15 collision pairs, RIOT timers, mirrors, LFSR, audio sample capture + `pkg/audio`).
 - **Cross-emulator agreement**: `cmd/stellacheck` RAM cross-checks PASS against Stella for `smoke` and the
-  `litmus_6502` measurement suite.
+  `litmus_6502` measurement suite (128/128 bytes each). The Exerciser cross-check additionally showed all
+  structural state agreeing, with only per-frame counters phase-shifted by the emulators' differing
+  frame-boundary cut points — measured and documented in `docs/stella-oracle.md` (sub-frame alignment = v2).
 - **Docs**: routing-tabled deep dives (`fundamentals-audit`, `techniques/`, `exerciser`, `stella-oracle`,
   `verified-coverage`), each fact tagged verified/documented with sources.
 
