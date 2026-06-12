@@ -93,11 +93,14 @@ The actionable follow-ups live in `hardening-roadmap.md` § "v2 backlog". Verifi
   `soundTypeArray` on imported songs.
 
 ## 7. Input
-- 📖 SWCHA joystick bits (P0 high nibble R/L/D/U, 0=pushed), SWCHB console switches, SWACNT/SWBCNT DDRs.
-- 📖 INPT4/5 fire: D7, 0=pressed; **VBLANK D6=1 enables latch mode** (stays 0 once pressed; disabling
-  resets to 1). Test with N flag, never Z (bus noise in low bits).
-- 📖 Paddles INPT0–3: **VBLANK D7=1 dumps the caps**; clear → caps charge; count scanlines until D7=1.
-- ⬜ none of this is litmus-verified; `set_input` exists but its paddle path is uncalibrated.
+- ✅ SWCHA joystick bits (P0 high nibble R/L/D/U, 0=pushed) — verified `litmus_input` (v0.42.0).
+- ✅ **SWCHB console switches** — verified `litmus_swchb` (v1.46.0): D0 RESET / D1 SELECT
+  (active-low), D3 color/BW, D6/D7 P0/P1 difficulty. Driven via `SetPanel`
+  (reset/select/color/p0pro/p1pro) + scenario panel inputs.
+- ✅ INPT4/5 fire: D7, 0=pressed; **VBLANK D6=1 latch mode** — verified `litmus_input` (v0.42.0).
+  Test with N flag, never Z (bus noise in low bits).
+- ✅ Paddles INPT0–3 dump/charge — verified `litmus_paddle` (v0.54.0; transfer curve measured).
+- 📖 SWACNT/SWBCNT DDRs — documented only (rarely game-relevant).
 
 ## 8. 6502/6507 precision
 - ✅ cycle accounting (76/line; WSYNC-stall exclusion).

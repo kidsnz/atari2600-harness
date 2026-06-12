@@ -12,6 +12,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.46.0] - 2026-06-12
+
+### Added
+- **Technique: game state machine** (`roms/techniques/game_states.asm` +
+  `docs/techniques/game-states.md`): title/play/game-over skeleton with edge-detected console
+  switches, SELECT variants, difficulty-dependent round timing, attract mode, deterministic
+  state entry, frame logic under TIM64T. CI: full-lifecycle scenario (~1100 frames, golden).
+  Dogfooded: `fieldtest -auto` detects this ROM's title via `auto-start: reset`.
+- **`litmus_swchb` — SWCHB read side verified** (D0/D1 active-low, D3 color, D6/D7 difficulty):
+  `emu.SetPanel` extended with `color`/`p0pro`/`p1pro`, and scenario `inputs[]` now accepts panel
+  actions (`reset`/`select`/`color`/`p0pro`/`p1pro`). `docs/fundamentals-audit.md` input section
+  updated to verified.
+
 ## [1.45.0] - 2026-06-12
 
 ### Added

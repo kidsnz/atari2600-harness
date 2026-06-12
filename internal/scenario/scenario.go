@@ -23,7 +23,7 @@ import (
 type Input struct {
 	Frame   int    `json:"frame"`   // シナリオ開始（warmup 後）からの 0 起点フレーム。このフレームを走らせる前に適用
 	Player  int    `json:"player"`  // 0=P0/左, 1=P1/右
-	Action  string `json:"action"`  // left|right|up|down|fire|center|paddle
+	Action  string `json:"action"`  // left|right|up|down|fire|center|paddle|reset|select|color|p0pro|p1pro
 	Pressed bool   `json:"pressed"` // 押下保持/解除（center/paddle では無視）
 	Value   float64 `json:"value,omitempty"` // action=paddle の位置 0.0〜1.0（V2-4b）
 }
@@ -180,6 +180,11 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			if in.Action == "paddle" {
 				if err := e.SetPaddle(in.Player, in.Value); err != nil {
 					return nil, fmt.Errorf("frame %d paddle: %w", f, err)
+				}
+			} else if in.Action == "reset" || in.Action == "select" || in.Action == "color" ||
+				in.Action == "p0pro" || in.Action == "p1pro" {
+				if err := e.SetPanel(in.Action, in.Pressed); err != nil {
+					return nil, fmt.Errorf("frame %d panel: %w", f, err)
 				}
 			} else if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
 				return nil, fmt.Errorf("frame %d input: %w", f, err)

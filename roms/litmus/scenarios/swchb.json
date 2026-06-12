@@ -1,0 +1,29 @@
+{
+  "rom": "roms/litmus/litmus_swchb.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 10, "action": "reset",  "pressed": true},
+    {"frame": 14, "action": "reset",  "pressed": false},
+    {"frame": 20, "action": "select", "pressed": true},
+    {"frame": 24, "action": "select", "pressed": false},
+    {"frame": 30, "action": "color",  "pressed": false},
+    {"frame": 40, "action": "color",  "pressed": true},
+    {"frame": 50, "action": "p0pro",  "pressed": true},
+    {"frame": 60, "action": "p1pro",  "pressed": true},
+    {"frame": 70, "action": "p0pro",  "pressed": false}
+  ],
+  "asserts": [
+    { "at_frame": 8,  "field": "ram.0x81", "op": "==", "value": 0 },
+    { "at_frame": 12, "field": "ram.0x81", "op": "==", "value": 1 },
+    { "at_frame": 16, "field": "ram.0x81", "op": "==", "value": 0 },
+    { "at_frame": 22, "field": "ram.0x82", "op": "==", "value": 1 },
+    { "at_frame": 26, "field": "ram.0x82", "op": "==", "value": 0 },
+    { "at_frame": 35, "field": "ram.0x83", "op": "==", "value": 0 },
+    { "at_frame": 45, "field": "ram.0x83", "op": "==", "value": 1 },
+    { "at_frame": 55, "field": "ram.0x84", "op": "==", "value": 1 },
+    { "at_frame": 65, "field": "ram.0x85", "op": "==", "value": 1 },
+    { "at_frame": 75, "field": "ram.0x84", "op": "==", "value": 0 },
+    { "at_frame": 75, "field": "ram.0x85", "op": "==", "value": 1 }
+  ],
+  "checks": { "ntsc_frame_lines": 262 }
+}

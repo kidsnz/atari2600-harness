@@ -1,0 +1,30 @@
+{
+  "rom": "roms/techniques/game_states.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 10,  "action": "select", "pressed": true},
+    {"frame": 12,  "action": "select", "pressed": false},
+    {"frame": 20,  "action": "reset",  "pressed": true},
+    {"frame": 22,  "action": "reset",  "pressed": false},
+    {"frame": 475, "action": "p0pro",  "pressed": true},
+    {"frame": 480, "action": "reset",  "pressed": true},
+    {"frame": 482, "action": "reset",  "pressed": false}
+  ],
+  "asserts": [
+    { "at_frame": 5,    "field": "ram.0x80", "op": "==", "value": 0 },
+    { "at_frame": 15,   "field": "ram.0x83", "op": "==", "value": 1 },
+    { "at_frame": 25,   "field": "ram.0x80", "op": "==", "value": 1 },
+    { "at_frame": 330,  "field": "ram.0x80", "op": "==", "value": 1 },
+    { "at_frame": 350,  "field": "ram.0x80", "op": "==", "value": 2 },
+    { "at_frame": 470,  "field": "ram.0x80", "op": "==", "value": 0 },
+    { "at_frame": 490,  "field": "ram.0x80", "op": "==", "value": 1 },
+    { "at_frame": 600,  "field": "ram.0x80", "op": "==", "value": 1 },
+    { "at_frame": 660,  "field": "ram.0x80", "op": "==", "value": 2 },
+    { "at_frame": 790,  "field": "ram.0x80", "op": "==", "value": 0 },
+    { "at_frame": 1100, "field": "ram.0x89", "op": "==", "value": 1 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

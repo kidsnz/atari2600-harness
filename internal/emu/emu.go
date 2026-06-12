@@ -357,8 +357,14 @@ func (e *Emu) SetPanel(switchName string, pressed bool) error {
 		ev = ports.PanelReset
 	case "select":
 		ev = ports.PanelSelect
+	case "color": // pressed=true → カラー / false → 白黒（SWCHB D3）
+		ev = ports.PanelSetColor
+	case "p0pro": // pressed=true → P0 難易度 A(Pro) / false → B（SWCHB D6）
+		ev = ports.PanelSetPlayer0Pro
+	case "p1pro": // SWCHB D7
+		ev = ports.PanelSetPlayer1Pro
 	default:
-		return fmt.Errorf("unknown panel switch %q (want reset/select)", switchName)
+		return fmt.Errorf("unknown panel switch %q (want reset/select/color/p0pro/p1pro)", switchName)
 	}
 	_, err := e.VCS.RIOT.Ports.HandleInputEvent(ports.InputEvent{Port: plugging.PortPanel, Ev: ev, D: pressed})
 	return err
