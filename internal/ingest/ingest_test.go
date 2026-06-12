@@ -568,8 +568,11 @@ func TestMultiFrameStaticScene(t *testing.T) {
 		t.Fatalf("PF bands %d != single-frame %d", len(mr.Static.Playfield), len(single.Playfield))
 	}
 	for i := range single.Playfield {
-		if mr.Static.Playfield[i] != single.Playfield[i] {
-			t.Fatalf("band %d differs: %+v vs %+v", i, mr.Static.Playfield[i], single.Playfield[i])
+		a, b := mr.Static.Playfield[i], single.Playfield[i]
+		if a.Top != b.Top || a.Height != b.Height || a.Mode != b.Mode ||
+			a.PF0 != b.PF0 || a.PF1 != b.PF1 || a.PF2 != b.PF2 ||
+			a.ColorLeft != b.ColorLeft || a.ColorRight != b.ColorRight {
+			t.Fatalf("band %d differs: %+v vs %+v", i, a, b)
 		}
 	}
 	// P0 柱（静止物）は static_* 側に出る（動的層には何も出ない）
@@ -667,5 +670,44 @@ func TestMultiFrameAnimatedPF(t *testing.T) {
 	}
 	if hinted == 0 {
 		t.Fatalf("no animated_pf? hints in dynamic layers")
+	}
+}
+
+// --- R3: 行中 COLUPF（color_writes）---
+// 左半に2色の PF が並ぶ行 → ColorWrites として表現され fidelity 100%。
+func TestColorWrites(t *testing.T) {
+	q := NewNTSCQuantizer()
+	a := q.Canonical(0xD6) // 葉
+	b := q.Canonical(0x42) // 赤
+	img := image.NewRGBA(image.Rect(0, 0, 160, 12))
+	for y := 4; y < 8; y++ {
+		for c := 1; c <= 8; c++ { // colsA
+			for dx := 0; dx < 4; dx++ {
+				img.SetRGBA(c*4+dx, y, q.RGB(a))
+			}
+		}
+		for c := 12; c <= 18; c++ { // colsB（同じ左半・別色）
+			for dx := 0; dx < 4; dx++ {
+				img.SetRGBA(c*4+dx, y, q.RGB(b))
+			}
+		}
+	}
+	n, err := Normalize(img, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep := Analyze(n, q)
+	if len(rep.Playfield) != 1 {
+		t.Fatalf("bands=%d want 1: %+v", len(rep.Playfield), rep.Playfield)
+	}
+	band := rep.Playfield[0]
+	if len(band.ColorWrites) < 2 {
+		t.Fatalf("no color_writes: %+v", band)
+	}
+	if band.ColorWrites[1].Clock != 48 || band.ColorWrites[1].Color != int(b) {
+		t.Fatalf("write[1]=%+v want clock48 color $%02X", band.ColorWrites[1], b)
+	}
+	if rep.Fidelity != 1.0 {
+		t.Fatalf("fidelity %.4f", rep.Fidelity)
 	}
 }

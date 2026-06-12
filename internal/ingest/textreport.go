@@ -119,6 +119,9 @@ func TextReport(rep *Report, title string) string {
 		fmt.Fprintf(&b, "  y%3d h%2d %-4s pf=%02X/%02X/%02X colL=$%02X colR=$%02X %s%s\n",
 			band.Top, band.Height, mode, band.PF0, band.PF1, band.PF2,
 			band.ColorLeft, band.ColorRight, bandRow(band), flag)
+		for _, w := range band.ColorWrites {
+			fmt.Fprintf(&b, "        ; COLUPF timed write: clock %d -> $%02X\n", w.Clock, uint8(w.Color))
+		}
 	}
 	fmt.Fprintf(&b, "\n=== DASM 片 ===\n%s\n%s", rep.PlayfieldASM, rep.SpritesASM)
 	return b.String()

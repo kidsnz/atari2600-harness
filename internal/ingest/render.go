@@ -19,20 +19,35 @@ func RenderReport(rep *Report) [][]uint8 {
 			out[y][x] = bg
 		}
 	}
-	// PF バンド
+	// PF バンド（ColorWrites があれば timed write を再生して列毎色を決める）
 	for _, b := range rep.Playfield {
 		bits := decodeBand(b)
+		var colColors [40]uint8
+		for c := 0; c < 40; c++ {
+			if c < 20 {
+				colColors[c] = b.ColorLeft
+			} else {
+				colColors[c] = b.ColorRight
+			}
+		}
+		if len(b.ColorWrites) > 0 {
+			cur := uint8(b.ColorWrites[0].Color)
+			wi := 1
+			for c := 0; c < 40; c++ {
+				for wi < len(b.ColorWrites) && b.ColorWrites[wi].Clock <= c*4 {
+					cur = uint8(b.ColorWrites[wi].Color)
+					wi++
+				}
+				colColors[c] = cur
+			}
+		}
 		for y := b.Top; y < b.Top+b.Height && y < h; y++ {
 			for c := 0; c < 40; c++ {
 				if !bits[c] {
 					continue
 				}
-				col := b.ColorLeft
-				if c >= 20 {
-					col = b.ColorRight
-				}
 				for dx := 0; dx < 4; dx++ {
-					out[y][c*4+dx] = col
+					out[y][c*4+dx] = colColors[c]
 				}
 			}
 		}

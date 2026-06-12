@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.31.0] - 2026-06-12
+
+### Added
+- **Ingest R3 — mid-scanline COLUPF as a first-class citizen.** Bands whose lit columns change
+  color mid-half now carry `color_writes` ([{clock,color}] — faithful timed-write register
+  semantics, exactly how you'd author it), the renderer replays them, and the text report prints
+  them as `; COLUPF timed write: clock N -> $XX`. The previously "documented limit" is now
+  modeled: **Pitfall's static layer 98.56% → 99.90%** (8 bands gained writes). Synthetic CI
+  proof: a two-color half extracts write@clock48 with fidelity 100%. Half-boundary-only changes
+  (score mode) still use ColorLeft/Right — no churn for existing data. inbox reports regenerated.
+
 ## [1.30.0] - 2026-06-12
 
 ### Changed

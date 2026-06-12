@@ -24,6 +24,15 @@ type PFBand struct {
 	// 確信度: 1.0=全列が綺麗に 4clk 整列・単色。重なり等で列を捨てた行があると下がる。
 	Confidence float64 `json:"confidence"`
 	Repaired   bool    `json:"repaired,omitempty"` // M7: 参照バンドから重なり修復済み
+	// R3: 行中 COLUPF 書換（timed write）。点灯列の色が途中で変わるバンドはこれで忠実に表現する
+	//（Pitfall の林冠フリンジ等）。先頭要素は clock0 の初期色（=ColorLeft）。レジスタ意味論に忠実。
+	ColorWrites []ColorWrite `json:"color_writes,omitempty"`
+}
+
+// ColorWrite は可視 clock 位置での COLUPF 書換。
+type ColorWrite struct {
+	Clock int `json:"clock"`
+	Color int `json:"color"`
 }
 
 // rowPF は 1 行ぶんの PF 解析結果。
@@ -224,6 +233,34 @@ func litCols(bits [40]bool) int {
 
 func makeBand(r rowPF, top, height int) PFBand {
 	b := PFBand{Top: top, Height: height, ColorLeft: r.colorL, ColorRight: r.colorR, Confidence: r.conf}
+	// 点灯列の色変化を timed write 列として抽出（R3）。半面1色なら writes 無し（後方互換）。
+	var writes []ColorWrite
+	var cur uint8
+	started := false
+	multi := false
+	for c := 0; c < 40; c++ {
+		if !r.bits[c] {
+			continue
+		}
+		col := r.colColor[c]
+		if !started {
+			writes = append(writes, ColorWrite{Clock: 0, Color: int(col)})
+			cur, started = col, true
+			continue
+		}
+		if col != cur {
+			writes = append(writes, ColorWrite{Clock: c * 4, Color: int(col)})
+			cur = col
+			multi = true
+		}
+	}
+	// 半面境界のみの変化（score-mode 等）は ColorLeft/Right で表現済み → writes 不要
+	if multi && !onlyHalfBoundaryChange(writes) {
+		b.ColorWrites = writes
+		if b.Confidence < 1.0 {
+			b.Confidence = 0.95 // 多色はモデル化された＝混色ペナルティを緩和
+		}
+	}
 	left := r.bits[:20]
 	right := r.bits[20:]
 	mirror := true
@@ -256,6 +293,14 @@ func makeBand(r rowPF, top, height int) PFBand {
 }
 
 func boolSlice(b []bool) []bool { return b }
+
+// onlyHalfBoundaryChange は「色変化が clock80 の半面境界 1 箇所だけ」か（=Left/Right で表現可能）。
+func onlyHalfBoundaryChange(w []ColorWrite) bool {
+	if len(w) != 2 {
+		return false
+	}
+	return w[1].Clock == 80
+}
 
 // globalMode は画像全体の最頻色。
 func globalMode(codes [][]uint8) uint8 {
