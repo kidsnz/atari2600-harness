@@ -226,3 +226,63 @@ func NearestNote(freq float64) (name string, cents float64) {
 	exact := 440.0 * math.Pow(2, float64(n)/12.0)
 	return fmt.Sprintf("%s%d", names[idx%12], idx/12), 1200 * math.Log2(freq/exact)
 }
+
+// --- SFX ヘルパ（U-M2: 効果音をフレーム列として生成・数値検証可能） ---
+
+// SFXFrame は 1 フレームぶんの音声レジスタ指定。
+type SFXFrame struct {
+	C uint8 // AUDC（音色）
+	F uint8 // AUDF（分周）
+	V uint8 // AUDV（音量）
+}
+
+// PitchSweep は AUDF を fStart→fEnd へ線形補間するスイープ（fEnd 大=下降音）。
+func PitchSweep(audc, fStart, fEnd, vol, frames int) []SFXFrame {
+	out := make([]SFXFrame, frames)
+	for i := range out {
+		f := fStart
+		if frames > 1 {
+			f = fStart + (fEnd-fStart)*i/(frames-1)
+		}
+		out[i] = SFXFrame{uint8(audc), uint8(f), uint8(vol)}
+	}
+	return out
+}
+
+// NoiseBurst はノイズ（既定 AUDC=8）の減衰バースト。vol→0 へ線形減衰。
+func NoiseBurst(audc, audf, vol, frames int) []SFXFrame {
+	out := make([]SFXFrame, frames)
+	for i := range out {
+		v := vol * (frames - i) / frames
+		out[i] = SFXFrame{uint8(audc), uint8(audf), uint8(v)}
+	}
+	return out
+}
+
+// Blip は単発の短音。
+func Blip(audc, audf, vol, frames int) []SFXFrame {
+	out := make([]SFXFrame, frames)
+	for i := range out {
+		out[i] = SFXFrame{uint8(audc), uint8(audf), uint8(vol)}
+	}
+	return out
+}
+
+// Arpeggio は AUDF 列を framesPer フレームずつ順に鳴らす（ピックアップ音等）。
+func Arpeggio(audc int, audfs []int, framesPer, vol int) []SFXFrame {
+	var out []SFXFrame
+	for _, f := range audfs {
+		out = append(out, Blip(audc, f, vol, framesPer)...)
+	}
+	return out
+}
+
+// EmitSFX は SFX フレーム列を dasm の .byte 表（2バイト/フレーム: AUDC<<4|AUDV, AUDF）へ。
+func EmitSFX(label string, frames []SFXFrame) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s: ; %d frames (2 bytes each: AUDC<<4|AUDV, AUDF)\n", label, len(frames))
+	for _, fr := range frames {
+		fmt.Fprintf(&b, "        byte $%02X,$%02X\n", fr.C<<4|fr.V&0x0F, fr.F)
+	}
+	return b.String()
+}

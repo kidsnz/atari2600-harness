@@ -115,3 +115,30 @@ func TestNearestNoteRoundTrip(t *testing.T) {
 		t.Errorf("Freq(4,12) -> %s %+.1f cents, want D6 ≈ +48", name, cents)
 	}
 }
+
+// SFX ヘルパ: スイープは単調・バーストは 0 で終わる・長さが正しい。
+func TestSFXHelpers(t *testing.T) {
+	laser := PitchSweep(4, 4, 20, 12, 12)
+	if len(laser) != 12 {
+		t.Fatalf("laser len %d", len(laser))
+	}
+	for i := 1; i < len(laser); i++ {
+		if laser[i].F < laser[i-1].F {
+			t.Errorf("sweep not monotonic at %d", i)
+		}
+	}
+	if laser[0].F != 4 || laser[11].F != 20 {
+		t.Errorf("sweep endpoints %d..%d", laser[0].F, laser[11].F)
+	}
+	boom := NoiseBurst(8, 6, 15, 24)
+	if boom[0].V != 15 || boom[23].V > 1 {
+		t.Errorf("burst envelope %d..%d", boom[0].V, boom[23].V)
+	}
+	arp := Arpeggio(4, []int{14, 10, 8}, 4, 10)
+	if len(arp) != 12 || arp[4].F != 10 {
+		t.Errorf("arpeggio shape")
+	}
+	if got := EmitSFX("Laser", laser[:1]); got != "Laser: ; 1 frames (2 bytes each: AUDC<<4|AUDV, AUDF)\n        byte $4C,$04\n" {
+		t.Errorf("EmitSFX got %q", got)
+	}
+}

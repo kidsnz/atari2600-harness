@@ -1,0 +1,36 @@
+{
+  "rom": "roms/techniques/sfx_demo.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 10, "player": 0, "action": "fire", "pressed": true},
+    {"frame": 12, "player": 0, "action": "fire", "pressed": false},
+    {"frame": 30, "player": 0, "action": "fire", "pressed": true},
+    {"frame": 32, "player": 0, "action": "fire", "pressed": false},
+    {"frame": 60, "player": 0, "action": "fire", "pressed": true},
+    {"frame": 62, "player": 0, "action": "fire", "pressed": false},
+    {"frame": 80, "player": 0, "action": "fire", "pressed": true},
+    {"frame": 82, "player": 0, "action": "fire", "pressed": false},
+    {"frame": 100, "player": 0, "action": "fire", "pressed": true},
+    {"frame": 102, "player": 0, "action": "fire", "pressed": false}
+  ],
+  "asserts": [
+    { "at_frame": 12,  "field": "audio.ch0.control", "op": "==", "value": 4 },
+    { "at_frame": 12,  "field": "audio.ch0.volume",  "op": "==", "value": 12 },
+    { "at_frame": 26,  "field": "audio.ch0.volume",  "op": "==", "value": 0 },
+    { "at_frame": 32,  "field": "audio.ch0.control", "op": "==", "value": 8 },
+    { "at_frame": 32,  "field": "audio.ch0.volume",  "op": ">",  "value": 10 },
+    { "at_frame": 58,  "field": "audio.ch0.volume",  "op": "==", "value": 0 },
+    { "at_frame": 62,  "field": "audio.ch0.control", "op": "==", "value": 4 },
+    { "at_frame": 62,  "field": "audio.ch0.freq",    "op": "==", "value": 19 },
+    { "at_frame": 70,  "field": "audio.ch0.freq",    "op": "==", "value": 11 },
+    { "at_frame": 82,  "field": "audio.ch0.control", "op": "==", "value": 6 },
+    { "at_frame": 90,  "field": "audio.ch0.volume",  "op": "==", "value": 0 },
+    { "at_frame": 102, "field": "audio.ch0.control", "op": "==", "value": 3 },
+    { "at_frame": 140, "field": "audio.ch0.volume",  "op": "==", "value": 0 },
+    { "at_frame": 140, "field": "ram.0x83", "op": "==", "value": 0 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_audio": true
+  }
+}
