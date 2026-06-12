@@ -12,6 +12,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.47.0] - 2026-06-12
+
+### Added
+- **Technique: missiles as bullets** (`roms/techniques/bullets.asm` +
+  `docs/techniques/missiles-bullets.md`): RESMP spawn-at-player, sentinel-encoded row-range
+  flight (kernel stays under the line budget on the active path), CXM0P hit handling.
+  CI: `scenarios/bullets.json` (spawn at ship+4, flight, latch, hit bookkeeping, golden).
+- **`litmus_resmp` — RESMP verified**: unlock places the missile at **player+4px** (1x center),
+  follows HMOVE moves, and the lock must be **held ≥1 frame** (same-pass lock+unlock does not
+  move the missile). Plus three recorded traps: collision *read* addresses decode the low nibble
+  ($32 reads CXP0FB, not CXM0P=$30); PosObject fine adjust is `eor #7` (not `eor #$FF`); active-
+  path-only line-budget overruns show up as frame-length changes (350-line frames).
+
 ## [1.46.0] - 2026-06-12
 
 ### Added

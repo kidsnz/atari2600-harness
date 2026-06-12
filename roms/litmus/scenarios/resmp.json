@@ -1,0 +1,12 @@
+{
+  "rom": "roms/litmus/litmus_resmp.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    { "at_frame": 5,  "field": "tia.player0.hmoved_pixel",  "op": "==", "value": 24 },
+    { "at_frame": 5,  "field": "tia.missile0.hmoved_pixel", "op": "==", "value": 28 },
+    { "at_frame": 15, "field": "tia.missile0.hmoved_pixel", "op": "==", "value": 28 },
+    { "at_frame": 25, "field": "tia.player0.hmoved_pixel",  "op": "==", "value": 32 },
+    { "at_frame": 35, "field": "tia.missile0.hmoved_pixel", "op": "==", "value": 36 }
+  ],
+  "checks": { "ntsc_frame_lines": 262 }
+}

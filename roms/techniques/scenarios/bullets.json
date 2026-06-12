@@ -1,0 +1,24 @@
+{
+  "rom": "roms/techniques/bullets.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 10, "player": 0, "action": "fire", "pressed": true},
+    {"frame": 12, "player": 0, "action": "fire", "pressed": false}
+  ],
+  "asserts": [
+    { "at_frame": 5,  "field": "tia.player0.hmoved_pixel",  "op": "==", "value": 60 },
+    { "at_frame": 5,  "field": "tia.player1.hmoved_pixel",  "op": "==", "value": 60 },
+    { "at_frame": 12, "field": "tia.missile0.hmoved_pixel", "op": "==", "value": 64 },
+    { "at_frame": 12, "field": "ram.0x81", "op": "==", "value": 142 },
+    { "at_frame": 20, "field": "ram.0x81", "op": "==", "value": 110 },
+    { "at_frame": 39, "field": "ram.0x81", "op": "==", "value": 34 },
+    { "at_frame": 40, "field": "collisions.m0_p1", "op": "==", "value": 1 },
+    { "at_frame": 50, "field": "ram.0x83", "op": "==", "value": 1 },
+    { "at_frame": 50, "field": "ram.0x81", "op": "==", "value": 200 },
+    { "at_frame": 50, "field": "ram.0x84", "op": "==", "value": 84 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
