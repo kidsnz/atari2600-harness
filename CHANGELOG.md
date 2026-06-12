@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.35.0] - 2026-06-12
+
+### Added
+- **Composing-session groundwork**: `pkg/audio.NoteFreq/FindNote` (12-TET note names →
+  best (AUDC,AUDF) with cents error, Slocum tuning) and **`cmd/jingle`** — melody notation
+  (`"C5:30 E5:30 G5:30 C6:60 R:30"`) → a playable looping ROM in one command (auto-picks the
+  sound type that fits the whole melody within ±60 cents; assembles via dasm when present;
+  per-note cents annotated in the generated source). Verified: register sequence
+  AUDF 29→23→19→14 matches the documented C6 spot value; 262 lines held. The joint session is
+  now "hum it → ROM in 30 seconds → listen together in Stella".
+
 ## [1.34.0] - 2026-06-12
 
 ### Added

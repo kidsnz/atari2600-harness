@@ -77,3 +77,19 @@ func TestMeasurePeriodSynthetic(t *testing.T) {
 		t.Fatal("DC must measure 0")
 	}
 }
+
+func TestNoteFreqAndFind(t *testing.T) {
+	f, err := NoteFreq("A4")
+	if err != nil || math.Abs(f-440) > 0.01 {
+		t.Fatalf("A4=%f err=%v", f, err)
+	}
+	f, _ = NoteFreq("C4")
+	if math.Abs(f-261.63) > 0.1 {
+		t.Fatalf("C4=%f", f)
+	}
+	// C6 は square AUDF14 が ≈1047Hz（既存スポット値と整合）
+	c, fr, cents, err := FindNote("C6", []int{4}, BaseClockNTSC)
+	if err != nil || c != 4 || fr != 14 || math.Abs(cents) > 10 {
+		t.Fatalf("C6 -> audc=%d audf=%d cents=%f err=%v", c, fr, cents, err)
+	}
+}

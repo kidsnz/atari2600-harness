@@ -4,6 +4,12 @@
 // 検証: harness の audio capture（生サンプル→周期測定, internal/emu）で数値裏取り（V2-14/15）。
 package audio
 
+import (
+	"fmt"
+	"math"
+	"strings"
+)
+
 // BaseClockNTSC は TIA 音声クロック（Hz）。カラークロック/114 = 2 サンプル/scanline。
 const BaseClockNTSC = 3579545.0 / 114.0 // ≈ 31399.5
 // BaseClockPAL は PAL の音声クロック（≈13 セント低い）。
@@ -147,4 +153,58 @@ func DecodeNoteByte(b uint8) (soundTypeIdx, audf int) {
 		return -1, -1
 	}
 	return int(b >> 5), int(b & 0x1F)
+}
+
+// --- 音名 → TIA（R7: 作曲セッション支援）---
+
+var noteOffsets = map[string]int{
+	"C": -9, "C#": -8, "DB": -8, "D": -7, "D#": -6, "EB": -6, "E": -5,
+	"F": -4, "F#": -3, "GB": -3, "G": -2, "G#": -1, "AB": -1, "A": 0,
+	"A#": 1, "BB": 1, "B": 2,
+}
+
+// NoteFreq は 12 平均律の音名（"C4", "F#3", "Bb2" 等, A4=440Hz）を周波数へ。
+func NoteFreq(name string) (float64, error) {
+	n := strings.ToUpper(strings.TrimSpace(name))
+	if len(n) < 2 {
+		return 0, fmt.Errorf("bad note %q", name)
+	}
+	octIdx := len(n) - 1
+	pitch := n[:octIdx]
+	oct := int(n[octIdx] - '0')
+	if oct < 0 || oct > 9 {
+		return 0, fmt.Errorf("bad octave in %q", name)
+	}
+	off, ok := noteOffsets[pitch]
+	if !ok {
+		return 0, fmt.Errorf("bad pitch %q", name)
+	}
+	semis := float64((oct-4)*12 + off)
+	return 440.0 * math.Pow(2, semis/12.0), nil
+}
+
+// FindNote は音名に最も近い (AUDC, AUDF) を返す（セント誤差つき）。
+// types を空にすると実用音色 {4(square), 6(bass), 7(buzz), 12(lead)} から探す。
+func FindNote(name string, types []int, baseClock float64) (audc, audf int, cents float64, err error) {
+	target, err := NoteFreq(name)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if len(types) == 0 {
+		types = []int{4, 6, 7, 12}
+	}
+	best := math.Inf(1)
+	for _, c := range types {
+		for f := 0; f < 32; f++ {
+			got := Freq(c, f, baseClock)
+			if got <= 0 {
+				continue
+			}
+			ct := 1200 * math.Log2(got/target)
+			if math.Abs(ct) < math.Abs(best) {
+				best, audc, audf = ct, c, f
+			}
+		}
+	}
+	return audc, audf, best, nil
 }
