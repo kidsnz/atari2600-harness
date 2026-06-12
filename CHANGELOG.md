@@ -12,6 +12,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.25.0] - 2026-06-12
+
+### Added
+- **Technique #10b — dynamic multi-sprite kernel, the full form** (`dynamic-multisprite.md`,
+  demo `dyn_multisprite.asm`; suite now 50). 5 crossing objects through 2 players: 9-comparator
+  sorting network (deterministic cycles), dynamic 2-of-N slot queues with 0-sentinels and
+  per-frame fairness flip, mid-screen timed-RESP repositioning on the coarse grid, and a
+  **TIM64T-managed VBLANK** (sort+assign vary 60–160 cycles by path — un-paddable; the
+  real-game idiom now verified here). Zero visible budget spills over 10 frames by
+  instruction-level interval enumeration; all 5 object colors proven rendered via multi-frame
+  ingest. War stories recorded: a POSITION path at exactly 76 cycles (the closing WSYNC itself
+  crossed) fixed by a fall-through reorder worth −3 cycles.
+
 ## [1.24.0] - 2026-06-12
 
 ### Added

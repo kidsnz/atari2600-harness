@@ -590,3 +590,36 @@ func TestMultiFrameStaticScene(t *testing.T) {
 		t.Fatalf("unresolved %.4f, want 0 for a static scene", mr.UnresolvedShare)
 	}
 }
+
+// --- M-G: 動的マルチスプライト kernel（technique #10 完全形）の機能証明 ---
+// 5 オブジェクト全色が描画され（=ソート＋動的割当＋画面中再配置が機能）、262 を維持する。
+func TestDynMultisprite(t *testing.T) {
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM("../../roms/techniques/dyn_multisprite.bin"); err != nil {
+		t.Fatal(err)
+	}
+	for f := 0; f < 30; f++ {
+		lines, _ := e.StepFrame()
+		if f >= 2 && lines != 262 {
+			t.Fatalf("frame %d: %d lines", f, lines)
+		}
+	}
+	q := NewNTSCQuantizer()
+	colors := map[int]bool{}
+	for i := 0; i < 6; i++ {
+		img, _ := e.Snapshot()
+		n, _ := Normalize(upscale(img, 2, 1), q)
+		rep := Analyze(n, q)
+		for _, s := range rep.Sprites {
+			for _, c := range s.Colors {
+				colors[c] = true
+			}
+		}
+		e.RunFrames(3)
+	}
+	for _, want := range []int{0x1E, 0x56, 0x9A, 0xCA, 0x44} {
+		if !colors[int(q.Canonical(uint8(want)))] {
+			t.Fatalf("object color $%02X never seen (colors=%v)", want, colors)
+		}
+	}
+}

@@ -1,0 +1,11 @@
+{
+  "rom": "roms/techniques/dyn_multisprite.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 9,  "field": "ram.0x9e", "op": "==", "value": 214 },
+    { "at_frame": 9,  "field": "ram.0x80", "op": ">", "value": 0 },
+    { "at_frame": 50, "field": "ram.0x97", "op": ">", "value": 0 },
+    { "at_frame": 50, "field": "ram.0x9d", "op": ">", "value": 0 }
+  ],
+  "checks": { "ntsc_frame_lines": 262, "golden_frame": true }
+}
