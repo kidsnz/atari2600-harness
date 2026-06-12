@@ -876,7 +876,7 @@ func handleWatchRAM(ctx context.Context, req *mcp.CallToolRequest, in WatchRAMIn
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.12.0",
+		Version: "1.28.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)

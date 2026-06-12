@@ -45,9 +45,10 @@ must always hold *only* in a doc — burn them here or into memory.
   **`assemble_and_load`** (v0.16.0, dasm→load in one shot; on failure returns structured dasm output) /
   **`read_audio`** (v0.17.0, reads TIA audio AUDC/AUDF/AUDV numerically = verify sound with numbers too) /
   **`read_bank`** (v0.43.0, current cartridge bank at PC + is_ram; **F8/F6/F4 verified** (litmus_bank, _f6, _f4), scenario fields `bank.number`/`bank.is_ram`) /
-  **`analyze_image`** (v1.12.0, screenshot→TIA data: PF bands + sprite GRP + colors + grid overlay; `docs/ingest.md`).
-  Unimplemented (planned): `step_clock` (color-clock unit; `Step` is per-instruction, needs a finer hook) /
-  `watch|trap` (the budget case is effectively covered by `assert_line_budget`).
+  **`analyze_image`** (v1.12.0+, screenshot→TIA data; multi-frame `paths[]` = static/dynamic separation + union tracks + flicker; `docs/ingest.md`) /
+  **`analyze_screen`** (v1.19.0, ingest on the current emulator frame) / **`run_scenario`** (v1.19.0, regression verdicts live) /
+  **`watch_ram`** (v1.20.0, RAM-change trap with writing PC). `step_clock`/`watch(bus)` parked (docs/mcp-tools.md).
+  
 
 ## Constants you must never get wrong (source: `docs/resources.md`)
 **Frame** — 1 line = 228 color clocks (HBLANK 68 + visible 160) = **76 CPU cycles** (3 clocks/cycle).

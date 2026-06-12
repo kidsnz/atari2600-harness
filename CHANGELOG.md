@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.28.0] - 2026-06-12
+
+### Added
+- **V2-18 RAM-map audit** — `docs/ram-maps.md`, auto-extracted zero-page equates per ROM.
+- CLAUDE.md tool list updated (analyze_screen / run_scenario / watch_ram; parked items noted);
+  MCP serverInfo now tracks releases (1.28.0). Open-backlog ledger updated with v1.19–v1.28
+  results. Overnight summary at `inbox/overnight_report.txt`.
+
 ## [1.27.0] - 2026-06-12
 
 ### Decided
