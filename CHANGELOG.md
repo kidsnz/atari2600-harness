@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.27.0] - 2026-06-12
+
+### Decided
+- **Ingest M-I — static-layer residual diagnosed and documented, not papered over.** Pitfall's
+  98.6% static reconstruction loses its 1.4% in canopy-fringe rows where two colors share one
+  playfield half on one scanline = the game writes COLUPF mid-scanline. The band model keeps
+  one color per half on purpose (per-column colors would misrepresent register semantics);
+  the documented guidance is to author such rows as timed-write kernels. Diff-row histogram
+  methodology recorded in docs/ingest.md.
+
 ## [1.26.0] - 2026-06-12
 
 ### Added

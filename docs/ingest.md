@@ -103,6 +103,16 @@ to the pixels, noisy in semantics.
 the grid overlay inline; the overlay also lands at `$ATARI2600_INGEST_PATH` (default OS temp).
 CLI equivalent: `cmd/ingest`.
 
+## Static-layer residual — diagnosed (M-I)
+
+Pitfall's static layer reconstructs at **98.6%**; the residual concentrates in canopy-fringe
+rows 68–76 where leaf green ($D6) and trunk dark ($10) coexist **in the same playfield half on
+the same scanline** — hardware-wise that requires a **mid-scanline COLUPF write**, which the
+band model (one color per half) deliberately does not express. Modelling per-column PF colors
+would misrepresent the register semantics, so this stays a documented limit: when you see a
+low-confidence multi-color band, the game is doing mid-line color splits — read those rows with
+`read_row` and author them as a timed-write kernel, not as band data.
+
 ## Honest limits
 
 - One screenshot = **one frame of truth**: flicker-multiplexed objects (#10) appear half-missing;
