@@ -103,3 +103,22 @@ func TestReflect(t *testing.T) {
 		}
 	}
 }
+
+// DigitFont: 10 桁・各行は 6px 幅（下位 2bit 空白）・全桁に点灯行がある。
+func TestDigitFont(t *testing.T) {
+	f := DigitFont()
+	for d, rows := range f {
+		lit := false
+		for r, b := range rows {
+			if b&0x03 != 0 {
+				t.Errorf("digit %d row %d uses low 2 bits: %02X", d, r, b)
+			}
+			if b != 0 {
+				lit = true
+			}
+		}
+		if !lit {
+			t.Errorf("digit %d is blank", d)
+		}
+	}
+}

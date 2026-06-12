@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.43.0] - 2026-06-12
+
+### Added
+- **Technique: 6-digit score kernel** (`roms/techniques/score6.asm` + `docs/techniques/score-kernel.md`):
+  BCD 3-byte score + per-frame font-pointer build + the litmus_48px6 VDEL 6-store choreography with
+  `(zp),y` fetches (stores at 55/58/61/64 cy → whole block repositioned +63px to P0=87/P1=95; gap
+  relations preserved). `pkg/sprite.DigitFont()` for Go-side reuse. CI: `scenarios/score6.json`
+  (positions, BCD carry at frames 99/150, 262 lines, golden).
+
 ## [1.42.0] - 2026-06-12
 
 ### Added

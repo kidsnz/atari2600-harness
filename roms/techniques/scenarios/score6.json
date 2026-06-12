@@ -1,0 +1,58 @@
+{
+  "rom": "roms/techniques/score6.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 5,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 87
+    },
+    {
+      "at_frame": 5,
+      "field": "tia.player1.hmoved_pixel",
+      "op": "==",
+      "value": 95
+    },
+    {
+      "at_frame": 5,
+      "field": "tiareg.player0.vertical_delay",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 5,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 9
+    },
+    {
+      "at_frame": 99,
+      "field": "ram.0x81",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 99,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 3
+    },
+    {
+      "at_frame": 150,
+      "field": "ram.0x81",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 150,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 84
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
