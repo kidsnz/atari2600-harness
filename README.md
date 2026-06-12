@@ -37,9 +37,10 @@ capability base**, two living documents kept honest by the same numeric loop:
 - a **[techniques catalog](docs/techniques/)** — each authoring technique re-implemented clean-room,
   hardware-verified, and CI-locked (e.g. sprite multiplexing).
 
-Today the harness ships **20 MCP tools** and **20+ litmus/technique regression scenarios** (VDEL, HMOVE side
-effects, asymmetric-playfield write windows, input ports, F8 bankswitching, 6502 cycle/BCD precision, …),
-all green in CI on every push.
+Today the harness ships **20 MCP tools** and **39 regression scenarios** (26 litmus ROMs, a verified
+techniques catalog, and the **[Exerciser ROM](docs/exerciser.md)** — an 8K F8 cartridge composing every
+verified capability into six scenes: a 48px-logo/score/music title, zone-multiplexed landscape, interactive
+collision playground, paddle, gradient+SFX, and an LFSR-procedural starfield), all green in CI on every push.
 
 ## Architecture
 
@@ -134,6 +135,8 @@ go build -o bin/harness ./cmd/harness   # produce the binary referenced by .mcp.
 | Verified coverage (what each litmus proves on hardware) | [`docs/verified-coverage.md`](docs/verified-coverage.md) |
 | Techniques catalog (verified 2600 authoring techniques) | [`docs/techniques/`](docs/techniques/) |
 | Fundamentals audit (verified vs documented vs unknown, sourced) | [`docs/fundamentals-audit.md`](docs/fundamentals-audit.md) |
+| The Exerciser ROM (integration showcase; v1.0.0 keystone) | [`docs/exerciser.md`](docs/exerciser.md) |
+| Stella oracle cross-check (`cmd/stellacheck`) | [`docs/stella-oracle.md`](docs/stella-oracle.md) |
 | Roadmap / next moves | [`docs/improvement-roadmap.md`](docs/improvement-roadmap.md) |
 | Strengthening roadmap (sprites / audio / CI) | [`docs/hardening-roadmap.md`](docs/hardening-roadmap.md) |
 | Decisions and changelog | [`CHANGELOG.md`](CHANGELOG.md) |

@@ -112,6 +112,8 @@ round trip. Also return `png_path` in JSON.
 | verified coverage (what each litmus proves on hardware) | `docs/verified-coverage.md` |
 | techniques catalog (verified 2600 authoring techniques: zone multiplexing, …) | `docs/techniques/` |
 | fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
+| Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
+| Stella oracle cross-check usage | `docs/stella-oracle.md` |
 | Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
 | Strengthening roadmap (sprites / audio / CI hardening) | `docs/hardening-roadmap.md` |
 | Decision history and changelog | `CHANGELOG.md` |

@@ -9,8 +9,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Planned
-- Real game authoring (production use of the harness; e.g. a Pong rematch).
-- Extending the `step_scanline|clock` / `watch|trap` tools.
+- Real game authoring on top of the 1.0 base (1.x).
+- Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
+
+## [1.0.0] - 2026-06-11
+
+**The harness is 1.0.** The declared bar — a trustworthy loop (gaps A–E), a sourced fundamentals audit with
+the unknowns measured, a verified techniques catalog, a two-emulator oracle, and **one artifact composing
+every capability** — is met:
+
+- **The Exerciser ROM is complete** (M1–M8, v0.56.0–v0.62.0): an 8K F8 cartridge whose six scenes compose
+  the 48px six-store kernel + live BCD score + a 2-channel music driver, zone multiplexing over an
+  asymmetric playfield, an interactive collision playground, paddle reading, per-scanline color + SFX, and
+  LFSR procedural generation — all driven by input-timeline scenarios, locked by video/audio goldens, and
+  green in CI on every push (39 scenarios; every scene provably inside the 76-cycle line budget via its
+  262-line assertion).
+- **Verification surface**: 26 litmus ROMs; the v2 fundamentals backlog closed (Tier 1–3, incl. VDEL, HMOVE
+  side effects, asymmetric-PF windows, inputs incl. paddles, F8 bankswitching + `read_bank`, 6502/BCD
+  precision, all 15 collision pairs, RIOT timers, mirrors, LFSR, audio sample capture + `pkg/audio`).
+- **Cross-emulator agreement**: `cmd/stellacheck` RAM cross-checks PASS against Stella for `smoke` and the
+  `litmus_6502` measurement suite.
+- **Docs**: routing-tabled deep dives (`fundamentals-audit`, `techniques/`, `exerciser`, `stella-oracle`,
+  `verified-coverage`), each fact tagged verified/documented with sources.
 
 ## [0.50.0] - 2026-06-11
 
