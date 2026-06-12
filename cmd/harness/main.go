@@ -20,6 +20,7 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 	"github.com/kidsnz/atari2600-harness/internal/srcmap"
+	"github.com/kidsnz/atari2600-harness/pkg/audio"
 	"github.com/kidsnz/atari2600-harness/internal/ingest"
 	"github.com/kidsnz/atari2600-harness/internal/scenario"
 )
@@ -393,9 +394,24 @@ func handleReadTIARegisters(ctx context.Context, req *mcp.CallToolRequest, _ str
 
 // --- read_audio（R-2: 音声レジスタを数値で）---
 
+type ChannelNote struct {
+	Note  string  `json:"note,omitempty"`  // 12 平均律の最近接音名（無音/非楽音は空）
+	Cents float64 `json:"cents,omitempty"` // その音名からの誤差
+}
 type ReadAudioOut struct {
 	emu.AudioState
-	Coords Coords `json:"coords"`
+	Note0  ChannelNote `json:"note0"` // ch0 の音名（A-1 回収: 耳でなく名前で議論できる）
+	Note1  ChannelNote `json:"note1"`
+	Coords Coords      `json:"coords"`
+}
+
+func noteOf(ch emu.AudioChannel) ChannelNote {
+	if ch.Volume == 0 {
+		return ChannelNote{}
+	}
+	f := audio.Freq(int(ch.Control), int(ch.Freq), audio.BaseClockNTSC)
+	name, cents := audio.NearestNote(f)
+	return ChannelNote{Note: name, Cents: cents}
 }
 
 func handleReadAudio(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, ReadAudioOut, error) {
@@ -406,7 +422,8 @@ func handleReadAudio(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) 
 	if err != nil {
 		return nil, ReadAudioOut{}, err
 	}
-	return nil, ReadAudioOut{AudioState: e.ReadAudio(), Coords: coordsOf(e)}, nil
+	st := e.ReadAudio()
+	return nil, ReadAudioOut{AudioState: st, Note0: noteOf(st.Channel0), Note1: noteOf(st.Channel1), Coords: coordsOf(e)}, nil
 }
 
 // --- read_collisions（P1: CXxx を構造化）---
@@ -932,7 +949,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.51.0",
+		Version: "1.52.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)

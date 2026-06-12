@@ -168,10 +168,21 @@ func (e *Emu) Snapshot() (img *image.RGBA, visibleTop int) {
 // （P0=赤 / M0=橙 / P1=黄 / M1=緑 / BL=紫）。Clock は HmovedPixel（可視 0..159）。
 func (e *Emu) Markers() []annotate.Marker {
 	v := e.VCS.TIA.Video
+	wide := func(nusiz uint8) int { // NUSIZ サイズビット → ピクセル倍率（$05=2x, $07=4x）
+		switch nusiz & 0x07 {
+		case 0x05:
+			return 2
+		case 0x07:
+			return 4
+		}
+		return 1
+	}
 	return []annotate.Marker{
-		{Label: "P0", Clock: v.Player0.HmovedPixel, Col: color.RGBA{230, 60, 60, 255}},
+		{Label: "P0", Clock: v.Player0.HmovedPixel, Col: color.RGBA{230, 60, 60, 255},
+			Gfx: v.Player0.GfxDataNew, Reflect: v.Player0.Reflected, Wide: wide(v.Player0.SizeAndCopies)},
 		{Label: "M0", Clock: v.Missile0.HmovedPixel, Col: color.RGBA{235, 140, 40, 255}},
-		{Label: "P1", Clock: v.Player1.HmovedPixel, Col: color.RGBA{230, 215, 50, 255}},
+		{Label: "P1", Clock: v.Player1.HmovedPixel, Col: color.RGBA{230, 215, 50, 255},
+			Gfx: v.Player1.GfxDataNew, Reflect: v.Player1.Reflected, Wide: wide(v.Player1.SizeAndCopies)},
 		{Label: "M1", Clock: v.Missile1.HmovedPixel, Col: color.RGBA{70, 200, 70, 255}},
 		{Label: "BL", Clock: v.Ball.HmovedPixel, Col: color.RGBA{180, 90, 210, 255}},
 	}

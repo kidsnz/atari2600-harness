@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.52.0] - 2026-06-12
+
+### Added
+- **`read_audio` note names** (A-1 closed): each channel now reports `note`/`cents` via
+  `pkg/audio.NearestNote` — audio state is discussable by name ("ch0 is C5 +0.2¢"), not just
+  raw AUDC/AUDF. Verified against the sound-driver ROM (C5/C4 exactly as composed).
+- **Sprite shape in the annotated screenshot** (S-4 closed): `get_screen_annotated` draws the
+  *current GRP bit pattern* (REFP-reflected, NUSIZ-width-scaled) at each player's marker
+  position — mid-frame stops show exactly what byte the TIA is holding, cross-checked against
+  `read_tia_registers.gfx_new` ($CC ⇒ the visible 2-2-2 pattern).
+
 ## [1.51.0] - 2026-06-12
 
 ### Added

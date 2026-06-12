@@ -22,6 +22,12 @@ type Marker struct {
 	Label string
 	Clock int
 	Col   color.RGBA
+	// S-4: プレイヤーの現在 GRP ビットパターン（0=無し）。Reflect で左右反転、Wide は
+	// ピクセル倍率（NUSIZ 1x/2x/4x）。注釈画像のマーカー位置に「いま GRP に入っている絵」
+	// の 1 行ぶんを実寸で重ねる。
+	Gfx     uint8
+	Reflect bool
+	Wide    int
 }
 
 const (
@@ -111,6 +117,25 @@ func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.R
 		dc.Stroke()
 		ly := bottom + 7 + float64((rank%2)*12)
 		dc.DrawStringAnchored(fmt.Sprintf("%s:%d", m.Label, m.Clock), cx(m.Clock), ly, 0.5, 0.5)
+		// S-4: 現在の GRP パターンをマーカー位置の直上に実寸で表示（D7 が最左、REFP は反転）
+		if m.Gfx != 0 {
+			w := m.Wide
+			if w <= 0 {
+				w = 1
+			}
+			for bit := 0; bit < 8; bit++ {
+				b := uint(7 - bit)
+				if m.Reflect {
+					b = uint(bit)
+				}
+				if m.Gfx&(1<<b) == 0 {
+					continue
+				}
+				x0 := cx(m.Clock + bit*w)
+				dc.DrawRectangle(x0, bottom-float64(4*scale)-2, float64(w*scale), float64(3*scale))
+				dc.Fill()
+			}
+		}
 	}
 
 	return dc.Image().(*image.RGBA)
