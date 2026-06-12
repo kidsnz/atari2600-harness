@@ -633,3 +633,29 @@ func (e *Emu) RunUntilBudget(maxFrames, budgetCycles int) (over bool, atScanline
 		prevRdy = rdy
 	}
 }
+
+// WatchRAM は RAM[addr] が変化するまで命令単位で実行する（watch_ram ツールの心臓部）。
+// 戻り: 変化したか・旧値/新値・変化時の PC。max_frames で打ち切り。
+// 注: Gopher2600 の VCS.Step は命令途中で中断できない（colorClockCallback は観測専用）ため、
+// 検出粒度は命令単位。同値書込（変化なしの sta）は peek では検出できない＝change 検出に限定。
+func (e *Emu) WatchRAM(addr uint16, maxFrames int) (changed bool, oldVal, newVal uint8, pc uint16, err error) {
+	oldVal, err = e.PeekRAM(addr)
+	if err != nil {
+		return false, 0, 0, 0, err
+	}
+	startFrame := e.Coords().Frame
+	for e.Coords().Frame < startFrame+maxFrames {
+		p := e.VCS.CPU.PC.Address()
+		if err := e.StepInstruction(); err != nil {
+			return false, oldVal, 0, 0, err
+		}
+		v, err := e.PeekRAM(addr)
+		if err != nil {
+			return false, oldVal, 0, 0, err
+		}
+		if v != oldVal {
+			return true, oldVal, v, p, nil
+		}
+	}
+	return false, oldVal, oldVal, 0, nil
+}

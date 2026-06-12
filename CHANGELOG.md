@@ -12,6 +12,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.20.0] - 2026-06-12
+
+### Added
+- **MCP `watch_ram`** — run until RAM[addr] changes; returns old/new value and the PC of the
+  writing instruction (bounded by max_frames). Granularity is per-instruction; same-value
+  stores are invisible (documented).
+
+### Decided
+- **step_clock parked with findings** (docs/mcp-tools.md): Gopher2600's colorClockCallback can
+  observe but not suspend mid-instruction; a color-clock quantum needs an upstream CPU
+  micro-instruction refactor. RunUntilBeam/read_cycles/assert_line_budget/watch_ram cover the
+  practical cases.
+
 ## [1.19.0] - 2026-06-12
 
 ### Added

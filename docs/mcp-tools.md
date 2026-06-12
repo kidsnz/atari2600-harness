@@ -204,3 +204,14 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
 
 For a manual check, pipe the `initialize`/`tools/call` JSON into harness over stdin, or call it via an MCP
 client (registered in Claude Code's `.mcp.json`).
+
+## step_clock — parked (investigated 2026-06-12, overnight run)
+
+`VCS.Step(colorClockCallback)` fires the callback at every color clock (`isCycle` marks CPU-cycle
+boundaries) but **cannot suspend execution mid-instruction** — Step always completes one CPU
+instruction (the CPU core is a single large ExecuteInstruction; Gopher2600's own comments in
+`hardware/step.go` note that sub-instruction suspension would require rebuilding the CPU out of
+micro-instructions). A color-clock-quantum tool therefore needs an upstream refactor.
+Practical coverage today: `RunUntilBeam` (breakif) stops at a target scanline/clock at
+instruction granularity, `read_cycles` measures, `assert_line_budget` guards intervals, and
+`watch_ram` (v1.20.0) traps RAM changes with the writing PC.

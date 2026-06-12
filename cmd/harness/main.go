@@ -833,6 +833,44 @@ func handleAnalyzeScreen(ctx context.Context, req *mcp.CallToolRequest, in Analy
 	return result, AnalyzeImageOut{Report: rep, OverlayPath: ovPath}, nil
 }
 
+
+// --- watch_ram: RAM 変化トラップ ---
+
+type WatchRAMIn struct {
+	Addr      int `json:"addr"`                 // 監視する RAM アドレス（$80-$FF）
+	MaxFrames int `json:"max_frames,omitempty"` // 打ち切り（既定 60）
+}
+
+type WatchRAMOut struct {
+	Changed bool   `json:"changed"`
+	Old     int    `json:"old"`
+	New     int    `json:"new"`
+	PC      string `json:"pc,omitempty"` // 変化を起こした命令のアドレス
+	Coords  Coords `json:"coords"`
+}
+
+func handleWatchRAM(ctx context.Context, req *mcp.CallToolRequest, in WatchRAMIn) (*mcp.CallToolResult, WatchRAMOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	e, err := get()
+	if err != nil {
+		return nil, WatchRAMOut{}, err
+	}
+	mf := in.MaxFrames
+	if mf <= 0 {
+		mf = 60
+	}
+	changed, oldV, newV, pc, err := e.WatchRAM(uint16(in.Addr), mf)
+	if err != nil {
+		return nil, WatchRAMOut{}, err
+	}
+	out := WatchRAMOut{Changed: changed, Old: int(oldV), New: int(newV), Coords: coordsOf(e)}
+	if changed {
+		out.PC = fmt.Sprintf("$%04X", pc)
+	}
+	return nil, out, nil
+}
+
 // --- main ---
 
 func main() {
@@ -860,6 +898,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed)."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "watch_ram", Description: "Run instruction-by-instruction until RAM[addr] CHANGES (returns old/new value and the PC of the writing instruction), bounded by max_frames. Granularity is per-instruction (Gopher2600 cannot suspend mid-instruction); same-value stores are invisible to change detection."}, handleWatchRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "run_scenario", Description: "Run regression scenario JSON files (input timeline + numeric assertions) in-process and return pass/fail with failing assertion details — the cmd/scenario verdict from the live loop."}, handleRunScenario)
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_screen", Description: "Run the ingest analyzer on the CURRENT emulator frame (no file needed): playfield bands as PF bytes, sprite candidates with GRP bytes + per-row colors, groups, fidelity, plus the TIA-grid overlay. The reverse-direction read of whatever is on screen right now."}, handleAnalyzeScreen)
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_image", Description: "Ingest a game screenshot (grade A = Stella F12 PNG, unmodified, TV effects off; any integer multiple of the 160-clock raster) and return TIA-space analysis: normalized raster + palette quantization to real COLUxx values, playfield bands as PF0/PF1/PF2 bytes (repeat/reflect/asymmetric, score-mode flag), sprite candidates with GRP bytes + per-row colors + NUSIZ copy folding, plus a TIA-grid overlay image. Ambiguous elements carry confidence; one screenshot is one frame of truth (flicker objects appear partially)."}, handleAnalyzeImage)
