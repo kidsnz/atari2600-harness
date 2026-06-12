@@ -1,0 +1,66 @@
+{
+  "rom": "roms/techniques/paddle_demo.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {
+      "frame": 5,
+      "player": 0,
+      "action": "paddle",
+      "value": 0.1
+    },
+    {
+      "frame": 40,
+      "player": 0,
+      "action": "paddle",
+      "value": 0.25
+    },
+    {
+      "frame": 80,
+      "player": 0,
+      "action": "paddle",
+      "value": 0.5
+    }
+  ],
+  "asserts": [
+    {
+      "at_frame": 30,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 70,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 63
+    },
+    {
+      "at_frame": 70,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 63
+    },
+    {
+      "at_frame": 110,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 170
+    },
+    {
+      "at_frame": 110,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 151
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

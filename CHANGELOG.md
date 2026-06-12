@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.48.0] - 2026-06-12
+
+### Added
+- **Technique: paddle input** (`roms/techniques/paddle_demo.asm` + `docs/techniques/paddle.md`):
+  the dump/charge/per-line-count kernel (VBLANK=$82 discharge → release at visible start →
+  count lines until INPT0 D7) with the value mapped to a PosObject-placed bar. CI:
+  `scenarios/paddle_demo.json` — paddle 0.1/0.25/0.5 measure exactly 0/63/170 lines (litmus
+  transfer curve, shifted by the dump-release line) and the bar X follows (clamped), golden.
+
 ## [1.47.0] - 2026-06-12
 
 ### Added
