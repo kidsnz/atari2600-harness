@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.19.0] - 2026-06-12
+
+### Added
+- **MCP `run_scenario`** — the regression runner's verdict callable from the live loop
+  (paths[], returns pass/fail with failing-assertion details).
+- **MCP `analyze_screen`** — the ingest analyzer applied to the *current emulator frame*
+  (no file round-trip): PF bytes, sprite GRP + per-row colors, groups, fidelity, grid overlay.
+  Supersedes the long-parked read_sprite_shape idea.
+- `scripts/mcp_smoke.py` — sequential MCP smoke driver (the go-sdk serves tool calls
+  concurrently; piping a batch races load_rom vs later calls — cost one debugging round).
+
 ## [1.18.0] - 2026-06-12
 
 ### Added

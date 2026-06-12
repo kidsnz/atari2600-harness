@@ -20,6 +20,7 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 	"github.com/kidsnz/atari2600-harness/internal/ingest"
+	"github.com/kidsnz/atari2600-harness/internal/scenario"
 )
 
 // --- グローバル状態（stdio は逐次だが念のため mutex 保護）---
@@ -744,6 +745,94 @@ func handleAnalyzeImage(ctx context.Context, req *mcp.CallToolRequest, in Analyz
 	return result, AnalyzeImageOut{Report: rep, Multi: multi, OverlayPath: ovPath}, nil
 }
 
+
+// --- run_scenario: 回帰シナリオを live ループから実行 ---
+
+type RunScenarioIn struct {
+	Paths []string `json:"paths"` // scenario JSON のパス（複数可）
+}
+
+type ScenarioResult struct {
+	Path   string   `json:"path"`
+	Pass   bool     `json:"pass"`
+	Detail []string `json:"detail,omitempty"` // 失敗アサーションの説明
+}
+
+type RunScenarioOut struct {
+	AllPass bool             `json:"all_pass"`
+	Results []ScenarioResult `json:"results"`
+}
+
+func handleRunScenario(ctx context.Context, req *mcp.CallToolRequest, in RunScenarioIn) (*mcp.CallToolResult, RunScenarioOut, error) {
+	if len(in.Paths) == 0 {
+		return nil, RunScenarioOut{}, fmt.Errorf("paths is required")
+	}
+	out := RunScenarioOut{AllPass: true}
+	for _, p := range in.Paths {
+		sc, err := scenario.Load(p)
+		if err != nil {
+			return nil, RunScenarioOut{}, fmt.Errorf("%s: %w", p, err)
+		}
+		res, err := scenario.Run(sc, false)
+		if err != nil {
+			return nil, RunScenarioOut{}, fmt.Errorf("%s: %w", p, err)
+		}
+		r := ScenarioResult{Path: p, Pass: res.Pass}
+		if !res.Pass {
+			out.AllPass = false
+			for _, a := range res.Asserts {
+				if !a.Pass {
+					r.Detail = append(r.Detail, fmt.Sprintf("%s (got %d)", a.Desc, a.Got))
+				}
+			}
+		}
+		out.Results = append(out.Results, r)
+	}
+	return nil, out, nil
+}
+
+// --- analyze_screen: 現在のエミュレータフレームに ingest を直接適用（ファイル不要） ---
+
+type AnalyzeScreenIn struct {
+	Scale int `json:"scale,omitempty"`
+}
+
+func handleAnalyzeScreen(ctx context.Context, req *mcp.CallToolRequest, in AnalyzeScreenIn) (*mcp.CallToolResult, AnalyzeImageOut, error) {
+	mu.Lock()
+	e, err := get()
+	if err != nil {
+		mu.Unlock()
+		return nil, AnalyzeImageOut{}, err
+	}
+	snap, _ := e.Snapshot()
+	mu.Unlock()
+	q := ingest.NewNTSCQuantizer()
+	n, err := ingest.Normalize(snap, q)
+	if err != nil {
+		return nil, AnalyzeImageOut{}, err
+	}
+	rep := ingest.Analyze(n, q)
+	scale := in.Scale
+	if scale <= 0 {
+		scale = 3
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, ingest.OverlayReport(n, rep, scale)); err != nil {
+		return nil, AnalyzeImageOut{}, err
+	}
+	ovPath := os.Getenv("ATARI2600_INGEST_PATH")
+	if ovPath == "" {
+		ovPath = filepath.Join(os.TempDir(), "atari2600_ingest.png")
+	}
+	if err := os.WriteFile(ovPath, buf.Bytes(), 0o644); err != nil {
+		return nil, AnalyzeImageOut{}, err
+	}
+	result := &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.ImageContent{Data: buf.Bytes(), MIMEType: "image/png"}},
+	}
+	return result, AnalyzeImageOut{Report: rep, OverlayPath: ovPath}, nil
+}
+
 // --- main ---
 
 func main() {
@@ -771,6 +860,8 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed)."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "run_scenario", Description: "Run regression scenario JSON files (input timeline + numeric assertions) in-process and return pass/fail with failing assertion details — the cmd/scenario verdict from the live loop."}, handleRunScenario)
+	mcp.AddTool(server, &mcp.Tool{Name: "analyze_screen", Description: "Run the ingest analyzer on the CURRENT emulator frame (no file needed): playfield bands as PF bytes, sprite candidates with GRP bytes + per-row colors, groups, fidelity, plus the TIA-grid overlay. The reverse-direction read of whatever is on screen right now."}, handleAnalyzeScreen)
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_image", Description: "Ingest a game screenshot (grade A = Stella F12 PNG, unmodified, TV effects off; any integer multiple of the 160-clock raster) and return TIA-space analysis: normalized raster + palette quantization to real COLUxx values, playfield bands as PF0/PF1/PF2 bytes (repeat/reflect/asymmetric, score-mode flag), sprite candidates with GRP bytes + per-row colors + NUSIZ copy folding, plus a TIA-grid overlay image. Ambiguous elements carry confidence; one screenshot is one frame of truth (flicker objects appear partially)."}, handleAnalyzeImage)
 	mcp.AddTool(server, &mcp.Tool{Name: "get_screen_annotated", Description: "Return the latest frame as a PNG with an XY grid in real TIA coordinates (x=clock 0..159, y=scanline) and labelled sprite-position markers. The primary visual channel: the user can point at it and instruct by coordinate. Also returns sprite positions numerically."}, handleScreenAnnotated)
 
