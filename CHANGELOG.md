@@ -12,6 +12,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.1.0] - 2026-06-11
+
+### Changed
+- **Exerciser polish from the author's play-test (three QA reports, all confirmed and fixed).**
+  1. *Title logo & score were left of center* — the 48px blocks sat at the verified-recipe default (X=24).
+     Now centered (P0=56/P1=64), which required **recalibrating the six-store choreography for the new
+     display window** (timed stores 44/47/50/53 instead of 34/37/40/43) and rebalancing the kernel: B0/B1
+     loads moved into the head, the tail slimmed to `dec row` + B5 staging, and the exit-line cleanups moved
+     after their closing WSYNC (the combined exit line ran 77 cycles and spilled a scanline — caught by the
+     line-budget probe).
+  2. *Zone sprites never reached the right edge* — the drift wrap was `and #$7F` (0–127), inherited from the
+     techniques demo. Now wraps properly at 0–159 (full width), with the drift loop re-split two zones per
+     line to stay inside the 76-cycle budget.
+  3. *The starfield's "reorganize every 64 frames" read as nothing happening* — one LFSR step per second
+     only shifted the pattern a single line. The seed now advances every frame: a continuous upward-scrolling
+     starfield. 38 scenarios pass; goldens regenerated.
+
 ## [1.0.1] - 2026-06-11
 
 ### Fixed

@@ -32,13 +32,13 @@
       "at_frame": 9,
       "field": "tia.player0.hmoved_pixel",
       "op": "==",
-      "value": 24
+      "value": 56
     },
     {
       "at_frame": 9,
       "field": "tia.player1.hmoved_pixel",
       "op": "==",
-      "value": 32
+      "value": 64
     },
     {
       "at_frame": 9,

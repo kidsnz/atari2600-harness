@@ -234,44 +234,74 @@ ZI2:    lda ZoneXInit1,x
         sta lastScene
         sta WSYNC           ; 4
         sta WSYNC           ; 5
-        jmp ZMountains
-ZDrift: ; ドリフトパス（4 行: 3ゾーンずつ＝各行 ~65cy で 76 内）
+        sta WSYNC           ; 6
+        sta WSYNC           ; 7
+ZMountains2:
+ZDrift: ; ドリフトパス（6 行: 2ゾーンずつ＝0..159 の全幅ラップでも 76cy 内）
         ldx #5
 ZD1:    lda zx0,x
         clc
         adc #1
-        and #$7F
-        sta zx0,x
+        cmp #160
+        bcc ZD1w
+        lda #0
+ZD1w:   sta zx0,x
         dex
-        cpx #2
+        cpx #3
         bne ZD1
         sta WSYNC           ; 2
 ZD2:    lda zx0,x
         clc
         adc #1
-        and #$7F
-        sta zx0,x
+        cmp #160
+        bcc ZD2w
+        lda #0
+ZD2w:   sta zx0,x
         dex
-        bpl ZD2
+        cpx #1
+        bne ZD2
         sta WSYNC           ; 3
-        ldx #5
-ZD3:    lda zx1,x
-        sec
-        sbc #1
-        and #$7F
-        sta zx1,x
+ZD3:    lda zx0,x
+        clc
+        adc #1
+        cmp #160
+        bcc ZD3w
+        lda #0
+ZD3w:   sta zx0,x
         dex
-        cpx #2
-        bne ZD3
+        bpl ZD3
         sta WSYNC           ; 4
+        ldx #5
 ZD4:    lda zx1,x
         sec
         sbc #1
-        and #$7F
-        sta zx1,x
+        bcs ZD4w
+        lda #159
+ZD4w:   sta zx1,x
         dex
-        bpl ZD4
+        cpx #3
+        bne ZD4
         sta WSYNC           ; 5
+ZD5:    lda zx1,x
+        sec
+        sbc #1
+        bcs ZD5w
+        lda #159
+ZD5w:   sta zx1,x
+        dex
+        cpx #1
+        bne ZD5
+        sta WSYNC           ; 6
+ZD6:    lda zx1,x
+        sec
+        sbc #1
+        bcs ZD6w
+        lda #159
+ZD6w:   sta zx1,x
+        dex
+        bpl ZD6
+        sta WSYNC           ; 7
+        jmp ZMountains2
 ZMountains:
         ; --- 山並み 48 行: 非対称 PF1（左=MtnL 早書き≤27 / 右=MtnR cyc38 書き=窓37-53）---
         ldy #0
@@ -328,10 +358,10 @@ ZPad:   sta WSYNC
         inx
         cpx #6
         bne ZLoop
-        ; --- 地面 43 行（1+4+48+96+43 = 192）---
+        ; --- 地面 41 行（1+6+48+96+41 = 192）---
         lda #$E4
         sta COLUBK
-        ldy #43
+        ldy #41
 ZGnd:   sta WSYNC
         dey
         bne ZGnd
@@ -618,16 +648,13 @@ SceneProc:
         sta AUDV0
         sta AUDV1
 RNoInit:
-        lda frameCt
-        and #$3F
-        bne RKeep
-        ; 64 フレーム毎: 世界を 1 ステップ進める
+        ; 毎フレーム 1 ステップ進める＝星空が連続して上へ流れる（飛行スクロール）
         lda worldSeed
         lsr
         bcc RNoEor
         eor #$8E
 RNoEor: sta worldSeed
-RKeep:  lda worldSeed
+        lda worldSeed
         sta rnd
         lda #$0E
         sta COLUPF
@@ -713,13 +740,15 @@ TMusOk:
         lda #0
         sta COLUBK
 
-        ; --- 位置決め（2行）: litmus_48px の検証済みレシピ ---
+        ; --- 位置決め: litmus_48px レシピの中央化版（coarse 54 → fine で P0=56/P1=64＝画面中央の48px）---
         sta WSYNC
-        ds 13, $EA          ; SLEEP 26
+        ds 18, $EA          ; SLEEP 36（+10cy で coarse +30px）
         sta RESP0
         sta RESP1
-        lda #$10
-        sta HMP1
+        lda #$E0
+        sta HMP0            ; P0 右2 → 56
+        lda #$F0
+        sta HMP1            ; P1 右1 → 64（=P0+8）
         sta WSYNC
         sta HMOVE
         ds 12, $EA          ; SLEEP 24
@@ -790,48 +819,43 @@ TB1:    sta WSYNC
         dey
         bne TB1
 
-        ; --- ロゴ 16 行（行倍化テーブル, 1ライン kernel）---
-        ; ループ構造: tail 末尾で sta WSYNC(74) → 次行頭で jmp(0-2) → head は +3 シフト設計。
-        ; プリステージ（row=15 の分）。GRP0=B0 書込は VDEL の影側が 0 のため画面には出ない。
+        ; --- ロゴ 16 行（中央 P0=56 用の振付: 表示窓 41.3-57.0cy → timed stores 完了 44/47/50/53）---
+        ; head で B0..B5 全ロード（tail は row-- と B5 ステージのみ＝76cy 内）
         ldy #15
         sty row
         lda TblR2,y
         sta t5
-        lda TblE,y
-        sta GRP0            ; B0→P0新
-        lda TblX,y          ; B1 を A に
         sta WSYNC
-        jmp LogoHead        ; 次行の cycle 0-2 で実行（毎イテレーション同型）
-LogoHead:
-        sta GRP1            ; 6   B1→P1新（B0→P0影）
-        lda TblR1,y         ; 10  B2
-        sta GRP0            ; 13  B2→P0新（B1→P1影）
-        lda TblC,y          ; 17  B3
-        ldx TblS,y          ; 21  B4
-        ldy t5              ; 24  B5
-        cmp t5              ; 27  SLEEP 7（フラグのみ・A 不変）
-        ds 2, $EA           ; 31
-        sta GRP1            ; 34  B3→P1新, B2→P0影
-        stx GRP0            ; 37  B4→P0新, B3→P1影
-        sty GRP1            ; 40  B5→P1新, B4→P0影
-        sta GRP0            ; 43  junk,    B5→P1影
-        ldy row             ; 46
-        dey                 ; 48
-        sty row             ; 51
-        bmi LogoDone        ; 53（不成立）
-        lda TblR2,y         ; 57  次行 B5
-        sta t5              ; 60
-        lda TblE,y          ; 64  次行 B0
-        sta GRP0            ; 67
-        lda TblX,y          ; 71  次行 B1（A 保持）
-        sta WSYNC           ; 74 → stall → 次行頭の jmp へ
+        jmp LogoHead
+LogoHead:                   ; jmp が次行 0-2cy で着地
+        lda TblE,y          ; 6   B0
+        sta GRP0            ; 9
+        lda TblX,y          ; 13  B1
+        sta GRP1            ; 16  （B0→P0影）
+        lda TblR1,y         ; 20  B2
+        sta GRP0            ; 23  （B1→P1影）
+        lda TblC,y          ; 27  B3
+        ldx TblS,y          ; 31  B4
+        ldy t5              ; 34  B5
+        cmp t5              ; 37  SLEEP 7
+        ds 2, $EA           ; 41
+        sta GRP1            ; 44  B3→P1新, B2→P0影
+        stx GRP0            ; 47  B4→P0新, B3→P1影
+        sty GRP1            ; 50  B5→P1新, B4→P0影
+        sta GRP0            ; 53  junk,    B5→P1影
+        dec row             ; 58
+        bmi LogoDone        ; 60（不成立）
+        ldy row             ; 63
+        lda TblR2,y         ; 67  次行 B5
+        sta t5              ; 70
+        sta WSYNC           ; 73 → stall → 次行頭の jmp 相当（フォールスルーで LogoHead へ）
         jmp LogoHead
 LogoDone:
+        sta WSYNC           ; 出口行を即閉じ（クリアまで同居させると 77cy=予算+1 で行が零れる）
         lda #0
         sta GRP0
         sta GRP1
-        sta GRP0            ; 影もクリア
-        sta WSYNC           ; LogoDone の行を閉じる（17 行目）
+        sta GRP0            ; 影クリア（次行頭 ~14cy ＝表示窓 41cy より前なのでゴースト無し）
 
         ; --- 中余白: 29 行（ここまで 40+17 → 86 行）---
         ldy #29
@@ -873,20 +897,20 @@ ScoreLoop:
         lda t3              ; 21
         ldx t4              ; 24
         ldy t5              ; 27
-        ds 2, $EA           ; 31  SLEEP 4
-        sta GRP1            ; 34
-        stx GRP0            ; 37
-        sty GRP1            ; 40
-        sta GRP0            ; 43
+        ds 7, $EA           ; 41  SLEEP 14（中央位置用）
+        sta GRP1            ; 44
+        stx GRP0            ; 47
+        sty GRP1            ; 50
+        sta GRP0            ; 53
         ldy row             ; 46
         dey                 ; 48
         sty row             ; 51
         bpl ScoreLoop       ; 54
+        sta WSYNC           ; 出口行を即閉じ（クリア同居だと予算+1 で零れる）
         lda #0
         sta GRP0
         sta GRP1
-        sta GRP0
-        sta WSYNC           ; 閉じ行（86+32+1=119 行目）
+        sta GRP0            ; 影クリア（次行頭・表示窓前）
 
         ; --- 音楽 tick（2 行: ch0 / ch1）---
         sta WSYNC
