@@ -12,6 +12,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.53.0] - 2026-06-12
+
+### Added
+- **Verification sweep — four documented-but-unverified facts closed** (`docs/fundamentals-audit.md`
+  updated to ✅, each with a litmus + scenario):
+  - `litmus_hmxx_freeze`: on Gopher2600, **HMxx is latched at the HMOVE strobe** — post-HMOVE
+    rewrites (+6/+15/+33 cy) never alter in-flight movement. The 24-cycle rule stays as a
+    real-hardware portability constraint.
+  - `litmus_score_pfp`: **PFP dominates SCORE** — CTRLPF $06 renders identically to $04
+    (PF in COLUPF on both halves, priority over players); SCORE coloring only without PFP.
+  - `litmus_vdel_2lk`: the 2LK alignment relation pixel-exact — **VDELP0=1 shifts P0 +1 line**
+    to align with odd-line-written P1 (read_row 137→138).
+  - Shear-safe write window (cycles 0–22) closed by derivation from verified beam constants +
+    litmus_48px6's measured mid-line choreography.
+
 ## [1.52.0] - 2026-06-12
 
 ### Added

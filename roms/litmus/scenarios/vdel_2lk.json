@@ -1,0 +1,14 @@
+{
+  "rom": "roms/litmus/litmus_vdel_2lk.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    { "at_frame": 30, "field": "ram.0x81", "op": "==", "value": 0 },
+    { "at_frame": 30, "field": "tiareg.player0.vertical_delay", "op": "==", "value": 0 },
+    { "at_frame": 90, "field": "ram.0x81", "op": "==", "value": 1 },
+    { "at_frame": 90, "field": "tiareg.player0.vertical_delay", "op": "==", "value": 1 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

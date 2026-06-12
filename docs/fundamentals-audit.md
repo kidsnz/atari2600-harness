@@ -30,8 +30,11 @@ The actionable follow-ups live in `hardening-roadmap.md` § "v2 backlog". Verifi
   missile 2; all 16 HMOVE nibbles (+7..−8, positive = left) right after WSYNC.
 - ⚠️ `reference/docs_atari/cycle_counting_guide.html` uses `X=(CYCLES−20)*3` and "round to 15" — both are
   tutorial approximations. **Never cite it for positioning**; our calibrated formula is more precise.
-- 📖 **Do not write HMxx within 24 CPU cycles after HMOVE** — "unpredictable motion" (Stella PG, stated 5×;
-  also visible in score6.asm's deliberate HMCLR delay). Not yet in our constants — adopt.
+- ✅ **Do not write HMxx within 24 CPU cycles after HMOVE** — measured `litmus_hmxx_freeze` (v1.53.0):
+  on Gopher2600, HMxx is **latched at the HMOVE strobe** — rewrites at +6/+15/+33 cy never alter the
+  in-flight movement (right-8 stayed +8/frame in all three windows). Keep the 24-cycle rule as a
+  REAL-HARDWARE portability constraint ("unpredictable" on silicon, Stella PG 5×), but our oracle is
+  deterministic and write-inert; the rule costs nothing to follow (HMCLR after SLEEP 24, as score6 does).
 - 📖 **HMOVE mechanism** (Towers, *TIA Hardware Notes*): HMOVE right after WSYNC **extends HBLANK by exactly
   8 color clocks** → the famous left-side 8px black comb on HMOVE lines; movement = clock stuffing (1px
   left per extra pulse). **Late HMOVE during the visible line "plugs" MOTCK pulses → moves objects RIGHT at
@@ -47,10 +50,13 @@ The actionable follow-ups live in `hardening-roadmap.md` § "v2 backlog". Verifi
 - 📖 **VDEL exact semantics** (Stella PG §6.D — the load-bearing mechanism): each GRP has new+old copies.
   **Writing GRP0 copies P1's new→old; writing GRP1 copies P0's new→old, and also ENABL's new→old.**
   VDELPx/VDELBL D0=1 selects the *old* copy for display. This write-triggered cross-copy is what powers the
-  2-line kernel alignment AND the 48px/6-digit score trick. Testable relation (SpiceWare Step 4): in a 2LK,
-  VDELP0=1/VDELP1=0 aligns sprites at the same Y; 0/1 aligns at Y+1. ⬜ unverified — top backlog item.
+  2-line kernel alignment AND the 48px/6-digit score trick. ✅ The 2LK alignment relation is now
+  **verified pixel-exact** by `litmus_vdel_2lk` (v1.53.0): GRP0-even/GRP1-odd writes, VDELP0=0 → P0
+  starts 1 line above P1; VDELP0=1 → P0 shifts +1 line and aligns exactly (read_row 137→138).
 - 📖 Missiles have **no** vertical delay (so in a 2LK they start only on even lines).
-- 📖 Moveable-object writes are shear-safe at CPU cycles 0–22 of the line (HBLANK 68/3) (SpiceWare Step 4).
+- ✅ Moveable-object writes are shear-safe at CPU cycles 0–22 of the line — closed by derivation from
+  verified constants（any write completing by cy 22 precedes every draw start: (X+68)/3 ≥ 22.67 even at
+  X=0）plus litmus_48px6's measured mid-line GRP choreography (writes landing in copy gaps).
 - ⬜ 48px kernel GRP write windows: **no local source documents the cycle map** — derive ourselves (the
   recipe exists in score6.asm: NUSIZ=3-close, RESP0/RESP1 3 cycles apart at ~cycle 26+, HMP1=$10, VDELP both
   on, 6-store choreography, font `align $100`).
@@ -65,7 +71,9 @@ The actionable follow-ups live in `hardening-roadmap.md` § "v2 backlog". Verifi
 - ⚠️ Internal discrepancy found: SpiceWare Step 3 says the left-PF1 window opens at cycle ~66 of the prior
   line; Step 7 annotates ~71. Resolve by measurement; trust the harness.
 - 📖 CTRLPF D1 SCORE (left half→COLUP0, right→COLUP1), D2 PFP priority (PF/BL above players),
-  D4–5 ball width 1/2/4/8 (Stella PG). ⬜ SCORE×PFP interaction is specified nowhere — measure.
+  D4–5 ball width 1/2/4/8 (Stella PG). ✅ **SCORE×PFP interaction measured** `litmus_score_pfp`
+  (v1.53.0): **PFP dominates** — with D2 set, D1 has no effect (PF renders in COLUPF on BOTH
+  halves, with priority over players); $02→halves colored, $04 and $06→identical COLUPF rendering.
 - 📖 Asymmetric PF under reflection via double PF0 rewrite per line is real-game practice
   (DaveC's Random-Dungeon `_room_loop`). ⬜ unverified by us.
 

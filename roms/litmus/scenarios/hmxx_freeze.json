@@ -1,0 +1,14 @@
+{
+  "rom": "roms/litmus/litmus_hmxx_freeze.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    { "at_frame": 5,  "field": "tia.player0.hmoved_pixel", "op": "==", "value": 80 },
+    { "at_frame": 9,  "field": "tia.player0.hmoved_pixel", "op": "==", "value": 112 },
+    { "at_frame": 19, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 32 },
+    { "at_frame": 29, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 112 },
+    { "at_frame": 39, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 32 },
+    { "at_frame": 59, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 32 },
+    { "at_frame": 65, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 80 }
+  ],
+  "checks": { "ntsc_frame_lines": 262 }
+}

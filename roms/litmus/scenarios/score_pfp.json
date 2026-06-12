@@ -1,0 +1,13 @@
+{
+  "rom": "roms/litmus/litmus_score_pfp.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    { "at_frame": 30,  "field": "ram.0x81", "op": "==", "value": 0 },
+    { "at_frame": 90,  "field": "ram.0x81", "op": "==", "value": 1 },
+    { "at_frame": 150, "field": "ram.0x81", "op": "==", "value": 2 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
