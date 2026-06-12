@@ -48,9 +48,14 @@ rarely exist). Validated against ground truth: our own `vertical_pos.bin` resolv
 exact ROM address; a commercial title resolved the player sprite (21 rows, reversed), its per-row color
 table, and a PF table on the first run.
 
-**Future ideas recorded** (not implemented): bank-aware matching for F8/F6 carts (search per-bank slices);
-AUDF/AUDC store tracing -> music transcription (pairs with `read_audio`); diffing dissect output across
-inputs to locate game-state tables; feeding discovered tables back into `analyze_image` as an oracle.
+**Follow-up status (v1.41.0–v1.42.0):** two of the recorded ideas are now implemented —
+**bank-aware matching** (v1.41.0: >4K carts report "bank N $Fxxx" in the $F000 window; ground-truth
+verified with a planted table in bank 1 of a purpose-built F8 ROM) and **music transcription**
+(v1.42.0: `dissect -audio N` samples the TIA audio registers per frame and emits each channel as
+jingle notation via `pkg/audio.NearestNote`; round-trip verified — transcribing our own fanfare ROMs
+reproduces the input melody note-for-note on both channels; legato merges of repeated equal pitches
+are acoustically identical and expected). Still future: diffing dissect output across inputs to
+locate game-state tables; feeding discovered tables back into `analyze_image` as an oracle.
 
 **Clean-room line:** dissect/disassembly output of commercial ROMs stays in `inbox/`/`reference/`
 (never committed); only generalized techniques enter the public catalog, re-implemented from scratch.

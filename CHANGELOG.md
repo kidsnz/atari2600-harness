@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.42.0] - 2026-06-12
+
+### Added
+- **Music transcription** (`cmd/dissect -audio N`): samples TIA audio registers (AUDC/AUDF/AUDV,
+  both channels) at frame granularity from reset and emits each channel as jingle notation
+  ("D6:80 F6:40 R:6 ..."), with per-note AUDF/cents. New `pkg/audio.NearestNote` (12-TET inverse
+  of `FindNote`, unit-tested). **Round-trip verified**: transcribing our own single- and two-voice
+  fanfare ROMs reproduces the input melodies note-for-note on both channels (repeated equal
+  pitches merge legato — register-identical, acoustically the same). Demo: a commercial title's
+  theme transcribed with names + frame durations (output kept in inbox per clean-room policy).
+
 ## [1.41.0] - 2026-06-12
 
 ### Added

@@ -93,3 +93,25 @@ func TestNoteFreqAndFind(t *testing.T) {
 		t.Fatalf("C6 -> audc=%d audf=%d cents=%f err=%v", c, fr, cents, err)
 	}
 }
+
+// NearestNote は NoteFreq の逆（往復で音名が戻り、セント誤差 0）。
+func TestNearestNoteRoundTrip(t *testing.T) {
+	for _, name := range []string{"C4", "F#3", "D6", "A4", "G5"} {
+		f, err := NoteFreq(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, cents := NearestNote(f)
+		if got != name {
+			t.Errorf("NearestNote(NoteFreq(%s)) = %s", name, got)
+		}
+		if cents > 0.01 || cents < -0.01 {
+			t.Errorf("cents for %s = %f, want 0", name, cents)
+		}
+	}
+	// TIA 実音: AUDC=4 AUDF=12 ≈ D6 +48 cents（G1 ファンファーレの主音）
+	name, cents := NearestNote(Freq(4, 12, BaseClockNTSC))
+	if name != "D6" || cents < 40 || cents > 55 {
+		t.Errorf("Freq(4,12) -> %s %+.1f cents, want D6 ≈ +48", name, cents)
+	}
+}

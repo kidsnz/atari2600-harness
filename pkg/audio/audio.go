@@ -208,3 +208,21 @@ func FindNote(name string, types []int, baseClock float64) (audc, audf int, cent
 	}
 	return audc, audf, best, nil
 }
+
+// NearestNote は周波数に最も近い 12 平均律の音名（"D6" 等, A4=440Hz）とセント誤差を返す
+// （FindNote の逆方向＝採譜用）。freq<=0 は無音として空文字を返す。
+func NearestNote(freq float64) (name string, cents float64) {
+	if freq <= 0 {
+		return "", 0
+	}
+	semis := 12 * math.Log2(freq/440.0) // A4 からの半音数
+	n := int(math.Round(semis))
+	idx := n + 57 // C0 起点の半音インデックス（A4 = 57）
+	if idx < 0 {
+		idx = 0
+		n = -57
+	}
+	names := []string{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"}
+	exact := 440.0 * math.Pow(2, float64(n)/12.0)
+	return fmt.Sprintf("%s%d", names[idx%12], idx/12), 1200 * math.Log2(freq/exact)
+}
