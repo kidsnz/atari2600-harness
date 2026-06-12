@@ -75,7 +75,8 @@ Implemented: `pkg/sprite.SplitWide`; `litmus_p0p1.asm` + `scenarios/p0p1.json` p
   gap/overlap at the seam); `read_tia` shows `player0`/`player1` `HmovedPixel` exactly 8 apart. This is the
   headline capability and the proof that sprite placement is as numerically trustworthy as playfield.
 
-#### S-4. Sprite-shape verification extensions  — size: medium
+#### S-4. Sprite-shape verification extensions  — size: medium — ✅ DONE (v1.52.0)
+Implemented: `get_screen_annotated` draws the current GRP bit pattern (REFP/NUSIZ aware) at each player's marker.
 - **Problem:** `get_screen_annotated` marks only sprite X; it doesn't show shape, and there's no direct
   GRP-bytes-vs-rendered-pixels cross-check.
 - **Proposal:** overlay the sprite **shape / bounding box** in the annotated screenshot; and/or a
@@ -86,7 +87,8 @@ Implemented: `pkg/sprite.SplitWide`; `litmus_p0p1.asm` + `scenarios/p0p1.json` p
 
 ### A. Audio
 
-#### A-1. Semantic verification = note/timbre names in `read_audio`  — size: small (tracker in-tree)
+#### A-1. Semantic verification = note/timbre names in `read_audio`  — size: small — ✅ DONE (v1.52.0)
+Implemented via our own `pkg/audio.NearestNote` (no tracker wiring needed): each channel reports note+cents.
 - **Problem:** `read_audio` returns only raw AUDC/AUDF/AUDV; "is this a C-4 square or a noise sweep?" isn't
   answerable numerically.
 - **Proposal:** wire Gopher2600 `tracker.lookupMusicalNote` / `lookupDistortion` (and `NoteToPianoKey`) so
@@ -132,7 +134,8 @@ README. (Already paid off: it immediately surfaced a flaky `TestStepScanline`, f
   it (pin a commit) — or adopt F-2 to drop the local clone entirely (cleaner CI).
 - **Verify:** the workflow goes green on a clean checkout; a deliberately broken test fails it.
 
-#### F-2. Pin Gopher2600 to a version (optional; makes F-1 trivial)  — size: medium (verification risk)
+#### F-2. Pin Gopher2600 to a version — ✅ DONE (v1.55.0)
+CI already clones a pinned SHA; `scripts/check_gopher_pin.sh` verifies the local clone matches the CI pin.
 - **Problem:** `go.mod` uses `replace github.com/jetsetilly/gopher2600 => ./Gopher2600` (a local clone),
   which complicates CI and clones.
 - **Proposal:** replace it with a pinned tagged module dependency, **if** the exported API the harness uses
@@ -151,7 +154,7 @@ Implemented: `litmus_pal.asm` (312 = 3/45/228/36) + `scenarios/pal.json` (tv_spe
 - **Where to touch:** `roms/litmus/` (PAL ROM), `internal/emu` tests; `load_rom` already accepts `tv_spec`.
 - **Verify:** PAL scenario asserts 312 lines and correct beam coords.
 
-#### F-4. Stella oracle cross-check  — size: medium–large
+#### F-4. Stella oracle cross-check  — size: medium–large — ✅ DONE (v1: RAM v0.55.0 / v2: pixels v1.54.0, 100.00% on litmus_pf with the measured Stella palette)
 - **Problem:** `gap-analysis.md` flags that Gopher2600 annotation pixels are never cross-checked against the
   Stella oracle.
 - **Proposal:** a cross-check harness that drives Stella (`-sssingle -ss1x -dbg.script` + `dump`) and
@@ -246,7 +249,7 @@ Priority = general/foundational value × cost × how much it unlocks. Each item 
 - [x] **V2-17 F-4 Stella oracle.** ✅ DONE v1 (v0.55.0, `cmd/stellacheck`; one human keypress): RAM
   cross-checks PASS for smoke and the litmus_6502 measurement suite — two independent emulators agree.
   v2 = TIA/pixel compare + full keystroke automation (see `docs/stella-oracle.md`).
-- [ ] **V2-18 RAM-map audit helper.** Symbols → read/write coverage (catches dead variables à la Pitfall's
+- [x] **V2-18 RAM-map audit helper.** ✅ DONE (v1.55.0, `cmd/rammap`: per-frame RAM diff over N frames → markdown map of addr/chg-rate/range). Symbols → read/write coverage (catches dead variables à la Pitfall's
   `cxHarry`); cheap pass over existing trace hooks.
 
 ### Constants to adopt into CLAUDE.md (from the audit)

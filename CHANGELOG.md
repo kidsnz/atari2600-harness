@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.55.0] - 2026-06-12
+
+### Added
+- **`cmd/rammap`** (V2-18 closed): per-frame RAM diff over N frames → markdown usage map
+  (address, change rate, value range, constant/per-frame hints). Feeds `docs/ram-maps.md` and
+  audits our own ROMs' RAM budgets.
+- **`scripts/check_gopher_pin.sh`** (F-2 closed): verifies the local Gopher2600 clone matches the
+  CI-pinned SHA. Hardening-roadmap statuses updated (A-1/S-4/F-2/F-4/V2-18 all ✅).
+
 ## [1.54.0] - 2026-06-12
 
 ### Added

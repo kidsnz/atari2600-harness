@@ -143,7 +143,8 @@ any game; even its tests reference only its own `roms/litmus`).
   `cmd/calibrate` (horizontal X(N) sweep-fit) /
   `cmd/fieldtest` (ROM self-drive + multi-frame analysis; `-inbox` batch, `-auto` start escalation) /
   `cmd/dissect` (runtime trace × ROM matching → asset table addresses + annotated DiStella disassembly) /
-  `cmd/jingle` (melody notation → playable ROM) / `internal/emu` (driving) / `internal/annotate` (annotation) /
+  `cmd/jingle` (melody notation → playable ROM) / `cmd/rammap` (RAM usage audit → markdown map) /
+  `cmd/stellacheck` (Stella oracle: RAM + pixel compare; hands-free via scripts/stella_oracle.sh) / `internal/emu` (driving) / `internal/annotate` (annotation) /
   `internal/scenario` (scenario regression = input timeline + numeric assertions, ROM-agnostic) /
   `internal/calibrate` (position calibration = poke sweep + linear regression) /
   **`pkg/playfield`** (public encoder `EncodeSymmetric` etc. = universal Atari 2600 knowledge; the roms-side `gen` imports it).
