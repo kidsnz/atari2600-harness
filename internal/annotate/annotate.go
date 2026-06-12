@@ -38,8 +38,11 @@ const (
 )
 
 var (
-	gridMinor = color.RGBA{255, 255, 255, 30}
-	gridMajor = color.RGBA{255, 255, 255, 70}
+	// 注意: Go の color.RGBA はアルファ事前乗算。チャネル > アルファ（例 {255,255,255,30}）は
+	// 不正値で、明るい背景上の合成が壊れる（黒背景では偶然無害＝v1.14.1 まで潜伏したバグ）。
+	// 半透明は setLine 側で dc.SetRGBA（非乗算 0..1）を使う。
+	gridMinorA = 30.0 / 255
+	gridMajorA = 70.0 / 255
 	labelCol  = color.RGBA{205, 215, 225, 255}
 )
 
@@ -114,13 +117,14 @@ func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.R
 }
 
 func setLine(dc *gg.Context, major bool) {
-	dc.SetLineWidth(1)
 	if major {
-		dc.SetColor(gridMajor)
+		dc.SetRGBA(1, 1, 1, gridMajorA)
 	} else {
-		dc.SetColor(gridMinor)
+		dc.SetRGBA(1, 1, 1, gridMinorA)
 	}
+	dc.SetLineWidth(1)
 }
+
 
 // upscale は nearest-neighbor で整数倍拡大（ピクセルを鮮明に保つ）。
 func upscale(src *image.RGBA, scale int) *image.RGBA {

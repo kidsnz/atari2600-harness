@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.14.1] - 2026-06-12
+
+### Fixed
+- **annotate grid drew pink artifacts over bright backgrounds** — a latent bug since v0.5.0:
+  the semi-transparent grid colors were invalid premultiplied `color.RGBA` values
+  (channels > alpha, e.g. {255,255,255,30}); harmless over black (most 2600 screens) but the
+  compositor produced pink streaks over bright areas (visible on Pizza Boy's cyan buildings;
+  in hindsight also faint on the zone scene). Grid lines now use non-premultiplied
+  `dc.SetRGBA`. Affects `get_screen_annotated` and all ingest overlays.
+
 ## [1.14.0] - 2026-06-12
 
 ### Added
