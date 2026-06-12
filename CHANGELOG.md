@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.6.0] - 2026-06-12
+
+### Added
+- **Technique #8 completed — playfield score mode & priority** (`docs/techniques/pf-modes.md`,
+  demo `roms/techniques/pf_modes.asm`, CI-locked; suite now 42). Three regions switch CTRLPF
+  mid-frame; pixel-verified by read_row: in score mode the same PF1=$66 pattern reads back
+  COLUP0-red on the left half and COLUP1-blue on the right; with priority off the red P0 column
+  fully covers the yellow wall, with D2 set the wall splits the sprite (62+2/64+4/68+2).
+  Together with the already-verified asymmetric PF and reflect, #8 is done.
+
 ## [1.5.0] - 2026-06-12
 
 ### Added

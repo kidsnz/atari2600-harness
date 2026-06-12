@@ -23,6 +23,7 @@ with confidence, from basics to advanced tricks.
 | 2 | Sprite animation — GRP frame cycling + free REFP flip | easy | [sprite-animation.md](sprite-animation.md) | `roms/techniques/sprite_anim.asm` | ✅ 4-phase walker, pos(v)=v calibrated, CI-locked |
 | 3 | Vertical positioning — any-Y placement, per-line compare | intermediate | [vertical-positioning.md](vertical-positioning.md) | `roms/techniques/vertical_pos.asm` | ✅ bouncing ball, art verified bit-for-bit, CI-locked |
 | 4 | 2-line kernel — art rows over 2 scanlines = CPU headroom | intermediate | [two-line-kernel.md](two-line-kernel.md) | `roms/techniques/two_line_kernel.asm` | ✅ 2 sprites + gradient, shared HMOVE, CI-locked |
+| 8 | Playfield modes — score mode & PF priority | intermediate | [pf-modes.md](pf-modes.md) | `roms/techniques/pf_modes.asm` | ✅ both modes pixel-verified, CI-locked |
 
 What to absorb next (prioritized, with sources): **[roadmap.md](roadmap.md)** — e.g. 48-px score / 2-line
 kernel / vertical positioning / sound / animation / playfield tricks / general flicker kernel / bank switching.

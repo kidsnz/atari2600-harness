@@ -1,0 +1,14 @@
+{
+  "rom": "roms/techniques/pf_modes.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 9, "field": "ram.0x9e", "op": "==", "value": 213 },
+    { "at_frame": 9, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 62 },
+    { "at_frame": 9, "field": "tiareg.playfield.ctrlpf", "op": "==", "value": 4 },
+    { "at_frame": 9, "field": "tiareg.player0.color", "op": "==", "value": 68 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
