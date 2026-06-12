@@ -1,0 +1,46 @@
+{
+  "rom": "roms/techniques/bitmap48.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 5,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 87
+    },
+    {
+      "at_frame": 5,
+      "field": "tia.player1.hmoved_pixel",
+      "op": "==",
+      "value": 95
+    },
+    {
+      "at_frame": 10,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 7
+    },
+    {
+      "at_frame": 40,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 22
+    },
+    {
+      "at_frame": 60,
+      "field": "ram.0x83",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 100,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 4
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

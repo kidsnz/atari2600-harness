@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.59.0] - 2026-06-12
+
+### Added
+- **Technique: 48px bitmap zone with window scrolling** (`roms/techniques/bitmap48.asm` +
+  `docs/techniques/bitmap48.md`): six bottom-up column tables + per-frame `ColK+offset`
+  pointers = a logo/message band that scrolls through a taller bitmap (RevEng's Bitmap
+  Minikernel idea, own implementation). Completes the 48px family: one verified choreography,
+  three data feeds (digits / packed text / bitmap window). CI: offset animation incl. bounce,
+  262, golden.
+
 ## [1.58.0] - 2026-06-12
 
 ### Added
