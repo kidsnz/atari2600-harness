@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.34.0] - 2026-06-12
+
+### Added
+- **`cmd/fieldtest` — ROM self-driving field tests (input contract v3).** Given a ROM file, the
+  harness runs it in Gopher2600, captures K frames (with optional input injection
+  `-press right@60,fire@90`), and emits the full multi-frame analysis (overlay/report.txt/json).
+  Screenshots are no longer required when a ROM exists — F12 becomes the fallback. Verified
+  end-to-end on dyn_multisprite (4 frames, fidelity ~100%).
+
 ## [1.33.0] - 2026-06-12
 
 ### Added

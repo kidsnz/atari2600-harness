@@ -55,6 +55,14 @@ Checklist for grade A:
   re-extracted, compared against the source constants (litmus_pf exact bytes; pf_modes score +
   wall; Exerciser mountains vs live RAM; ball/walker GRP bit-for-bit; NUSIZ 3-copy fold).
 
+## ROM field-testing (R6 — contract v3, the best input of all)
+
+If you have the **ROM file**, skip screenshots entirely:
+`go run ./cmd/fieldtest -rom game.bin [-warmup N -shots K -gap G -press right@60,fire@90]`
+runs it in Gopher2600, captures K frames, and produces the full multi-frame analysis
+(overlay/report.txt/report.json) in one shot. Drop ROMs into `inbox/` (it belongs to no repo —
+nothing gets committed). F12 screenshots remain the fallback when only a running Stella exists.
+
 ## Multi-frame separation (M8/M9 — the general solution)
 
 Single screenshots have a principled limit: where a sprite overlaps playfield, pixel ownership
