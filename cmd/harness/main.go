@@ -4,6 +4,8 @@
 package main
 
 import (
+	"image"
+	_ "image/jpeg"
 	"bytes"
 	"context"
 	"fmt"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/ingest"
 )
 
 // --- グローバル状態（stdio は逐次だが念のため mutex 保護）---
@@ -660,12 +663,71 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 	return result, out, nil
 }
 
+
+// --- analyze_image: スクリーンショット → TIA データ（ingest パイプライン） ---
+
+type AnalyzeImageIn struct {
+	Path  string `json:"path"`            // 解析する PNG（A ランク = Stella F12 無加工）
+	Scale int    `json:"scale,omitempty"` // overlay の拡大率（既定 3）
+}
+
+type AnalyzeImageOut struct {
+	Report      *ingest.Report `json:"report"`       // 正規化/色/playfield/sprites の全解析
+	OverlayPath string         `json:"overlay_path"` // グリッド付きオーバーレイの固定パス（毎回上書き）
+}
+
+func handleAnalyzeImage(ctx context.Context, req *mcp.CallToolRequest, in AnalyzeImageIn) (*mcp.CallToolResult, AnalyzeImageOut, error) {
+	if in.Path == "" {
+		return nil, AnalyzeImageOut{}, fmt.Errorf("path is required")
+	}
+	f, err := os.Open(in.Path)
+	if err != nil {
+		return nil, AnalyzeImageOut{}, err
+	}
+	defer f.Close()
+	src, _, err := image.Decode(f)
+	if err != nil {
+		return nil, AnalyzeImageOut{}, fmt.Errorf("decode %s: %w", in.Path, err)
+	}
+	q := ingest.NewNTSCQuantizer()
+	n, err := ingest.Normalize(src, q)
+	if err != nil {
+		return nil, AnalyzeImageOut{}, err
+	}
+	rep := ingest.Analyze(n, q)
+
+	scale := in.Scale
+	if scale <= 0 {
+		scale = 3
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, ingest.Overlay(n, scale)); err != nil {
+		return nil, AnalyzeImageOut{}, err
+	}
+	ovPath := os.Getenv("ATARI2600_INGEST_PATH")
+	if ovPath == "" {
+		ovPath = filepath.Join(os.TempDir(), "atari2600_ingest.png")
+	}
+	if err := os.MkdirAll(filepath.Dir(ovPath), 0o755); err != nil {
+		return nil, AnalyzeImageOut{}, err
+	}
+	if err := os.WriteFile(ovPath, buf.Bytes(), 0o644); err != nil {
+		return nil, AnalyzeImageOut{}, err
+	}
+	result := &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.ImageContent{Data: buf.Bytes(), MIMEType: "image/png"},
+		},
+	}
+	return result, AnalyzeImageOut{Report: rep, OverlayPath: ovPath}, nil
+}
+
 // --- main ---
 
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.4.0",
+		Version: "1.12.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -687,6 +749,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed)."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "analyze_image", Description: "Ingest a game screenshot (grade A = Stella F12 PNG, unmodified, TV effects off; any integer multiple of the 160-clock raster) and return TIA-space analysis: normalized raster + palette quantization to real COLUxx values, playfield bands as PF0/PF1/PF2 bytes (repeat/reflect/asymmetric, score-mode flag), sprite candidates with GRP bytes + per-row colors + NUSIZ copy folding, plus a TIA-grid overlay image. Ambiguous elements carry confidence; one screenshot is one frame of truth (flicker objects appear partially)."}, handleAnalyzeImage)
 	mcp.AddTool(server, &mcp.Tool{Name: "get_screen_annotated", Description: "Return the latest frame as a PNG with an XY grid in real TIA coordinates (x=clock 0..159, y=scanline) and labelled sprite-position markers. The primary visual channel: the user can point at it and instruct by coordinate. Also returns sprite positions numerically."}, handleScreenAnnotated)
 
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {

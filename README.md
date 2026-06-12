@@ -8,6 +8,13 @@ It is not a game-generation app — it is two things: the loop substrate the mod
 fundamentals audit + a techniques catalog) so 2600 capability *accrues* instead of being re-derived each
 session. The aim is general, verified competence on the machine — not any one game.
 
+## Image ingestion (screenshot → TIA data)
+
+Show it a Stella F12 screenshot and get back: a TIA-grid overlay, every color as a real
+`COLUxx` value, playfield bands as PF0/PF1/PF2 bytes, and sprite candidates as GRP tables —
+round-trip proven against the harness's own ROMs in CI. See `docs/ingest.md` (input contract
+included). CLI: `cmd/ingest`; MCP: `analyze_image`.
+
 ## Premises
 
 - **The primary author is the model (Claude).** The project owner does not read assembly. So this

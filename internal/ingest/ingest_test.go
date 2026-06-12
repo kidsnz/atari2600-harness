@@ -238,10 +238,10 @@ func TestExtractSpriteBall(t *testing.T) {
 		t.Fatalf("sprite %+v, want player at x=80 h=8", s)
 	}
 	for i, b := range want {
-		if s.GRP[i] != b {
+		if s.GRP[i] != int(b) {
 			t.Fatalf("GRP[%d] = %%%08b, want %%%08b", i, s.GRP[i], b)
 		}
-		if s.Colors[i] != q.Canonical(0x86) {
+		if s.Colors[i] != int(q.Canonical(0x86)) {
 			t.Fatalf("row color $%02X, want canonical $86", s.Colors[i])
 		}
 	}
@@ -280,7 +280,7 @@ func TestExtractSpriteWalker(t *testing.T) {
 		t.Fatalf("sprite %+v, want player h=32 (row-quadrupled)", s)
 	}
 	for i := 0; i < 32; i++ {
-		if s.GRP[i] != phase0[i/4] {
+		if s.GRP[i] != int(phase0[i/4]) {
 			t.Fatalf("GRP[%d] = %%%08b, want %%%08b (art row %d)", i, s.GRP[i], phase0[i/4], i/4)
 		}
 	}

@@ -41,6 +41,26 @@ Checklist for grade A:
 - **Warnings** instead of refusals: non-integer scale, low cell uniformity (filtered input),
   high palette distance.
 
+## Extraction layers (M2/M3)
+
+- **Playfield bands**: per-row background estimation (global mode color, per-row fallback for
+  COLUBK gradients), 4-clock-aligned column folding, repeat/reflect/asymmetric halves,
+  score-mode flag (same pattern, two colors), band compression, DASM `byte` tables in
+  `pkg/playfield`'s verified bit order.
+- **Sprites**: connected components of what's left → player (GRP bytes + per-row colors),
+  missile/ball, or low-confidence large_object; equal shapes at 16/32/64 spacing fold into one
+  NUSIZ entry. Reconciliation pass: tiny grid-aligned "playfield" (height ≤2, ≤2 columns)
+  demotes back to the sprite layer.
+- All of it is **round-trip proven in CI**: our own ROMs rendered, pseudo-Stella upscaled,
+  re-extracted, compared against the source constants (litmus_pf exact bytes; pf_modes score +
+  wall; Exerciser mountains vs live RAM; ball/walker GRP bit-for-bit; NUSIZ 3-copy fold).
+
+## MCP tool
+
+`analyze_image {path}` runs the same pipeline live and returns the full report (structured) plus
+the grid overlay inline; the overlay also lands at `$ATARI2600_INGEST_PATH` (default OS temp).
+CLI equivalent: `cmd/ingest`.
+
 ## Honest limits
 
 - One screenshot = **one frame of truth**: flicker-multiplexed objects (#10) appear half-missing;

@@ -60,7 +60,7 @@ func DASMSprites(sprites []Sprite) string {
 		if len(s.GRP) > 0 {
 			out += fmt.Sprintf("Spr%dGfx:\n", i)
 			for r, b := range s.GRP {
-				out += fmt.Sprintf("        byte %%%08b ; color $%02X\n", b, s.Colors[r])
+				out += fmt.Sprintf("        byte %%%08b ; color $%02X\n", uint8(b), uint8(s.Colors[r]))
 			}
 		}
 	}

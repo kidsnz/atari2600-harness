@@ -12,6 +12,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.12.0] - 2026-06-12
+
+### Added
+- **Image ingestion M4 — `analyze_image` MCP tool.** The full pipeline (normalize → quantize →
+  playfield bands → sprite candidates → DASM snippets) callable live; returns the structured
+  report plus the TIA-grid overlay inline and at `$ATARI2600_INGEST_PATH`. Found and fixed a
+  go-sdk structured-output gotcha: `[]uint8` marshals as base64 (Go `[]byte`) and fails the
+  generated array schema — byte sequences in tool outputs are `[]int` now.
+- docs/ingest.md (+ja) extended with the extraction layers and MCP usage; README section;
+  CLAUDE.md routing + tool list. MCP serverInfo.version now 1.12.0.
+- Field test: Pizza Boy F12 shot → 29 playfield bands + 16 sprite candidates end-to-end through
+  the MCP tool (full report delivered to the author separately).
+
 ## [1.11.0] - 2026-06-12
 
 ### Added

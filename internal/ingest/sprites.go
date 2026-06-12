@@ -7,8 +7,9 @@ type Sprite struct {
 	W      int    `json:"w"`
 	H      int    `json:"h"`
 	Kind   string `json:"kind"`   // "player" | "missile_or_ball" | "large_object"
-	GRP    []uint8 `json:"grp,omitempty"`        // player のとき: 行毎 GRP（pkg/sprite ビット順、X 起点 8px 窓）
-	Colors []uint8 `json:"row_colors,omitempty"` // 行毎の色（TIA コード）。2600 スプライトは行毎多色が普通
+	// []int なのは MCP の structured output 対策（Go の []uint8=[]byte は base64 文字列になる）
+	GRP    []int `json:"grp,omitempty"`        // player のとき: 行毎 GRP（pkg/sprite ビット順、X 起点 8px 窓）
+	Colors []int `json:"row_colors,omitempty"` // 行毎の色（TIA コード）。2600 スプライトは行毎多色が普通
 	Copies  int    `json:"copies"`            // NUSIZ 等間隔コピー（1=単独）
 	Spacing int    `json:"spacing,omitempty"` // copies>1 のときの clock 間隔（16/32/64）
 	Confidence float64 `json:"confidence"`
@@ -104,8 +105,8 @@ func classify(n *Normalized, px [][2]int, minX, minY, maxX, maxY int) Sprite {
 					}
 				}
 			}
-			s.GRP = append(s.GRP, b)
-			s.Colors = append(s.Colors, rowCol)
+			s.GRP = append(s.GRP, int(b))
+			s.Colors = append(s.Colors, int(rowCol))
 		}
 	}
 	return s
@@ -166,7 +167,7 @@ func mergeCopies(in []Sprite) []Sprite {
 	return out
 }
 
-func sameGRP(a, b []uint8) bool {
+func sameGRP(a, b []int) bool {
 	if len(a) != len(b) {
 		return false
 	}
