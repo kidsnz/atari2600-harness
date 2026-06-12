@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.7.0] - 2026-06-12
+
+### Added
+- **Technique #10 — flicker multiplexing** (`docs/techniques/flicker-multiplexing.md`, demo
+  `roms/techniques/flicker_multiplex.asm`, CI-locked; suite now 43). Four color-coded bouncing
+  balls share two players by frame-parity subset rotation (30 Hz each) — the Pac-Man-ghost
+  technique; overlap-safe since slots use the any-Y compare kernel (#3 ×2, ~49 cy/line) with
+  per-subset colors and one shared HMOVE. **The alternation itself is CI-asserted** across three
+  consecutive frames. The full dynamic form (Y-sort + 2-of-N allocation + fairness rotation)
+  is documented for when a game needs it.
+
 ## [1.6.0] - 2026-06-12
 
 ### Added

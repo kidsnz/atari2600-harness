@@ -1,0 +1,52 @@
+{
+  "rom": "roms/techniques/flicker_multiplex.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 40,
+      "field": "ram.0x9e",
+      "op": "==",
+      "value": 230
+    },
+    {
+      "at_frame": 40,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 53
+    },
+    {
+      "at_frame": 40,
+      "field": "tia.player1.hmoved_pixel",
+      "op": "==",
+      "value": 97
+    },
+    {
+      "at_frame": 41,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 40
+    },
+    {
+      "at_frame": 41,
+      "field": "tia.player1.hmoved_pixel",
+      "op": "==",
+      "value": 120
+    },
+    {
+      "at_frame": 42,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 55
+    },
+    {
+      "at_frame": 42,
+      "field": "tia.player1.hmoved_pixel",
+      "op": "==",
+      "value": 95
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
