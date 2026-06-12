@@ -712,3 +712,22 @@ func (e *Emu) TraceClocks(maxInstr int) ([]InstrTrace, error) {
 	}
 	return out, nil
 }
+
+// --- dissect 用の軽量アクセサ ---
+
+// PC は現在のプログラムカウンタ。
+func (e *Emu) PC() uint16 { return e.VCS.CPU.PC.Address() }
+
+// A/XReg/YReg はレジスタ現在値（store トレースの値取得用）。
+func (e *Emu) A() uint8    { return e.VCS.CPU.A.Value() }
+func (e *Emu) XReg() uint8 { return e.VCS.CPU.X.Value() }
+func (e *Emu) YReg() uint8 { return e.VCS.CPU.Y.Value() }
+
+// PeekROM は副作用なしの 1 バイト読み（命令ストリームのデコード用）。
+func (e *Emu) PeekROM(addr uint16) uint8 {
+	v, err := e.VCS.Mem.Peek(addr)
+	if err != nil {
+		return 0
+	}
+	return v
+}

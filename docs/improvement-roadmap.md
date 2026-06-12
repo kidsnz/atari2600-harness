@@ -24,6 +24,37 @@ Everything below is done or reduced to a single pending user action:
   Stella launched, key sent by AppleScript, RAM 128/128 match, zero human input.**
 - ⏳ user: ROM files into inbox (field tests) ・ the listening session (inbox/fanfare.bin is waiting).
 
+## Disassembly-driven extraction — DiStella research + `cmd/dissect` (v1.38.0)
+
+When the ROM itself is available, static disassembly + runtime tracing beats pixel analysis. Researched
+DiStella v2.10 (classic C; built locally under the umbrella's `reference/distella/`, outside this repo)
+and shipped the integration as **`cmd/dissect`**.
+
+**What disassembly gives that pixels can't** (verified on a commercial 4K title, analysis kept local):
+(a) **whole asset tables** — every animation frame and per-row color table, not just what was on screen;
+(b) code/data separation with TIA register names = kernel structure becomes readable;
+(c) exact ROM addresses for every table (the ultimate ground truth for ingest results);
+(d) reversed/row-doubled storage conventions become visible;
+(e) RAM variable usage sites (complements `watch_ram`).
+
+**`cmd/dissect` — runtime trace × ROM byte matching** (the idea that makes disassembly *trustworthy*):
+instruction-step N frames; record every store hitting TIA graphics registers (GRP0/1, PF0-2, COLUxx)
+with PC + scanline; group into per-register scanline streams; search the ROM bytes for each stream
+(plus trimmed-blank, run-length-collapsed, and reversed variants) -> report table addresses with the
+sprite rendered as ASCII art; constant streams are reported as immediates, not searched (false-positive
+guard). With `-distella <bin>` it also emits the disassembly with `; dissect:` annotations attached to
+the nearest preceding label (tables are usually referenced via base offsets, so exact-address labels
+rarely exist). Validated against ground truth: our own `vertical_pos.bin` resolves its art table to the
+exact ROM address; a commercial title resolved the player sprite (21 rows, reversed), its per-row color
+table, and a PF table on the first run.
+
+**Future ideas recorded** (not implemented): bank-aware matching for F8/F6 carts (search per-bank slices);
+AUDF/AUDC store tracing -> music transcription (pairs with `read_audio`); diffing dissect output across
+inputs to locate game-state tables; feeding discovered tables back into `analyze_image` as an oracle.
+
+**Clean-room line:** dissect/disassembly output of commercial ROMs stays in `inbox/`/`reference/`
+(never committed); only generalized techniques enter the public catalog, re-implemented from scratch.
+
 ## (superseded) Open backlog (2026-06-12, post-ingest)
 
 ### Image ingestion (v1.9–1.18 shipped; field-testing continues)

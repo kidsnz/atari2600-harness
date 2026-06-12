@@ -12,6 +12,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.38.0] - 2026-06-12
+
+### Added
+- **`cmd/dissect` — runtime trace × ROM byte matching** (disassembly-driven asset extraction; the
+  preferred path when the ROM exists, superseding pixel analysis): instruction-steps N frames recording
+  every TIA graphics-register store (GRP/PF/COLU) with PC + scanline, groups them into streams, and
+  locates each table's **ROM address** (trying trimmed-blank / run-length-collapsed / reversed variants),
+  rendering sprites as ASCII art. Constant streams are reported as immediates (false-positive guard).
+  `-distella` merges `; dissect:` annotations into a DiStella disassembly at the nearest preceding label.
+  Validated on ground truth (vertical_pos art table found at its exact address) and on a commercial
+  title (player sprite incl. reversed storage + per-row color table + PF table; output kept local per
+  the clean-room policy). Research notes + future ideas: `docs/improvement-roadmap.md`.
+- `internal/emu`: CPU register accessors `PC`/`A`/`XReg`/`YReg` and `PeekROM` (memory peek without
+  side effects) to support instruction-level tracing.
+
 ## [1.37.0] - 2026-06-12
 
 ### Added

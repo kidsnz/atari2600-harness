@@ -140,7 +140,10 @@ any game; even its tests reference only its own `roms/litmus`).
   └── roms/                     ← separate repo (atari2600-roms); frogger etc. live here
   ```
 - Base contents: `cmd/harness` (MCP server) / `cmd/probe` (plumbing) / `cmd/scenario` (regression runner CLI) /
-  `cmd/calibrate` (horizontal X(N) sweep-fit) / `internal/emu` (driving) / `internal/annotate` (annotation) /
+  `cmd/calibrate` (horizontal X(N) sweep-fit) /
+  `cmd/fieldtest` (ROM self-drive + multi-frame analysis; `-inbox` batch, `-auto` start escalation) /
+  `cmd/dissect` (runtime trace × ROM matching → asset table addresses + annotated DiStella disassembly) /
+  `cmd/jingle` (melody notation → playable ROM) / `internal/emu` (driving) / `internal/annotate` (annotation) /
   `internal/scenario` (scenario regression = input timeline + numeric assertions, ROM-agnostic) /
   `internal/calibrate` (position calibration = poke sweep + linear regression) /
   **`pkg/playfield`** (public encoder `EncodeSymmetric` etc. = universal Atari 2600 knowledge; the roms-side `gen` imports it).
