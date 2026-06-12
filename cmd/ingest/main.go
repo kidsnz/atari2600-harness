@@ -102,6 +102,17 @@ func run(in, out string, scale int) error {
 	} else if err := enc.Encode(rep); err != nil {
 		return err
 	}
+	// 人間向けテキストレポート（report.txt — pizzaboy_report.txt 形式の正式版）
+	title := strings.Join(strings.Split(in, ","), " + ")
+	var txt string
+	if multi != nil {
+		txt = ingest.TextReportMulti(multi, title)
+	} else {
+		txt = ingest.TextReport(rep, title)
+	}
+	if err := os.WriteFile(filepath.Join(out, "report.txt"), []byte(txt), 0o644); err != nil {
+		return err
+	}
 
 	fmt.Printf("normalized %dx%d (scale %dx%d), avg palette dist %.1f\n",
 		rep.Width, rep.Height, rep.ScaleX, rep.ScaleY, rep.AvgPaletteDist)
@@ -121,6 +132,6 @@ func run(in, out string, scale int) error {
 	for i, s := range rep.Sprites {
 		fmt.Printf("  sprite %d: %s x=%d y=%d %dx%d copies=%d\n", i, s.Kind, s.X, s.Y, s.W, s.H, s.Copies)
 	}
-	fmt.Println("wrote", filepath.Join(out, "overlay.png"), "and report.json")
+	fmt.Println("wrote", filepath.Join(out, "overlay.png"), ", report.json and report.txt")
 	return nil
 }

@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.18.0] - 2026-06-12
+
+### Added
+- **`report.txt` — the human-readable report is now an official tool output** (the author asked
+  why the nice ASCII format was one-off). `cmd/ingest` writes it next to `report.json`/
+  `overlay.png`: sprite ASCII art with per-row TIA color codes (duplicate rows compressed xN,
+  NUSIZ stretch expanded), group list, playfield band table with 40-column previews and
+  repaired/SCORE flags, and the DASM snippets. Multi-frame runs get the layered version
+  (per-frame dynamic sprites + union + static layer).
+
 ## [1.17.0] - 2026-06-12
 
 ### Added
