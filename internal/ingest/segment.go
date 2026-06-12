@@ -104,15 +104,17 @@ func halfColor(colColor map[int]uint8, from, to int, conf float64) (uint8, float
 // その行の背景として採用し、無ければ行内最頻色（per-scanline COLUBK 変化に対応）。
 // 行内最頻だけだと、塗りが 50% を超える行（密な山など）で図と地が反転する（実測で発見）。
 // なお「行全体が単一色」は原理的に背景か全面 PF か決定不能 → 背景扱い（doc 参照）。
-func ExtractPlayfield(n *Normalized) (bands []PFBand, residualMask [][]bool) {
+func ExtractPlayfield(n *Normalized) (bands []PFBand, residualMask [][]bool, rowBG []uint8) {
 	globalBG := globalMode(n.Codes)
 	residualMask = make([][]bool, n.Height)
+	rowBG = make([]uint8, n.Height)
 	rows := make([]rowPF, n.Height)
 	for y := 0; y < n.Height; y++ {
 		bg := rowMode(n.Codes[y])
 		if cnt := countCode(n.Codes[y], globalBG); cnt >= 16 {
 			bg = globalBG
 		}
+		rowBG[y] = bg
 		r, _ := analyzeRowPF(n.Codes[y], bg)
 		rows[y] = r
 		// residual マスク（PF 列に取り込まれなかった非背景ピクセル）
@@ -155,7 +157,7 @@ func ExtractPlayfield(n *Normalized) (bands []PFBand, residualMask [][]bool) {
 		}
 		bands = append(bands, b)
 	}
-	return bands, residualMask
+	return bands, residualMask, rowBG
 }
 
 func litCols(bits [40]bool) int {

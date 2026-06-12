@@ -12,6 +12,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.13.0] - 2026-06-12
+
+### Added
+- **Image ingestion M5 — fidelity metric + fragment merging** (author feedback: "if the accuracy
+  is too low to use, it's pointless" — so accuracy became a number first).
+  - **Reconstruction fidelity**: the report (per-row background + PF bands + sprites) renders
+    back to a 160×H plane and is pixel-compared with the normalized input; `fidelity` is in
+    every report. CI asserts **100% on our own ROMs** (an extractor that can't reconstruct its
+    own renderer's output is buggy); pf_modes allows 0.999 (sprite-over-PF assumption vs the
+    priority region).
+  - **Fragment merging**: connected components within a 2px gap sharing colors fuse before
+    classification (the courier's detached hand, the cab's wheel, multi-part icons). Pizza Boy:
+    16 components → 6 objects, fidelity **99.25%** (the remainder is exactly the still-GRP-less
+    large objects = M6's job).
+
 ## [1.12.0] - 2026-06-12
 
 ### Added

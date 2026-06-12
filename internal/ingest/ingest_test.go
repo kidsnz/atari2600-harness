@@ -120,7 +120,7 @@ func TestExtractLitmusPF(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bands, _ := ExtractPlayfield(n)
+	bands, _, _ := ExtractPlayfield(n)
 	if len(bands) == 0 {
 		t.Fatal("no PF bands found")
 	}
@@ -153,7 +153,7 @@ func TestExtractPFModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bands, _ := ExtractPlayfield(n)
+	bands, _, _ := ExtractPlayfield(n)
 	score, wall := false, false
 	for _, b := range bands {
 		if b.PF1 == 0x66 && b.ScoreMode && b.ColorLeft == 0x44 && b.ColorRight == 0x86 {
@@ -187,7 +187,7 @@ func TestExtractReflectMountains(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bands, _ := ExtractPlayfield(n)
+	bands, _, _ := ExtractPlayfield(n)
 	// RAM の band 三つ組（mPF0/mPF1/mPF2 = $C0/$CA/$D4 起点 ×10）
 	type triple struct{ p0, p1, p2 uint8 }
 	ram := map[triple]bool{}
@@ -227,7 +227,7 @@ func TestExtractSpriteBall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, residual := ExtractPlayfield(n)
+	_, residual, _ := ExtractPlayfield(n)
 	sprites := ExtractSprites(n, residual)
 	if len(sprites) != 1 {
 		t.Fatalf("found %d sprites, want 1", len(sprites))
@@ -269,7 +269,7 @@ func TestExtractSpriteWalker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, residual := ExtractPlayfield(n)
+	_, residual, _ := ExtractPlayfield(n)
 	sprites := ExtractSprites(n, residual)
 	if len(sprites) != 1 {
 		t.Fatalf("found %d sprites, want 1", len(sprites))
@@ -299,7 +299,7 @@ func TestExtractNusizCopies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, residual := ExtractPlayfield(n)
+	_, residual, _ := ExtractPlayfield(n)
 	sprites := ExtractSprites(n, residual)
 	for _, s := range sprites {
 		if s.Copies == 3 && s.Spacing == 16 {
@@ -307,4 +307,43 @@ func TestExtractNusizCopies(t *testing.T) {
 		}
 	}
 	t.Fatalf("no 3-copy/spacing-16 group found in %+v", sprites)
+}
+
+// --- M5: 忠実度（自前 ROM は完全再構成できなければバグ） ---
+
+func fidelityOf(t *testing.T, romPath string, frames int) float64 {
+	t.Helper()
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM(romPath); err != nil {
+		t.Fatal(err)
+	}
+	e.RunFrames(frames)
+	truth, _ := e.Snapshot()
+	q := NewNTSCQuantizer()
+	n, err := Normalize(upscale(truth, 2, 1), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep := Analyze(n, q)
+	return rep.Fidelity
+}
+
+func TestFidelityOwnROMs(t *testing.T) {
+	cases := []struct {
+		rom    string
+		frames int
+		min    float64
+	}{
+		{"../../roms/litmus/litmus_pf.bin", 10, 1.0},
+		{"../../roms/techniques/pf_modes.bin", 10, 0.999}, // 優先度領域は再構成が sprite-over-PF 仮定（誤差数px）
+		{"../../roms/techniques/vertical_pos.bin", 30, 1.0},
+		{"../../roms/techniques/sprite_anim.bin", 30, 1.0},
+		{"../../roms/litmus/litmus_nusiz_copies.bin", 10, 1.0},
+	}
+	for _, c := range cases {
+		f := fidelityOf(t, c.rom, c.frames)
+		if f < c.min {
+			t.Errorf("%s: fidelity %.4f < %.4f", c.rom, f, c.min)
+		}
+	}
 }

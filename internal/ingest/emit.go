@@ -29,16 +29,22 @@ type Report struct {
 	PlayfieldASM     string       `json:"playfield_asm,omitempty"` // M2: そのまま貼れる DASM データ片
 	Sprites          []Sprite     `json:"sprites,omitempty"`       // M3: スプライト候補
 	SpritesASM       string       `json:"sprites_asm,omitempty"`   // M3: GRP テーブル等の DASM 片
+	RowBG            []int        `json:"-"`                       // M5: 行毎の背景色（逆描画用）
+	Fidelity         float64      `json:"fidelity"`                // M5: 再構成一致率（0..1）
 }
 
 // Analyze は正規化結果からフルレポートを作る（統計＋playfield。M3 でスプライトが加わる）。
 func Analyze(n *Normalized, q *Quantizer) *Report {
 	r := BuildReport(n, q)
-	bands, residual := ExtractPlayfield(n)
+	bands, residual, rowBG := ExtractPlayfield(n)
 	r.Playfield = bands
 	r.PlayfieldASM = DASMPlayfield(bands)
 	r.Sprites = ExtractSprites(n, residual)
 	r.SpritesASM = DASMSprites(r.Sprites)
+	for _, bg := range rowBG {
+		r.RowBG = append(r.RowBG, int(bg))
+	}
+	r.Fidelity = Fidelity(r, n)
 	return r
 }
 

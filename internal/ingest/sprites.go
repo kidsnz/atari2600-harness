@@ -20,37 +20,56 @@ type Sprite struct {
 // 窓 8px の anchoring はバウンディングボックス基準＝絵の左端が GRP の D7 に来るとは限らない
 //（絵がスプライト窓のどこに置かれていたかは画像から決定不能）。
 func ExtractSprites(n *Normalized, residual [][]bool) []Sprite {
+	comps := collectComponents(n, residual)
+	comps = mergeFragments(comps)
+	var sprites []Sprite
+	for _, c := range comps {
+		if len(c.px) < 2 {
+			continue // マージ後も孤立している 1px は量子化ノイズとして捨てる
+		}
+		sprites = append(sprites, classify(n, c.px, c.minX, c.minY, c.maxX, c.maxY))
+	}
+	return mergeCopies(sprites)
+}
+
+// component は連結成分（マージ前の生の塊）。
+type component struct {
+	px                     [][2]int
+	minX, minY, maxX, maxY int
+	colors                 map[uint8]bool
+}
+
+func collectComponents(n *Normalized, residual [][]bool) []component {
 	h := n.Height
 	visited := make([][]bool, h)
 	for y := range visited {
 		visited[y] = make([]bool, tiaWidth)
 	}
-	var sprites []Sprite
+	var comps []component
 	for y := 0; y < h; y++ {
 		for x := 0; x < tiaWidth; x++ {
 			if !residual[y][x] || visited[y][x] {
 				continue
 			}
-			// 8近傍 flood fill
-			minX, maxX, minY, maxY := x, x, y, y
+			c := component{minX: x, maxX: x, minY: y, maxY: y, colors: map[uint8]bool{}}
 			stack := [][2]int{{x, y}}
 			visited[y][x] = true
-			var px [][2]int
 			for len(stack) > 0 {
 				p := stack[len(stack)-1]
 				stack = stack[:len(stack)-1]
-				px = append(px, p)
-				if p[0] < minX {
-					minX = p[0]
+				c.px = append(c.px, p)
+				c.colors[n.Codes[p[1]][p[0]]] = true
+				if p[0] < c.minX {
+					c.minX = p[0]
 				}
-				if p[0] > maxX {
-					maxX = p[0]
+				if p[0] > c.maxX {
+					c.maxX = p[0]
 				}
-				if p[1] < minY {
-					minY = p[1]
+				if p[1] < c.minY {
+					c.minY = p[1]
 				}
-				if p[1] > maxY {
-					maxY = p[1]
+				if p[1] > c.maxY {
+					c.maxY = p[1]
 				}
 				for dy := -1; dy <= 1; dy++ {
 					for dx := -1; dx <= 1; dx++ {
@@ -65,13 +84,79 @@ func ExtractSprites(n *Normalized, residual [][]bool) []Sprite {
 					}
 				}
 			}
-			if len(px) < 2 {
-				continue // 1px のゴミは捨てる（量子化ノイズ対策）
-			}
-			sprites = append(sprites, classify(n, px, minX, minY, maxX, maxY))
+			comps = append(comps, c)
 		}
 	}
-	return mergeCopies(sprites)
+	return comps
+}
+
+// mergeFragments は「bbox の間隙 ≤2px かつ 色集合が交差」する成分を安定するまで統合する。
+// 配達員の離れた手・キャブの車輪・桁の断片など、1 オブジェクトの分裂を 1 つに戻す（F1）。
+func mergeFragments(comps []component) []component {
+	for {
+		merged := false
+		for i := 0; i < len(comps) && !merged; i++ {
+			for j := i + 1; j < len(comps) && !merged; j++ {
+				if gap(comps[i], comps[j]) <= 2 && colorsIntersect(comps[i].colors, comps[j].colors) {
+					comps[i] = fuse(comps[i], comps[j])
+					comps = append(comps[:j], comps[j+1:]...)
+					merged = true
+				}
+			}
+		}
+		if !merged {
+			return comps
+		}
+	}
+}
+
+// gap は 2 つの bbox 間のチェビシェフ距離（重なれば 0）。
+func gap(a, b component) int {
+	dx := 0
+	if b.minX > a.maxX {
+		dx = b.minX - a.maxX - 1
+	} else if a.minX > b.maxX {
+		dx = a.minX - b.maxX - 1
+	}
+	dy := 0
+	if b.minY > a.maxY {
+		dy = b.minY - a.maxY - 1
+	} else if a.minY > b.maxY {
+		dy = a.minY - b.maxY - 1
+	}
+	if dx > dy {
+		return dx
+	}
+	return dy
+}
+
+func colorsIntersect(a, b map[uint8]bool) bool {
+	for c := range a {
+		if b[c] {
+			return true
+		}
+	}
+	return false
+}
+
+func fuse(a, b component) component {
+	a.px = append(a.px, b.px...)
+	for c := range b.colors {
+		a.colors[c] = true
+	}
+	if b.minX < a.minX {
+		a.minX = b.minX
+	}
+	if b.maxX > a.maxX {
+		a.maxX = b.maxX
+	}
+	if b.minY < a.minY {
+		a.minY = b.minY
+	}
+	if b.maxY > a.maxY {
+		a.maxY = b.maxY
+	}
+	return a
 }
 
 func classify(n *Normalized, px [][2]int, minX, minY, maxX, maxY int) Sprite {
