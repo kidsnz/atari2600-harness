@@ -20,8 +20,9 @@ Everything below is done or reduced to a single pending user action:
   (v1.31.0, Pitfall static 99.9%) ・ trace_clocks (v1.32.0, corrected the mid-HMOVE clock table)
   ・ hands-free Stella oracle (v1.33.0) ・ ROM fieldtest = contract v3 (v1.34.0)
   ・ composing groundwork FindNote+jingle (v1.35.0) ・ housekeeping (v1.36.0)
-- ⏳ user, one action each: Accessibility grant (oracle), ROM files into inbox (field tests),
-  the listening session itself (jingle is ready).
+- ✅ Accessibility grant — was already in place; **hands-free oracle verified live 2026-06-12:
+  Stella launched, key sent by AppleScript, RAM 128/128 match, zero human input.**
+- ⏳ user: ROM files into inbox (field tests) ・ the listening session (inbox/fanfare.bin is waiting).
 
 ## (superseded) Open backlog (2026-06-12, post-ingest)
 
