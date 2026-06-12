@@ -13,16 +13,16 @@ not "verified"** — verification happens when its demo is built.
 ## TODO (ordered: foundational + easy wins first)
 
 - [x] **#1 Sprite multiplexing (vertical zones)** — many players past the 2-per-line limit. ★★ · prereqs ✅ · **done** (catalog #1).
-- [ ] **#2 Sprite animation** — cycle GRP frames every N frames (walk cycles, blinking, wheels). ★ · prereqs ✅(sprite) · value **high** (ubiquitous). Src: spiceware Step 14.
-- [ ] **#3 Vertical positioning + VDEL** — place a sprite at any Y smoothly; vertical-delay shadow registers. ★★ · prereqs: VDEL ⬜ · value **high** (foundational). Src: spiceware Step 5; Davie S23.
+- [x] **#2 Sprite animation** — cycle GRP frames every N frames + free REFP flip. ★ · **done** (catalog: `sprite-animation.md`; demo `sprite_anim.asm` with pos(v)=v calibrated positioner, locked by scenario+golden in CI).
+- [ ] **#3 Vertical positioning (skipDraw)** — place a sprite at any Y smoothly. ★★ · prereqs: VDEL ✅ (litmus_vdel; used live in the Exerciser 48px kernel) · value **high** (foundational). Src: spiceware Step 5; Davie S23.
 - [ ] **#4 2-line (double-line) kernel** — repeat each sprite line over 2 scanlines → CPU headroom for logic. ★★ · prereqs ✅(cycles/budget) · value **high** (foundation for complex kernels). Src: spiceware Step 4; `multisprite.inc`.
-- [ ] **#5 48-px sprite + 6-digit score** — wide hi-res graphic via 3-copy + VDEL shadow, 6 timed GRP writes ("Six-Digit Score Trick" / Staugas kernel). ★★ · prereqs ✅(NUSIZ/sprite), VDEL ⬜ · value **high** (almost every game needs a score/title). Src: `bigsprite.asm`,`score6.asm`,`6digit.inc`; Bumbershoot 48px.
-- [ ] **#6 Sound FX / music driver** — AUDC/AUDF/AUDV envelopes & note tables (resumes parked **A-3**). ★★★ · prereqs ✅(read_audio/golden) · value **high** (every game needs sound; best done with the author by ear). Src: spiceware Step 13; Slocum guide.
-- [ ] **#7 LFSR pseudo-random** — cheap, repeatable randomness (spawns, patterns). ★ · prereqs n/a · value **med** (common utility). Src: spiceware Step 10; randomterrain.
-- [ ] **#8 Playfield tricks** — asymmetric (non-mirrored) PF, score-mode, CTRLPF priority. ★★ · prereqs ✅(`pkg/playfield`) · value **med**. Src: `playfield.asm`; spiceware Step 7.
-- [ ] **#9 Ball + missiles as objects** — use BL/M0/M1 as extra small movers (bullets, dots). ★ · prereqs ✅(missile/collide) · value **med**. Src: spiceware Step 11–12; `missiles.asm`.
+- [x] **#5 48-px sprite + 6-digit score** — wide hi-res graphic via 3-copy + VDEL shadow, 6 timed GRP writes ("Six-Digit Score Trick" / Staugas kernel). ★★ · **done** (Exerciser title: 48px "EXRCSR" + live BCD score, timed stores recalibrated for centered X; locked by `m2_title` golden in CI; litmus_48px/_48px6).
+- [x] **#6 Sound FX / music driver** — AUDC/AUDF/AUDV envelopes & note tables. ★★★ · **done** (Exerciser: 2-channel music driver with Sequencer-Kit note codec + kick-drum SFX, `pkg/audio` tuning math, locked by `m7_music` golden_audio). *Composing real tunes by ear with the author remains a future joint session.*
+- [x] **#7 LFSR pseudo-random** — cheap, repeatable randomness (spawns, patterns). ★ · **done** (litmus_lfsr; applied in the Exerciser procedural scene v1.2.0 — starfield + AND-cascade mountain ridge from one-byte seeds; documented caveat: consecutive steps correlate, cap or decorrelate when masking).
+- [ ] **#8 Playfield tricks** — score-mode, CTRLPF priority. ★★ · **partially done**: asymmetric PF ✅ (litmus_pf_async + Exerciser zone scene), reflect ✅ (procedural mountains). Remaining: score-mode colors, PF priority bit. Src: `playfield.asm`; spiceware Step 7.
+- [x] **#9 Ball + missiles as objects** — use BL/M0/M1 as extra small movers (bullets, dots). ★ · **done** (Exerciser playground: auto-firing missile with per-frame HMOVE drift + ball pole + collision-latch color feedback, locked by `m4_playground`; litmus_collide_all).
 - [ ] **#10 General multi-sprite kernel** — dynamic Y-sort + 2-of-N allocation + **flicker** past 2/line; the general form of #1. ★★★ · prereqs ✅(extends #1) · value **high** but advanced. Src: `multisprite2/3.asm`.
-- [ ] **#11 Bank switching** — F8/F6/… schemes to break the 4K ROM ceiling. ★★★ · prereqs n/a · value **low now / needed once ROM grows**. Src: `bankswitching.asm`; `bankswitch_sizes.txt`.
+- [x] **#11 Bank switching (F8)** — break the 4K ROM ceiling. ★★★ · **done for F8** (litmus_bank pattern: vectors+reset stub in every bank, same-location switch zones; the whole Exerciser is a live F8 2-bank cart, `bank.number` asserted in CI). F6/F4/larger schemes remain documented-only.
 - [ ] **#12 Venetian Blinds** — horizontal reuse + vertical interlacing (striped/flicker); Bob Whitehead, *Video Chess* 1979. ★★ · prereqs ✅(sprite) · value **low** (historical/curiosity). Src: Video Chess; AtariAge.
 
 ## Notes

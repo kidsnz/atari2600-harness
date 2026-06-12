@@ -12,6 +12,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.3.0] - 2026-06-11
+
+### Added
+- **Technique #2 — Sprite animation** (`docs/techniques/sprite-animation.md`, demo
+  `roms/techniques/sprite_anim.asm`, CI-locked by `scenarios/sprite_anim.json` + golden; suite now 39).
+  4-phase walk cycle (frame-divided clock, `frameBase` staged in VBLANK, row-quadrupled kernel),
+  ping-pong X with **free REFP0 horizontal flip** (asymmetric art so the flip reads), divide-by-15 +
+  HMOVE-table positioner **calibrated to `pos(v) = v` exactly** (`XCAL=-8`, organic full-range sweep).
+  Documented measurement subtlety: frame-boundary `hmoved_pixel` reads lag one frame (xpos∓1 by
+  direction) — observation artifact, not a positioning error; and **calibrate with organic runs, not
+  pokes** (poke timing vs frame-boundary anatomy mis-measured ±2 px twice).
+
+### Changed
+- `docs/techniques/roadmap.md` synced with reality: the Exerciser had already verified **#5 48px+score**,
+  **#6 sound/music driver**, **#7 LFSR**, **#9 ball+missiles**, **#11 bank switching (F8)** (and parts of
+  #8; VDEL prereq of #3 now ✅) — 7 of 12 techniques done. Next open items: #3 vertical positioning,
+  #4 2-line kernel, #10 general multi-sprite kernel.
+
 ## [1.2.0] - 2026-06-11
 
 ### Changed

@@ -1,0 +1,64 @@
+{
+  "rom": "roms/techniques/sprite_anim.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 9,
+      "field": "ram.0x9e",
+      "op": "==",
+      "value": 162
+    },
+    {
+      "at_frame": 9,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 9,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 23
+    },
+    {
+      "at_frame": 9,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 22
+    },
+    {
+      "at_frame": 9,
+      "field": "tiareg.player0.reflected",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 197,
+      "field": "ram.0x83",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 197,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 69
+    },
+    {
+      "at_frame": 197,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 70
+    },
+    {
+      "at_frame": 197,
+      "field": "tiareg.player0.reflected",
+      "op": "==",
+      "value": 1
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
