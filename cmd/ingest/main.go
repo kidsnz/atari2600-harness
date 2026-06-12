@@ -57,7 +57,7 @@ func run(in, out string, scale int) error {
 		return err
 	}
 	defer ov.Close()
-	if err := png.Encode(ov, ingest.Overlay(n, scale)); err != nil {
+	if err := png.Encode(ov, ingest.OverlayReport(n, rep, scale)); err != nil {
 		return err
 	}
 	js, err := os.Create(filepath.Join(out, "report.json"))

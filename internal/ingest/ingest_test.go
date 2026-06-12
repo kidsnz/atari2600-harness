@@ -347,3 +347,40 @@ func TestFidelityOwnROMs(t *testing.T) {
 		}
 	}
 }
+
+// --- M6: 文脈つき降格（スプライトの水平ストロークを PF に取られない） ---
+// 4clk 整列の上下棒を持つリング3つ（"000" 型）が、棒も含めて 3 つの完全な成分になること。
+func TestContextDemotionRings(t *testing.T) {
+	q := NewNTSCQuantizer()
+	orange := q.RGB(q.Canonical(0x3C))
+	img := image.NewRGBA(image.Rect(0, 0, 160, 24))
+	draw := func(x, y int) { img.SetRGBA(x, y, orange) }
+	for d := 0; d < 3; d++ {
+		x0 := 72 + d*8 // 上下棒は col18/20/22 に 4clk 整列（列数3 > 2 ＝旧規則をすり抜ける形）
+		for dx := 0; dx < 4; dx++ {
+			draw(x0+dx, 6)  // 上棒
+			draw(x0+dx, 13) // 下棒
+		}
+		for y := 7; y <= 12; y++ { // 両壁（1px ＝ 4clk 列として不均一 → residual に落ちる側）
+			draw(x0, y)
+			draw(x0+3, y)
+		}
+	}
+	n, err := Normalize(img, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bands, residual, _ := ExtractPlayfield(n)
+	if len(bands) != 0 {
+		t.Fatalf("rings leaked into %d PF bands: %+v", len(bands), bands)
+	}
+	sprites := ExtractSprites(n, residual)
+	if len(sprites) != 3 {
+		t.Fatalf("found %d sprites, want 3 rings", len(sprites))
+	}
+	for _, s := range sprites {
+		if s.H != 8 || s.W != 4 {
+			t.Fatalf("ring %+v, want 4x8 complete (top/bottom bars included)", s)
+		}
+	}
+}

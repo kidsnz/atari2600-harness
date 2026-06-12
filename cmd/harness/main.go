@@ -701,7 +701,7 @@ func handleAnalyzeImage(ctx context.Context, req *mcp.CallToolRequest, in Analyz
 		scale = 3
 	}
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, ingest.Overlay(n, scale)); err != nil {
+	if err := png.Encode(&buf, ingest.OverlayReport(n, rep, scale)); err != nil {
 		return nil, AnalyzeImageOut{}, err
 	}
 	ovPath := os.Getenv("ATARI2600_INGEST_PATH")

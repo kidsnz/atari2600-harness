@@ -13,6 +13,7 @@ type Sprite struct {
 	Copies  int    `json:"copies"`            // NUSIZ 等間隔コピー（1=単独）
 	Spacing int    `json:"spacing,omitempty"` // copies>1 のときの clock 間隔（16/32/64）
 	Confidence float64 `json:"confidence"`
+	Shape      int     `json:"shape,omitempty"` // 同形スプライトは同じ id（同定用）
 }
 
 // ExtractSprites は residual マスク（PF/背景以外）から連結成分を拾い分類する。
@@ -27,9 +28,11 @@ func ExtractSprites(n *Normalized, residual [][]bool) []Sprite {
 		if len(c.px) < 2 {
 			continue // マージ後も孤立している 1px は量子化ノイズとして捨てる
 		}
-		sprites = append(sprites, classify(n, c.px, c.minX, c.minY, c.maxX, c.maxY))
+		sprites = append(sprites, analyzeComponent(n, c)...)
 	}
-	return mergeCopies(sprites)
+	sprites = mergeCopies(sprites)
+	assignShapes(sprites)
+	return sprites
 }
 
 // component は連結成分（マージ前の生の塊）。
@@ -159,6 +162,206 @@ func fuse(a, b component) component {
 	return a
 }
 
+// analyzeComponent は 1 成分をスプライト（複数になり得る）へ落とす。
+// 幅 ≤8 はそのまま player。9-16 は NUSIZ 2x 仮説 → 空列分割 → 8px 窓割り の順で試す。
+// 17-32 は 4x 仮説から。どの仮説が通ったかは kind と confidence に出る。
+func analyzeComponent(n *Normalized, c component) []Sprite {
+	w := c.maxX - c.minX + 1
+	lit := map[[2]int]bool{}
+	for _, p := range c.px {
+		lit[p] = true
+	}
+	if w <= 8 {
+		return []Sprite{classify(n, c.px, c.minX, c.minY, c.maxX, c.maxY)}
+	}
+	if w <= 16 {
+		if s, ok := tryStretch(n, lit, c, 2); ok {
+			return []Sprite{s}
+		}
+	} else if w <= 32 {
+		if s, ok := tryStretch(n, lit, c, 4); ok {
+			return []Sprite{s}
+		}
+	}
+	if parts := splitAtEmptyColumns(n, lit, c); parts != nil {
+		return parts
+	}
+	if w <= 16 {
+		return splitWindows(n, lit, c) // 8px 窓割り composite（確信度低・GRP は必ず出す）
+	}
+	return []Sprite{classify(n, c.px, c.minX, c.minY, c.maxX, c.maxY)} // large_object
+}
+
+// tryStretch は NUSIZ 拡大（2x/4x）仮説: 全 lit ピクセルが stretch 幅の塊に揃うか。
+func tryStretch(n *Normalized, lit map[[2]int]bool, c component, stretch int) (Sprite, bool) {
+	w := c.maxX - c.minX + 1
+	bits := (w + stretch - 1) / stretch
+	if bits > 8 {
+		return Sprite{}, false
+	}
+	rows := 0
+	conform := 0
+	for y := c.minY; y <= c.maxY; y++ {
+		any := false
+		ok := true
+		for b := 0; b < bits; b++ {
+			cnt := 0
+			for dx := 0; dx < stretch; dx++ {
+				if lit[[2]int{c.minX + b*stretch + dx, y}] {
+					cnt++
+				}
+			}
+			if cnt > 0 {
+				any = true
+				if cnt != stretch {
+					ok = false
+				}
+			}
+		}
+		if any {
+			rows++
+			if ok {
+				conform++
+			}
+		}
+	}
+	if rows == 0 || float64(conform)/float64(rows) < 0.9 {
+		return Sprite{}, false
+	}
+	s := Sprite{X: c.minX, Y: c.minY, W: w, H: c.maxY - c.minY + 1, Copies: 1, Confidence: 0.9}
+	if stretch == 2 {
+		s.Kind = "player_2x"
+	} else {
+		s.Kind = "player_4x"
+	}
+	for y := c.minY; y <= c.maxY; y++ {
+		var g uint8
+		counts := map[uint8]int{}
+		var rowCol uint8
+		bestN := 0
+		for b := 0; b < bits; b++ {
+			if lit[[2]int{c.minX + b*stretch, y}] {
+				g |= 1 << (7 - uint(b))
+				cc := n.Codes[y][c.minX+b*stretch]
+				counts[cc]++
+				if counts[cc] > bestN {
+					rowCol, bestN = cc, counts[cc]
+				}
+			}
+		}
+		s.GRP = append(s.GRP, int(g))
+		s.Colors = append(s.Colors, int(rowCol))
+	}
+	return s, true
+}
+
+// splitAtEmptyColumns は内部の完全空列で分割（全断片が幅 ≤8 になる時のみ）。"$000" 型。
+func splitAtEmptyColumns(n *Normalized, lit map[[2]int]bool, c component) []Sprite {
+	colHas := map[int]bool{}
+	for p := range lit {
+		colHas[p[0]] = true
+	}
+	type seg struct{ a, b int }
+	var segs []seg
+	x := c.minX
+	for x <= c.maxX {
+		for x <= c.maxX && !colHas[x] {
+			x++
+		}
+		if x > c.maxX {
+			break
+		}
+		a := x
+		for x <= c.maxX && colHas[x] {
+			x++
+		}
+		segs = append(segs, seg{a, x - 1})
+	}
+	if len(segs) < 2 {
+		return nil
+	}
+	for _, sg := range segs {
+		if sg.b-sg.a+1 > 8 {
+			return nil
+		}
+	}
+	var out []Sprite
+	for _, sg := range segs {
+		var px [][2]int
+		minY, maxY := c.maxY, c.minY
+		for p := range lit {
+			if p[0] >= sg.a && p[0] <= sg.b {
+				px = append(px, p)
+				if p[1] < minY {
+					minY = p[1]
+				}
+				if p[1] > maxY {
+					maxY = p[1]
+				}
+			}
+		}
+		out = append(out, classify(n, px, sg.a, minY, sg.b, maxY))
+	}
+	return out
+}
+
+// splitWindows は最後の砦: 左 8px 窓＋残り に機械分割（composite, 確信度低・GRP は出る）。
+func splitWindows(n *Normalized, lit map[[2]int]bool, c component) []Sprite {
+	var out []Sprite
+	for x0 := c.minX; x0 <= c.maxX; x0 += 8 {
+		x1 := x0 + 7
+		if x1 > c.maxX {
+			x1 = c.maxX
+		}
+		var px [][2]int
+		minY, maxY := c.maxY, c.minY
+		for p := range lit {
+			if p[0] >= x0 && p[0] <= x1 {
+				px = append(px, p)
+				if p[1] < minY {
+					minY = p[1]
+				}
+				if p[1] > maxY {
+					maxY = p[1]
+				}
+			}
+		}
+		if len(px) == 0 {
+			continue
+		}
+		sp := classify(n, px, x0, minY, x1, maxY)
+		sp.Kind = "composite_part"
+		sp.Confidence = 0.6
+		out = append(out, sp)
+	}
+	return out
+}
+
+// assignShapes は同形（W/H/GRP 一致）のスプライトに同じ shape id を振る（同定用）。
+func assignShapes(sprites []Sprite) {
+	type key struct {
+		w, h int
+		sig  string
+	}
+	ids := map[key]int{}
+	next := 1
+	for i := range sprites {
+		if len(sprites[i].GRP) == 0 {
+			continue
+		}
+		sig := ""
+		for _, g := range sprites[i].GRP {
+			sig += string(rune(g))
+		}
+		k := key{sprites[i].W, sprites[i].H, sig}
+		if _, ok := ids[k]; !ok {
+			ids[k] = next
+			next++
+		}
+		sprites[i].Shape = ids[k]
+	}
+}
+
 func classify(n *Normalized, px [][2]int, minX, minY, maxX, maxY int) Sprite {
 	s := Sprite{X: minX, Y: minY, W: maxX - minX + 1, H: maxY - minY + 1, Copies: 1, Confidence: 1.0}
 	lit := map[[2]int]bool{}
@@ -174,7 +377,7 @@ func classify(n *Normalized, px [][2]int, minX, minY, maxX, maxY int) Sprite {
 		s.Kind = "large_object" // PF 非整列の大物 or 拡大 NUSIZ。確定はユーザーと
 		s.Confidence = 0.5
 	}
-	if s.Kind == "player" || s.Kind == "missile_or_ball" {
+	if s.Kind != "large_object" {
 		for y := minY; y <= maxY; y++ {
 			var b uint8
 			counts := map[uint8]int{}

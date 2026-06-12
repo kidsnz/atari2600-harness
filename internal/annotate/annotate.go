@@ -31,6 +31,12 @@ const (
 	botPad     = 30 // マーカーラベル 2 段用
 )
 
+// LeftMargin/TopMargin は Render の作図原点（TIA (0,0) が乗る画素位置の算出用に公開）。
+const (
+	LeftMargin = leftMargin
+	TopMargin  = topMargin
+)
+
 var (
 	gridMinor = color.RGBA{255, 255, 255, 30}
 	gridMajor = color.RGBA{255, 255, 255, 70}

@@ -139,11 +139,15 @@ func ExtractPlayfield(n *Normalized) (bands []PFBand, residualMask [][]bool, row
 			y++
 		}
 		b := makeBand(rows[top], top, y-top)
-		// 調停: 高さ≤2 かつ点灯列≤2 の極小バンドは「4clk 整列したスプライト」の公算が高い
-		// → PF から降格し、ピクセルをスプライト層（residual）へ戻す。
-		// （本物の 1 行 PF＝星空などは列が多数あるので残る。実測: x=80 のボールが PF に
-		//   横取りされて 5 断片化したのをこの調停で解消。）
-		if b.Height <= 2 && litCols(rows[top].bits) <= 2 {
+		// 調停1: 高さ≤2 かつ点灯列≤2 の極小バンドは「4clk 整列したスプライト」の公算が高い。
+		// 調停2（文脈つき）: 高さ≤2 のバンドで、点灯列の直上/直下の行に同色の residual が
+		// 縦に接している＝スプライトの水平ストローク（スコア桁の上下棒など）。
+		// どちらも PF から降格し、ピクセルをスプライト層（residual）へ戻す。
+		demote := b.Height <= 2 && litCols(rows[top].bits) <= 2
+		if !demote && b.Height <= 2 {
+			demote = touchesResidualVertically(n, residualMask, rows[top], top, b.Height)
+		}
+		if demote {
 			for yy := top; yy < top+b.Height; yy++ {
 				for c := 0; c < 40; c++ {
 					if rows[top].bits[c] {
@@ -158,6 +162,32 @@ func ExtractPlayfield(n *Normalized) (bands []PFBand, residualMask [][]bool, row
 		bands = append(bands, b)
 	}
 	return bands, residualMask, rowBG
+}
+
+// touchesResidualVertically は薄バンドの点灯列が、上下の行の同色 residual ピクセルと
+// 縦に接しているか（＝スプライトの一部である強い徴候）。
+func touchesResidualVertically(n *Normalized, residual [][]bool, r rowPF, top, height int) bool {
+	for c := 0; c < 40; c++ {
+		if !r.bits[c] {
+			continue
+		}
+		col := r.colorL
+		if c >= 20 {
+			col = r.colorR
+		}
+		for _, yy := range []int{top - 1, top + height} {
+			if yy < 0 || yy >= n.Height {
+				continue
+			}
+			for dx := 0; dx < 4; dx++ {
+				x := c*4 + dx
+				if residual[yy][x] && n.Codes[yy][x] == col {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func litCols(bits [40]bool) int {

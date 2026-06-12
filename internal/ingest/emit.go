@@ -5,6 +5,9 @@ import (
 	"image"
 	"sort"
 
+	"github.com/fogleman/gg"
+	"golang.org/x/image/font/basicfont"
+
 	"github.com/kidsnz/atari2600-harness/internal/annotate"
 )
 
@@ -31,6 +34,17 @@ type Report struct {
 	SpritesASM       string       `json:"sprites_asm,omitempty"`   // M3: GRP テーブル等の DASM 片
 	RowBG            []int        `json:"-"`                       // M5: 行毎の背景色（逆描画用）
 	Fidelity         float64      `json:"fidelity"`                // M5: 再構成一致率（0..1）
+	Groups           []Group      `json:"groups,omitempty"`        // M6: 同行・同色の並び（スコア/ゲージ等）
+}
+
+// Group は意味的な並び（スコア桁・ライフゲージなど）。Members は Sprites のインデックス。
+type Group struct {
+	Label   string `json:"label"` // "row-group"
+	Members []int  `json:"members"`
+	X       int    `json:"x"`
+	Y       int    `json:"y"`
+	W       int    `json:"w"`
+	H       int    `json:"h"`
 }
 
 // Analyze は正規化結果からフルレポートを作る（統計＋playfield。M3 でスプライトが加わる）。
@@ -44,8 +58,84 @@ func Analyze(n *Normalized, q *Quantizer) *Report {
 	for _, bg := range rowBG {
 		r.RowBG = append(r.RowBG, int(bg))
 	}
+	r.Groups = groupRows(r.Sprites)
 	r.Fidelity = Fidelity(r, n)
 	return r
+}
+
+// groupRows は「Y 範囲が重なり・色が交差・X 間隙 ≤8」の連鎖を row-group に束ねる。
+func groupRows(sprites []Sprite) []Group {
+	n := len(sprites)
+	used := make([]bool, n)
+	var groups []Group
+	for i := 0; i < n; i++ {
+		if used[i] || len(sprites[i].GRP) == 0 {
+			continue
+		}
+		members := []int{i}
+		used[i] = true
+		for {
+			grew := false
+			for j := 0; j < n; j++ {
+				if used[j] || len(sprites[j].GRP) == 0 {
+					continue
+				}
+				for _, m := range members {
+					a, b := sprites[m], sprites[j]
+					yOverlap := a.Y < b.Y+b.H && b.Y < a.Y+a.H
+					gapX := b.X - (a.X + a.W)
+					if gapX < 0 {
+						gapX = a.X - (b.X + b.W)
+					}
+					if yOverlap && gapX >= 0 && gapX <= 8 && colorsShared(a.Colors, b.Colors) {
+						members = append(members, j)
+						used[j] = true
+						grew = true
+						break
+					}
+				}
+			}
+			if !grew {
+				break
+			}
+		}
+		if len(members) >= 2 {
+			g := Group{Label: "row-group", Members: members}
+			g.X, g.Y = sprites[members[0]].X, sprites[members[0]].Y
+			maxX, maxY := 0, 0
+			for _, m := range members {
+				s := sprites[m]
+				if s.X < g.X {
+					g.X = s.X
+				}
+				if s.Y < g.Y {
+					g.Y = s.Y
+				}
+				if s.X+s.W > maxX {
+					maxX = s.X + s.W
+				}
+				if s.Y+s.H > maxY {
+					maxY = s.Y + s.H
+				}
+			}
+			g.W, g.H = maxX-g.X, maxY-g.Y
+			groups = append(groups, g)
+		}
+	}
+	return groups
+}
+
+func colorsShared(a, b []int) bool {
+	set := map[int]bool{}
+	for _, c := range a {
+		set[c] = true
+	}
+	for _, c := range b {
+		if set[c] {
+			return true
+		}
+	}
+	return false
 }
 
 // DASMSprites はスプライト候補を DASM に貼れる GRP テーブル＋色テーブルで出力する。
@@ -129,9 +219,31 @@ func DASMPlayfield(bands []PFBand) string {
 
 // Overlay は TIA 実座標グリッド付きのオーバーレイ画像を返す（annotate を再利用）。
 // visibleTop=0（画像相対座標）。ユーザーはこの画像の座標をそのまま指せる。
-func Overlay(n *Normalized, scale int) *image.RGBA {
+// rep があればスプライトの bbox＋番号を重ね描きする（answer-check 用）。
+func Overlay(n *Normalized, scale int) *image.RGBA { return OverlayReport(n, nil, scale) }
+
+func OverlayReport(n *Normalized, rep *Report, scale int) *image.RGBA {
 	if scale < 1 {
 		scale = 3
 	}
-	return annotate.Render(n.TIA, 0, scale, nil)
+	img := annotate.Render(n.TIA, 0, scale, nil)
+	if rep == nil {
+		return img
+	}
+	dc := gg.NewContextForRGBA(img)
+	dc.SetFontFace(basicfont.Face7x13)
+	for i, s := range rep.Sprites {
+		x0 := float64(annotate.LeftMargin + s.X*scale)
+		y0 := float64(annotate.TopMargin + s.Y*scale)
+		w := float64(s.W * scale)
+		if s.Copies > 1 {
+			w = float64((s.Spacing*(s.Copies-1) + s.W) * scale)
+		}
+		dc.SetRGBA(1, 0.35, 0.35, 0.9)
+		dc.SetLineWidth(1.5)
+		dc.DrawRectangle(x0-1, y0-1, w+2, float64(s.H*scale)+2)
+		dc.Stroke()
+		dc.DrawStringAnchored(fmt.Sprintf("%d", i), x0+3, y0-6, 0, 0.5)
+	}
+	return img
 }

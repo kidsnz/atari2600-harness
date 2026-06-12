@@ -12,6 +12,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.14.0] - 2026-06-12
+
+### Added
+- **Image ingestion M6 — context arbitration, stretch decomposition, grouping.** Thin "playfield"
+  rows vertically touching same-colored sprite pixels are sprite strokes (the score digits'
+  top/bottom bars) — they demote and the rings reassemble whole (synthetic 3-ring CI test).
+  Components 9-16/17-32 px wide try NUSIZ 2x/4x hypotheses (≥90% row conformance) before
+  empty-column splitting and 8px-window composites — everything gets GRP data now. Row-groups
+  bundle score/gauge runs; identical shapes share an id. Overlay draws numbered bounding boxes.
+- **Pizza Boy acceptance (author's checklist): all six criteria met.** Courier = one complete
+  sprite (detached hand re-merged; 10 art rows × 2-line kernel), life gauge = one 3-copy entry,
+  pizza = standalone sprite, **both cabs = player_2x with identical shape id (GRP'd)**, score =
+  one row-group of complete digits, **fidelity 99.93%** (own-ROM suites stay at 100%).
+
 ## [1.13.0] - 2026-06-12
 
 ### Added

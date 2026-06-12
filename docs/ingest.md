@@ -55,6 +55,18 @@ Checklist for grade A:
   re-extracted, compared against the source constants (litmus_pf exact bytes; pf_modes score +
   wall; Exerciser mountains vs live RAM; ball/walker GRP bit-for-bit; NUSIZ 3-copy fold).
 
+## Accuracy machinery (M5/M6)
+
+- **Reconstruction fidelity**: every report carries `fidelity` — the report rendered back to a
+  160×H plane and pixel-compared with the input. Own-ROM round-trips assert **100%** in CI;
+  the Pizza Boy field image scores **99.93%**.
+- Fragment merging (≤2px gaps, shared colors), context-aware PF↔sprite arbitration (thin
+  "playfield" rows vertically touching same-colored sprite pixels are sprite strokes — score
+  digits reassemble into complete rings), NUSIZ stretch hypotheses (2x/4x with ≥90% row
+  conformance), empty-column splitting for digit strips, row-groups (score/gauge bundles),
+  shape ids for identifying the same object appearing twice (the two cabs).
+- The overlay draws numbered bounding boxes for every sprite — answer-check by eye.
+
 ## MCP tool
 
 `analyze_image {path}` runs the same pipeline live and returns the full report (structured) plus
