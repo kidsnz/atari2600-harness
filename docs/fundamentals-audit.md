@@ -173,3 +173,21 @@ The actionable follow-ups live in `hardening-roadmap.md` § "v2 backlog". Verifi
 ## Where the follow-ups live
 The prioritized work items distilled from this audit (new litmus ROMs, `read_bank`, audio sample capture,
 Stella oracle automation, `pkg/audio` tables) are tracked in **`hardening-roadmap.md` § v2 backlog**.
+
+## Mid-line HMOVE — verified (2026-06-12, litmus_hmove_mid)
+
+Strobing HMOVE outside the post-WSYNC slot, with **all HM registers cleared** (HMCLR'd):
+measured on Gopher2600 with pixel-level confirmation (bar edge above/below the strobe line):
+
+| strobe completion (visible clock) | shift |
+|---|---|
+| ≈ 1   | 0 px |
+| ≈ 73  | 0 px |
+| ≈ 130 | **−5 px (left)** |
+| (control: no strobe) | 0 px |
+
+The folk rule "objects move right ~1px/4CLK" did **not** reproduce at these sample points — the
+shift is a non-monotonic function of strobe time (consistent with Towers' per-cycle tables being
+more complex than the summary line). Regression-pinned in `scenarios/hmove_mid.json`. For
+authoring: keep HMOVE in the post-WSYNC slot unless deliberately exploiting the quirk, and if
+exploiting it, measure your exact strobe cycle with this litmus pattern first.

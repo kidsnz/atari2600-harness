@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.22.0] - 2026-06-12
+
+### Added
+- **litmus_hmove_mid — mid-line HMOVE measured** (documented→verified). With HM registers
+  cleared, strobes completing at visible clocks ≈1 and ≈73 shift nothing; ≈130 shifts **−5 px
+  left**; no-strobe control 0. Pixel-confirmed (bar edge above/below the strobe line). The folk
+  "right 1px/4CLK" summary did not reproduce — recorded as a non-monotonic function of strobe
+  time in docs/fundamentals-audit.md; pinned in scenarios/hmove_mid.json. Suite now 47.
+
 ## [1.21.0] - 2026-06-12
 
 ### Added

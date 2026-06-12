@@ -1,0 +1,33 @@
+{
+  "rom": "roms/litmus/litmus_hmove_mid.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 8,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 55
+    },
+    {
+      "at_frame": 9,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 60
+    },
+    {
+      "at_frame": 10,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 60
+    },
+    {
+      "at_frame": 11,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 60
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262
+  }
+}
