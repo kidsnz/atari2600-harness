@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.37.0] - 2026-06-12
+
+### Added
+- **fieldtest v2**: console panel switches (`emu.SetPanel` reset/select; `-press reset@30`),
+  **auto-start escalation** (`-auto`: capture → if no dynamic objects, RESET → fire →
+  fire+hold-right, reporting which attempt started the game — verified live: E.T. needed RESET,
+  Outlaw needed fire+hold-right), and **inbox organize mode** (`-inbox dir`: each X.bin moves
+  into X/ with overlay/report.txt/report.json inside — the standing structure, documented in
+  inbox/README.txt). Batch-ran 9 ROMs end-to-end.
+
 ## [1.36.0] - 2026-06-12
 
 ### Added

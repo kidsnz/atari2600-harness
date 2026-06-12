@@ -348,6 +348,22 @@ func (e *Emu) SetInput(player int, action string, pressed bool) error {
 	return err
 }
 
+// SetPanel は本体パネルスイッチ（Game Reset / Game Select）を操作する。
+// 多くの市販ゲームはジョイスティックでなく RESET スイッチで開始する（fieldtest -auto の土台）。
+func (e *Emu) SetPanel(switchName string, pressed bool) error {
+	var ev ports.Event
+	switch switchName {
+	case "reset":
+		ev = ports.PanelReset
+	case "select":
+		ev = ports.PanelSelect
+	default:
+		return fmt.Errorf("unknown panel switch %q (want reset/select)", switchName)
+	}
+	_, err := e.VCS.RIOT.Ports.HandleInputEvent(ports.InputEvent{Port: plugging.PortPanel, Ev: ev, D: pressed})
+	return err
+}
+
 // RowRun は ReadRow の連長エンコード 1 区間。可視 clock [Clock, Clock+Len) が同色 Hex。
 type RowRun struct {
 	Clock int    `json:"clock"` // 区間先頭の可視 clock（0..159）

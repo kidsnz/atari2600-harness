@@ -1,11 +1,12 @@
-// fieldtest — ROM 自走フィールドテスト（R6, v1.34.0）。
-// ROM を Gopher2600 で自走させ、複数フレームを採取してマルチフレーム解析（静的/動的分離・
-// union トラック・flicker）まで全自動で行う。スクリーンショット不要＝「ROM を inbox に
-// 置けば解析一式が出てくる」入力契約 v3 の実体。
+// fieldtest — ROM 自走フィールドテスト（R6→S1 で v2）。
+// ROM を Gopher2600 で自走させ、複数フレームを採取してマルチフレーム解析まで全自動。
 //
-// 使い方:
-//   go run ./cmd/fieldtest -rom game.bin [-warmup 120] [-shots 4] [-gap 2] [-out dir]
-//                          [-press right@60,fire@90]   ; フレーム指定の入力注入
+//	go run ./cmd/fieldtest -rom game.bin [-warmup N -shots K -gap G] [-auto]
+//	                        [-press right@60,fire@90,reset@30] [-out dir]
+//	go run ./cmd/fieldtest -inbox ../inbox       ; 整理モード（*.bin → 各フォルダ＋解析一式）
+//
+// -auto: 動的オブジェクトが採れるまで RESET → fire → fire+右入力保持 の順に試す
+// （タイトル画面・アトラクト・待機キャラ対策。何で開始できたかを報告）。
 package main
 
 import (
@@ -24,23 +25,68 @@ import (
 
 func main() {
 	rom := flag.String("rom", "", "ROM (.bin)")
-	warmup := flag.Int("warmup", 120, "frames to run before the first shot")
+	warmup := flag.Int("warmup", 120, "frames before the first shot")
 	shots := flag.Int("shots", 4, "frames to capture")
-	gap := flag.Int("gap", 2, "frames between shots")
-	out := flag.String("out", "", "output dir (default: alongside the ROM, <name>_fieldtest/)")
-	press := flag.String("press", "", "input injection: action@frame[,action@frame...] (left|right|up|down|fire)")
+	gap := flag.Int("gap", 3, "frames between shots")
+	out := flag.String("out", "", "output dir (default: <romdir>/<name>_fieldtest)")
+	press := flag.String("press", "", "input injection: action@frame[,...] (left|right|up|down|fire|reset|select)")
+	auto := flag.Bool("auto", false, "auto-start: escalate RESET/fire/hold-right until dynamic objects appear")
+	inboxDir := flag.String("inbox", "", "batch: organize <dir>/*.bin into per-ROM folders and analyze each")
 	flag.Parse()
+	if *inboxDir != "" {
+		if err := runInbox(*inboxDir, *warmup, *shots, *gap); err != nil {
+			fmt.Fprintln(os.Stderr, "FAIL:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *rom == "" {
-		fmt.Fprintln(os.Stderr, "usage: fieldtest -rom game.bin [...]")
+		fmt.Fprintln(os.Stderr, "usage: fieldtest -rom game.bin [...] | -inbox dir")
 		os.Exit(2)
 	}
-	if err := run(*rom, *warmup, *shots, *gap, *out, *press); err != nil {
+	if err := run(*rom, *warmup, *shots, *gap, *out, *press, *auto); err != nil {
 		fmt.Fprintln(os.Stderr, "FAIL:", err)
 		os.Exit(1)
 	}
 }
 
-func run(rom string, warmup, shots, gap int, out, press string) error {
+// runInbox: 直下の各 X.bin → X/ フォルダへ移動し、その中へ解析一式を出力（散らかり防止の標準構造）。
+func runInbox(dir string, warmup, shots, gap int) error {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	n := 0
+	for _, ent := range ents {
+		name := ent.Name()
+		if ent.IsDir() || !strings.HasSuffix(strings.ToLower(name), ".bin") {
+			continue
+		}
+		base := strings.TrimSuffix(name, filepath.Ext(name))
+		sub := filepath.Join(dir, base)
+		if err := os.MkdirAll(sub, 0o755); err != nil {
+			return err
+		}
+		dst := filepath.Join(sub, name)
+		if err := os.Rename(filepath.Join(dir, name), dst); err != nil {
+			return err
+		}
+		if asm := base + ".asm"; fileExists(filepath.Join(dir, asm)) {
+			os.Rename(filepath.Join(dir, asm), filepath.Join(sub, asm))
+		}
+		fmt.Printf("== %s ==\n", base)
+		if err := run(dst, warmup, shots, gap, sub, "", true); err != nil {
+			fmt.Printf("  解析失敗: %v（ROM は %s/ に整理済み）\n", err, sub)
+		}
+		n++
+	}
+	fmt.Printf("organized %d ROM(s) under %s\n", n, dir)
+	return nil
+}
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+func run(rom string, warmup, shots, gap int, out, press string, auto bool) error {
 	if out == "" {
 		base := strings.TrimSuffix(filepath.Base(rom), filepath.Ext(rom))
 		out = filepath.Join(filepath.Dir(rom), base+"_fieldtest")
@@ -72,19 +118,23 @@ func run(rom string, warmup, shots, gap int, out, press string) error {
 		return err
 	}
 	q := ingest.NewNTSCQuantizer()
-	var frames []*ingest.Normalized
 	frame := 0
+	apply := func(action string, pressed bool) error {
+		if action == "reset" || action == "select" {
+			return e.SetPanel(action, pressed)
+		}
+		return e.SetInput(0, action, pressed)
+	}
 	step := func(n int) error {
 		for i := 0; i < n; i++ {
 			for _, ij := range injs {
 				if ij.frame == frame {
-					// 1 フレーム押して放す（押しっぱなしは action@f を連続指定）
-					if err := e.SetInput(0, ij.action, true); err != nil {
+					if err := apply(ij.action, true); err != nil {
 						return err
 					}
 				}
 				if ij.frame == frame-1 {
-					if err := e.SetInput(0, ij.action, false); err != nil {
+					if err := apply(ij.action, false); err != nil {
 						return err
 					}
 				}
@@ -96,27 +146,73 @@ func run(rom string, warmup, shots, gap int, out, press string) error {
 		}
 		return nil
 	}
+	capture := func(holdRight bool) (*ingest.MultiReport, []*ingest.Normalized, error) {
+		var fs []*ingest.Normalized
+		if holdRight {
+			apply("right", true)
+			defer apply("right", false)
+		}
+		for s := 0; s < shots; s++ {
+			img, _ := e.Snapshot()
+			n, err := ingest.Normalize(img, q)
+			if err != nil {
+				return nil, nil, err
+			}
+			fs = append(fs, n)
+			if s < shots-1 {
+				if err := step(gap); err != nil {
+					return nil, nil, err
+				}
+			}
+		}
+		mr, err := ingest.AnalyzeFrames(fs, q)
+		return mr, fs, err
+	}
+	pulse := func(action string) error {
+		if err := apply(action, true); err != nil {
+			return err
+		}
+		if err := step(2); err != nil {
+			return err
+		}
+		if err := apply(action, false); err != nil {
+			return err
+		}
+		return step(40)
+	}
+
 	if err := step(warmup); err != nil {
 		return err
 	}
-	for s := 0; s < shots; s++ {
-		img, _ := e.Snapshot()
-		n, err := ingest.Normalize(img, q)
-		if err != nil {
-			return err
-		}
-		frames = append(frames, n)
-		if s < shots-1 {
-			if err := step(gap); err != nil {
-				return err
-			}
-		}
-	}
-
-	mr, err := ingest.AnalyzeFrames(frames, q)
+	mr, frames, err := capture(false)
 	if err != nil {
 		return err
 	}
+	startedBy := "as-is"
+	if auto && len(mr.Union) == 0 {
+		for _, at := range []struct {
+			name, action string
+			hold         bool
+		}{{"reset", "reset", false}, {"fire", "fire", false}, {"fire+hold-right", "fire", true}} {
+			if err := pulse(at.action); err != nil {
+				return err
+			}
+			mr2, fs2, err := capture(at.hold)
+			if err != nil {
+				return err
+			}
+			if len(mr2.Union) > 0 {
+				mr, frames = mr2, fs2
+				startedBy = at.name
+				break
+			}
+			startedBy = "no-dynamics"
+		}
+	}
+	if auto {
+		fmt.Printf("  auto-start: %s (union=%d)\n", startedBy, len(mr.Union))
+	}
+
 	if err := os.MkdirAll(out, 0o755); err != nil {
 		return err
 	}
@@ -134,7 +230,8 @@ func run(rom string, warmup, shots, gap int, out, press string) error {
 	enc.SetIndent("", "  ")
 	enc.Encode(mr)
 	js.Close()
-	title := fmt.Sprintf("%s (fieldtest: warmup %d, %d shots, gap %d)", filepath.Base(rom), warmup, shots, gap)
+	title := fmt.Sprintf("%s (fieldtest: warmup %d, %d shots, gap %d, start=%s)",
+		filepath.Base(rom), warmup, shots, gap, startedBy)
 	os.WriteFile(filepath.Join(out, "report.txt"), []byte(ingest.TextReportMulti(mr, title)), 0o644)
 
 	fmt.Printf("fieldtest %s: %d frames, unresolved %.2f%%, union %d objects\n",
