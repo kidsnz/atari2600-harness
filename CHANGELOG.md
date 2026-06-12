@@ -12,6 +12,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.57.0] - 2026-06-12
+
+### Added
+- **`scripts/aa_fetch.py` — AtariAge thread-mining pipeline** (Wayback-first): the live forum
+  sits behind a Cloudflare bot challenge, so the tool enumerates snapshots via the CDX API
+  (both old/new domains), caches raw pages, parses IPB posts into a single `thread.md`
+  (author/date/body), and recovers attachments (attachment.php redirects need
+  status-filterless CDX + replay-URL following with retries). Gaps are reported for cookie/
+  manual fallback (`AA_COOKIE` env supported; no passwords). First run: Medieval Mayhem topic —
+  17/17 pages, 400 posts, dev-build ROMs recovered and analyzed with fieldtest/dissect
+  (analysis artifacts stay in the non-repo reference/ area per the clean-room policy).
+
 ## [1.56.0] - 2026-06-12
 
 ### Changed
