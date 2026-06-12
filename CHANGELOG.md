@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.60.0] - 2026-06-12
+
+### Added
+- **`scripts/aa_index.py` (functional WIP)** — forum-wide topic catalog from Wayback index-page
+  snapshots (title/author/replies/views CSV, views-sorted = digging-value ranking). The CDX
+  enumeration and fetch loop work (50 archived index pages of the 2600 Programming forum);
+  the IPB list parser only captures a fraction of rows and pollutes some titles — **parser
+  iteration is the named next step** (recorded in reference/atariage/README.md).
+
 ## [1.59.0] - 2026-06-12
 
 ### Added
