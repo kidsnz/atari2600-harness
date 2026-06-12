@@ -5,10 +5,16 @@ AtariAge 本家は Cloudflare の bot チャレンジで直接取得できない
 Wayback Machine の CDX API でスナップショットを列挙して取得する。
 
 使い方:
-    python3 scripts/aa_fetch.py <topic-url> <出力ディレクトリ>
+    python3 scripts/aa_fetch.py <topic-url> <出力ディレクトリ> [-attachments] [-keep-raw]
     例: python3 scripts/aa_fetch.py \\
         https://forums.atariage.com/topic/85667-medieval-mayhem-2600/ \\
         ../reference/atariage/85667-medieval-mayhem
+
+既定は**リーン運用**（溜め込まない）:
+    - raw/ の HTML キャッシュは parse 後に削除（Wayback がアーカイブ＝いつでも再取得可能）。
+      再実行を高速化したい時だけ -keep-raw。
+    - 添付はダウンロードせず thread.md 末尾に一覧だけ記録。実物が要る時だけ -attachments。
+    - 残すのは蒸留物（thread.md・gaps.md・手書きの notes）だけ。
 
 出力:
     raw/pageNN.html   各ページのスナップショット（キャッシュ・再実行は差分のみ）
@@ -161,10 +167,13 @@ def fetch_attachment(url, outdir, names, gaps):
 
 
 def main():
-    if len(sys.argv) != 3:
+    if len([a for a in sys.argv[1:] if not a.startswith("-")]) != 2:
         print(__doc__)
         sys.exit(2)
-    topic_url, outdir = sys.argv[1], sys.argv[2]
+    want_atts = "-attachments" in sys.argv
+    keep_raw = "-keep-raw" in sys.argv
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    topic_url, outdir = args[0], args[1]
     raw = os.path.join(outdir, "raw")
     attdir = os.path.join(outdir, "attachments")
     os.makedirs(raw, exist_ok=True)
@@ -211,12 +220,24 @@ def main():
             md.append(f"\n### {p['author']} — {p['time']}\n\n{p['text']}\n")
         print(f"page {n}: {len(posts)} posts, {len(atts)} attachment links")
 
-    got = 0
     uniq = sorted(set(all_atts))
+    got = 0
+    if want_atts:
+        for u in uniq:
+            if fetch_attachment(u, attdir, names, gaps):
+                got += 1
+    # 添付一覧は常に thread.md へ記録（後から -attachments で取り直せる）
+    md.append("\n## attachments (" + str(len(uniq)) + ")\n")
     for u in uniq:
-        if fetch_attachment(u, attdir, names, gaps):
-            got += 1
+        aid = re.search(r"attachment\.php\?id=(\d+)", u)
+        nm = names.get(aid.group(1), "") if aid else ""
+        md.append(f"- {u} {nm}")
     open(os.path.join(outdir, "thread.md"), "w").write("\n".join(md))
+    if not keep_raw:
+        import shutil
+        shutil.rmtree(raw, ignore_errors=True)
+    if not want_atts and not os.listdir(attdir):
+        os.rmdir(attdir)
     open(os.path.join(outdir, "gaps.md"), "w").write(
         "# Gaps\n" + ("\n".join(f"- {g}" for g in gaps) if gaps else "(none)") + "\n")
     print(f"\nDONE: {total_posts} posts / attachments {got}/{len(uniq)} / gaps {len(gaps)}")

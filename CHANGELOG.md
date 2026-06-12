@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.57.1] - 2026-06-12
+
+### Changed
+- `aa_fetch.py` defaults to **lean storage**: raw HTML cache is deleted after parsing (Wayback
+  itself is the permanent archive — re-fetchable anytime), attachments are listed in thread.md
+  but only downloaded with `-attachments`, and `-keep-raw` opts back into caching. Keeps only
+  the distillate (thread.md / gaps.md / notes). Demonstrated: a 2-page topic harvests to 80KB.
+
 ## [1.57.0] - 2026-06-12
 
 ### Added
