@@ -220,26 +220,36 @@ SceneZone:
         lda lastScene
         cmp #1
         beq ZDrift
-        ; 初期化パス（4 行）＋音楽ミュート
+        ; 初期化パス（6 行・各行 ≤76cy: 6連コピーは1行 ~82cy で零れる→3+3 分割。R1 で根治）
         lda #0
         sta AUDV0
         sta AUDV1
         ldx #5
-ZI1:    lda ZoneXInit0,x
+ZI1a:   lda ZoneXInit0,x
         sta zx0,x
         dex
-        bpl ZI1
+        cpx #2
+        bne ZI1a
         sta WSYNC           ; 2
+ZI1b:   lda ZoneXInit0,x
+        sta zx0,x
+        dex
+        bpl ZI1b
+        sta WSYNC           ; 3
         ldx #5
-ZI2:    lda ZoneXInit1,x
+ZI2a:   lda ZoneXInit1,x
         sta zx1,x
         dex
-        bpl ZI2
-        sta WSYNC           ; 3
+        cpx #2
+        bne ZI2a
+        sta WSYNC           ; 4
+ZI2b:   lda ZoneXInit1,x
+        sta zx1,x
+        dex
+        bpl ZI2b
+        sta WSYNC           ; 5
         lda #1
         sta lastScene
-        sta WSYNC           ; 4
-        sta WSYNC           ; 5
         sta WSYNC           ; 6
         sta WSYNC           ; 7
         jmp ZMountains
@@ -594,32 +604,31 @@ SceneGrad:
         sta lastScene
         lda #0
         sta AUDV1
-        ; SFX: kick 開始
+        lda #40
+        sta sfxTmr          ; kick レジスタ書込は WSYNC 後（sfxTmr==40 が進入フレームの旗）
+        jmp GRun
+GNoInit:
+        ; 減衰（分岐レス・毎フレーム AUDV0 = sfxTmr>>2。旧 4 フレーム毎更新の +12cy ジッタが
+        ; 4 フレーム毎の 263 行の原因だった。包絡線は同一）
+        lda sfxTmr
+        beq GZero
+        dec sfxTmr
+GZero:  lda sfxTmr
+        lsr
+        lsr
+        sta AUDV0
+GRun:   sta WSYNC           ; 1
+        ; 進入フレームのみ: kick 開始（dispatch+init 行が 88cy になるのを避けてここで）
+        lda sfxTmr
+        cmp #40
+        bne GK
         lda #15
         sta AUDC0
         lda #30
         sta AUDF0
         lda #10
         sta AUDV0
-        lda #40
-        sta sfxTmr
-GNoInit:
-        ; 減衰: 4 フレーム毎に AUDV--
-        lda sfxTmr
-        beq GSilent
-        dec sfxTmr
-        lda sfxTmr
-        and #$03
-        bne GVolOk
-        lda sfxTmr
-        lsr
-        lsr
-        sta AUDV0
-GVolOk: jmp GRun
-GSilent:
-        lda #0
-        sta AUDV0
-GRun:   sta WSYNC           ; 1
+GK:
         ; --- 虹 190 行: COLUBK = 行インデックス（луma 巡回）---
         ldy #0
 GKer:   sta WSYNC
@@ -828,17 +837,7 @@ CallB1Scene:
 TitleScene:
         lda #$B1
         sta sent1
-        ; 音楽: タイトル進入で初期化（lastScene 方式）
-        lda lastScene
-        beq TMusOk
-        lda #0
-        sta lastScene
-        sta m0idx
-        sta m1idx
-        lda #1
-        sta m0dur
-        sta m1dur
-TMusOk:
+        ; （音楽 init は HMCLR 行へ移設＝進入フレームの pre 行超過を解消。R1）
         ; スプライト構成（48px: NUSIZ 3コピー, P0=24/P1=+8, VDEL on）
         lda #$03
         sta NUSIZ0
@@ -865,7 +864,17 @@ TMusOk:
         sta HMOVE
         ds 12, $EA          ; SLEEP 24
         sta HMCLR
-        sta WSYNC           ; HMOVE 行をここで閉じる（閉じないと計算と合体して 93cy=2 scanline 跨ぎ→263 行）
+        ; 音楽: タイトル進入で初期化（この行は ~30cy しか使っていない＝移設先として安全）
+        lda lastScene
+        beq TMusOk
+        lda #0
+        sta lastScene
+        sta m0idx
+        sta m1idx
+        lda #1
+        sta m0dur
+        sta m1dur
+TMusOk: sta WSYNC           ; HMOVE 行をここで閉じる（閉じないと計算と合体して 93cy=2 scanline 跨ぎ→263 行）
         ; ここまで 3 行
 
         ; --- 計算行 1: BCD スコア +1 ＋ ptr hi 設定 ---

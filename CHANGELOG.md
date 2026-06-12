@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.29.0] - 2026-06-12
+
+### Fixed
+- **Exerciser scene-entry line transients eradicated** (debt since v1.2.0): title entry 263
+  (music init moved into the half-empty HMCLR line), zone entry 264 (the 6-element X-table
+  copies ran ~82 cycles — split 3+3 across the init's six lines), gradient entry 263 + a 263
+  every 4th frame (the kick envelope's every-4th-frame branch jitter — now a branchless
+  per-frame `AUDV0 = sfxTmr>>2` with identical envelope, and the entry-frame kick register
+  writes moved past the first WSYNC, flagged by sfxTmr==40). **All five scenes now hold 262
+  on every frame including entry** (full per-scene map probed). Goldens regenerated.
+
 ## [1.28.0] - 2026-06-12
 
 ### Added
