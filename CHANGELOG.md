@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.30.0] - 2026-06-12
+
+### Changed
+- **dyn_multisprite polish**: all five objects now have distinct X (DelTbl 1..5 — enabled by a
+  −2-cycle state-flag dispatch: draw state = $80 so one `bmi` replaces cmp/beq); the documented
+  position mapping now matches measurement (X = 33+15d on slot A, 36+15d on slot B; the 3px
+  slot difference is the A/B dispatch asymmetry, now documented); scenario asserts strengthened
+  with deterministic ys at two fixed frames; goldens regenerated.
+
 ## [1.29.0] - 2026-06-12
 
 ### Fixed

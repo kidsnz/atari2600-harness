@@ -174,10 +174,9 @@ WaitVB: lda INTIM
 
         ; ============ 可視 96 ペア × 2 行 ============
 KPair:  sta WSYNC           ; ---- A 行（P0）----
-        lda p0st            ; 3
-        beq KA_id           ; 8
-        cmp #2              ; 10
-        beq KA_dr           ; 12
+        lda p0st            ; 3  状態: 0=idle / 1=wait / $80=draw（bmi 1発で draw 判定 = −2cy）
+        bmi KA_dr           ; 5
+        beq KA_id           ; 7
         ldx p0qi            ; WAIT: トリガ判定（枯渇は番兵 0 が吸収＝pair と一致しない）
         lda q0y,x
         cmp pair
@@ -212,16 +211,15 @@ KA_pos: lda q0o,x           ; POSITION（色は WAIT でステージ済み・fal
         ldy DelTbl,x
 KA_dl:  dey
         bne KA_dl
-        sta RESP0           ; 粗のみ＝X は 66+15d の正確な格子（HM 不要）
-        lda #2
+        sta RESP0           ; 粗のみ（X は d 写像の正確な整数位置・HM 不要）
+        lda #$80
         sta p0st
 KA_end:
 KA_end2:
         sta WSYNC           ; ---- B 行（P1・対称）----
         lda p1st
+        bmi KB_dr
         beq KB_id
-        cmp #2
-        beq KB_dr
         ldx p1qi
         lda q1y,x
         cmp pair
@@ -256,7 +254,7 @@ KB_pos: lda q1o,x
 KB_dl:  dey
         bne KB_dl
         sta RESP1
-        lda #2
+        lda #$80
         sta p1st
 KB_end:
 KB_end2:
@@ -367,9 +365,10 @@ RangeLo: byte 2, 6, 10, 4, 8
 RangeHi: byte 80, 70, 86, 76, 84
 NetA:    byte 0,3,2,2,1,0,0,1,1
 NetB:    byte 1,4,4,3,4,3,2,3,2
-; X は粗格子 66+15d（HM 不要の正確な整数位置）: d=1,2,3,4,2 → X=81,96,111,126,96
+; X は粗遅延 d で決まる（HM 不要）。実測写像（R2）: X = 33+15d（Aスロット）/ 36+15d（Bスロット）
+; d=1..5 → A:48,63,78,93,108 / B:51,66,81,96,111。スロット差 3px は A/B 行の dispatch 差 1cy。
 ColTbl:  byte $1E,$56,$9A,$CA,$44
-DelTbl:  byte 1,2,3,4,2
+DelTbl:  byte 1,2,3,4,5
 Art:     byte %00111100
          byte %01111110
          byte %11111111

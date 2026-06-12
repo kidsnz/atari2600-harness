@@ -20,7 +20,7 @@ proof (`TestDynMultisprite`).
   bounds check by 5 cycles, which mattered).
 - **2-line kernel state machine.** Line A = P0's slot, line B = P1's: WAIT (stage the next
   object's color; compare trigger pair) → POSITION (timed RESP via per-object delay constants —
-  X lands on the coarse 15-px grid, no HMOVE needed) → DRAW (art rows) → next queue entry.
+  X = 33+15d (slot A) / 36+15d (slot B), measured; no HMOVE needed) → DRAW (art rows) → next queue entry.
 - **TIM64T VBLANK.** Sort + assignment cost varies by path (~60–160 cycles); padding WSYNCs
   can't equalize that. The timer absorbs it — the real-game idiom, now verified here.
 
