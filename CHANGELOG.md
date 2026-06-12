@@ -12,6 +12,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.5.0] - 2026-06-12
+
+### Added
+- **Technique #4 — 2-line kernel** (`docs/techniques/two-line-kernel.md`, demo
+  `roms/techniques/two_line_kernel.asm`, CI-locked; suite now 41). Each art row spans two
+  scanlines; line A carries P0's vertical compare + a COLUBK gradient, line B carries P1 +
+  loop control — the standard headroom structure of real games. Two players staged then moved
+  by **one shared HMOVE** (strobing per positioning line re-applies the earlier HMxx — a +3 px
+  bug caught by read_tia and documented). Carry-hygiene note: an `adc` inheriting the sprite
+  compare's flags jittered the gradient until it became an `ora`. VDEL odd/even (1-px vertical
+  granularity inside a 2LK) left documented-only.
+
 ## [1.4.0] - 2026-06-12
 
 ### Added

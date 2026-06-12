@@ -1,0 +1,17 @@
+{
+  "rom": "roms/techniques/two_line_kernel.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 9,   "field": "ram.0x9e", "op": "==", "value": 196 },
+    { "at_frame": 9,   "field": "ram.0x80", "op": "==", "value": 17 },
+    { "at_frame": 9,   "field": "ram.0x81", "op": "==", "value": 71 },
+    { "at_frame": 9,   "field": "tia.player0.hmoved_pixel", "op": "==", "value": 60 },
+    { "at_frame": 9,   "field": "tia.player1.hmoved_pixel", "op": "==", "value": 100 },
+    { "at_frame": 196, "field": "ram.0x80", "op": "==", "value": 44 },
+    { "at_frame": 196, "field": "ram.0x81", "op": "==", "value": 44 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
