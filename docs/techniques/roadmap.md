@@ -14,7 +14,7 @@ not "verified"** — verification happens when its demo is built.
 
 - [x] **#1 Sprite multiplexing (vertical zones)** — many players past the 2-per-line limit. ★★ · prereqs ✅ · **done** (catalog #1).
 - [x] **#2 Sprite animation** — cycle GRP frames every N frames + free REFP flip. ★ · **done** (catalog: `sprite-animation.md`; demo `sprite_anim.asm` with pos(v)=v calibrated positioner, locked by scenario+golden in CI).
-- [ ] **#3 Vertical positioning (skipDraw)** — place a sprite at any Y smoothly. ★★ · prereqs: VDEL ✅ (litmus_vdel; used live in the Exerciser 48px kernel) · value **high** (foundational). Src: spiceware Step 5; Davie S23.
+- [x] **#3 Vertical positioning** — any-Y placement via per-line compare kernel. ★★ · **done** (catalog: `vertical-positioning.md`; demo `vertical_pos.asm`, pixel rows verified bit-for-bit vs art; DCP/skipDraw variant documented for cycle-starved kernels).
 - [ ] **#4 2-line (double-line) kernel** — repeat each sprite line over 2 scanlines → CPU headroom for logic. ★★ · prereqs ✅(cycles/budget) · value **high** (foundation for complex kernels). Src: spiceware Step 4; `multisprite.inc`.
 - [x] **#5 48-px sprite + 6-digit score** — wide hi-res graphic via 3-copy + VDEL shadow, 6 timed GRP writes ("Six-Digit Score Trick" / Staugas kernel). ★★ · **done** (Exerciser title: 48px "EXRCSR" + live BCD score, timed stores recalibrated for centered X; locked by `m2_title` golden in CI; litmus_48px/_48px6).
 - [x] **#6 Sound FX / music driver** — AUDC/AUDF/AUDV envelopes & note tables. ★★★ · **done** (Exerciser: 2-channel music driver with Sequencer-Kit note codec + kick-drum SFX, `pkg/audio` tuning math, locked by `m7_music` golden_audio). *Composing real tunes by ear with the author remains a future joint session.*

@@ -358,15 +358,19 @@ type RowRun struct {
 // ReadRow は指定した可視 scanline（注釈グリッドの y と同座標、0 起点）の 1 ライン分の
 // ピクセル色を、横方向に連長エンコード(RLE)して返す。playfield の点灯列や per-scanline 色を
 // 目視でなく数値で確かめるための土台。width は可視幅（通常 160）。
+// 注: グリッドの y ラベルは visibleTop + 画像行（annotate.Render と同じ式）。ここでも
+// visibleTop を引いて画像行へ変換する＝「グリッドで見えた y をそのまま渡せる」を守る
+//（v1.4.0 修正: 以前はクロップ後の画像行を直接受けており、グリッドと ~visibleTop ずれていた）。
 func (e *Emu) ReadRow(scanline int) (runs []RowRun, width int, err error) {
-	img, _ := e.cap.snapshot()
+	img, visibleTop := e.cap.snapshot()
 	w := img.Bounds().Dx()
 	h := img.Bounds().Dy()
-	if scanline < 0 || scanline >= h {
-		return nil, w, fmt.Errorf("scanline %d out of visible range 0..%d", scanline, h-1)
+	row := scanline - visibleTop
+	if row < 0 || row >= h {
+		return nil, w, fmt.Errorf("scanline %d out of visible range %d..%d", scanline, visibleTop, visibleTop+h-1)
 	}
 	hexAt := func(x int) string {
-		c := img.RGBAAt(x, scanline)
+		c := img.RGBAAt(x, row)
 		return fmt.Sprintf("%02X%02X%02X", c.R, c.G, c.B)
 	}
 	for x := 0; x < w; x++ {

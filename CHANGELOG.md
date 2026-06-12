@@ -12,6 +12,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.4.0] - 2026-06-12
+
+### Added
+- **Technique #3 — Vertical positioning** (`docs/techniques/vertical-positioning.md`, demo
+  `roms/techniques/vertical_pos.asm`, CI-locked; suite now 40). Vertical has no hardware — the
+  kernel compares `line − sprY` against the sprite height every scanline and feeds GRP0 art or
+  zero (single unsigned `cmp` covers above *and* below via underflow; both paths converge on one
+  store at ~21 cy). Demo bounces a ball Y 4⇔180 at X=80; pixel rows verified **bit-for-bit**
+  against the art via `read_row`. DCP/skipDraw variant documented for cycle-starved kernels.
+  Re-confirmed: **position calibration is kernel-specific** (`lda #imm` vs `lda zp` prologue =
+  1 cy = 3 px; this ROM's XCAL is −5 where sprite_anim's is −8) — never copy constants, re-measure.
+
+### Fixed
+- **`read_row` y-coordinate was off by `visibleTop` (~29 lines)** from the annotated-grid labels
+  the tool promises to match (grid = `visibleTop + image row`; the implementation indexed the
+  cropped image directly). Static playfield checks were self-consistent, but grid-coordinate
+  round-trips missed. `ReadRow` now subtracts `visibleTop` — the y you see on the grid is the y
+  you pass. Found while pixel-verifying this technique's demo.
+- MCP server `serverInfo.version` was stuck at "0.9.0"; now tracks releases (1.4.0).
+
 ## [1.3.0] - 2026-06-11
 
 ### Added

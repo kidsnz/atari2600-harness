@@ -665,7 +665,7 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "0.9.0",
+		Version: "1.4.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
