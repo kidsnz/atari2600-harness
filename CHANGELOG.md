@@ -12,6 +12,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.41.0] - 2026-06-12
+
+### Added
+- **`cmd/dissect` bank-aware matching (F8/F6/F4)**: for carts >4K, matches are reported as
+  "bank N $Fxxx-$Fxxx" (bank-relative in the $F000-$FFFF window) instead of a wrong flat address.
+  Ground-truth verified with a purpose-built F8 ROM (Art table planted in bank 1 at $F200 →
+  reported exactly as "bank 1 $F200-$F207"); field-checked on a commercial 8K title (asset tables
+  resolved per bank, computed wireframe data correctly left unmatched). DiStella annotation is
+  skipped with a note for banked carts (DiStella v2.10 supports 2K/4K only).
+
 ## [1.40.0] - 2026-06-12
 
 ### Changed

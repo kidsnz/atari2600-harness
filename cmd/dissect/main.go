@@ -192,8 +192,20 @@ func run(rom string, warmup, frames int, out, distella string) error {
 	fmt.Fprintf(&rep, "dissect %s — runtime trace × ROM matching (%d frames, %d stores, %d streams)\n",
 		filepath.Base(rom), frames, len(stores), len(streams))
 	fmt.Fprintf(&rep, "%s\n", strings.Repeat("=", 70))
-	romOrg := 0x10000 - len(romBytes) // 末尾が $FFFF に当たる素朴な ORG（4K=$F000）
-	annots := map[int]string{}        // ROM offset → 注釈
+	romOrg := 0x10000 - len(romBytes) // 末尾が $FFFF に当たる素朴な ORG（4K=$F000、2K=$F800）
+	banked := len(romBytes) > 4096    // F8/F6/F4: 4K バンクが $F000-$FFFF 窓に入る
+	fmtRange := func(off, n int) string {
+		if !banked {
+			return fmt.Sprintf("ROM $%04X-$%04X", romOrg+off, romOrg+off+n-1)
+		}
+		bank, a := off/4096, 0xF000+off%4096
+		return fmt.Sprintf("ROM bank %d $%04X-$%04X", bank, a, a+n-1)
+	}
+	if banked {
+		fmt.Fprintf(&rep, "(banked cart: %dK = %d banks of 4K; addresses below are bank-relative in the $F000-$FFFF window)\n",
+			len(romBytes)/1024, len(romBytes)/4096)
+	}
+	annots := map[int]string{} // ROM offset → 注釈
 	for _, st := range streams {
 		fmt.Fprintf(&rep, "\n%s frame%d rows %d-%d (%d values): ", st.reg, st.frame, st.fromL, st.toL, len(st.vals))
 		if c := dedup(trim(st.vals)); len(c) <= 1 { // 全行同値＝テーブルではなく即値（ROM 検索すると偽陽性になる）
@@ -218,12 +230,11 @@ func run(rom string, warmup, frames int, out, distella string) error {
 		found := false
 		for si, seq := range seqs {
 			if off, ok, rev := find(seq); ok {
-				addr := romOrg + off
 				tag := tags[si]
 				if rev {
 					tag += "(stored reversed)"
 				}
-				fmt.Fprintf(&rep, "ROM $%04X-$%04X %s\n", addr, addr+len(seq)-1, tag)
+				fmt.Fprintf(&rep, "%s %s\n", fmtRange(off, len(seq)), tag)
 				if st.reg == "GRP0" || st.reg == "GRP1" {
 					for _, v := range seq {
 						fmt.Fprintf(&rep, "      %s\n", artRow(v))
@@ -246,7 +257,12 @@ func run(rom string, warmup, frames int, out, distella string) error {
 		}
 	}
 
-	// --- distella 注釈付き逆アセンブル（任意）---
+	// --- distella 注釈付き逆アセンブル（任意・2K/4K のみ）---
+	if distella != "" && banked {
+		fmt.Fprintf(&rep, "\n(distella annotation skipped: DiStella v2.10 supports 2K/4K only; this is a %dK banked cart)\n",
+			len(romBytes)/1024)
+		distella = ""
+	}
 	if distella != "" {
 		if outAsm, err := exec.Command(distella, "-a", rom).Output(); err == nil {
 			// 注釈先＝「対象アドレス以下で最も近いラベル行」。テーブルは基準オフセット参照
