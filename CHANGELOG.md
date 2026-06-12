@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.39.0] - 2026-06-12
+
+### Added
+- **`cmd/jingle` two-voice support** (`-notes2`/`-vol2`/`-type2`): both TIA channels driven
+  independently (AUDC1/AUDF1/AUDV1, per-voice auto-picked sound type, automatic rest padding for
+  loop sync). Verified numerically via `read_audio`: both channels sound the expected harmony
+  pair (e.g. F6/A5) at the expected frames. Generated-ASM comments and CLI output are English.
+
 ## [1.38.0] - 2026-06-12
 
 ### Added
