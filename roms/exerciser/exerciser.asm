@@ -236,7 +236,7 @@ ZI2:    lda ZoneXInit1,x
         sta WSYNC           ; 5
         sta WSYNC           ; 6
         sta WSYNC           ; 7
-ZMountains2:
+        jmp ZMountains
 ZDrift: ; ドリフトパス（6 行: 2ゾーンずつ＝0..159 の全幅ラップでも 76cy 内）
         ldx #5
 ZD1:    lda zx0,x
@@ -301,7 +301,6 @@ ZD6w:   sta zx1,x
         dex
         bpl ZD6
         sta WSYNC           ; 7
-        jmp ZMountains2
 ZMountains:
         ; --- 山並み 48 行: 非対称 PF1（左=MtnL 早書き≤27 / 右=MtnR cyc38 書き=窓37-53）---
         ldy #0
