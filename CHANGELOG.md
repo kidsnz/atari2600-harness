@@ -12,6 +12,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.16.0] - 2026-06-12
+
+### Added
+- **Image ingestion M8 — multi-frame separation** (the author's architectural point: M7's
+  reference-pattern repair doesn't generalize; this does). Feed N screenshots of the same scene:
+  per-pixel voting builds the **static layer** (playfield/background/parked objects — leaf
+  fringes, pit holes, ladders land here correctly as `static_*`), per-frame diffs give the
+  **dynamic layer** (real sprites). No repeating-structure assumption. Bonus: **union across
+  frames with flicker detection** — 30 Hz multiplexed objects read completely from 2 shots.
+  N=2 ties fill from row background (recorded in `unresolved_share`); N=3 recommended.
+- CI proofs from our own ROMs: flicker_multiplex 2 frames → all 4 balls in the union, each
+  flagged flicker, per-frame fidelity 100%; sprite_anim → walker tracked moving +1px/frame, not
+  misflagged; pf_modes static scene → bands identical to single-frame analysis, dynamic layer
+  empty, unresolved 0.
+
 ## [1.15.0] - 2026-06-12
 
 ### Added

@@ -467,3 +467,126 @@ func bandBytes(cols []int) [3]uint8 {
 	pf0, pf1, pf2 := playfieldEncode(cells)
 	return [3]uint8{pf0, pf1, pf2}
 }
+
+// --- M8: マルチフレーム分離（正解既知・自前 ROM で多フレーム生成） ---
+
+func captureFrames(t *testing.T, romPath string, warmup, count int) []*Normalized {
+	t.Helper()
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM(romPath); err != nil {
+		t.Fatal(err)
+	}
+	e.RunFrames(warmup)
+	q := NewNTSCQuantizer()
+	var out []*Normalized
+	for i := 0; i < count; i++ {
+		img, _ := e.Snapshot()
+		n, err := Normalize(upscale(img, 2, 1), q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, n)
+		e.RunFrames(1)
+	}
+	return out
+}
+
+// flicker_multiplex: 連続2フレームで 4 オブジェクト全部が union に揃い、flicker 判定が立つ。
+func TestMultiFrameFlicker(t *testing.T) {
+	frames := captureFrames(t, "../../roms/techniques/flicker_multiplex.bin", 40, 2)
+	q := NewNTSCQuantizer()
+	mr, err := AnalyzeFrames(frames, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mr.Union) != 4 {
+		t.Fatalf("union has %d objects, want 4 (got %+v)", len(mr.Union), mr.Union)
+	}
+	colors := map[int]bool{}
+	for _, u := range mr.Union {
+		if !u.Flicker {
+			t.Fatalf("object %+v should be flagged flicker (appears in 1 of 2 frames)", u.Sprite)
+		}
+		if u.Kind != "player" || u.H != 8 {
+			t.Fatalf("object %+v, want 8-row player", u.Sprite)
+		}
+		for _, c := range u.Colors {
+			colors[c] = true
+		}
+	}
+	if len(colors) != 4 {
+		t.Fatalf("union colors %v, want 4 distinct", colors)
+	}
+	// 静的層は空（PF なし・駐機物なし）、各フレーム fidelity 100%
+	if len(mr.Playfield) != 0 || len(mr.Report.Sprites) != 0 {
+		t.Fatalf("static layer should be empty: pf=%d static=%d", len(mr.Playfield), len(mr.Report.Sprites))
+	}
+	for i, fr := range mr.Frames {
+		if fr.Fidelity != 1.0 {
+			t.Fatalf("frame %d fidelity %.4f, want 1.0", i, fr.Fidelity)
+		}
+	}
+}
+
+// sprite_anim: 歩行者が両フレームに（移動して）出る＝flicker ではない。静的層クリーン。
+func TestMultiFrameWalker(t *testing.T) {
+	frames := captureFrames(t, "../../roms/techniques/sprite_anim.bin", 30, 2)
+	q := NewNTSCQuantizer()
+	mr, err := AnalyzeFrames(frames, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, fr := range mr.Frames {
+		if len(fr.Sprites) != 1 {
+			t.Fatalf("frame %d: %d sprites, want 1", i, len(fr.Sprites))
+		}
+		if fr.Fidelity != 1.0 {
+			t.Fatalf("frame %d fidelity %.4f", i, fr.Fidelity)
+		}
+	}
+	// 位置が 1px 進んでいる（同一オブジェクトの移動）
+	if mr.Frames[1].Sprites[0].X != mr.Frames[0].Sprites[0].X+1 {
+		t.Fatalf("walker did not advance: %d -> %d", mr.Frames[0].Sprites[0].X, mr.Frames[1].Sprites[0].X)
+	}
+	for _, u := range mr.Union {
+		if u.Flicker && len(mr.Union) == 1 {
+			t.Fatalf("moving walker misflagged as flicker")
+		}
+	}
+}
+
+// pf_modes（静止シーン）×2: 静的層の PF が単一フレーム解析と一致＝退行なし。
+func TestMultiFrameStaticScene(t *testing.T) {
+	frames := captureFrames(t, "../../roms/techniques/pf_modes.bin", 10, 2)
+	q := NewNTSCQuantizer()
+	mr, err := AnalyzeFrames(frames, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	single := Analyze(frames[0], q)
+	if len(mr.Playfield) != len(single.Playfield) {
+		t.Fatalf("PF bands %d != single-frame %d", len(mr.Playfield), len(single.Playfield))
+	}
+	for i := range single.Playfield {
+		if mr.Playfield[i] != single.Playfield[i] {
+			t.Fatalf("band %d differs: %+v vs %+v", i, mr.Playfield[i], single.Playfield[i])
+		}
+	}
+	// P0 柱（静止物）は static_* 側に出る（動的層には何も出ない）
+	for _, s := range mr.Report.Sprites {
+		if len(s.Kind) < 7 || s.Kind[:7] != "static_" {
+			t.Fatalf("static-layer sprite without static_ prefix: %+v", s)
+		}
+	}
+	if len(mr.Report.Sprites) == 0 {
+		t.Fatalf("static P0 column not found in static layer")
+	}
+	for i, fr := range mr.Frames {
+		if len(fr.Sprites) != 0 {
+			t.Fatalf("frame %d has %d dynamic sprites, want 0 in a static scene", i, len(fr.Sprites))
+		}
+	}
+	if mr.UnresolvedShare != 0 {
+		t.Fatalf("unresolved %.4f, want 0 for a static scene", mr.UnresolvedShare)
+	}
+}
