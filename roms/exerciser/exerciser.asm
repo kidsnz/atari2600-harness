@@ -58,7 +58,7 @@ CTRLPF  = $0A
 COLUPF  = $08
 PF1     = $0E
 
-NSCENES = 5
+NSCENES = 6
 
 scene    = $80
 prevFire = $81
@@ -91,6 +91,9 @@ pdlPos   = $B7      ; 前フレーム確定のカーソル X（描画用）
 pdlDone  = $B8
 ; Gradient シーン・ローカル
 sfxTmr   = $B9      ; SFX 減衰タイマ
+; Procedural シーン・ローカル
+worldSeed = $BA     ; 現在の世界シード（64 フレーム毎に進む）
+rnd      = $BB      ; 行毎 LFSR 作業用
 ; Playground シーン・ローカル（排他オーバーレイ）
 px       = $A4      ; P0 X（10-140）
 py       = $A5      ; P0 Y（10-170）
@@ -156,7 +159,11 @@ VB:     sta WSYNC
         beq DoPlay
         cmp #3
         beq DoPdl
-        jsr SceneGrad       ; scene 4（bank0）
+        cmp #4
+        beq DoGrad
+        jsr SceneProc       ; scene 5（bank0）
+        jmp AfterScene
+DoGrad: jsr SceneGrad       ; scene 4（bank0）
         jmp AfterScene
 DoPdl:  jsr ScenePaddle     ; scene 3（bank0）
         jmp AfterScene
@@ -665,6 +672,60 @@ GKer:   sta WSYNC
         sta COLUBK
         sta WSYNC           ; 192
         rts
+
+; --- S5: 手続き生成（bank0）---
+; LFSR（litmus_lfsr で数学検証済みの eor #$8E Galois）で行毎に星空 PF を生成。
+; worldSeed を行頭で rnd に再ロード→各行 1 ステップ＝フレーム内は決定的（静止画）。
+; 64 フレーム毎に worldSeed を 1 ステップ進める＝世界が周期的に組み変わる（Pitfall/DaveC オマージュ）。
+SceneProc:
+        lda #$E9
+        sta $99             ; 実行センチネル
+        lda lastScene
+        cmp #5
+        beq RNoInit
+        lda #5
+        sta lastScene
+        lda #$2F
+        sta worldSeed       ; 初期世界
+RNoInit:
+        lda frameCt
+        and #$3F
+        bne RKeep
+        ; 64 フレーム毎: 世界を 1 ステップ進める
+        lda worldSeed
+        lsr
+        bcc RNoEor
+        eor #$8E
+RNoEor: sta worldSeed
+RKeep:  lda worldSeed
+        sta rnd
+        lda #$0E
+        sta COLUPF
+        lda #0
+        sta COLUBK
+        sta CTRLPF
+        sta PF0
+        sta WSYNC           ; 1
+        ; --- 星空 190 行: 行毎 LFSR → 疎な PF1/PF2 ---
+        ldy #0
+RKer:   sta WSYNC
+        lda rnd             ; 3
+        lsr                 ; 5
+        bcc RSk             ; 7
+        eor #$8E            ; 9
+RSk:    sta rnd             ; 12
+        and #$88            ; 14  疎マスク（点をまばらに）
+        sta PF1             ; 17
+        lda rnd             ; 20
+        and #$11            ; 22
+        sta PF2             ; 25
+        iny
+        cpy #190
+        bne RKer
+        lda #0
+        sta PF1
+        sta PF2
+        rts                 ; 1+190+(framework) = 192 内: 末尾 WSYNC は不要だった
 
         ; --- HMOVE 表（ページ跨ぎ回避の負インデックス, zone_multiplex と同型）---
         ORG  $0E00
