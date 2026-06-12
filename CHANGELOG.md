@@ -12,6 +12,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.10.0] - 2026-06-12
+
+### Added
+- **Image ingestion M2 — playfield extraction.** Per-row background estimation (global mode color
+  with per-row fallback for COLUBK gradients — naive per-row mode inverted figure/ground on rows
+  more than half-filled, caught by the mountain round-trip), 4-clock-aligned column folding,
+  repeat/reflect/asymmetric half classification, score-mode flagging (same pattern, two colors),
+  band compression, and DASM `byte` table emission reusing `pkg/playfield`'s verified bit order.
+- Round-trip CI proofs: litmus_pf bands == $10/$80/$01 exactly; pf_modes score band ($66,
+  $44-left/$86-right) and wall band ($10) found; Exerciser mountain bands match the live RAM
+  band triples (PF0 masked to its displayed upper nibble) with reflect detected.
+- Palette canonicalization: codes with identical RGB (e.g. $0C≡$0E here) report as the lowest
+  code (`Quantizer.Canonical`).
+- CI now assembles roms/techniques + roms/exerciser before `go test` (ingest tests use them as
+  ground truth).
+- Field result: Pizza Boy buildings extract as repeat-mode PF bands (blue $9E) with concrete
+  PF0/PF1/PF2 bytes per 4-line band.
+
 ## [1.9.0] - 2026-06-12
 
 ### Added

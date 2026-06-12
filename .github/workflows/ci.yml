@@ -26,9 +26,9 @@ jobs:
           git clone https://github.com/JetSetIlly/Gopher2600.git
           git -C Gopher2600 checkout 5d532e8831c63a4794c1ce3f5f4c32ad069aee8b
 
-      - name: Assemble litmus ROMs (.bin are gitignored; tests/scenarios need them)
+      - name: Assemble ROMs (.bin are gitignored; tests/scenarios need them)
         run: |
-          for f in roms/litmus/*.asm; do
+          for f in roms/litmus/*.asm roms/techniques/*.asm roms/exerciser/*.asm; do
             dasm "$f" -f3 -o"${f%.asm}.bin"
           done
 

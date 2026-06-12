@@ -47,7 +47,7 @@ func run(in, out string, scale int) error {
 	if err != nil {
 		return err
 	}
-	rep := ingest.BuildReport(n, q)
+	rep := ingest.Analyze(n, q)
 
 	if err := os.MkdirAll(out, 0o755); err != nil {
 		return err
@@ -82,6 +82,9 @@ func run(in, out string, scale int) error {
 	}
 	for _, c := range top {
 		fmt.Printf("  color $%02X (#%s) %.1f%%\n", c.Code, c.Hex, c.Share*100)
+	}
+	if len(rep.Playfield) > 0 {
+		fmt.Printf("  playfield bands: %d\n", len(rep.Playfield))
 	}
 	fmt.Println("wrote", filepath.Join(out, "overlay.png"), "and report.json")
 	return nil

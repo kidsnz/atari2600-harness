@@ -45,6 +45,13 @@ func (q *Quantizer) Nearest(c color.RGBA) (code uint8, dist int) {
 	return q.codes[best], bestD
 }
 
+// Canonical は「同一 RGB を持つ最小の TIA コード」を返す。パレットには同色衝突がある
+//（例: 本パレットでは $0C と $0E が同一 RGB）。量子化結果は常にこの正準値で報告される。
+func (q *Quantizer) Canonical(code uint8) uint8 {
+	c, _ := q.Nearest(specification.SpecNTSC.GetColor(signal.ColorSignal(code)))
+	return c
+}
+
 // RGB は TIA 色コードのパレット RGB を返す（overlay の再描画用）。
 func (q *Quantizer) RGB(code uint8) color.RGBA {
 	return specification.SpecNTSC.GetColor(signal.ColorSignal(code))

@@ -25,6 +25,17 @@ type Report struct {
 	AvgPaletteDist   float64  `json:"avg_palette_dist"` // 0=Gopher2600 由来。Stella は数十程度の微差
 	Warnings         []string `json:"warnings,omitempty"`
 	Colors           []ColorCount `json:"colors"` // 出現順（多い順）
+	Playfield        []PFBand     `json:"playfield,omitempty"`     // M2: PF バンド（上→下）
+	PlayfieldASM     string       `json:"playfield_asm,omitempty"` // M2: そのまま貼れる DASM データ片
+}
+
+// Analyze は正規化結果からフルレポートを作る（統計＋playfield。M3 でスプライトが加わる）。
+func Analyze(n *Normalized, q *Quantizer) *Report {
+	r := BuildReport(n, q)
+	bands, _ := ExtractPlayfield(n)
+	r.Playfield = bands
+	r.PlayfieldASM = DASMPlayfield(bands)
+	return r
 }
 
 // BuildReport は正規化結果から統計レポートを作る。
@@ -52,6 +63,33 @@ func BuildReport(n *Normalized, q *Quantizer) *Report {
 	}
 	sort.Slice(r.Colors, func(i, j int) bool { return r.Colors[i].Share > r.Colors[j].Share })
 	return r
+}
+
+// DASMPlayfield は PF バンド列を DASM にそのまま貼れる byte テーブル＋コメントで出力する。
+func DASMPlayfield(bands []PFBand) string {
+	if len(bands) == 0 {
+		return ""
+	}
+	out := "; playfield bands (extracted by cmd/ingest — rows are image-relative)\n"
+	for i, b := range bands {
+		out += fmt.Sprintf("; band %d: rows %d-%d (%d lines) mode=%s colorL=$%02X colorR=$%02X",
+			i, b.Top, b.Top+b.Height-1, b.Height, b.Mode, b.ColorLeft, b.ColorRight)
+		if b.ScoreMode {
+			out += " SCORE-MODE?"
+		}
+		if b.Confidence < 1.0 {
+			out += fmt.Sprintf(" conf=%.2f", b.Confidence)
+		}
+		out += "\n"
+		if b.Mode == "asymmetric" {
+			out += fmt.Sprintf("        byte $%02X,$%02X,$%02X, $%02X,$%02X,$%02X ; PF0A,PF1A,PF2A, PF0B,PF1B,PF2B\n",
+				b.PF0, b.PF1, b.PF2, b.PF0B, b.PF1B, b.PF2B)
+		} else {
+			out += fmt.Sprintf("        byte $%02X,$%02X,$%02X ; PF0,PF1,PF2 (CTRLPF D0=%d)\n",
+				b.PF0, b.PF1, b.PF2, map[string]int{"repeat": 0, "reflect": 1}[b.Mode])
+		}
+	}
+	return out
 }
 
 // Overlay は TIA 実座標グリッド付きのオーバーレイ画像を返す（annotate を再利用）。

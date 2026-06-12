@@ -104,3 +104,110 @@ func TestQuantizerExactness(t *testing.T) {
 		}
 	}
 }
+
+// --- M2: playfield 抽出のラウンドトリップ（正解既知） ---
+
+// litmus_pf: PF0=$10 PF1=$80 PF2=$01・repeat・白 $0E が全可視行で出続ける。
+func TestExtractLitmusPF(t *testing.T) {
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM("../../roms/litmus/litmus_pf.bin"); err != nil {
+		t.Fatal(err)
+	}
+	e.RunFrames(10)
+	truth, _ := e.Snapshot()
+	q := NewNTSCQuantizer()
+	n, err := Normalize(upscale(truth, 2, 1), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bands, _ := ExtractPlayfield(n)
+	if len(bands) == 0 {
+		t.Fatal("no PF bands found")
+	}
+	total := 0
+	for _, b := range bands {
+		if b.Mode != "repeat" || b.PF0 != 0x10 || b.PF1 != 0x80 || b.PF2 != 0x01 {
+			t.Fatalf("band %+v, want repeat $10/$80/$01", b)
+		}
+		want := q.Canonical(0x0E) // パレット同色衝突（$0C≡$0E）は正準値で比較
+		if b.ColorLeft != want || b.ColorRight != want {
+			t.Fatalf("band colors $%02X/$%02X, want $%02X", b.ColorLeft, b.ColorRight, want)
+		}
+		total += b.Height
+	}
+	if total < 180 {
+		t.Fatalf("PF rows total %d, want >=180", total)
+	}
+}
+
+// pf_modes: score-mode（PF1=$66 左右同パターン・別色）と壁（PF2=$10）が抽出できる。
+func TestExtractPFModes(t *testing.T) {
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM("../../roms/techniques/pf_modes.bin"); err != nil {
+		t.Fatal(err)
+	}
+	e.RunFrames(10)
+	truth, _ := e.Snapshot()
+	q := NewNTSCQuantizer()
+	n, err := Normalize(upscale(truth, 2, 1), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bands, _ := ExtractPlayfield(n)
+	score, wall := false, false
+	for _, b := range bands {
+		if b.PF1 == 0x66 && b.ScoreMode && b.ColorLeft == 0x44 && b.ColorRight == 0x86 {
+			score = true
+		}
+		if b.PF2 == 0x10 && b.PF0 == 0 && b.PF1 == 0 && b.Mode == "repeat" {
+			wall = true
+		}
+	}
+	if !score {
+		t.Fatalf("score-mode band not found in %d bands", len(bands))
+	}
+	if !wall {
+		t.Fatalf("wall band not found in %d bands", len(bands))
+	}
+}
+
+// Exerciser 山脈: reflect 判定＋抽出バイトが RAM の band データ（実行時の正解）と一致。
+func TestExtractReflectMountains(t *testing.T) {
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM("../../roms/exerciser/exerciser.bin"); err != nil {
+		t.Fatal(err)
+	}
+	e.RunFrames(5)
+	e.Poke(0x80, 4) // scene=proc
+	e.Poke(0x83, 0) // lastScene≠4 → 進入初期化（山生成）
+	e.RunFrames(20)
+	truth, _ := e.Snapshot()
+	q := NewNTSCQuantizer()
+	n, err := Normalize(upscale(truth, 2, 1), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bands, _ := ExtractPlayfield(n)
+	// RAM の band 三つ組（mPF0/mPF1/mPF2 = $C0/$CA/$D4 起点 ×10）
+	type triple struct{ p0, p1, p2 uint8 }
+	ram := map[triple]bool{}
+	for i := 0; i < 10; i++ {
+		a, _ := e.PeekRAM(uint16(0xC0 + i))
+		b, _ := e.PeekRAM(uint16(0xCA + i))
+		c, _ := e.PeekRAM(uint16(0xD4 + i))
+		ram[triple{a & 0xF0, b, c}] = true // PF0 は上位ニブルのみ表示＝表示真実でマスク
+	}
+	found := 0
+	for _, b := range bands {
+		if b.Mode != "reflect" || b.Height < 6 {
+			continue
+		}
+		if !ram[triple{b.PF0, b.PF1, b.PF2}] {
+			t.Fatalf("reflect band $%02X/$%02X/$%02X not in RAM ground truth", b.PF0, b.PF1, b.PF2)
+		}
+		found++
+	}
+	if found < 3 {
+		t.Fatalf("only %d reflect mountain bands matched, want >=3", found)
+	}
+}
