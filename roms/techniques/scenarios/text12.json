@@ -1,0 +1,15 @@
+{
+  "rom": "roms/techniques/text12.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 5, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 87 },
+    { "at_frame": 5, "field": "tia.player1.hmoved_pixel", "op": "==", "value": 95 },
+    { "at_frame": 5, "field": "ram.0x90", "op": "==", "value": 159 },
+    { "at_frame": 5, "field": "ram.0xb0", "op": "==", "value": 146 },
+    { "at_frame": 5, "field": "tiareg.player0.vertical_delay", "op": "==", "value": 1 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

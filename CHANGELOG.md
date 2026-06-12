@@ -12,6 +12,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.58.0] - 2026-06-12
+
+### Added
+- **Technique: 12-character text line** (`roms/techniques/text12.asm` +
+  `docs/techniques/text12.md`): flicker-free text via the verified 48px 6-store choreography
+  with a 4×5 font packed two characters per player byte (column-major zp buffer, strings
+  pre-encoded as glyph indices). The catalog's biggest gap (menus/messages) closed at the
+  sweet spot of the width ladder researched in the AtariAge 32-character thread (12 needs no
+  RESP re-strobing and no flicker). CI: `scenarios/text12.json` (packed-buffer bytes, positions,
+  262, golden). Wider variants (24 column-flicker / 32 interleaved) recorded as candidates with
+  measured constraints.
+
 ## [1.57.1] - 2026-06-12
 
 ### Changed
