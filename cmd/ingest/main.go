@@ -86,6 +86,9 @@ func run(in, out string, scale int) error {
 	if len(rep.Playfield) > 0 {
 		fmt.Printf("  playfield bands: %d\n", len(rep.Playfield))
 	}
+	for i, s := range rep.Sprites {
+		fmt.Printf("  sprite %d: %s x=%d y=%d %dx%d copies=%d\n", i, s.Kind, s.X, s.Y, s.W, s.H, s.Copies)
+	}
 	fmt.Println("wrote", filepath.Join(out, "overlay.png"), "and report.json")
 	return nil
 }

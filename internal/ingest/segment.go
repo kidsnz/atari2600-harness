@@ -136,9 +136,36 @@ func ExtractPlayfield(n *Normalized) (bands []PFBand, residualMask [][]bool) {
 			rows[y].colorL == rows[top].colorL && rows[y].colorR == rows[top].colorR {
 			y++
 		}
-		bands = append(bands, makeBand(rows[top], top, y-top))
+		b := makeBand(rows[top], top, y-top)
+		// 調停: 高さ≤2 かつ点灯列≤2 の極小バンドは「4clk 整列したスプライト」の公算が高い
+		// → PF から降格し、ピクセルをスプライト層（residual）へ戻す。
+		// （本物の 1 行 PF＝星空などは列が多数あるので残る。実測: x=80 のボールが PF に
+		//   横取りされて 5 断片化したのをこの調停で解消。）
+		if b.Height <= 2 && litCols(rows[top].bits) <= 2 {
+			for yy := top; yy < top+b.Height; yy++ {
+				for c := 0; c < 40; c++ {
+					if rows[top].bits[c] {
+						for dx := 0; dx < 4; dx++ {
+							residualMask[yy][c*4+dx] = true
+						}
+					}
+				}
+			}
+			continue
+		}
+		bands = append(bands, b)
 	}
 	return bands, residualMask
+}
+
+func litCols(bits [40]bool) int {
+	n := 0
+	for _, b := range bits {
+		if b {
+			n++
+		}
+	}
+	return n
 }
 
 func makeBand(r rowPF, top, height int) PFBand {

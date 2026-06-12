@@ -27,15 +27,44 @@ type Report struct {
 	Colors           []ColorCount `json:"colors"` // 出現順（多い順）
 	Playfield        []PFBand     `json:"playfield,omitempty"`     // M2: PF バンド（上→下）
 	PlayfieldASM     string       `json:"playfield_asm,omitempty"` // M2: そのまま貼れる DASM データ片
+	Sprites          []Sprite     `json:"sprites,omitempty"`       // M3: スプライト候補
+	SpritesASM       string       `json:"sprites_asm,omitempty"`   // M3: GRP テーブル等の DASM 片
 }
 
 // Analyze は正規化結果からフルレポートを作る（統計＋playfield。M3 でスプライトが加わる）。
 func Analyze(n *Normalized, q *Quantizer) *Report {
 	r := BuildReport(n, q)
-	bands, _ := ExtractPlayfield(n)
+	bands, residual := ExtractPlayfield(n)
 	r.Playfield = bands
 	r.PlayfieldASM = DASMPlayfield(bands)
+	r.Sprites = ExtractSprites(n, residual)
+	r.SpritesASM = DASMSprites(r.Sprites)
 	return r
+}
+
+// DASMSprites はスプライト候補を DASM に貼れる GRP テーブル＋色テーブルで出力する。
+func DASMSprites(sprites []Sprite) string {
+	if len(sprites) == 0 {
+		return ""
+	}
+	out := "; sprites (extracted by cmd/ingest — window anchored at leftmost lit pixel)\n"
+	for i, s := range sprites {
+		out += fmt.Sprintf("; sprite %d: kind=%s x=%d y=%d w=%d h=%d", i, s.Kind, s.X, s.Y, s.W, s.H)
+		if s.Copies > 1 {
+			out += fmt.Sprintf(" copies=%d spacing=%d (NUSIZ)", s.Copies, s.Spacing)
+		}
+		if s.Confidence < 1.0 {
+			out += fmt.Sprintf(" conf=%.2f", s.Confidence)
+		}
+		out += "\n"
+		if len(s.GRP) > 0 {
+			out += fmt.Sprintf("Spr%dGfx:\n", i)
+			for r, b := range s.GRP {
+				out += fmt.Sprintf("        byte %%%08b ; color $%02X\n", b, s.Colors[r])
+			}
+		}
+	}
+	return out
 }
 
 // BuildReport は正規化結果から統計レポートを作る。

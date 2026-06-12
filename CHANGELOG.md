@@ -12,6 +12,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.11.0] - 2026-06-12
+
+### Added
+- **Image ingestion M3 — sprite extraction.** 8-connected components over the residual layer
+  (non-background, non-playfield) classified as player (width ≤8: GRP bytes in pkg/sprite bit
+  order + per-row color table), missile/ball (≤4 solid), or large_object (low confidence);
+  equal-shape groups at 16/32/64 spacing fold into one NUSIZ entry. DASM GRP tables emitted.
+- **PF↔sprite reconciliation:** a grid-aligned sprite (the bouncing ball at x=80) was claimed by
+  the playfield layer and fragmented — tiny PF bands (height ≤2, lit columns ≤2) now demote back
+  to the sprite layer. Genuine 1-line playfield (starfields) survives via column count.
+- Round-trip CI proofs: ball GRP == Art bit-for-bit with canonical colors; walker GRP matches
+  phase art through the row-quadrupled kernel (32 rows); litmus_nusiz_copies folds to one
+  3-copy/16-spacing entry.
+
 ## [1.10.0] - 2026-06-12
 
 ### Added

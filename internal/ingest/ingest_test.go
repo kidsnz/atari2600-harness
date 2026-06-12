@@ -211,3 +211,100 @@ func TestExtractReflectMountains(t *testing.T) {
 		t.Fatalf("only %d reflect mountain bands matched, want >=3", found)
 	}
 }
+
+// --- M3: スプライト抽出のラウンドトリップ（正解既知） ---
+
+// vertical_pos のボール: GRP 行が Art 定数とビット単位で一致、X=80、色は青 $86（正準）。
+func TestExtractSpriteBall(t *testing.T) {
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM("../../roms/techniques/vertical_pos.bin"); err != nil {
+		t.Fatal(err)
+	}
+	e.RunFrames(30)
+	truth, _ := e.Snapshot()
+	q := NewNTSCQuantizer()
+	n, err := Normalize(upscale(truth, 2, 1), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, residual := ExtractPlayfield(n)
+	sprites := ExtractSprites(n, residual)
+	if len(sprites) != 1 {
+		t.Fatalf("found %d sprites, want 1", len(sprites))
+	}
+	s := sprites[0]
+	want := []uint8{0x3C, 0x7E, 0xFF, 0xDB, 0xFF, 0xE7, 0x7E, 0x3C}
+	if s.Kind != "player" || s.X != 80 || s.H != 8 {
+		t.Fatalf("sprite %+v, want player at x=80 h=8", s)
+	}
+	for i, b := range want {
+		if s.GRP[i] != b {
+			t.Fatalf("GRP[%d] = %%%08b, want %%%08b", i, s.GRP[i], b)
+		}
+		if s.Colors[i] != q.Canonical(0x86) {
+			t.Fatalf("row color $%02X, want canonical $86", s.Colors[i])
+		}
+	}
+}
+
+// sprite_anim の歩行者: 行4倍化（h=32）込みで GRP がフェーズの絵と一致。
+func TestExtractSpriteWalker(t *testing.T) {
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM("../../roms/techniques/sprite_anim.bin"); err != nil {
+		t.Fatal(err)
+	}
+	// phase==0（$80）かつ右向き（$83==0）のフレームまで進める
+	for i := 0; i < 200; i++ {
+		e.RunFrames(1)
+		ph, _ := e.PeekRAM(0x80)
+		dir, _ := e.PeekRAM(0x83)
+		tmr, _ := e.PeekRAM(0x81)
+		if ph == 0 && dir == 0 && tmr == 4 {
+			break
+		}
+	}
+	truth, _ := e.Snapshot()
+	q := NewNTSCQuantizer()
+	n, err := Normalize(upscale(truth, 2, 1), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, residual := ExtractPlayfield(n)
+	sprites := ExtractSprites(n, residual)
+	if len(sprites) != 1 {
+		t.Fatalf("found %d sprites, want 1", len(sprites))
+	}
+	s := sprites[0]
+	phase0 := []uint8{0x18, 0x18, 0x3C, 0x78, 0x3C, 0x24, 0x42, 0x81}
+	if s.Kind != "player" || s.H != 32 {
+		t.Fatalf("sprite %+v, want player h=32 (row-quadrupled)", s)
+	}
+	for i := 0; i < 32; i++ {
+		if s.GRP[i] != phase0[i/4] {
+			t.Fatalf("GRP[%d] = %%%08b, want %%%08b (art row %d)", i, s.GRP[i], phase0[i/4], i/4)
+		}
+	}
+}
+
+// litmus_nusiz_copies: 3 コピー近接（間隔16）が 1 件 copies=3 に畳まれる。
+func TestExtractNusizCopies(t *testing.T) {
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM("../../roms/litmus/litmus_nusiz_copies.bin"); err != nil {
+		t.Fatal(err)
+	}
+	e.RunFrames(10)
+	truth, _ := e.Snapshot()
+	q := NewNTSCQuantizer()
+	n, err := Normalize(upscale(truth, 2, 1), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, residual := ExtractPlayfield(n)
+	sprites := ExtractSprites(n, residual)
+	for _, s := range sprites {
+		if s.Copies == 3 && s.Spacing == 16 {
+			return // 期待どおり
+		}
+	}
+	t.Fatalf("no 3-copy/spacing-16 group found in %+v", sprites)
+}
