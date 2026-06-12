@@ -12,6 +12,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.36.0] - 2026-06-12
+
+### Added
+- Recovery-run wrap-up: routing table entries (ram-maps, dynamic-multisprite), mcp_smoke now
+  exercises all five new tools end-to-end, serverInfo version bump added to the release
+  checklist in CLAUDE.md, open-backlog ledger CLEARED (remaining items are single user
+  actions, each fully prepared). Summary at inbox/recovery_report.txt.
+
 ## [1.35.0] - 2026-06-12
 
 ### Added

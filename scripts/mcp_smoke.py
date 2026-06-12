@@ -18,6 +18,14 @@ while True:
     if d.get("id")==1: print("initialize OK", d["result"]["serverInfo"]["version"]); break
 r=call(2,"load_rom",{"path":"roms/litmus/smoke.bin"})
 assert not r["result"].get("isError"), r
-r=call(3,"step_frame",{"count":5})
-print("smoke OK")
+r=call(3,"step_frame",{"count":30})
+r=call(4,"analyze_screen",{})
+assert not r["result"].get("isError"), r
+r=call(5,"watch_ram",{"addr":0x80,"max_frames":2})
+assert not r["result"].get("isError"), r
+r=call(6,"trace_clocks",{"max_instructions":4})
+assert not r["result"].get("isError"), r
+r=call(7,"run_scenario",{"paths":["roms/litmus/scenarios/hmove_mid.json"]})
+assert r["result"]["structuredContent"]["all_pass"], r
+print("smoke OK (load/step/analyze_screen/watch_ram/trace_clocks/run_scenario)")
 p.terminate()

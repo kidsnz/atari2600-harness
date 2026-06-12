@@ -120,7 +120,9 @@ round trip. Also return `png_path` in JSON.
 | fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
-| Image ingestion (screenshot → TIA data) + **image input contract** | `docs/ingest.md` |
+| Image ingestion (screenshot/ROM → TIA data) + **input contract v3** | `docs/ingest.md` |
+| RAM maps per ROM (auto-extracted audit) | `docs/ram-maps.md` |
+| Dynamic multi-sprite kernel (full form) | `docs/techniques/dynamic-multisprite.md` |
 | Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
 | Strengthening roadmap (sprites / audio / CI hardening) | `docs/hardening-roadmap.md` |
 | Decision history and changelog | `CHANGELOG.md` |
@@ -162,4 +164,5 @@ Clone Gopher2600 into the **harness/** root (untracked, referenced via `go.mod` 
 
 ## Version control
 For each meaningful change, append to `CHANGELOG.md` (Keep a Changelog) and tag with SemVer. Record decisions
-in the CHANGELOG's "Decisions" section.
+in the CHANGELOG's "Decisions" section. **When tagging, also bump `Version:` in cmd/harness/main.go**
+(serverInfo) — it has drifted twice; treat it as part of the release checklist.
