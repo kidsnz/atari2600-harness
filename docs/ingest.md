@@ -64,8 +64,11 @@ the same scene instead** (`analyze_image {paths: [...]}` / `cmd/ingest -in a.png
 - per-pixel voting builds the **static layer** — playfield, backgrounds, parked objects
   (ladders, pit holes, leaf fringes) come out as `static_*` with a hint (`pf_fringe?` /
   `parked_object?`), never confused with moving sprites;
-- per-frame diffs give the **dynamic layer** — true sprites, per frame, plus a **union** with
-  `seen_frames` and **flicker detection** (multiplexed objects read completely);
+- per-frame diffs give the **dynamic layer** — true sprites, per frame, plus a **union of
+  position-continuity tracks** (an animating, moving object — Pitfall's Harry at up to 18px/frame —
+  is one track with a `poses` count); **flicker** now means only "blinking in place across
+  skipped frames"; fully-grid-aligned dynamic cells carry an `animated_pf?` hint (scrolling
+  starfields and the like);
 - no repeating-structure assumption (this is what the reference-based repair of M7 could not
   promise); `unresolved_share` reports pixels that never settled (background animation).
 

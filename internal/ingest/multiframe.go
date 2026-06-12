@@ -19,11 +19,13 @@ type FrameResult struct {
 	Fidelity float64  `json:"fidelity"`
 }
 
-// UnionObject は全フレームを通したオブジェクト（同形・同色を1件に統合）。
+// UnionObject は全フレームを通したオブジェクト・トラック（位置連続性で連結）。
+// 形が変わっても（アニメ）、動いても、近接（≤12px）かつ色が交差すれば同一トラック。
 type UnionObject struct {
-	Sprite
+	Sprite           // 代表（最初の出現）
 	SeenFrames []int `json:"seen_frames"`
-	Flicker    bool  `json:"flicker,omitempty"` // 一部フレームにしか出ない＝30Hz flicker の徴候
+	Poses      int   `json:"poses"`              // トラック内の異なる GRP 形の数（アニメ検出）
+	Flicker    bool  `json:"flicker,omitempty"`  // 同位置でフレームを飛ばして明滅（真の flicker）
 }
 
 // MultiReport は静的層レポート＋フレーム毎の動的層＋union。
@@ -177,42 +179,81 @@ func fillTiesWithRowBG(static *Normalized, frames []*Normalized) {
 	}
 }
 
-// unionObjects は全フレームのスプライトを「形＋色＋サイズ」で束ね、出現フレームと flicker を付ける。
+// unionObjects は位置連続性トラッキング（M-H）: フレームを跨いで「近接（≤12px）かつ色が
+// 交差する」スプライトを 1 トラックに連結する。形ベースの旧実装はアニメ移動体（Pitfall の
+// ハリー）をポーズ毎に別エントリへ割り、全部に flicker を誤フラグした。
+// 真の flicker ＝「ほぼ同位置でフレームを飛ばして明滅」だけに限定する。
 func unionObjects(frames []FrameResult) []UnionObject {
-	type key struct {
-		w, h int
-		sig  string
+	type track struct {
+		u          UnionObject
+		lastX, lastY int
+		lastFrame  int
+		shapes     map[string]bool
+		gap        bool // 出現に飛びがあった
+		moved      bool // 大きく動いた（>2px）
 	}
-	sigOf := func(s Sprite) key {
+	sigOf := func(s Sprite) string {
 		sig := ""
-		for i, g := range s.GRP {
+		for _, g := range s.GRP {
 			sig += string(rune(g))
-			if i < len(s.Colors) {
-				sig += string(rune(s.Colors[i]))
-			}
 		}
-		return key{s.W, s.H, sig}
+		return sig
 	}
-	order := []key{}
-	m := map[key]*UnionObject{}
+	var tracks []*track
 	for fi, fr := range frames {
 		for _, s := range fr.Sprites {
-			k := sigOf(s)
-			if u, ok := m[k]; ok {
-				if u.SeenFrames[len(u.SeenFrames)-1] != fi {
-					u.SeenFrames = append(u.SeenFrames, fi)
+			var best *track
+			bestD := 21 // 速い移動体（Pitfall のハリーは最大 18px/フレーム）も繋ぐ。色交差が誤連結を防ぐ
+			for _, t := range tracks {
+				if t.lastFrame == fi {
+					continue // 同フレームの別物
 				}
+				dx := s.X - t.lastX
+				if dx < 0 {
+					dx = -dx
+				}
+				dy := s.Y - t.lastY
+				if dy < 0 {
+					dy = -dy
+				}
+				d := dx
+				if dy > d {
+					d = dy
+				}
+				if d < bestD && colorsShared(s.Colors, t.u.Colors) {
+					best, bestD = t, d
+				}
+			}
+			if best != nil {
+				if fi-best.lastFrame > 1 {
+					best.gap = true
+				}
+				if bestD > 2 {
+					best.moved = true
+				}
+				best.lastX, best.lastY, best.lastFrame = s.X, s.Y, fi
+				if best.u.SeenFrames[len(best.u.SeenFrames)-1] != fi {
+					best.u.SeenFrames = append(best.u.SeenFrames, fi)
+				}
+				best.shapes[sigOf(s)] = true
 				continue
 			}
-			m[k] = &UnionObject{Sprite: s, SeenFrames: []int{fi}}
-			order = append(order, k)
+			t := &track{u: UnionObject{Sprite: s, SeenFrames: []int{fi}},
+				lastX: s.X, lastY: s.Y, lastFrame: fi, shapes: map[string]bool{sigOf(s): true}}
+			if fi > 0 {
+				t.gap = true // 途中から現れた（先頭フレームに居ない）
+			}
+			tracks = append(tracks, t)
 		}
 	}
 	var out []UnionObject
-	for _, k := range order {
-		u := m[k]
-		u.Flicker = len(u.SeenFrames) < len(frames)
-		out = append(out, *u)
+	for _, t := range tracks {
+		if t.lastFrame < len(frames)-1 {
+			t.gap = true // 途中で消えた（最終フレームに不在）
+		}
+		t.u.Poses = len(t.shapes)
+		t.u.Flicker = t.gap && !t.moved // 同位置明滅のみ＝真の flicker
+		out = append(out, t.u)
 	}
 	return out
 }

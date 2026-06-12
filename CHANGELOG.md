@@ -12,6 +12,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.26.0] - 2026-06-12
+
+### Added
+- **Ingest M-H — position-continuity union tracks + animated-PF hints.** The union links
+  sprites across frames by proximity (≤20px; Pitfall's Harry runs up to 18px/frame) and shared
+  colors — an animating mover is now ONE track with a `poses` count (Harry: 1 track, 4 poses,
+  not flicker). `flicker` is redefined to "blinking in place across skipped frames" only
+  (the four flicker balls keep their flag; vanished/appeared tracks count as gaps). Fully
+  grid-aligned dynamic cells get an `animated_pf?` hint — the Exerciser's scrolling starfield
+  is CI ground truth (mountains stay static reflect bands).
+
 ## [1.25.0] - 2026-06-12
 
 ### Added

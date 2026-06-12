@@ -623,3 +623,49 @@ func TestDynMultisprite(t *testing.T) {
 		}
 	}
 }
+
+// アニメ PF（星空スクロール）は動的層で animated_pf? ヒント付きになり、山は静的 PF に残る。
+func TestMultiFrameAnimatedPF(t *testing.T) {
+	e, _ := emu.New("NTSC")
+	if err := e.LoadROM("../../roms/exerciser/exerciser.bin"); err != nil {
+		t.Fatal(err)
+	}
+	e.RunFrames(5)
+	e.Poke(0x80, 4)
+	e.Poke(0x83, 0)
+	e.RunFrames(20)
+	q := NewNTSCQuantizer()
+	var frames []*Normalized
+	for i := 0; i < 3; i++ {
+		img, _ := e.Snapshot()
+		n, _ := Normalize(upscale(img, 2, 1), q)
+		frames = append(frames, n)
+		e.RunFrames(1)
+	}
+	mr, err := AnalyzeFrames(frames, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 山（reflect バンド）が静的層に残る
+	reflect := 0
+	for _, b := range mr.Static.Playfield {
+		if b.Mode == "reflect" && b.Height >= 6 {
+			reflect++
+		}
+	}
+	if reflect < 3 {
+		t.Fatalf("mountains not in static layer: %d reflect bands", reflect)
+	}
+	// 動的層に animated_pf? ヒントの幅広成分が出る
+	hinted := 0
+	for _, fr := range mr.Frames {
+		for _, s := range fr.Sprites {
+			if s.Hint == "animated_pf?" {
+				hinted++
+			}
+		}
+	}
+	if hinted == 0 {
+		t.Fatalf("no animated_pf? hints in dynamic layers")
+	}
+}

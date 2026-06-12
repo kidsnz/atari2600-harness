@@ -94,6 +94,21 @@ func collectComponents(n *Normalized, residual [][]bool) []component {
 	return comps
 }
 
+// alignedShare は成分画素のうち「完全に 4clk 整列した一様列」に属する割合。
+func alignedShare(c component) float64 {
+	cols := map[int]int{}
+	for _, p := range c.px {
+		cols[p[1]*64+p[0]/4]++ // 行×列キー
+	}
+	aligned := 0
+	for _, cnt := range cols {
+		if cnt == 4 {
+			aligned += 4
+		}
+	}
+	return float64(aligned) / float64(len(c.px))
+}
+
 // mergeFragments は「bbox の間隙 ≤2px かつ 色集合が交差」する成分を安定するまで統合する。
 // 配達員の離れた手・キャブの車輪・桁の断片など、1 オブジェクトの分裂を 1 つに戻す（F1）。
 func mergeFragments(comps []component) []component {
@@ -174,6 +189,13 @@ func analyzeComponent(n *Normalized, c component) []Sprite {
 	}
 	if w <= 8 {
 		return []Sprite{classify(n, c.px, c.minX, c.minY, c.maxX, c.maxY)}
+	}
+	if w%4 == 0 && alignedShare(c) >= 0.99 {
+		// 完全 4clk 整列（孤立 1 セル or 幅広）＝アニメする playfield の公算（星空スクロール等）。
+		s := classify(n, c.px, c.minX, c.minY, c.maxX, c.maxY)
+		s.Hint = "animated_pf?"
+		s.Confidence = 0.5
+		return []Sprite{s}
 	}
 	if w <= 16 {
 		if s, ok := tryStretch(n, lit, c, 2); ok {
