@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.23.0] - 2026-06-12
+
+### Added
+- **skipDraw (DCP) verified** — `vertical_pos_dcp.asm`: the classic undocumented-opcode vertical
+  trigger (`lda #H-1 / DCP sprDraw / bcs`), encoded via `.byte $C7` (DASM has no illegal
+  mnemonics). Measured against the compare version on the same kernel: max line 40→38 cycles,
+  sprite line 31→30 — modest here; the idiom's real value is freeing Y. Pixel-identical motion,
+  CI-locked. Suite now 48.
+
 ## [1.22.0] - 2026-06-12
 
 ### Added

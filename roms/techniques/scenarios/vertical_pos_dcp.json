@@ -1,0 +1,12 @@
+{
+  "rom": "roms/techniques/vertical_pos_dcp.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 9,   "field": "ram.0x9e", "op": "==", "value": 180 },
+    { "at_frame": 9,   "field": "ram.0x80", "op": "==", "value": 17 },
+    { "at_frame": 9,   "field": "tia.player0.hmoved_pixel", "op": "==", "value": 80 },
+    { "at_frame": 196, "field": "ram.0x80", "op": "==", "value": 156 },
+    { "at_frame": 196, "field": "ram.0x81", "op": "==", "value": 1 }
+  ],
+  "checks": { "ntsc_frame_lines": 262, "golden_frame": true }
+}
