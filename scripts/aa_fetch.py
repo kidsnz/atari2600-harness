@@ -5,7 +5,8 @@ AtariAge 本家は Cloudflare の bot チャレンジで直接取得できない
 Wayback Machine の CDX API でスナップショットを列挙して取得する。
 
 使い方:
-    python3 scripts/aa_fetch.py <topic-url> <出力ディレクトリ> [-attachments] [-keep-raw]
+    python3 scripts/aa_fetch.py <topic-url> <出力ディレクトリ> [-attachments] [-keep-raw] [-force]
+    （既採掘 topic は自動 skip＝再採掘防止。-force で上書き再取得。掘る前の照会は aa_manifest.py --check）
     例: python3 scripts/aa_fetch.py \\
         https://forums.atariage.com/topic/85667-medieval-mayhem-2600/ \\
         ../reference/atariage/85667-medieval-mayhem
@@ -166,14 +167,36 @@ def fetch_attachment(url, outdir, names, gaps):
     return False
 
 
+def already_mined(topic_url, outdir):
+    """reference/atariage に同じ topic_id の notes.ja.md が在れば既採掘（再採掘の機械的防止）。
+
+    判定は **topic_id（URL の数字）**。slug 名が違っても同じスレなら検出する。
+    outdir の親（= reference/atariage）に `<topic_id>-*/notes.ja.md` が在れば既採掘とみなす。
+    """
+    import glob
+    m = re.search(r"/topic/(\d+)", topic_url)
+    if not m:
+        return None
+    tid = m.group(1)
+    refroot = os.path.dirname(os.path.abspath(outdir.rstrip("/")))
+    hits = glob.glob(os.path.join(refroot, tid + "-*", "notes.ja.md"))
+    return (tid, hits[0]) if hits else None
+
+
 def main():
     if len([a for a in sys.argv[1:] if not a.startswith("-")]) != 2:
         print(__doc__)
         sys.exit(2)
     want_atts = "-attachments" in sys.argv
     keep_raw = "-keep-raw" in sys.argv
+    force = "-force" in sys.argv
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     topic_url, outdir = args[0], args[1]
+    mined = already_mined(topic_url, outdir)
+    if mined and not force:
+        print(f"ALREADY MINED topic {mined[0]} → {mined[1]}")
+        print("skip（再採掘するなら -force）。掘る前の照会は scripts/aa_manifest.py --check <url> でも可。")
+        sys.exit(0)
     raw = os.path.join(outdir, "raw")
     attdir = os.path.join(outdir, "attachments")
     os.makedirs(raw, exist_ok=True)

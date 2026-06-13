@@ -16,6 +16,15 @@
 *.test
 /bin/probe
 /bin/harness
+# stray standalone cmd binaries built to repo root (build to /bin instead)
+/rammap
+/jingle
+/dissect
+/fieldtest
+/calibrate
+/scenario
+/stellacheck
+/ingest
 
 # external dependency: Gopher2600 upstream clone (obtain per README)
 /Gopher2600/

@@ -12,6 +12,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.65.0] - 2026-06-13
+
+### Added
+- **AtariAge mining manifest management** (`scripts/aa_manifest.py`): the single source of truth for
+  "which threads are already mined", **regenerated idempotently from the filesystem** (a thread is
+  mined iff `reference/atariage/<topic_id>-*/notes.ja.md` exists) → `reference/atariage/MINED.csv`.
+  `--check <url|topic_id>` reports MINED (exit 1) / NEW (exit 0). Dedup keys on **topic_id**, so a
+  different slug for the same thread is still caught. Stops re-mining the same thread across
+  sessions/agents without relying on a hand-kept list.
+- **`aa_fetch.py` auto-dedup**: skips a thread (no fetch, no stray dirs) if its topic_id is already
+  mined; `-force` overrides. Mining is now mechanically dedup-enforced, not by memory.
+
+### Changed
+- `.gitignore`: ignore stray standalone `cmd/*` binaries built to the repo root
+  (`/rammap` `/jingle` `/dissect` `/fieldtest` `/calibrate` `/scenario` `/stellacheck` `/ingest`) —
+  build to `/bin` instead. (Removed a stray 12 MB `rammap` binary from the working tree.)
+
 ## [1.64.0] - 2026-06-13
 
 ### Added
