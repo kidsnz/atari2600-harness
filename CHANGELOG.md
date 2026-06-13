@@ -12,6 +12,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.64.0] - 2026-06-13
+
+### Added
+- **Technique: instrument-envelope music driver** (`roms/techniques/music_driver.asm` +
+  `docs/techniques/music-driver.md`): the step up from the constant-volume sound driver — AUDV is
+  driven by a **per-instrument volume envelope every frame** (attack/decay → sustain, or
+  decay-to-silence for plucks) and **each note selects its own instrument**. Data is the
+  TIATracker model reduced clean-room: instrument `{AUDC, env offset, sustain}` over a flat `Env`
+  table, parallel `Notes/Inst/Durs` patterns, looping song, `Env[0]=0` silence cell for rests.
+  10 bytes of zero-page state; tick in overscan under TIM64T. Distilled from TIATracker
+  (kylearan, forums.atariage.com/topic/250014 → `reference/atariage/250014-tiatracker/`).
+  CI: `scenarios/music_driver.json` (envelope ramps 15→12→10→8 / 11→9→7, sustain holds, per-note
+  instrument switch to pluck, pluck decay-to-silence with bass sustaining independently, song loop
+  back to C5, 262 lines, audio golden). Hardware-calibrated via read_audio. = technique candidate ⑦.
+
+### Mined (research, non-repo `reference/atariage/`, clean-room)
+- AtariAge deep-dive run (depth-first, 11 threads distilled to `notes.ja.md`): TIATracker (⑦),
+  fast-divide-by-seven (⑮), bus-stuffing (scope-out), raycasting (⑫ split a/b),
+  48px-positioning (⑯), screen-resolution (constants cross-check), disassembling (dissect notes),
+  castlevania-port (⑰), modular-kernel (⑱ RTS-stack dispatch), pointer-optimization,
+  tiatracker-plus. Ledger updated; only ⑦ has been implemented+verified so far.
+
 ## [1.63.0] - 2026-06-12
 
 ### Added

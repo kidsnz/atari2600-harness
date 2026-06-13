@@ -27,6 +27,7 @@ with confidence, from basics to advanced tricks.
 | 10 | Flicker multiplexing — N objects through 2 players | advanced | [flicker-multiplexing.md](flicker-multiplexing.md) | `roms/techniques/flicker_multiplex.asm` | ✅ 4 balls @30Hz, alternation CI-asserted |
 | 12 | Venetian Blinds — 2 figures through 1 player, zero flicker | intermediate | [venetian-blinds.md](venetian-blinds.md) | `roms/techniques/venetian.asm` | ✅ alternating rows pixel-verified, CI-locked |
 | 10b | Dynamic multi-sprite kernel — Y-sort + 2-of-N + mid-screen reposition | advanced | [dynamic-multisprite.md](dynamic-multisprite.md) | `roms/techniques/dyn_multisprite.asm` | ✅ 5 crossing objects, zero budget spills, CI-locked |
+| M | Instrument-envelope music driver — per-frame volume envelopes + per-note instrument (TIATracker-derived) | advanced | [music-driver.md](music-driver.md) | `roms/techniques/music_driver.asm` | ✅ envelopes/sustain/pluck-gate/loop CI-locked, audio golden |
 
 What to absorb next (prioritized, with sources): **[roadmap.md](roadmap.md)** — e.g. 48-px score / 2-line
 kernel / vertical positioning / sound / animation / playfield tricks / general flicker kernel / bank switching.

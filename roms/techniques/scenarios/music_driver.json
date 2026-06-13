@@ -1,0 +1,35 @@
+{
+  "rom": "roms/techniques/music_driver.asm",
+  "warmup_frames": 0,
+  "inputs": [],
+  "asserts": [
+    { "at_frame": 0,  "field": "audio.ch0.control", "op": "==", "value": 4,  "note": "lead inst0 AUDC4" },
+    { "at_frame": 0,  "field": "audio.ch0.freq",    "op": "==", "value": 29, "note": "C5" },
+    { "at_frame": 0,  "field": "audio.ch0.volume",  "op": "==", "value": 12, "note": "lead envelope decaying (15->12->10->8)" },
+    { "at_frame": 0,  "field": "audio.ch1.control", "op": "==", "value": 12, "note": "bass inst1 AUDC12" },
+    { "at_frame": 0,  "field": "audio.ch1.freq",    "op": "==", "value": 19, "note": "C4" },
+    { "at_frame": 0,  "field": "audio.ch1.volume",  "op": "==", "value": 9,  "note": "bass envelope decaying (11->9->7)" },
+
+    { "at_frame": 1,  "field": "audio.ch0.volume",  "op": "==", "value": 10, "note": "decay continues" },
+    { "at_frame": 2,  "field": "audio.ch0.volume",  "op": "==", "value": 8,  "note": "sustain reached" },
+    { "at_frame": 2,  "field": "audio.ch1.volume",  "op": "==", "value": 7,  "note": "bass sustain reached" },
+    { "at_frame": 6,  "field": "audio.ch0.volume",  "op": "==", "value": 8,  "note": "sustain held" },
+
+    { "at_frame": 14, "field": "audio.ch0.freq",    "op": "==", "value": 23, "note": "next note E5" },
+    { "at_frame": 14, "field": "audio.ch0.control", "op": "==", "value": 4,  "note": "instrument 2 pluck AUDC4 (per-note instrument)" },
+    { "at_frame": 14, "field": "audio.ch0.volume",  "op": "==", "value": 15, "note": "pluck attack peak" },
+    { "at_frame": 15, "field": "audio.ch0.volume",  "op": "==", "value": 10, "note": "pluck decay 15->10" },
+    { "at_frame": 16, "field": "audio.ch0.volume",  "op": "==", "value": 6,  "note": "pluck decay 10->6" },
+    { "at_frame": 19, "field": "audio.ch0.volume",  "op": "==", "value": 0,  "note": "pluck decayed to silence (gated envelope)" },
+    { "at_frame": 19, "field": "audio.ch1.volume",  "op": "==", "value": 7,  "note": "bass sustains independently while lead is silent" },
+
+    { "at_frame": 127, "field": "audio.ch0.freq",   "op": "==", "value": 29, "note": "song looped back to C5" },
+    { "at_frame": 127, "field": "audio.ch0.volume", "op": "==", "value": 12, "note": "looped note replays its envelope" },
+    { "at_frame": 127, "field": "ram.0x81", "op": "==", "value": 0, "note": "c0idx wrapped to pattern start" },
+    { "at_frame": 127, "field": "ram.0x82", "op": "==", "value": 1, "note": "c0eoff = lead instrument env offset" }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_audio": true
+  }
+}
