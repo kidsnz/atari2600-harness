@@ -12,6 +12,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.60.1] - 2026-06-12
+
+### Fixed
+- `aa_index.py` parser rewritten against the real IPB4 markup (verified on a live snapshot):
+  title inside the nested span, `data-stattype` for replies/views, row split on the actual
+  item class. One index page now yields ~49 clean topics (was 0-2 with polluted titles).
+
 ## [1.60.0] - 2026-06-12
 
 ### Added

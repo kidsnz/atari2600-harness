@@ -46,40 +46,47 @@ def cdx(url_pattern, **params):
     return rows[1:] if rows else []
 
 
-TOPIC_RE = re.compile(
-    r'href="[^"]*?/topic/(\d+-[\w\-]+)/"[^>]*>\s*<span[^>]*>([^<]{1,200})</span>', re.S)
-ROW_SPLIT = re.compile(r'<li[^>]*class="ipsDataItem[^"]*"')
-NUM_RE = re.compile(r'([\d,.]+)[km]?\s*(?:replies|repl|views)', re.I)
+# 実物の IPB4 マークアップ（2023 スナップショットで確認）:
+#   タイトル: <a href=".../topic/SLUG/" ...><span> TITLE </span></a>
+#   統計:     <li data-stattype="forums_comments"><span class="ipsDataItem_stats_number">87</span>
+#             <li data-stattype="num_views"><span class="ipsDataItem_stats_number">10.9k</span>
+ROW_SPLIT = re.compile(r'<li class="ipsDataItem ipsDataItem_responsivePhoto')
+TITLE_RE = re.compile(r'/topic/(\d+-[\w\-]+)/"[^>]*>\s*<span>\s*(.*?)\s*</span>', re.S)
+STAT_RE = re.compile(
+    r'data-stattype="(forums_comments|num_views)">\s*<span class="ipsDataItem_stats_number">([^<]+)</span>', re.S)
+
+
+def parse_num(t):
+    v = t.strip().lower().replace(",", "")
+    mult = 1
+    if v.endswith("k"):
+        mult, v = 1000, v[:-1]
+    elif v.endswith("m"):
+        mult, v = 1000000, v[:-1]
+    try:
+        return int(float(v) * mult)
+    except ValueError:
+        return 0
 
 
 def parse_index(html_text):
     """IPB4 のフォーラム一覧から (slug, title, author, replies, views) を抽出。"""
     out = []
     for chunk in ROW_SPLIT.split(html_text)[1:]:
-        m = re.search(r'href="[^"]*?/topic/(\d+-[\w\-]+)/?"[^>]*>([^<]{1,250})<', chunk)
+        m = TITLE_RE.search(chunk)
         if not m:
             continue
         slug = m.group(1)
-        title = html.unescape(m.group(2)).strip()
-        if not title or title.lower().startswith(("started by", "by ")):
+        title = re.sub(r"\s+", " ", html.unescape(m.group(2))).strip()
+        if not title:
             continue
         au = re.search(r'/profile/\d+-([\w\-]+)/', chunk)
-        # 統計: <span ...>N</span> replies / views（表記ゆれに耐えるため近傍数値を順に拾う）
-        stats = re.findall(r'ipsDataItem_stats[^>]*>.*?([\d][\d,.]*[km]?)\s*<', chunk, re.S)
-        nums = []
-        for t in re.findall(r'>([\d][\d,.]*[km]?)<', chunk):
-            v = t.lower().replace(",", "")
-            mult = 1
-            if v.endswith("k"):
-                mult, v = 1000, v[:-1]
-            elif v.endswith("m"):
-                mult, v = 1000000, v[:-1]
-            try:
-                nums.append(int(float(v) * mult))
-            except ValueError:
-                pass
-        replies = nums[0] if nums else 0
-        views = max(nums[1:3]) if len(nums) > 1 else 0
+        replies = views = 0
+        for kind, num in STAT_RE.findall(chunk):
+            if kind == "forums_comments":
+                replies = parse_num(num)
+            else:
+                views = parse_num(num)
         out.append((slug, title, au.group(1) if au else "?", replies, views))
     return out
 
