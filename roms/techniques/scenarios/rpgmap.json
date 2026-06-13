@@ -1,0 +1,21 @@
+{
+  "rom": "roms/techniques/rpgmap.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 5,  "player": 0, "action": "right", "pressed": true},
+    {"frame": 90, "player": 0, "action": "right", "pressed": false},
+    {"frame": 95, "player": 0, "action": "down", "pressed": true},
+    {"frame": 180, "player": 0, "action": "down", "pressed": false}
+  ],
+  "asserts": [
+    { "at_frame": 4,   "field": "ram.0x80", "op": "==", "value": 0 },
+    { "at_frame": 4,   "field": "ram.0x81", "op": "==", "value": 76 },
+    { "at_frame": 90,  "field": "ram.0x80", "op": "==", "value": 1 },
+    { "at_frame": 180, "field": "ram.0x80", "op": "==", "value": 3 },
+    { "at_frame": 4,   "field": "tiareg.playfield.reflected", "op": "==", "value": 1 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

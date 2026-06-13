@@ -12,6 +12,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.63.0] - 2026-06-12
+
+### Added
+- **Technique: room-based map navigation** (`roms/techniques/rpgmap.asm` +
+  `docs/techniques/rpgmap.md`): the RPG/adventure backbone — a 2×2 world where each room is a
+  wall table, the player walks (SWCHA + PosObject), and edge crossings transition rooms
+  (`room ^= 1`/`^= 2` with wrap). Adding rooms is pure data. Distilled from za2600's
+  kworld/rs/spr (`reference/2600-technique-sources/za2600/`, from the legacy ATARI AR folder).
+  CI: `scenarios/rpgmap.json` (walk right→room 1, down→room 3, reflect, 262, golden).
+
+### Note
+- This completes the AR-folder technique trio (text24 ⑩ / hscroll ⑪ / rpgmap ⑬) studied from
+  the recovered za2600 + sidescroll sources. Candidate ⑫ (raycasting) still lacks a source.
 ## [1.62.0] - 2026-06-12
 
 ### Added
