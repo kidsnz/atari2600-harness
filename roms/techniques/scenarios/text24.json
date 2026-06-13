@@ -1,0 +1,40 @@
+{
+  "rom": "roms/techniques/text24.asm",
+  "warmup_frames": 4,
+  "asserts": [
+    {
+      "at_frame": 10,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 39
+    },
+    {
+      "at_frame": 11,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 87
+    },
+    {
+      "at_frame": 10,
+      "field": "tiareg.player0.vertical_delay",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 5,
+      "field": "ram.0x90",
+      "op": ">",
+      "value": 0
+    },
+    {
+      "at_frame": 5,
+      "field": "ram.0xb0",
+      "op": ">",
+      "value": 0
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

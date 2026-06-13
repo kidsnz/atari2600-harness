@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.61.0] - 2026-06-12
+
+### Added
+- **Technique: 24-character text line** (`roms/techniques/text24.asm` + `docs/techniques/text24.md`):
+  doubles text12 to 24 chars by alternating two 12-char blocks across frames (left block P0=39,
+  right block P0=87 = +48px contiguous) at 50% flicker. Studied from za2600's text24.asm
+  (`reference/2600-technique-sources/za2600/`, recovered from the legacy ATARI AR folder).
+  CI: `scenarios/text24.json` (block positions, packed buffers, 262, golden).
+
 ## [1.60.1] - 2026-06-12
 
 ### Fixed
