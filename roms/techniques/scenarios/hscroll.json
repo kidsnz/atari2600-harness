@@ -1,0 +1,40 @@
+{
+  "rom": "roms/techniques/hscroll.asm",
+  "warmup_frames": 2,
+  "asserts": [
+    {
+      "at_frame": 3,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 10,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 2
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 5
+    },
+    {
+      "at_frame": 50,
+      "field": "ram.0x80",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "tiareg.playfield.reflected",
+      "op": "==",
+      "value": 1
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}

@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.62.0] - 2026-06-12
+
+### Added
+- **Technique: horizontal playfield scroll** (`roms/techniques/hscroll.asm` +
+  `docs/techniques/hscroll.md`): coarse 4px scroll via an 8-phase precomputed (PF0,PF1,PF2)
+  table (PF bit-order quirks baked in), reflect mode, scrollSpeed-paced. Studied from the legacy
+  ATARI AR Side-Scroll source. CI: `scenarios/hscroll.json` (phase progression, reflect, 262,
+  golden); read_row confirms 4px-per-tick stripe motion.
+
 ## [1.61.0] - 2026-06-12
 
 ### Added
