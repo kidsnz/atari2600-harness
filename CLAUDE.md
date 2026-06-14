@@ -24,6 +24,9 @@ must always hold *only* in a doc — burn them here or into memory.
    No bulk changes.
 4. **litmus test:** place a sprite at an arbitrary X / move it 1px and have it match `X = 3N − 55`. If this
    passes, the environment is real.
+5. **Design before asm.** When authoring graphics / a screen, first read `docs/design-principles.md` and run
+   the feasibility checks in `pkg/design` (color bands, line budget, multiplex, PF windows, background axes)
+   so an unworkable layout is rejected on paper, not after a roll. Don't reach for techniques you haven't budgeted.
 
 ## Settled architecture
 - Engine = **Gopher2600** (Go) **embedded in-process as a library**, wrapped by a thin **Go MCP** (official
@@ -117,6 +120,8 @@ round trip. Also return `png_path` in JSON.
 | litmus measurements (authoritative horizontal-position / HMOVE data) | `docs/litmus-results.md` |
 | verified coverage (what each litmus proves on hardware) | `docs/verified-coverage.md` |
 | techniques catalog (verified 2600 authoring techniques: zone multiplexing, …) | `docs/techniques/` |
+| **visual design judgment / craft rules** (color budget, layout feasibility, the ~20 distilled rules) | `docs/design-principles.md` |
+| **pre-authoring feasibility checks** (executable: color bands, line budget, multiplex, PF windows, craft) | `pkg/design/` |
 | fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
