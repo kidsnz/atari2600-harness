@@ -2,7 +2,7 @@
 
 採掘（AtariAge）＋web 研究で得た「ルール化できる作画設計の原則」の正典。用途＝(1) Claude のデザイン判断の
 明示ルール（roms/EVALUATION.md の⑥craft）(2) `pkg/design` フィジビリティ判定の根拠（凍結した TIA Studio テンプレにも流用可）。
-詳細出典＝`tools/research-w2-design.md` ＋ `docs/mining-digest.md`（採掘77スレ索引）＋ `reference/atariage/*/notes.ja.md`。
+詳細出典＝`tools/research-w2-design.md` ＋ `docs/mining-digest.md`（採掘スレ索引）＋ `reference/atariage/*/notes.ja.md`。
 
 **実行可能な判定は `pkg/design/` に「吸収」済み**（asm を書く前に機械チェックする）。数値化できるルールは
 末尾に `→ func` で対応関数を示す。数値化できない判断系は末尾「機械判定不能な判断ルール」節に集約する。
@@ -23,6 +23,9 @@
 ## スプライト（P0/P1）
 - 8 ドット幅・1 レジスタ（GRP 8bit, MSB=左端）。幅 NUSIZ 1x/2x/4x。〔2k6specs, Davie S21〕
 - **横位置 = 2段階**：粗 ÷15（5cy ループ）→ 微 HMOVE。粒度 3px/CPUサイクル（litmus 一致）。〔Davie S22〕 `→ design.PositionSplit/CoarseIterations`
+- **div15 の微動レンジは実装依存**：素朴な div15 は **−6..8px**、`eor #15`＋`adc #((8+1)<<4)` で対称化すると **−7..8px**。起源は Decuir/Video Olympics。HMOVE 生のハード可動域(−8..+7)とは別＝ルーチンの性質。〔採掘 286698〕（要 litmus 裏取り）
+- **early-HMOVE（WSYNC 前 HMOVE）の「動かさない」値 = HMPx $80（=8）であって $00 ではない**：$00 にすると同一走査線を跨ぐオブジェクトが 8px ドリフトする。15px×11 の専用カーネルで位置決めする型。〔採掘 169471〕（要 litmus）
+- **HMOVE をサイクル 73–74 で撃つと左端のコーム(黒線)が出ない**：Cosmic Ark 系の既知トリック。Omegamatrix の間接ジャンプ位置決め＝HMPx 下位ニブルがジャンプ索引を兼ねる。〔採掘 165428, 183219, 319456 "HMOVE Shuffle"〕（要 litmus）
 - **48px** = NUSIZ$03（3 copies）＋ P1 を 8px 右 ＋ VDEL 二重バッファで GRP 時間差差替え。score/bitmap48 を転用。〔48px-positioning〕 `→ pkg/sprite.SplitWide/NUSIZ・design.MaxChars(Text48px)`
 - **絵を先に決めて割当しない**。順序＝色予算→割当表→不足は「色共有・オブジェクト兼用・レイアウト変更」で交渉。
 - missile/ball = 線・縁・縦枠、player = 倍幅/複数コピー/4x で面。1つの見た目を複数オブジェクトの重ねで構成。
@@ -42,10 +45,12 @@
 - 2体超は Y 帯で多重化、横再配置は1走査線消費、**空 Y レーン必須**、代償 30Hz ちらつき。〔Bumbershoot〕 `→ design.NeedsFlicker/NeedsEmptyYLane/RepositionCostScanlines`
 - **フリッカは最終手段／短命限定**。大面積禁止。エミュを信用せず複数フレーム合成で検証。〔flicker-to-enhance-graphics〕
   - ただし**意図的フリッカを演出に転化**する手もある：点滅する目標物で Game&Watch 味を出しつつ、可動5スプライト制限を回避＝欠点を美観に変えた実例。〔Pizza Boy 329673〕
-  - **時間混色（2フレーム交互色）を使うなら、両色を同一輝度にして hue だけで分ける**＝フリッカー知覚は輝度差に比例するので激減する（例 lum4 の黄緑 vs 青緑）。〔176987 interlaced-multicolor〕
+  - **時間混色（2フレーム交互色）を使うなら、両色を同一輝度にして hue だけで分ける**＝フリッカー知覚は輝度差に比例するので激減する（例 lum4 の黄緑 vs 青緑）。〔176987 interlaced-multicolor〕 `→ design.InterlaceColorsSafe`
+  - **フリッカの見え方は輝度で調律する**：黒背景なら輝度 `$x4〜$x8` が安全圏（既定 `$38`）。同一輝度・異hue でちらつき最小化（上の則と整合）。264 ライン運用＝PAL は偶数必須。〔採掘 162521 StayFrosty〕
 
 ## カーネル予算・状態
 - **76cy/line が天井**。ライン数を先に決め残予算で機能配分。〔splendidnut〕 `→ design.LineBudget/RemainingCycles`
+- **★RIOT 6532 タイマのラップアラウンド・バグ（"Stella は通る／実機はロールする"トラップ）**：タイマがラップアラウンドする**まさにそのサイクル**に `TIM64T`/`TIM1024T` を書くと、分周器が静かに **1T** に化けてフレーム長が崩れ実機でロールする。**対策＝二重書き（double-write TIM64T）**。エミュ依存で見逃しやすい＝harness の中核ミッション(gap B)直撃。Gopher2600 作者(JetSetIlly)がこのスレで診断。〔採掘 303277 "To Roll or not to Roll"〕（harness 強化候補＝ラップアラウンド・サイクルでのタイマ書込みを検出する assert）
 - 状態＝1個の GameState 変数＋状態別カーネル。タイトル絵は上下パディング＋中央PFテーブル、終端で GRP/PF クリア。〔title-to-game-transition〕
 - 省サイクル＝ISC/ISB 非公式オペコード＋SP をラインカウンタ流用（要 litmus 裏取り）。〔5cycle-color-cycling, illegal-opcodes〕
 
@@ -58,6 +63,8 @@
 ## 作画 craft（スプライト/文字の絵作り＝⑥craft の具体ルール）
 - **サムネイル可読性を起点**：1ドット相当まで縮小して識別できるかを**先に**検証してから細部を足す。縮小は補間なし（nearest・半分ずつ）。〔326595, 106110〕
 - **2600 ピクセルは横長（横 ≒ 縦の約 1/2・≈2:1）**：正方ドットのプレビューを信じない。実機アスペクトで字形/絵を決める（player=横1px間引き、PF=縦3–4倍で密度を稼ぐ）。**→ プレビューは非正方ピクセルで描く**。〔326595〕 `→ design.PixelAspectRatio/ScanlinesForSquare`
+  - **⚠ 精密値は要検証（codified 2:1 は過大の疑い）**：採掘 190154 は「正方に見せる幅 `width_CC = lines × 3/5`」＝アスペクト **5:3(≈1.67)**、採掘 169128 は **12:7(≈1.71)** と、**独立2源が ≈1.7 で一致**。現コード `design.PixelAspectRatio=2`(2:1=2.0) はこれより大きい＝過大の疑い。**Photoshop モック→2600 のユーザー主ワークフロー直結なので、forum 値で上書きせず実機/Stella で実測してから確定する**（[[feedback-verification-first]]）。既知正方スプライトを実走→get_screen_annotated 実寸で校正。〔採掘 190154, 169128〕
+  - **走査線途中の色は 3CC グリッド上**：横多色は最大 ~18 帯／3色（SAX 流用で4色）。任意4色は不可＝穴(holes)＋重ね(stacking)で代替。SCORE bit(CTRLPF D1)で PF 左右分割。〔採掘 190154〕 `→ design.MinColorBandWidthPx, ScoreModeTwoColor`
 - **字形の誤読ペアを潰す**：L/I/T・U/W・M/H/N・O/0/D。作者は自分の誤読に気づけない→**他者/読み上げで検証**、最終調整は単一ピクセル単位。〔294306, 326595（重複確認＝強い原則）〕
 - **8px モノクロは輪郭に全予算**：識別力が最大の1パーツ（帽子/ヒゲ等）に集中。足りなければ倍幅＋ベネチアン縞で密度。〔106110〕
 - **歩行アニメは最小2フレーム 50:50**：フレームカウンタの1ビット（`and #2^n`）で等間隔・リセット不要・**移動中のみ**回す。〔301861〕 `→ design.WalkFrame`
