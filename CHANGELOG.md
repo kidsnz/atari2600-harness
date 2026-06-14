@@ -12,6 +12,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.68.0] - 2026-06-14
+
+### Added
+- **Forum-50 mining run absorbed (checklist + deep-mine + knowledge).**
+  - `scripts/gen_mining_digest.py`: idempotent generator for `docs/mining-digest.md` from
+    `reference/atariage/MINED.csv` (keyword + curated-override category inference). Digest now 89 threads.
+  - Deep-mined 12 high-value forum-50 threads into `design-principles.md`: the **RIOT 6532 timer-wraparound
+    roll trap** (double-write `TIM64T`; the rare "passes-in-Stella / rolls-on-hardware" trap, diagnosed
+    in-thread by the Gopher2600 author), early-HMOVE don't-move value = 8, HMOVE cy73-74 comb avoidance,
+    div15 fine-motion range, flicker luminance tuning, and a **pixel-aspect refinement** (190154 5:3 ≈
+    169128 12:7, both ≈1.7 vs the codified 2:1 — flagged for measurement, *not* codified, per verification-first).
+  - `capability-gap-audit.md` **G8**: candidate RIOT timer-wraparound roll detector (sibling to `assert_line_budget`).
+- **8bitworkshop sample cross-check** (`docs/8bitworkshop-crosscheck.md`). Steven Hugg's "Making Games for
+  the Atari 2600" examples assembled in our toolchain (**26/26**, DASM bundled `vcs.h`/`macro.h`) and run in
+  the harness; `multisprite3` verified in depth (8 multiplexed sprites read back at `fidelity:1`). Maps each
+  sample to our technique library: **25/26 covered**, one gap — `road` (pseudo-3D road via 2 missiles + ball),
+  logged as a technique candidate. External audit confirms `roms/techniques/` covers the standard curriculum.
+
+### Notes
+- The triage checklists (`reference/atariage/triage-forum50.csv` ~1317 rows, `triage-forum31.csv` 410 rows;
+  1727 threads triaged with reasons) and the per-thread `notes.ja.md` live under the umbrella `reference/`
+  (provenance, not committed). batari Basic (forum 65) is intentionally out of scope.
+
 ## [1.67.1] - 2026-06-14
 
 ### Changed
