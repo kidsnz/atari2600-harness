@@ -8,7 +8,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Planned
+- Real game authoring on top of the 1.0 base (1.x).
+- Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
+
+## [1.66.0] - 2026-06-13
+
 ### Added
+- **`pkg/design` feasibility checker (gap-audit G2).** Codifies the *hard/numeric* rules from
+  `docs/design-principles.md` into executable checks, so TIA Studio (and Claude) can answer "does
+  this layout fit?" in code rather than prose: color-band minimum width (`MinColorBandWidthPx` /
+  `CheckColorBands`), text capacity by technique (`MaxChars` / `FitsText`), 76cy line budget
+  (`LineBudget` / `RemainingCycles`), asymmetric-PF right-half write windows (`AsymRightWindow` /
+  `FitsAsymRightWrite`), and multiplex / sprites-per-line limits (`NeedsFlicker`). Soft craft (taste,
+  readability) intentionally stays prose. Foundation for milestone M4 (budget feasibility).
+- **`docs/capability-gap-audit.md`** — a mined-technique × harness-capability gap audit (G1–G7) with
+  a prioritized strengthening backlog (G2 → G1 → G4). Also brought `docs/design-principles.md` and the
+  `tools/` TIA Studio research corpus (research-w1..w11, build-readiness, M3/M5 prototype design)
+  under version control.
 - **`aa_fetch.py` direct AtariAge fetch via `curl_cffi`** (Cloudflare bypass). When `AA_COOKIE`
   (the browser Cookie header incl. `cf_clearance`) is set **and `curl_cffi` is installed**, fetches
   the live forum directly by impersonating Chrome's TLS (JA3) fingerprint — plain `curl` 403s even
@@ -17,12 +34,7 @@ versions follow [Semantic Versioning](https://semver.org/).
   wrong/short slug still resolves) to fill Wayback page gaps, a direct fallback when a Wayback page
   fetch fails, and **direct binary attachment download** (the `.bin`/ROM files Wayback never
   archived). Falls back cleanly to Wayback-only when cookie/`curl_cffi` absent (back-compatible).
-  Verified: 17-page discovery on topic 85667 (Wayback saw 1), 32 KB ROM attachment fetch that
-  previously gapped. New optional dep: `pip install curl_cffi`. (Release pending: branch→test→tag as 1.66.0.)
-
-### Planned
-- Real game authoring on top of the 1.0 base (1.x).
-- Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
+  New optional dep: `pip install curl_cffi`.
 
 ## [1.65.0] - 2026-06-13
 
