@@ -122,7 +122,8 @@ round trip. Also return `png_path` in JSON.
 | techniques catalog (verified 2600 authoring techniques: zone multiplexing, …) | `docs/techniques/` |
 | **visual design judgment / craft rules** (color budget, layout feasibility, the ~20 distilled rules) | `docs/design-principles.md` |
 | **pre-authoring feasibility checks** (executable: color bands, line budget, multiplex, PF windows, craft) | `pkg/design/` |
-| mining digest (77 AtariAge threads → one-line takeaways, indexed to principles/funcs) | `docs/mining-digest.md` |
+| mining digest (AtariAge threads → one-line takeaways, indexed to principles/funcs) | `docs/mining-digest.md` |
+| 8bitworkshop sample cross-check (book techniques vs our library; coverage + gaps) | `docs/8bitworkshop-crosscheck.md` |
 | fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
