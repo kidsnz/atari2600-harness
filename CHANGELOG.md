@@ -12,6 +12,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.67.0] - 2026-06-14
+
+### Added
+- **Absorbed the accumulated design knowledge into the authoring loop (gap-audit G2 completed).**
+  - `pkg/design` now codifies the remaining numeric design-principles rules, not just the first six:
+    color-register decomposition + judgment (`Hue`/`Luminance`/`HueName`/`WashoutRisk`/`GradientSameHue`/
+    `InterlaceColorsSafe`), coarse÷15 + fine-HMOVE positioning (`PositionSplit`/`CoarseIterations`/
+    `HMoveReachable`), PF helpers (`PFTotalColorClocks` reusing `playfield.FullWidth`, `ScoreModeTwoColor`,
+    `ScrollScanlinesConstant`), multiplex (`FitsMultiSprite`/`NeedsEmptyYLane`/`RepositionCostScanlines`),
+    and craft (`PixelAspectRatio`/`ScanlinesForSquare`/`WalkFrame`/`BackgroundSpec.Feasible`). All table-driven tested.
+  - `docs/mining-digest.md`: a self-contained index of the 77 mined AtariAge threads (generated from
+    `reference/atariage/MINED.csv`), each mapped to the design-principles section / `pkg/design` function /
+    technique candidate it feeds. Raw thread captures stay in the umbrella `reference/` as provenance.
+- **Routed the knowledge so authoring uses it.** `CLAUDE.md` gains an iron rule ("design before asm") and
+  routing-table rows for `docs/design-principles.md`, `pkg/design/`, and `docs/mining-digest.md`.
+
+### Changed
+- `docs/design-principles.md`: every rule now carries a disposition — codifiable rules cross-reference their
+  `pkg/design` function (`→ func`), and a new "machine-uncheckable judgment rules" section collects the
+  qualitative ones (glyph misreads, thumbnail readability, role split…) with the reason they stay doc-only.
+  Recorded the `colorPerRow[]` data-model lesson from the TIA Studio research.
+
+### Decisions
+- The raw 77-thread forum captures (3 MB HTML) are **not** moved into the harness; the harness keeps the
+  distilled, citable digest while `reference/atariage/` keeps provenance. Keeps concerns separated and the
+  published repo English-only.
+- TIA Studio learnings: durable, authoring-relevant findings are folded into design-principles; tool-impl
+  knowledge (spritemate data model, per-scanline-color UI) is intentionally not absorbed (no effect on
+  writing assembly) and stays preserved in the frozen `tia-studio/` repo and research notes.
+
 ## [1.66.0] - 2026-06-13
 
 ### Added
