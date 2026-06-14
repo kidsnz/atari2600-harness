@@ -40,6 +40,7 @@
   **PF0 再書込み cy31 / PF1 cy38 / PF2 は“ちょうど cy45”**（早くても遅くても崩れる＝nop 1個追加で破綻）。
   残り 76−47≒**29cy/line がスプライト等の自由予算**。横多色PFの実現性は「この 45cy 一点を外さず、かつ残29cy に他処理が収まるか」で判定する。〔Williams/Saunders "Asymmetric Reflected Playfield" tutorial〕
 - **タダで2色PF＝CTRLPF D1（score bit）**：bit1 を立てると **左半分PF=COLUP0・右半分PF=COLUP1** で独立色になる（非対称書込みタイミング不要）。スコア表示の定番だが、背景の左右色分けにも使える安価な2色化。〔w11/Asym2scrol〕 `→ design.ScoreModeTwoColor`
+- **PFレジスタ書込みの可視遅延**：PF0/PF1/PF2 への `sta` は**2〜3カラークロック遅れて**反映される（色レジスタは即時）。反射PFの中央境界は**ちょうど cycle 48** で完了させる（採掘 149228 の実測＝line 38 の cy45 締切と整合・クローン機は+1cy）。横多色PFのタイミング判定はこの遅延込みで行う。〔採掘 149228 PF書込みタイミング表〕
 
 ## 多重化・フリッカー
 - 2体超は Y 帯で多重化、横再配置は1走査線消費、**空 Y レーン必須**、代償 30Hz ちらつき。〔Bumbershoot〕 `→ design.NeedsFlicker/NeedsEmptyYLane/RepositionCostScanlines`
@@ -51,6 +52,8 @@
 ## カーネル予算・状態
 - **76cy/line が天井**。ライン数を先に決め残予算で機能配分。〔splendidnut〕 `→ design.LineBudget/RemainingCycles`
 - **★RIOT 6532 タイマのラップアラウンド・バグ（"Stella は通る／実機はロールする"トラップ）**：タイマがラップアラウンドする**まさにそのサイクル**に `TIM64T`/`TIM1024T` を書くと、分周器が静かに **1T** に化けてフレーム長が崩れ実機でロールする。**対策＝二重書き（double-write TIM64T）**。エミュ依存で見逃しやすい＝harness の中核ミッション(gap B)直撃。Gopher2600 作者(JetSetIlly)がこのスレで診断。〔採掘 303277 "To Roll or not to Roll"〕（harness 強化候補＝ラップアラウンド・サイクルでのタイマ書込みを検出する assert）
+- **縦配分の硬い下限と失敗モードの非対称**：総スキャンライン数を一定に保つ前提で、各区間の下限＝VSYNC≥3 / Overscan≥3 / VBLANK≥15（PAL は偶数）。**Overscan を伸ばし過ぎ＝無表示／VBLANK を伸ばし過ぎ＝jitter** と失敗の出方が違う＝余りは Overscan でなく VBLANK 側で吸収しない（jitter源）。〔採掘 171270〕
+- **WSYNC のセマンティクス**：`sta WSYNC` は**次の HBLANK 先頭**（68カラークロック＝22⅔ CPUサイクル）までCPUを止める。レジスタ更新遅延（色=即時／PF=2-3clk／VBLANK=+1ライン／音長=遅延）を踏まえて書込み位置を決める。〔採掘 192183 レジスタ更新遅延表〕
 - 状態＝1個の GameState 変数＋状態別カーネル。タイトル絵は上下パディング＋中央PFテーブル、終端で GRP/PF クリア。〔title-to-game-transition〕
 - 省サイクル＝ISC/ISB 非公式オペコード＋SP をラインカウンタ流用（要 litmus 裏取り）。〔5cycle-color-cycling, illegal-opcodes〕
 
