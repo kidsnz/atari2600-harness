@@ -52,6 +52,12 @@ own authoring loop**, not the editor. The G work stands on its own; M references
 - **G5:** mid-line HMOVE / RESP pipeline = *observed* via `trace_clocks`, not litmus-locked.
 - **G6:** oracle sub-frame phase offset for per-frame-mutating RAM.
 - **G7:** collision trap (`watch_ram` is RAM-only); `step_clock` (parked).
+- **G8 (mined 2026-06-14, on-mission):** RIOT timer-wraparound roll detector. Writing `TIM64T`/`TIM1024T`
+  on the exact wraparound cycle silently drops the divider to 1T → the ROM rolls on real hardware while
+  Stella/emulators pass. This is precisely the "passes-in-emu / fails-on-hardware" timing trap the harness
+  exists to catch (gap B). A `breakif`/assert that flags timer writes on the wraparound cycle would be a
+  natural sibling to `assert_line_budget`. Source: design-principles.md (採掘 303277), diagnosed in-thread
+  by the Gopher2600 author. Verify the exact behaviour against Gopher2600's RIOT model before implementing.
 
 ## Recommendation (concrete-driven, per project principle)
 1. ~~**G2 first**~~ **DONE in v1.67.0** — mined rules codified into `pkg/design` (color/position/pf/
