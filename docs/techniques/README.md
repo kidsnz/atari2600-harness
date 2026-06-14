@@ -28,6 +28,13 @@ with confidence, from basics to advanced tricks.
 | 12 | Venetian Blinds — 2 figures through 1 player, zero flicker | intermediate | [venetian-blinds.md](venetian-blinds.md) | `roms/techniques/venetian.asm` | ✅ alternating rows pixel-verified, CI-locked |
 | 10b | Dynamic multi-sprite kernel — Y-sort + 2-of-N + mid-screen reposition | advanced | [dynamic-multisprite.md](dynamic-multisprite.md) | `roms/techniques/dyn_multisprite.asm` | ✅ 5 crossing objects, zero budget spills, CI-locked |
 | M | Instrument-envelope music driver — per-frame volume envelopes + per-note instrument (TIATracker-derived) | advanced | [music-driver.md](music-driver.md) | `roms/techniques/music_driver.asm` | ✅ envelopes/sustain/pluck-gate/loop CI-locked, audio golden |
+| 15 | Constant divide (÷3/7/10/15) — corrected reciprocal-multiply, exact 0..255 + remainder | intermediate | [divtable.md](divtable.md) | `roms/techniques/divtable.asm` | ✅ Go-model exhaustive (0 errors), 13 RAM asserts, CI-locked |
+| 16 | Multicolor 48-px — 3×NUSIZ+VDEL 48px with per-row COLUPx (~73/76 cy) | advanced | [multicolor48.md](multicolor48.md) | `roms/techniques/multicolor48.asm` | ✅ per-row color verified, CI-locked, golden |
+| 18 | RTS-stack dispatch — data-driven zone chaining via push(addr-1)+RTS, ~6cy/zone | advanced | [rts-dispatch.md](rts-dispatch.md) | `roms/techniques/rts_dispatch.asm` | ✅ 4 zones, RAM-list driven, 262 held, CI-locked |
+| 19 | Procedural maze PF — LFSR bits doubled to 2px cells, scrolled, reflected | intermediate | [maze.md](maze.md) | `roms/techniques/maze.asm` | ✅ deterministic seed, symmetric maze, CI-locked |
+| 21 | TIA PCM — digitized sample via AUDV (AUDC=0), 1-bit ADPCM, pseudo-5bit DAC | advanced | [tia-pcm.md](tia-pcm.md) | `roms/techniques/tia_pcm.asm` | ✅ AUDV envelope + audio golden, CI-locked |
+| 22 | Shared SetXPos — position all 5 objects via one indexed RESPx,x/HMPx,x loop | intermediate | [shared-setxpos.md](shared-setxpos.md) | `roms/techniques/shared_setxpos.asm` | ✅ 5 objects at distinct X (hmoved_pixel), CI-locked |
+| 23 | Pseudo-3D road — M0/M1 shoulders + BL dashed centre, widening per band | advanced | [road.md](road.md) | `roms/techniques/road.asm` | ✅ widening wedge verified, steerable, CI-locked |
 
 What to absorb next (prioritized, with sources): **[roadmap.md](roadmap.md)** — e.g. 48-px score / 2-line
 kernel / vertical positioning / sound / animation / playfield tricks / general flicker kernel / bank switching.

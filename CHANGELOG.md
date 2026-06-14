@@ -12,6 +12,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.69.0] - 2026-06-14
+
+### Added
+- **Seven new verified techniques** (built in parallel from mined technique-candidates, each clean-room
+  implemented + locked by a CI scenario; all 31 technique scenarios pass, `ntsc_frame_lines:262` + golden):
+  - **`road`** (㉓) — pseudo-3D road: M0/M1 shoulders + BL dashed centre, widening per perspective band
+    (fills the only gap from the 8bitworkshop cross-check).
+  - **`maze`** (⑲) — Entombed-style procedural playfield maze: LFSR bits doubled to 2px cells, scrolled, reflected.
+  - **`tia_pcm`** (㉑) — digitized sample playback via AUDV (AUDC=0), 1-bit ADPCM, pseudo-5-bit 2-channel DAC; audio golden.
+  - **`shared_setxpos`** (㉒) — position all 5 movable objects with one indexed `RESPx,x`/`HMPx,x` loop.
+  - **`divtable`** (⑮) — constant divide ÷3/7/10/15 (corrected reciprocal-multiply, exact over 0..255 + remainder; Go-model exhaustive).
+  - **`multicolor48`** (⑯) — 48-px graphic with per-row COLUPx color (~73/76 cy line budget).
+  - **`rts_dispatch`** (⑱) — RTS-stack modular kernel dispatch: data-driven vertical zones at ~6cy/transition.
+  - Catalog updated (`docs/techniques/README.md`); each has `docs/techniques/<name>.md`.
+
 ## [1.68.0] - 2026-06-14
 
 ### Added
