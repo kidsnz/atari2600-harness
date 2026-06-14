@@ -1,0 +1,25 @@
+{
+  "rom": "roms/techniques/road.asm",
+  "warmup_frames": 3,
+  "inputs": [
+    {"frame": 1, "player": 0, "action": "right", "pressed": true},
+    {"frame": 6, "player": 0, "action": "right", "pressed": false}
+  ],
+  "asserts": [
+    { "at_frame": 0, "field": "ram.0x82", "op": "==", "value": 78 },
+    { "at_frame": 0, "field": "ram.0x88", "op": "==", "value": 34 },
+    { "at_frame": 0, "field": "ram.0x89", "op": "==", "value": 122 },
+    { "at_frame": 0, "field": "ram.0x8a", "op": "==", "value": 78 },
+    { "at_frame": 0, "field": "tia.missile0.hmoved_pixel", "op": "==", "value": 38 },
+    { "at_frame": 0, "field": "tia.missile1.hmoved_pixel", "op": "==", "value": 126 },
+    { "at_frame": 0, "field": "tia.ball.hmoved_pixel", "op": "==", "value": 86 },
+    { "at_frame": 0, "field": "tiareg.ball.enabled", "op": "==", "value": 0 },
+    { "at_frame": 6, "field": "ram.0x82", "op": "==", "value": 83 },
+    { "at_frame": 6, "field": "ram.0x88", "op": "==", "value": 39 },
+    { "at_frame": 6, "field": "ram.0x89", "op": "==", "value": 127 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
