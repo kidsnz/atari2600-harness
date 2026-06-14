@@ -5,7 +5,8 @@ AtariAge 本家は Cloudflare の bot チャレンジで直接取得できない
 Wayback Machine の CDX API でスナップショットを列挙して取得する。
 
 使い方:
-    python3 scripts/aa_fetch.py <topic-url> <出力ディレクトリ> [-attachments] [-keep-raw] [-force]
+    python3 scripts/aa_fetch.py <topic-url> <出力ディレクトリ> [-attachments] [-keep-raw] [-force] [-direct-first]
+    （-direct-first＝各ページを本家 Cookie 経路から先に取得し失敗時のみ Wayback。並列採掘の負荷分散用・cf_clearance 必須）
     （既採掘 topic は自動 skip＝再採掘防止。-force で上書き再取得。掘る前の照会は aa_manifest.py --check）
     例: python3 scripts/aa_fetch.py \\
         https://forums.atariage.com/topic/85667-medieval-mayhem-2600/ \\
@@ -250,6 +251,8 @@ def main():
     want_atts = "-attachments" in sys.argv
     keep_raw = "-keep-raw" in sys.argv
     force = "-force" in sys.argv
+    direct_first = "-direct-first" in sys.argv  # 各ページを本家(Cookie)から先に取り、失敗時のみ Wayback。
+    # 並列採掘の負荷分散用＝archive.org に集中させず AtariAge(Cloudflare) 経路へ振り分ける。cf_clearance 必須・短命。
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     topic_url, outdir = args[0], args[1]
     mined = already_mined(topic_url, outdir)
@@ -286,16 +289,22 @@ def main():
                     open(path, "w", encoding="utf-8").write(body)
                     ok = True
             else:
-                cands = [(ts, orig)]
-                for row in cdx(orig.replace("https://", "").replace("http://", ""),
-                               collapse="timestamp:6", limit="6"):
-                    cands.append((row[1], row[2]))
-                for cts, corig in cands:
-                    code = curl(f"http://web.archive.org/web/{cts}/{corig}", out=path, timeout=120)
-                    if code == "200" and os.path.getsize(path) > 10000:
+                if direct_first and direct_enabled():  # 直接優先＝archive.org を避け本家へ負荷分散
+                    body = direct_get(orig)
+                    if body and len(body) > 10000:
+                        open(path, "w", encoding="utf-8").write(body)
                         ok = True
-                        break
-                    time.sleep(1)
+                if not ok:
+                    cands = [(ts, orig)]
+                    for row in cdx(orig.replace("https://", "").replace("http://", ""),
+                                   collapse="timestamp:6", limit="6"):
+                        cands.append((row[1], row[2]))
+                    for cts, corig in cands:
+                        code = curl(f"http://web.archive.org/web/{cts}/{corig}", out=path, timeout=120)
+                        if code == "200" and os.path.getsize(path) > 10000:
+                            ok = True
+                            break
+                        time.sleep(1)
                 if not ok and direct_enabled():  # Wayback 失敗→本家直接に保険
                     body = direct_get(orig)
                     if body and len(body) > 10000:
