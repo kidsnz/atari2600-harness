@@ -1,5 +1,7 @@
 # Technique — in-game sound driver (music + SFX priority)
 
+**Source:** standard 2600 music+SFX driver architecture; hardware basis `litmus_audio`, tuning math in `pkg/audio`; cf. `music-driver.md` (TIATracker, AtariAge topic 250014).
+
 **Goal:** the audio architecture every real game uses: looping 2-voice music from data tables,
 with channel 1 **preempted by SFX** and restored when the effect ends — all inside a normal game
 frame (driver tick in overscan, timer-managed so the line count never depends on code paths).

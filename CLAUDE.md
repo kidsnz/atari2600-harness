@@ -124,6 +124,7 @@ round trip. Also return `png_path` in JSON.
 | **pre-authoring feasibility checks** (executable: color bands, line budget, multiplex, PF windows, craft) | `pkg/design/` |
 | mining digest (AtariAge threads → one-line takeaways, indexed to principles/funcs) | `docs/mining-digest.md` |
 | 8bitworkshop sample cross-check (book techniques vs our library; coverage + gaps) | `docs/8bitworkshop-crosscheck.md` |
+| provenance map (every technique/rule → its origin; for tracing back when something breaks) | `docs/provenance.md` (gen: `scripts/check_provenance.py --list`) |
 | fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |

@@ -44,3 +44,6 @@ jobs:
         env:
           CGO_ENABLED: "0"
         run: go run ./cmd/scenario roms/litmus/scenarios/*.json roms/techniques/scenarios/*.json roms/exerciser/scenarios/*.json
+
+      - name: Provenance check (every technique/rule records its origin)
+        run: python3 scripts/check_provenance.py

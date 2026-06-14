@@ -1,5 +1,7 @@
 # Technique — `shared_setxpos`: position all 5 objects with one shared routine
 
+**Source:** AtariAge topic 115690 *New way for repositioning all 5 objects in 1 shared code* (`reference/atariage/115690-*/notes.ja.md`; technique candidate ㉒).
+
 **Goal:** Place all five movable TIA objects (P0, P1, M0, M1, BL) at arbitrary X with a
 **single shared code path** instead of five hand-written positioning routines. The standard
 initial-placement idiom of real 2600 games (AtariAge #115690, LS_Dracon / robert-m, 2007).

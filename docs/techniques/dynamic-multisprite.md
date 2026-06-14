@@ -1,5 +1,7 @@
 # Technique #10b — Dynamic multi-sprite kernel (the full form)
 
+**Source:** clean-room synthesis of standard 2600 multi-sprite / flicker-sort practice (AtariAge topic 107063 *interlacing-multi-sprites*; bB multisprite kernel as seen in Pizza Boy) extending technique #10; hardware-grounded + CI-locked by `scenarios/dyn_multisprite.json`.
+
 **Goal:** N objects at arbitrary, *crossing* vertical positions through 2 players — the general
 engine behind games with free-moving object sets. Extends the verified flicker-pairs core (#10)
 with the three missing pieces: per-frame **Y-sort**, **dynamic 2-of-N slot allocation**, and
