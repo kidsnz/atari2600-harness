@@ -56,6 +56,8 @@
 - **WSYNC のセマンティクス**：`sta WSYNC` は**次の HBLANK 先頭**（68カラークロック＝22⅔ CPUサイクル）までCPUを止める。レジスタ更新遅延（色=即時／PF=2-3clk／VBLANK=+1ライン／音長=遅延）を踏まえて書込み位置を決める。〔採掘 192183 レジスタ更新遅延表〕
 - 状態＝1個の GameState 変数＋状態別カーネル。タイトル絵は上下パディング＋中央PFテーブル、終端で GRP/PF クリア。〔title-to-game-transition〕
 - 省サイクル＝ISC/ISB 非公式オペコード＋SP をラインカウンタ流用（要 litmus 裏取り）。〔5cycle-color-cycling, illegal-opcodes〕
+- **違法(非公式)オペコードの安定性マップ**：実機で**安定して使えるのは LAX/SAX/SBX/DCP/ASR(ALR) 系**（48px/dyn_multisprite で既使用）。**LXA/XAA は不安定＝使うな**（チップ個体/温度依存）。opcode レベルのコード生成はこの可否表で gate する。〔採掘 168616 illegal-opcode stability〕
+- **★TIA リビジョン差は実機照合の落とし穴**：HMOVE の「追加クロック」効果（Cosmic Ark の星）は **post-1989 TIA で挙動が反転**するなど、**同じ ROM がリビジョンで違う絵になる**。harness のピクセル照合は**TIA リビジョン/エミュを固定**して比較する（どのリビジョンで検証したか記録）。〔採掘 191061 Cosmic Ark stars〕
 
 ## 「良い作画」の経験則
 - 見栄え ≒ 色数 × スプライト密度。多色化はハードを足して買う（Pitfall II=DPC）。〔Demon Attack, Stay Frosty/Draconian〕
