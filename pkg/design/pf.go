@@ -1,5 +1,40 @@
 package design
 
+import "github.com/kidsnz/atari2600-harness/pkg/playfield"
+
+// ColorClockPerColumn は PF 1 列の幅（color clock）。列数は playfield.FullWidth(=40) を再利用する。
+// 〔design-principles.md「横 40px × 4clk/px」/ Davie S13〕
+const ColorClockPerColumn = 4
+
+// PFTotalColorClocks は PF 全幅の color clock 数（40 列 × 4 = 160 = 可視幅）。
+func PFTotalColorClocks() int { return playfield.FullWidth * ColorClockPerColumn }
+
+// CTRLPFScoreBit は CTRLPF の score ビット(D1)。立てると左半PF=COLUP0・右半PF=COLUP1 で
+// 独立色になる＝非対称書込みのタイミング不要で「タダの2色PF」。〔design-principles.md / w11〕
+const CTRLPFScoreBit = 0x02
+
+// ScoreModeTwoColor は CTRLPF 値が score ビットを立てて左右2色PFになっているかを返す。
+func ScoreModeTwoColor(ctrlpf byte) bool { return ctrlpf&CTRLPFScoreBit != 0 }
+
+// ScrollScanlinesConstant は縦/横スクロール背景の鉄則「総スキャンライン数をフレーム間で
+// 一定に保つ」を判定する。frameLines は各フレームの総ライン数。pal=true なら各フレームが
+// 偶数ラインであることも要求する（PAL は偶数必須）。〔design-principles.md / 採掘 200972〕
+func ScrollScanlinesConstant(frameLines []int, pal bool) bool {
+	if len(frameLines) == 0 {
+		return true
+	}
+	first := frameLines[0]
+	for _, n := range frameLines {
+		if n != first {
+			return false
+		}
+		if pal && n%2 != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // PFReg は playfield レジスタ（PF0/PF1/PF2）。
 type PFReg int
 

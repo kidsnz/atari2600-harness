@@ -43,3 +43,39 @@ func TestFitsAsymRightWrite(t *testing.T) {
 		})
 	}
 }
+
+// TestPFTotalColorClocks は 40 列 × 4clk = 可視 160 と一致すること（playfield.FullWidth 再利用）。
+func TestPFTotalColorClocks(t *testing.T) {
+	if got := PFTotalColorClocks(); got != 160 {
+		t.Errorf("PFTotalColorClocks()=%d want 160", got)
+	}
+}
+
+// TestScoreModeTwoColor は CTRLPF の score ビット(D1)検出。
+func TestScoreModeTwoColor(t *testing.T) {
+	if !ScoreModeTwoColor(0x02) || !ScoreModeTwoColor(0x06) {
+		t.Error("D1 set should be score mode")
+	}
+	if ScoreModeTwoColor(0x00) || ScoreModeTwoColor(0x01) || ScoreModeTwoColor(0x04) {
+		t.Error("D1 clear should not be score mode")
+	}
+}
+
+// TestScrollScanlinesConstant は総ライン一定・PAL偶数の鉄則。
+func TestScrollScanlinesConstant(t *testing.T) {
+	if !ScrollScanlinesConstant([]int{262, 262, 262}, false) {
+		t.Error("constant NTSC line counts should pass")
+	}
+	if ScrollScanlinesConstant([]int{262, 263}, false) {
+		t.Error("varying line counts should fail")
+	}
+	if !ScrollScanlinesConstant([]int{264, 264}, true) {
+		t.Error("constant even PAL line counts should pass")
+	}
+	if ScrollScanlinesConstant([]int{263, 263}, true) {
+		t.Error("odd PAL line count should fail")
+	}
+	if !ScrollScanlinesConstant(nil, true) {
+		t.Error("empty should be trivially constant")
+	}
+}
