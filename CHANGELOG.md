@@ -8,6 +8,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`aa_fetch.py` direct AtariAge fetch via `curl_cffi`** (Cloudflare bypass). When `AA_COOKIE`
+  (the browser Cookie header incl. `cf_clearance`) is set **and `curl_cffi` is installed**, fetches
+  the live forum directly by impersonating Chrome's TLS (JA3) fingerprint — plain `curl` 403s even
+  with a valid cookie because Cloudflare fingerprints TLS, not just UA/cookie. Adds `direct_get()` /
+  `direct_enabled()`, **live page-count discovery** (`discover_live_pages`, **topic_id-based** so a
+  wrong/short slug still resolves) to fill Wayback page gaps, a direct fallback when a Wayback page
+  fetch fails, and **direct binary attachment download** (the `.bin`/ROM files Wayback never
+  archived). Falls back cleanly to Wayback-only when cookie/`curl_cffi` absent (back-compatible).
+  Verified: 17-page discovery on topic 85667 (Wayback saw 1), 32 KB ROM attachment fetch that
+  previously gapped. New optional dep: `pip install curl_cffi`. (Release pending: branch→test→tag as 1.66.0.)
+
 ### Planned
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
