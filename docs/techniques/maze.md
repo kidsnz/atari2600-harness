@@ -1,5 +1,9 @@
 # Technique — Entombed-style procedural playfield maze
 
+**Source:** mined from AtariAge topic 296383 (US Games *Entombed* maze-generation investigation;
+`reference/atariage/296383-*/notes.ja.md`). The famous "32-byte table" was a reverse-engineering red
+herring — the maze is generated procedurally (technique candidate ⑲).
+
 ## Goal
 Generate a scrolling maze straight into the playfield, the way US Games' *Entombed* does: take
 pseudo-random bytes, distribute their nibbles across PF1/PF2, **expand each random bit to 2px**

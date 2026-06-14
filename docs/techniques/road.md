@@ -1,5 +1,9 @@
 # Technique — pseudo-3D road (missiles = shoulders, ball = centre line)
 
+**Source:** clean-room re-implementation studying the 8bitworkshop `road.asm` (Steven Hugg,
+*Making Games for the Atari 2600*; `reference/docs_atari/8bitworkshop_samples/road.asm`). This was the
+single gap found by `docs/8bitworkshop-crosscheck.md` (technique candidate ㉓).
+
 **Goal:** draw a perspective road with three one-pixel-wide objects — the two missiles M0/M1 as the
 left/right **shoulders**, the ball BL as the dashed **centre line** — converging near the horizon and
 **widening toward the bottom** of the screen. This is the racing-game primitive and a direct application
