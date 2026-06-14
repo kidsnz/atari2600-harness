@@ -1,0 +1,18 @@
+{
+  "rom": "roms/techniques/rts_dispatch.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 0, "field": "ram.0x94", "op": "==", "value": 0},
+    {"at_frame": 0, "field": "ram.0x95", "op": "==", "value": 1},
+    {"at_frame": 0, "field": "ram.0x96", "op": "==", "value": 2},
+    {"at_frame": 0, "field": "ram.0x97", "op": "==", "value": 3},
+    {"at_frame": 57, "field": "ram.0x94", "op": "==", "value": 3},
+    {"at_frame": 57, "field": "ram.0x95", "op": "==", "value": 2},
+    {"at_frame": 57, "field": "ram.0x96", "op": "==", "value": 1},
+    {"at_frame": 57, "field": "ram.0x97", "op": "==", "value": 0}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
