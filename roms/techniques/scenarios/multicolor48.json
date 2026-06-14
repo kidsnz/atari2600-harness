@@ -1,0 +1,46 @@
+{
+  "rom": "roms/techniques/multicolor48.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 5,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 87
+    },
+    {
+      "at_frame": 5,
+      "field": "tia.player1.hmoved_pixel",
+      "op": "==",
+      "value": 95
+    },
+    {
+      "at_frame": 5,
+      "field": "tiareg.player0.vertical_delay",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 5,
+      "field": "ram.0x82",
+      "op": "==",
+      "value": 100
+    },
+    {
+      "at_frame": 5,
+      "field": "ram.0x83",
+      "op": "==",
+      "value": 68
+    },
+    {
+      "at_frame": 5,
+      "field": "ram.0x82",
+      "op": "!=",
+      "value": 68
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
