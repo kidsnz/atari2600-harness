@@ -1,0 +1,15 @@
+{
+  "rom": "roms/techniques/shared_setxpos.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 1, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 20},
+    {"at_frame": 1, "field": "tia.player1.hmoved_pixel", "op": "==", "value": 55},
+    {"at_frame": 1, "field": "tia.missile0.hmoved_pixel", "op": "==", "value": 84},
+    {"at_frame": 1, "field": "tia.missile1.hmoved_pixel", "op": "==", "value": 109},
+    {"at_frame": 1, "field": "tia.ball.hmoved_pixel", "op": "==", "value": 139}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true
+  }
+}
