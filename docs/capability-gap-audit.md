@@ -10,8 +10,10 @@
 knowledge into code, and (2) **supporting/verifying advanced cartridges**. Views-ranked mining
 already exposed the high-value gaps; the remaining long tail has diminishing returns.
 
-**Label note:** `M1–M6` = **TIA Studio milestones** (the app). `G1–G7` = **harness capability gaps**
-(this doc). Some G's underpin some M's (e.g. G2 → M4); they are not the same thing.
+**Label note:** `M1–M6` = **TIA Studio milestones** (the app, **now frozen** — see
+`project-pivot-author-not-tool`). `G1–G7` = **harness capability gaps** (this doc). Some G's were
+originally motivated by M's (e.g. G2 → M4), but the **current consumer of the G capabilities is Claude's
+own authoring loop**, not the editor. The G work stands on its own; M references are historical.
 
 ## Tier 1 — high leverage, goal-aligned
 
@@ -21,7 +23,8 @@ already exposed the high-value gaps; the remaining long tail has diminishing ret
 - **Status — prose only.** The only numeric judge is `assert_line_budget` (76cy ceiling). Band
   width / char count / PF windows / multiplex limits are hand-computed.
 - **Gap:** turn the ~15 `design-principles.md` rules into **executable check functions**. This *is*
-  "absorbing mined knowledge into harness capability," and the core of **TIA Studio M4** (feasibility).
+  "absorbing mined knowledge into harness capability" — the pre-authoring feasibility gate Claude runs
+  before writing asm (it also happened to be TIA Studio M4, now frozen). **Done in v1.67.0.**
 
 ### G1 — advanced cartridge support + litmus (DPC, DPC+, ARM/ELF, 3E/3E+, bus stuffing, separate SC-RAM)
 - **Techniques:** DPC+ full-screen bitmap (181816), plain Superchip 30K (224683), bus stuffing
@@ -29,7 +32,7 @@ already exposed the high-value gaps; the remaining long tail has diminishing ret
 - **Status:** only **F8/F6/F4** are litmus-verified. DPC+/3E+/etc. are *recognized* by Gopher2600 but
   have **zero harness verification**; `read_bank` untested on them. [`fundamentals-audit.md`, `hscroll.md`]
 - **Gap:** can't reliably author/verify "beyond bB / full-screen bitmap" techniques. *Not* required for
-  TIA Studio's first target (vanilla + SC bespoke kernels) — this is the **advanced-track** foundation.
+  first authoring targets (vanilla + SC bespoke kernels) — this is the **advanced-track** foundation.
 
 ## Tier 2 — depth / accuracy
 
@@ -43,7 +46,7 @@ already exposed the high-value gaps; the remaining long tail has diminishing ret
 - **Techniques:** Doctor Who speech (234209), SAM2600 (309689), Tiamat micro-tuning (386896).
 - **Status:** `read_audio` covers AUDC/AUDF/AUDV + note/cents/duplicate/pitch; **no PCM waveform
   fidelity check.**
-- **Gap:** only needed for speech/music games — not core to a graphics-first TIA Studio.
+- **Gap:** only needed for speech/music games — not core to graphics-first authoring.
 
 ## Tier 3 — polish
 - **G5:** mid-line HMOVE / RESP pipeline = *observed* via `trace_clocks`, not litmus-locked.
@@ -51,12 +54,13 @@ already exposed the high-value gaps; the remaining long tail has diminishing ret
 - **G7:** collision trap (`watch_ram` is RAM-only); `step_clock` (parked).
 
 ## Recommendation (concrete-driven, per project principle)
-1. **G2 first** — codify mined rules into `pkg/design`. (a) the most essential answer to "strengthen
-   the harness" = prose → *capability*; (b) core of TIA Studio M4; (c) the ~15 rules already exist.
+1. ~~**G2 first**~~ **DONE in v1.67.0** — mined rules codified into `pkg/design` (color/position/pf/
+   multiplex/craft + the existing budget/text), each rule in `design-principles.md` cross-referenced to
+   its function or marked doc-only. This was the pre-authoring feasibility gate (prose → *capability*).
 2. **G1 next** — advanced-cartridge litmus = foundation of the "beyond bB" advanced track, built
    incrementally as specific techniques demand it.
 3. **G4** as oracle-completion hardening, anytime.
 4. **G3 / G5 / G6 / G7** only when concretely needed (avoid gold-plating; verification-first).
 
-→ The harness **can** be strengthened more — but via **G2 (codify) → G1 (advanced carts) → G4
-(oracle)**, not via more mining. A **finite backlog**, not infinite mining.
+→ The harness **can** be strengthened more — G2 done (v1.67.0); remaining order is **G1 (advanced
+carts) → G4 (oracle)**, not more mining. A **finite backlog**, not infinite mining.

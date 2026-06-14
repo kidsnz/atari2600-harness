@@ -12,6 +12,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.67.1] - 2026-06-14
+
+### Changed
+- **Reframed docs around the post-pivot direction** (TIA Studio canvas editor is frozen; the primary
+  consumer of `pkg/design` and the design rules is now Claude's own authoring loop, not the editor).
+  Updated `docs/design-principles.md` (intro, craft rules, "implementation" section), `docs/capability-gap-audit.md`
+  (frozen banner, G2 marked done in v1.67.0), and the `pkg/design` package doc. Research notes under
+  `tools/` are kept as the frozen project's historical record. No code behavior change.
+
 ## [1.67.0] - 2026-06-14
 
 ### Added

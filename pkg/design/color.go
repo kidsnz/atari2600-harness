@@ -1,6 +1,6 @@
 // Package design は design-principles.md の設計ルールを実行可能なフィジビリティ判定に
-// 「吸収」する。prose の craft/予算ルールを数値判定に落とし、TIA Studio M4（予算
-// フィジビリティ）と Claude の設計判断の土台にする。
+// 「吸収」する。prose の craft/予算ルールを数値判定に落とし、**Claude が asm を書く前の
+// 設計判断**の土台にする（凍結した TIA Studio の予算フィジビリティにも流用可）。
 //
 // 出典: docs/design-principles.md ／ 採掘ノート reference/atariage/*/notes.ja.md。
 // ハード定数（1 CPU cycle = 3 color clock = 3 可視px）は docs/resources.md / CLAUDE.md。

@@ -1,7 +1,7 @@
 # Atari 2600 ビジュアル設計原則（design-principles）
 
 採掘（AtariAge）＋web 研究で得た「ルール化できる作画設計の原則」の正典。用途＝(1) Claude のデザイン判断の
-明示ルール（roms/EVALUATION.md の⑥craft）(2) TIA Studio のテンプレ寸法・フィジビリティ判定の根拠。
+明示ルール（roms/EVALUATION.md の⑥craft）(2) `pkg/design` フィジビリティ判定の根拠（凍結した TIA Studio テンプレにも流用可）。
 詳細出典＝`tools/research-w2-design.md` ＋ `docs/mining-digest.md`（採掘77スレ索引）＋ `reference/atariage/*/notes.ja.md`。
 
 **実行可能な判定は `pkg/design/` に「吸収」済み**（asm を書く前に機械チェックする）。数値化できるルールは
@@ -57,12 +57,12 @@
 
 ## 作画 craft（スプライト/文字の絵作り＝⑥craft の具体ルール）
 - **サムネイル可読性を起点**：1ドット相当まで縮小して識別できるかを**先に**検証してから細部を足す。縮小は補間なし（nearest・半分ずつ）。〔326595, 106110〕
-- **2600 ピクセルは横長（横 ≒ 縦の約 1/2・≈2:1）**：正方ドットのプレビューを信じない。実機アスペクトで字形/絵を決める（player=横1px間引き、PF=縦3–4倍で密度を稼ぐ）。**→ TIA Studio エディタは非正方ピクセルで表示すべき**（M1 実装要件）。〔326595〕 `→ design.PixelAspectRatio/ScanlinesForSquare`
+- **2600 ピクセルは横長（横 ≒ 縦の約 1/2・≈2:1）**：正方ドットのプレビューを信じない。実機アスペクトで字形/絵を決める（player=横1px間引き、PF=縦3–4倍で密度を稼ぐ）。**→ プレビューは非正方ピクセルで描く**。〔326595〕 `→ design.PixelAspectRatio/ScanlinesForSquare`
 - **字形の誤読ペアを潰す**：L/I/T・U/W・M/H/N・O/0/D。作者は自分の誤読に気づけない→**他者/読み上げで検証**、最終調整は単一ピクセル単位。〔294306, 326595（重複確認＝強い原則）〕
 - **8px モノクロは輪郭に全予算**：識別力が最大の1パーツ（帽子/ヒゲ等）に集中。足りなければ倍幅＋ベネチアン縞で密度。〔106110〕
 - **歩行アニメは最小2フレーム 50:50**：フレームカウンタの1ビット（`and #2^n`）で等間隔・リセット不要・**移動中のみ**回す。〔301861〕 `→ design.WalkFrame`
 - **風景グラデは同一 hue・輝度のみ段階変化**（色相を混ぜない）。BG=奥／PF=手前の2層で奥行き。〔160655〕（色節の「高輝度→低彩度」則と整合）
-- **背景アートは4軸で先に決める**：幅(48/96px)・色数(1/2)・PF対称性(反射/非対称)・行高(1〜16ライン/行＝精細度 vs 負荷)。**これは TIA Studio 背景テンプレの入力パラメータそのもの**。〔319884 atari-background-builder（=ユーザーが Pizza Boy で使ったツール）〕 `→ design.BackgroundSpec.Feasible`
+- **背景アートは4軸で先に決める**：幅(48/96px)・色数(1/2)・PF対称性(反射/非対称)・行高(1〜16ライン/行＝精細度 vs 負荷)。**これは背景テンプレ（`design.BackgroundSpec`）の入力パラメータそのもの**。〔319884 atari-background-builder（=ユーザーが Pizza Boy で使ったツール）〕 `→ design.BackgroundSpec.Feasible`
 
 ## 機械判定不能な判断ルール（doc-only・`pkg/design` に落とさない）
 数値化できず Claude/人/画像の判断が要るため、あえてコード化せずここに集約する（＝全ルールに処遇を与え網羅を保証）。
@@ -75,7 +75,8 @@
 - **symbolic 命名 / PAL-NTSC 二系統(N_xx/P_xx)**：色の持ち方の規約。`design.Hue/Luminance` で値は分解できるが「象徴名で持つ」運用自体は規約であってチェック対象でない。〔symbolic-color-names〕
 - **ツール実装寄りの知見（spritemate データモデル / 走査線毎色UIの実装など）は吸収しない**：著述（asm を書く）に効かないため。凍結 `tia-studio/` リポと research ノートに保全で十分。
 
-## TIA Studio への落とし込み
-- テンプレ寸法・フィジビリティ4軸（色/走査線/多重化/予算）の既定値は `tools/research-w2-design.md` 末尾に詳細。
+## 実装への落とし込み（`pkg/design` ／ 凍結 TIA Studio）
+- フィジビリティ＝`pkg/design` の静的見積り＋実走の assert_line_budget/read_cycles/calibrate 連動で「この配置は 76cy に収まるか」を即判定。Claude が asm を書く前のゲートに使う。
+- フィジビリティ4軸（色/走査線/多重化/予算）の既定値の詳細は `tools/research-w2-design.md` 末尾。
 - テンプレ＝検証済みカーネル技（zone_multiplex/dyn_multisprite/score6/bitmap48/two_line_kernel…）に対応。
-- フィジビリティ＝assert_line_budget/read_cycles/calibrate 連動で「この配置は 76cy に収まるか」を即判定（`pkg/design` が静的見積り）。
+- ※ TIA Studio（canvas エディタ）は**凍結**（[[project-pivot-author-not-tool]]）。これらの寸法/判定は元々その M4 想定だったが、現在の主消費者は Claude の著述ループ。テンプレ群は復活時に流用可。
