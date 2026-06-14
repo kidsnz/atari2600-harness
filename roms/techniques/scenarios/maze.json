@@ -1,0 +1,17 @@
+{
+  "rom": "roms/techniques/maze.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 10, "field": "ram.0x81", "op": "==", "value": 13 },
+    { "at_frame": 30, "field": "ram.0x81", "op": "==", "value": 33 },
+    { "at_frame": 10, "field": "ram.0x80", "op": "==", "value": 195 },
+    { "at_frame": 10, "field": "ram.0x90", "op": "!=", "value": 0 },
+    { "at_frame": 10, "field": "ram.0x97", "op": "!=", "value": 0 },
+    { "at_frame": 10, "field": "ram.0x9f", "op": "!=", "value": 0 },
+    { "at_frame": 10, "field": "ram.0xa0", "op": "!=", "value": 0 },
+    { "at_frame": 10, "field": "ram.0xaf", "op": "!=", "value": 0 },
+    { "at_frame": 10, "field": "ram.0x90", "op": "==", "value": 243 },
+    { "at_frame": 10, "field": "ram.0xa0", "op": "==", "value": 240 }
+  ],
+  "checks": { "ntsc_frame_lines": 262, "golden_frame": true }
+}
