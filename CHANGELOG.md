@@ -12,6 +12,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.70.0] - 2026-06-15
+
+### Added
+- **AtariAge forum-50/31 mining campaign complete + absorbed.** All 761 `TO_MINE` threads from the
+  Programming + Newbies forums deep-mined (850 total in `reference/atariage/MINED.csv`); 1727 threads
+  triaged (provenance/checklists live under the umbrella `reference/`, not committed).
+  - `scripts/gen_mining_digest.py` keeps `docs/mining-digest.md` (850 threads → principle/function it feeds)
+    in sync from `MINED.csv`.
+  - `scripts/aa_fetch.py` gained `-direct-first` (AtariAge cookie lane) so parallel mining splits load across
+    two backends (Wayback + Cloudflare) without contending.
+  - Heavy `docs/design-principles.md` absorption: **positioning ground-truth** (RESxx internal draw delay
+    player+5 / missile·ball+4 CLK, multi-object cyc23 rule, X≤134 spill), RIOT timer-wraparound roll trap,
+    illegal-opcode stability map, TIA-revision pixel-match caveat, mid-scanline GRP-rewrite multiplexing,
+    resource triangle + TJ register convention, subpixel/ballistic physics, pixel-aspect source-spread
+    (1.67–1.82; codified 2.0 flagged as over — pending one Stella measurement).
+- **`docs/known-traps.md`** — catalog of "passes in the emulator, breaks on real hardware" traps (timer
+  wraparound, HMOVE-24cy, NOP-$00 bankswitch, page-cross, illegal-opcode stability, TIA read floats,
+  mid-line NUSIZ emu-only…), each sourced. The kernel pre-flight checklist and the spec for the future
+  `check_traps.py`. Directly targets the timing class of bug that killed past Pong attempts.
+- **Provenance enforcement.** `scripts/check_provenance.py` lints that every technique doc / `pkg/design`
+  function / design rule cites its origin (CI-gated); `--list` regenerates `docs/provenance.md` (every
+  element → its source). Rule recorded so a production issue can always be traced to the original thread.
+
 ## [1.69.0] - 2026-06-14
 
 ### Added
