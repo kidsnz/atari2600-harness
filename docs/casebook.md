@@ -12,6 +12,18 @@
 | ゲーム | 年/設計 | サイズ/型 | 状況→技 エントリ |
 |---|---|---|---|
 | Fishing Derby | 1980 Activision / David Crane（逆アセン Dennis Debro） | 2K / 単画面スポーツ | 大型不定形・斜めの線・多ターゲットのオブジェクト経済・対向スコア・同種衝突・無コスト演出 |
+| Breakout | 1978 Atari / Brad Stewart（逆アセン Dennis Debro） | 2K / 単画面アクション | **build-to-learn 初実装**（[[build-to-learn]]）＝自作で「書けた」技：多領域PFカーネル・RAM駆動の破壊可能PF・BL/P0位置決め・キーパドル・位置ベース衝突・サーブ/残球のゲーム状態 |
+
+## Breakout（Atari 1978）— build-to-learn の worked example（「書けた」技）
+`build-to-learn.md` の手順で、マニュアル＋逆アセン＋実ROM寸法スペックから**自作で8段（rung1-8）を実装し遊べる1人用 Breakout を完成**。各段は実ROMに数値照合。＝「説明できる」が「自分で書ける」に変わった実証。出典＝`reference/disassemblies/_casestudies/breakout/`（impl-map/fixtures/method-diff/layout-compare）＋`roms/breakout/`（自作ROM・steps/に各段スナップショット）。
+
+- **状況：単画面に複数の縦領域（スコア帯／ブロック帯／プレイ域）** → **領域ごとに COLUBK/PF の役割を切替える多領域カーネル**（壁＝PF端 or COLUBK、ブロック＝PF＋行COLUPF）。
+- **状況：壊せるブロック壁** → **PF値をRAM(`brkPF0/1/2`)に持ち、毎走査線リロードして描画。当たったビットをクリア＝破壊**（反射PFはミラー破壊の簡略／非対称PFが上位）。
+- **状況：1px のボール／横長パドルを任意X位置に** → **÷15 coarse(RESxx)＋HMxx fine を1 HMOVEで複数オブジェクト同時**位置決め。レンダ位置＝RAM値−offset（read_rowで実測較正）。
+- **状況：操作（キー）** → SWCHA でパドル±、INPT4 でサーブ。
+- **状況：衝突** → 今回は位置ベース（学習用に `CXBLPF` ハード衝突への置換を method-diff に記録）。
+- **状況：ゲーム進行** → `ballLive`(サーブ待ち/プレイ)・`lives`(5球)・`gameOver` の小さな状態機械。
+- **★craft 較正の作法**：色も寸法も **read_row/get_screen_annotated でオリジナルに数値収束**（目測だけだとパドルを「白24px」と誤認→実測「赤16px」）。[[build-to-learn]]・`layout-compare.ja.md`。
 
 ## 次ゲームの選定基準（scale-up）
 合成難易度の**昇順**で keystone を増やす。選定キー：
