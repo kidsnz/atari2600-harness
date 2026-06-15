@@ -6,6 +6,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+## [Unreleased]
+
+### Added
+- **`docs/build-to-learn.md`** (new) — reusable methodology: reproduce a real game mechanic-by-mechanic to
+  turn "can read" into "can author". Wired into the CLAUDE.md routing table (step 1c) + cross-linked with
+  casebook. First worked example = **Breakout** (`roms/breakout/`, 8 rungs from stable frame to a playable
+  single-player game, each verified numerically against the real ROM; per-rung snapshots in `steps/`).
+- Methodology refinements (user-driven): **measure the original's dimensional layout in Phase 0** (before
+  building — retrofitting layout in assembly is costly); **judge colour AND size by `read_row`, not by eye**
+  (caught the paddle being mis-set to white-24px when the original is red-16px); **read_row = measurement /
+  CXxx collision = runtime check + contact verification** (two-tool split).
+- **`docs/casebook.md`** — Breakout entry (the build-to-learn worked example: multi-region PF kernel,
+  RAM-driven destructible PF, BL/P0 positioning, joystick paddle, position-based collision, game-state loop).
+
+### Notes
+- Proposed release: **1.74.0** (MINOR — additive docs/methodology). Tag + push deferred to user approval.
+- The authored Breakout ROM lives in the **roms** repo (`roms/breakout/`), not here.
+
 ## [1.73.0] - 2026-06-15
 
 ### Added
