@@ -52,3 +52,6 @@ jobs:
         run: |
           python3 scripts/check_traps.py --selftest
           python3 scripts/check_traps.py
+
+      - name: Wiring check (no orphaned knowledge — every doc reachable from an entrypoint)
+        run: python3 scripts/check_wiring.py

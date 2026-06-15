@@ -1,10 +1,26 @@
-# Authoring protocol — the loop run on every kernel/feature/game
+# Authoring protocol — START HERE to build a 2600 ROM
 
-The repeatable, self-strengthening loop Claude runs when authoring 2600 assembly, so the mined corpus is
-**used at write time** (not just stored) and **each production sharpens the system** (compounding).
-Rule: [[feedback-authoring-loop-system]]. Goal: [[project-roadmap-to-pong-capstone]].
+**This is the single entry point for making a ROM.** It activates the whole accumulated knowledge base in
+order, so nothing rots unused. The loop is self-strengthening: each production sharpens the rules/checks
+(compounding). Rule: [[feedback-authoring-loop-system]] / [[knowledge-activation-architecture]]. Goal:
+[[project-roadmap-to-pong-capstone]].
 
-## The 6 steps
+## How a veteran builds (the mined pro workflow — A–E)
+Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an experienced 2600 engineer actually works:
+- **A. Image-first.** Design the screen/title in Photoshop **first**, then write the kernel to it. A designed
+  48-px image → on-screen title goes through the **flicker-free 2-color 48-px kernel** (`multicolor48`/`bitmap48`).
+  → see `docs/cookbook.md` "title from a Photoshop mock". *(This is the project's whole reason for the harness.)*
+- **B. Bottom-up build order.** Build + verify in the canonical 14-step sequence (stable display → timers →
+  score → 2-line kernel → VDEL → playfield → input → variations → RNG → ball → missiles → sound → animation →
+  polish). → `docs/cookbook.md`.
+- **C. Know the ceiling.** Vanilla first; DPC+/ARM/CDF "beyond-bB" is a later track → technique-candidates.
+- **D. Audio truths.** TIA = LFSR-pair voices (not a table); AUDF-lowering lags ≤32cy; 2 voices can cancel to
+  silence; Gopher2600 noise ≠ real HW → `docs/known-traps.md` E.
+- **E. Craft is cycle budgets.** Real games are won on per-line cycle math (mask-sprite 21cy, drop-PF0 frees
+  12cy, flicker algorithms for >2 objects) → `docs/design-principles.md`.
+- **Debug like a pro:** Stella Fixed Debug Colors (ROYGBIV per object) + the numeric verdicts (read_tia / scenario).
+
+## The 6 steps (run for every kernel/feature)
 
 1. **Retrieve** — before writing, pull the relevant knowledge:
    - `docs/cookbook.md` → the recipe for this game-type (technique stack + traps + checks).

@@ -188,12 +188,45 @@ def emit(rows, lang):
     return "".join(L)
 
 
+BLOGS = os.path.normpath(os.path.join(HARNESS, "..", "reference", "atariage", "blogs"))
+
+
+def blog_section():
+    """reference/atariage/blogs/*/notes.ja.md から Dev-blogs 索引節を生成（出典URL＋見出し）。"""
+    rows = []
+    if os.path.isdir(BLOGS):
+        for name in sorted(os.listdir(BLOGS)):
+            note = os.path.join(BLOGS, name, "notes.ja.md")
+            if not os.path.isfile(note):
+                continue
+            title, url = "", "https://forums.atariage.com/blogs/entry/%s/" % name
+            with open(note, encoding="utf-8") as f:
+                for line in f.readlines()[:6]:
+                    if not title and line.startswith("# "):
+                        title = line[2:].split("—")[0].strip()
+                    m = re.search(r"(forums\.atariage\.com/blogs/entry/[\w\-]+)", line)
+                    if m:
+                        url = "https://" + m.group(1) + "/"
+            rows.append((name, title or name, url))
+    if not rows:
+        return ""
+    out = ["\n## Dev-blogs — AtariAge 開発日誌（SpiceWare の Collect/Stay Frosty 連載ほか）\n",
+           "ブラウザ手取得不要・CDX 列挙→Wayback 取得→蒸留。詳細 `reference/atariage/blogs/<id>-<slug>/notes.ja.md`。"
+           "金脈は design-principles / known-traps / technique-candidates へ吸収済み。\n",
+           "| entry | title | source |\n|---|---|---|\n"]
+    for name, title, url in rows:
+        out.append("| `%s` | %s | [link](%s) |\n" % (name.split("-")[0], title.replace("|", "/"), url))
+    return "".join(out) + "\n(%d dev-blog entries)\n" % len(rows)
+
+
 def main():
     with open(MINED, encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-    open(os.path.join(DOCS, "mining-digest.md"), "w", encoding="utf-8").write(emit(rows, "en"))
-    open(os.path.join(DOCS, "mining-digest.ja.md"), "w", encoding="utf-8").write(emit(rows, "ja"))
-    print("mining-digest: %d threads -> docs/mining-digest.md(+ja)" % len(rows))
+    blog = blog_section()
+    open(os.path.join(DOCS, "mining-digest.md"), "w", encoding="utf-8").write(emit(rows, "en") + blog)
+    open(os.path.join(DOCS, "mining-digest.ja.md"), "w", encoding="utf-8").write(emit(rows, "ja") + blog)
+    nblog = blog.count("| `") if blog else 0
+    print("mining-digest: %d threads + %d dev-blogs -> docs/mining-digest.md(+ja)" % (len(rows), nblog))
 
 
 if __name__ == "__main__":

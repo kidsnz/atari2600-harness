@@ -24,9 +24,11 @@ must always hold *only* in a doc — burn them here or into memory.
    No bulk changes.
 4. **litmus test:** place a sprite at an arbitrary X / move it 1px and have it match `X = 3N − 55`. If this
    passes, the environment is real.
-5. **Design before asm.** When authoring graphics / a screen, first read `docs/design-principles.md` and run
-   the feasibility checks in `pkg/design` (color bands, line budget, multiplex, PF windows, background axes)
-   so an unworkable layout is rejected on paper, not after a roll. Don't reach for techniques you haven't budgeted.
+5. **Author by the protocol.** When building a ROM/kernel, follow `docs/authoring-protocol.md` — the 6-step
+   loop (retrieve→plan→author→preflight→verify→**feedback**). It is the single entry that activates the whole
+   knowledge base in order (cookbook → design-principles/`pkg/design` checks → known-traps/`check_traps` →
+   nearest technique → verify). Don't reach for techniques you haven't budgeted; reject unworkable layouts on
+   paper. The feedback step feeds every failure back into the rules/checks so the next build is better.
 
 ## Settled architecture
 - Engine = **Gopher2600** (Go) **embedded in-process as a library**, wrapped by a thin **Go MCP** (official
@@ -110,34 +112,40 @@ map straight to register values. Burn the current position as a **numeric label*
 round trip. Also return `png_path` in JSON.
 
 ## Routing table (read before working)
-| Task | Read first |
+
+### ① Building a ROM — read in this order (the activation sequence)
+| Step | Read |
+|---|---|
+| **0. START HERE** — the authoring loop (retrieve→plan→author→preflight→verify→feedback) | **`docs/authoring-protocol.md`** |
+| 1. pick the recipe — game-type → technique stack + traps + checks + 14-step build order | `docs/cookbook.md` |
+| 2. the design rules (color budget, layout, positioning ground-truth, the distilled rules) | `docs/design-principles.md` |
+| 2b. run the executable feasibility checks (color bands, line budget, multiplex, PF windows, craft) | `pkg/design/` |
+| 3. clone the nearest verified technique | `docs/techniques/` (+ catalog `README.md`) |
+| 4. pre-flight the kernel against the "emu-passes / HW-fails" traps | `docs/known-traps.md` → `scripts/check_traps.py` |
+| 5. verify — scenario format / litmus position+HMOVE data / what each litmus proves | `docs/scenarios.md` · `docs/litmus-results.md` · `docs/verified-coverage.md` |
+| search the whole mined corpus (forum 850 + dev-blogs 117) → principle/function it feeds | `docs/mining-digest.md` |
+
+### ② Reference — look up when needed
+| Task | Read |
 |---|---|
 | Why this design / anatomy of failure | `docs/gap-analysis.md` |
 | Tool selection rationale / alternatives | `docs/tool-landscape.md` |
 | Implementation spec (Gopher2600 API / MCP / Stella flags) / source of constants | `docs/resources.md` |
 | MCP tool implementation spec (go-sdk API, per-tool I/O) | `docs/mcp-tools.md` |
-| Scenario regression format (input timeline + numeric assertions) | `docs/scenarios.md` |
-| litmus measurements (authoritative horizontal-position / HMOVE data) | `docs/litmus-results.md` |
-| verified coverage (what each litmus proves on hardware) | `docs/verified-coverage.md` |
-| techniques catalog (verified 2600 authoring techniques: zone multiplexing, …) | `docs/techniques/` |
-| **visual design judgment / craft rules** (color budget, layout feasibility, the ~20 distilled rules) | `docs/design-principles.md` |
-| **pre-authoring feasibility checks** (executable: color bands, line budget, multiplex, PF windows, craft) | `pkg/design/` |
-| mining digest (AtariAge threads → one-line takeaways, indexed to principles/funcs) | `docs/mining-digest.md` |
-| 8bitworkshop sample cross-check (book techniques vs our library; coverage + gaps) | `docs/8bitworkshop-crosscheck.md` |
-| provenance map (every technique/rule → its origin; for tracing back when something breaks) | `docs/provenance.md` (gen: `scripts/check_provenance.py --list`) |
-| **known traps** (emu-passes/HW-fails timing+cart+CPU+TIA killers; pre-flight before shipping a kernel) | `docs/known-traps.md` |
-| trap linter (static check of known-traps before shipping a kernel; CI-gated) | `scripts/check_traps.py` |
-| **authoring protocol** (the 6-step loop run on every kernel: retrieve→plan→author→preflight→verify→feedback) | `docs/authoring-protocol.md` |
-| **cookbook** (intent→recipe: game-type → technique stack + traps + checks; canonical build order) | `docs/cookbook.md` |
-| fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
+| harness capability gaps (G1–G8, prioritized strengthening) | `docs/capability-gap-audit.md` |
+| 8bitworkshop sample cross-check (book techniques vs our library) | `docs/8bitworkshop-crosscheck.md` |
+| provenance map (every technique/rule → its origin) | `docs/provenance.md` (gen: `check_provenance.py --list`) |
+| fundamentals audit (verified vs documented vs unknown, with sources) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
-| Image ingestion (screenshot/ROM → TIA data) + **input contract v3** | `docs/ingest.md` |
+| Image ingestion (screenshot/ROM → TIA data) + input contract v3 | `docs/ingest.md` |
 | RAM maps per ROM (auto-extracted audit) | `docs/ram-maps.md` |
-| Dynamic multi-sprite kernel (full form) | `docs/techniques/dynamic-multisprite.md` |
 | Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
 | Strengthening roadmap (sprites / audio / CI hardening) | `docs/hardening-roadmap.md` |
 | Decision history and changelog | `CHANGELOG.md` |
+
+> **Anti-rot:** every `docs/*.md` must be reachable from this table or the authoring protocol — `scripts/check_wiring.py`
+> (CI-gated) fails on orphaned knowledge, so nothing accrued ever rots unused.
 
 ## Repository layout (v0.22.0 spinoff, standalone repo)
 **This repo = the harness base only (general-purpose, reused across all games).** Game ROM artifacts are

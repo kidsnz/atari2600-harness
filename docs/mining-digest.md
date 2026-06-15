@@ -899,3 +899,127 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 | [324603](https://forums.atariage.com/topic/324603) | `legendary-spear` | Legendary Spear | reference / DaveC作 |
 | [329673](https://forums.atariage.com/topic/329673) | `pizza-boy-atari-ar` | Pizza Boy / Atari AR 開発スレ | reference/pizza-boy/dissection.ja.md(grade-A正本) |
 | [328734](https://forums.atariage.com/topic/328734) | `stocking-stuffer-marble-game` | Stocking Stuffer Marble Game | reference / DaveC作 |
+
+## Dev-blogs — AtariAge 開発日誌（SpiceWare の Collect/Stay Frosty 連載ほか）
+ブラウザ手取得不要・CDX 列挙→Wayback 取得→蒸留。詳細 `reference/atariage/blogs/<id>-<slug>/notes.ja.md`。金脈は design-principles / known-traps / technique-candidates へ吸収済み。
+| entry | title | source |
+|---|---|---|
+| `10030` | Raspberry Pi - My Next Hardware Project（blog） | [link](https://forums.atariage.com/blogs/entry/10030-rasperry-pi-my-next-hardware-project-a-bit-of-fun/) |
+| `10237` | MidiBox-TIA（Antichambre） | [link](https://forums.atariage.com/blogs/entry/10237-im-proud-to-announce-the-midibox-tia/) |
+| `10334` | Learning and working in Assembly（Kiwi） | [link](https://forums.atariage.com/blogs/entry/10334-learning-and-working-in-assembly/) |
+| `10401` | Colecovision's sprites theories（Kiwi） | [link](https://forums.atariage.com/blogs/entry/10401-colecovisions-sprites-theories/) |
+| `10437` | Once a collector, always a collector?（blog） | [link](https://forums.atariage.com/blogs/entry/10437-once-a-collector-always-a-collector-how-to-prevent-problems-loss-and-regret-when-collecting/) |
+| `10489` | My game's been announced on Collector Vision forums（Kiwi） | [link](https://forums.atariage.com/blogs/entry/10489-my-games-been-announced-on-collector-vision-forums/) |
+| `10515` | Medieval Mayhem - Atari 2600（Marc Oberhäuser） | [link](https://forums.atariage.com/blogs/entry/10515-medieval-mayhem-atari-2600/) |
+| `10640` | Stay Frosty 2 Teaser Screenshots（SpiceWare, 2011） | [link](https://forums.atariage.com/blogs/entry/10640-stay-frosty-2-teaser-screenshots/) |
+| `10690` | My Gameboy Collection（Robin Gravel） | [link](https://forums.atariage.com/blogs/entry/10690-my-gameboy-collection/) |
+| `10721` | Didj collecting（atari2600land） | [link](https://forums.atariage.com/blogs/entry/10721-didj-collecting/) |
+| `10750` | New Kernel tested（SpiceWare / Frantic, 2014） | [link](https://forums.atariage.com/blogs/entry/10750-new-kernel-tested/) |
+| `10777` | Sprite driver rewritten（SpiceWare / Frantic, 2014） | [link](https://forums.atariage.com/blogs/entry/10777-sprite-driver-rewritten/) |
+| `10890` | Slick Kernel（SpiceWare / Space Rocks→Draconian, 2014） | [link](https://forums.atariage.com/blogs/entry/10890-slick-kernel/) |
+| `10896` | Announcing Draconian（SpiceWare, 2014） | [link](https://forums.atariage.com/blogs/entry/10896-announcing-draconian/) |
+| `10903` | Collecting 101 Panel at SuperBitCon（MegaManFan） | [link](https://forums.atariage.com/blogs/entry/10903-collecting-101-panel-at-superbitcon/) |
+| `10919` | Some love for Frantic（SpiceWare, 2014） | [link](https://forums.atariage.com/blogs/entry/10919-some-love-for-frantic/) |
+| `11015` | Faster Initialization（Omegamatrix） | [link](https://forums.atariage.com/blogs/entry/11015-faster-initialization/) |
+| `11046` | DPC+ Version of ChipOff Is Finally Done（Random Terrain） | [link](https://forums.atariage.com/blogs/entry/11046-dpc-version-of-chipoff-for-the-atari-2600-is-finally-done/) |
+| `11052` | Bob DeCrescenzo Collection - Atari 7800（Marc Oberhäuser） | [link](https://forums.atariage.com/blogs/entry/11052-bob-decrescenzo-collection-atari-7800/) |
+| `11104` | Let's Make a Game!（SpiceWare / Collect tutorial 序） | [link](https://forums.atariage.com/blogs/entry/11104-lets-make-a-game/) |
+| `11129` | Step 4 - 2 Line Kernel（SpiceWare / Collect tutorial） | [link](https://forums.atariage.com/blogs/entry/11129-step-4-2-line-kernel/) |
+| `11136` | step 7 - draw the playfield（SpiceWare / Collect tutorial） | [link](https://forums.atariage.com/blogs/entry/11136-step-7-draw-the-playfield/) |
+| `1116` | TIA Schematic - Audio Noise Generator（EricBall, 2010s） | [link](https://forums.atariage.com/blogs/entry/1116-tia-schematic-audio-noise-generator/) |
+| `11263` | Two more potential next gen gamers（blog） | [link](https://forums.atariage.com/blogs/entry/11263-two-more-potential-next-gen-gamers-have-come-into-this-world/) |
+| `1134` | TIA Audio Noise Generator part 2（EricBall） | [link](https://forums.atariage.com/blogs/entry/1134-tia-audio-noise-generator-part-2/) |
+| `11369` | Updated assembly-6502 and batari BASIC mode files（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11369-updated-assembly-6502-and-batari-basic-mode-files/) |
+| `11376` | Compile and Run 2600 assembly code from jEdit（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11376-compile-and-run-2600-assembly-code-from-jedit/) |
+| `1140` | TIA AGN part 3（EricBall） | [link](https://forums.atariage.com/blogs/entry/1140-tia-agn-part-3/) |
+| `11543` | The Story of Stay Frosty 2, Part 1（SpiceWare, 2008） | [link](https://forums.atariage.com/blogs/entry/11543-the-story-of-stay-frosty-2-part-1/) |
+| `1155` | Exponential Odyssey（Chronogamer） | [link](https://forums.atariage.com/blogs/entry/1155-exponential-odyssey/) |
+| `11552` | The Story of Stay Frosty 2, Part 2（SpiceWare, 2009-2010） | [link](https://forums.atariage.com/blogs/entry/11552-the-story-of-stay-frosty-2-part-2/) |
+| `11560` | Conquering Bankswitching in 7800Basic（Frankodragon） | [link](https://forums.atariage.com/blogs/entry/11560-conquering-bankswitching-in-7800basic/) |
+| `11595` | Game Gear Sprites（Draconland） | [link](https://forums.atariage.com/blogs/entry/11595-game-gear-sprites/) |
+| `11615` | The Story of Stay Frosty 2, Part 3（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11615-the-story-of-stay-frosty-2-part-3/) |
+| `11619` | The Story of Stay Frosty 2, Part 4（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11619-the-story-of-stay-frosty-2-part-4/) |
+| `11627` | The Story of Stay Frosty 2, Part 5（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11627-the-story-of-stay-frosty-2-part-5/) |
+| `11639` | The Story of Stay Frosty 2, Part 6（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11639-the-story-of-stay-frosty-2-part-6/) |
+| `11656` | The Story of Stay Frosty 2, Part 8（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11656-the-story-of-stay-frosty-2-part-8/) |
+| `11664` | Stay Frosty 2 and Lead!（MegaManFan） | [link](https://forums.atariage.com/blogs/entry/11664-stay-frosty-2-and-lead/) |
+| `11697` | The Story of Stay Frosty 2, Part 11（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11697-the-story-of-stay-frosty-2-part-11/) |
+| `11712` | DPC+ ARM Development（SpiceWare, 序） | [link](https://forums.atariage.com/blogs/entry/11712-dpc-arm-development/) |
+| `11720` | DPC+ARM Part 1, Virtual Machine and Linux（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11720-dpcarm-part-1-virtual-machine-and-linux/) |
+| `11746` | DPC+ARM Part 2, Guest Additions（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11746-dpcarm-part-2-guest-additions/) |
+| `11753` | DPC+ARM Part 3, VirtualBox/Ubuntu update, disable screen lock（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11753-dpcarm-part-3-virtualbox-update-ubuntu-update-disable-screen-lock/) |
+| `11764` | Cruiz'in no where - Bubsy Collection（blog） | [link](https://forums.atariage.com/blogs/entry/11764-cruizin-no-where-february-2015-bubsy-collection-updated/) |
+| `11774` | DPC+ARM Part 4, Cloning（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11774-dpcarm-part-4-cloning/) |
+| `11776` | The Story of Stay Frosty 2, Part 13（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11776-the-story-of-stay-frosty-2-part-13/) |
+| `11785` | DPC+ARM Part 5, C Compiler（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11785-dpcarm-part-5-c-compiler/) |
+| `11799` | The Story of Stay Frosty 2, Part 14（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11799-the-story-of-stay-frosty-2-part-14/) |
+| `11811` | DPC+ARM Part 6, DPC+ Cartridge Layout（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11811-dpcarm-part-6-dpc-cartridge-layout/) |
+| `11816` | The Story of Stay Frosty 2, Part 15（SpiceWare, 2010） | [link](https://forums.atariage.com/blogs/entry/11816-the-story-of-stay-frosty-2-part-15/) |
+| `11852` | I will never get a complete Pokemon Mini collection（atari2600land） | [link](https://forums.atariage.com/blogs/entry/11852-i-will-never-get-a-complete-pokemon-mini-collection/) |
+| `11855` | Medieval Mayhem manual scan（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11855-medieval-mayhem-manual-scan/) |
+| `11860` | I suck at sprites（Mord） | [link](https://forums.atariage.com/blogs/entry/11860-i-suck-at-sprites/) |
+| `11864` | Light control hardware - Spinax Part 003（Out of the Pack） | [link](https://forums.atariage.com/blogs/entry/11864-light-control-hardware-spinax-part-003/) |
+| `11883` | DPC+ARM Part 7, 6507/ARM Exchange of Information（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11883-dpcarm-part-7-6507arm-exchange-of-information/) |
+| `11903` | DPC+ARM Part 8, Multiple Functions（SpiceWare / Collect2） | [link](https://forums.atariage.com/blogs/entry/11903-dpcarm-part-8-multiple-functions/) |
+| `11915` | 7800basic tutorial - sprite and tile interactions（draggin） | [link](https://forums.atariage.com/blogs/entry/11915-7800basic-tutorial-sprite-and-tile-interactions/) |
+| `11935` | DPC+ARM Part 9, Functional Menu（SpiceWare / Collect2） | [link](https://forums.atariage.com/blogs/entry/11935-dpcarm-part-9-functional-menu/) |
+| `11964` | DPC+ARM Part 10: Score & Timer Display（SpiceWare, 2015） | [link](https://forums.atariage.com/blogs/entry/11964-dpcarm-part-10-score-timer-display/) |
+| `11982` | Almost | [link](https://forums.atariage.com/blogs/entry/11982-almost-jag-collecting-quitting-time/) |
+| `11985` | DPC+ARM Part 11 | [link](https://forums.atariage.com/blogs/entry/11985-dpcarm-part-11-beginnings-of-the-arena-kernel/) |
+| `11988` | DPC+ARM Part 12 | [link](https://forums.atariage.com/blogs/entry/11988-dpcarm-part-12-gamepad-support/) |
+| `12061` | Economical Initialization（SpiceWare 経由, Omegamatrix 作, 2015頃） | [link](https://forums.atariage.com/blogs/entry/12061-economical-initialization/) |
+| `12209` | Overscan Jitter 2 | [link](https://forums.atariage.com/blogs/entry/12209-overscan-jitter-2-dpc-jitter/) |
+| `1235` | Archon kernel for 3F or 4A50（2600 in 2006） | [link](https://forums.atariage.com/blogs/entry/1235-archon-kernel-for-3f-or-4a50/) |
+| `12410` | CollectMini（SpiceWare, 2015） | [link](https://forums.atariage.com/blogs/entry/12410-collectmini/) |
+| `12535` | My Cartridge Collection（著者不明, 2015） | [link](https://forums.atariage.com/blogs/entry/12535-my-cartridge-collection/) |
+| `12538` | CollectMini Source Code（SpiceWare, 2015） | [link](https://forums.atariage.com/blogs/entry/12538-collectmini-source-code/) |
+| `12577` | My Next Hardware Project（著者不明, 2016） | [link](https://forums.atariage.com/blogs/entry/12577-my-next-hardware-project/) |
+| `12585` | The Martian | [link](https://forums.atariage.com/blogs/entry/12585-the-martian-spoiler-free-movie-review/) |
+| `12623` | Game Gear Collection（atari2600land, 2016） | [link](https://forums.atariage.com/blogs/entry/12623-game-gear-collection/) |
+| `12640` | BurgerTime Remake | [link](https://forums.atariage.com/blogs/entry/12640-burgertime-remake-the-road-to-dpc/) |
+| `12644` | Adventures in Vastia: Temper Tantrum Dragon Clones | [link](https://forums.atariage.com/blogs/entry/12644-new-graphic-novel-adventures-in-vastia-temper-tantrum-dragon-clones/) |
+| `12646` | Stay Frosty 2 Part 17 | [link](https://forums.atariage.com/blogs/entry/12646-the-story-of-stay-frosty-2-part-17/) |
+| `12775` | Coleco Chameleon Hardware Speculations | [link](https://forums.atariage.com/blogs/entry/12775-from-coleco-chameleon-hardware-speculations/) |
+| `12850` | Medieval Mayhem Drops to $4 | [link](https://forums.atariage.com/blogs/entry/12850-medieval-mayhem-drops-to-4/) |
+| `13069` | Stay Frosty Part 1 | [link](https://forums.atariage.com/blogs/entry/13069-stay-frosty-part-1/) |
+| `13125` | Stay Frosty Part 3 | [link](https://forums.atariage.com/blogs/entry/13125-stay-frosty-part-3/) |
+| `13128` | Stay Frosty Part 4 | [link](https://forums.atariage.com/blogs/entry/13128-stay-frosty-part-4/) |
+| `1314` | Medieval Mayhem（SpiceWare, 2006） | [link](https://forums.atariage.com/blogs/entry/1314-medieval-mayhem/) |
+| `13143` | Stay Frosty Part 5 | [link](https://forums.atariage.com/blogs/entry/13143-stay-frosty-part-5/) |
+| `13150` | Stay Frosty Part 7 | [link](https://forums.atariage.com/blogs/entry/13150-stay-frosty-part-7/) |
+| `13153` | Stay Frosty Part 8 | [link](https://forums.atariage.com/blogs/entry/13153-stay-frosty-part-8/) |
+| `13160` | Stay Frosty Part 9 | [link](https://forums.atariage.com/blogs/entry/13160-stay-frosty-part-9/) |
+| `13175` | Simple Assembly for Atari BASIC Part 1 | [link](https://forums.atariage.com/blogs/entry/13175-part-1-of-11-simple-assembly-for-atari-basic-introduction/) |
+| `13176` | Simple Assembly Part 2 | [link](https://forums.atariage.com/blogs/entry/13176-part-2-of-11-simple-assembly-for-atari-basic/) |
+| `13177` | Simple Assembly Part 3 | [link](https://forums.atariage.com/blogs/entry/13177-part-3-of-11-simple-assembly-for-atari-basic/) |
+| `13178` | Simple Assembly Part 4 | [link](https://forums.atariage.com/blogs/entry/13178-part-4-of-11-simple-assembly-for-atari-basic/) |
+| `13180` | Simple Assembly Part 5 | [link](https://forums.atariage.com/blogs/entry/13180-part-5-of-11-simple-assembly-for-atari-basic/) |
+| `13181` | Simple Assembly Part 6 | [link](https://forums.atariage.com/blogs/entry/13181-part-6-of-11-simple-assembly-for-atari-basic/) |
+| `13182` | Simple Assembly Part 7 | [link](https://forums.atariage.com/blogs/entry/13182-part-7-of-11-simple-assembly-for-atari-basic/) |
+| `13183` | Simple Assembly Part 8 | [link](https://forums.atariage.com/blogs/entry/13183-part-8-of-11-simple-assembly-for-atari-basic/) |
+| `13184` | Simple Assembly Part 9 | [link](https://forums.atariage.com/blogs/entry/13184-part-9-of-11-simple-assembly-for-atari-basic/) |
+| `13185` | Simple Assembly Part 10 | [link](https://forums.atariage.com/blogs/entry/13185-part-10-of-11-simple-assembly-for-atari-basic/) |
+| `13186` | Simple Assembly Part 11 | [link](https://forums.atariage.com/blogs/entry/13186-part-11-simple-assembly-for-atari-basic-the-end/) |
+| `13212` | A8 Hardware Project Literature | [link](https://forums.atariage.com/blogs/entry/13212-a8-hardware-project-literature/) |
+| `13234` | Mucking Around with iOS SpriteKit | [link](https://forums.atariage.com/blogs/entry/13234-mucking-around-with-ios-spritekit/) |
+| `13269` | MIDI Computer Blues | [link](https://forums.atariage.com/blogs/entry/13269-midi-computer-blues-setting-up-the-hardware/) |
+| `13283` | My Jack-o-Lantern Collection | [link](https://forums.atariage.com/blogs/entry/13283-my-jack-olantern-collection/) |
+| `13289` | Programming iOS using SpriteKit Ch.3 | [link](https://forums.atariage.com/blogs/entry/13289-programming-ios-using-spritekit-chapter-3/) |
+| `13326` | Forgotten Hardware Projects | [link](https://forums.atariage.com/blogs/entry/13326-forgotten-hardware-projects/) |
+| `13334` | Life Without Bankswitching | [link](https://forums.atariage.com/blogs/entry/13334-life-without-bankswitching/) |
+| `13344` | iOS Programming: Battling with UICollectionView | [link](https://forums.atariage.com/blogs/entry/13344-ios-programming-battling-with-uicollectionview/) |
+| `13409` | Don't Go Near the Martian Water | [link](https://forums.atariage.com/blogs/entry/13409-dont-go-near-the-martian-water-seriously-its-against-the-law/) |
+| `1350` | Bankswitching and Paddle Driven Menu（SpiceWare, 2006） | [link](https://forums.atariage.com/blogs/entry/1350-bankswitching-and-paddle-driven-menu/) |
+| `13507` | Extra Hardware | [link](https://forums.atariage.com/blogs/entry/13507-extra-hardware/) |
+| `13680` | My Humble PC Software Collection | [link](https://forums.atariage.com/blogs/entry/13680-my-humble-pc-software-collection/) |
+| `13755` | Sprite Engine Back in Play | [link](https://forums.atariage.com/blogs/entry/13755-sprite-engine-back-in-play/) |
+| `1386` | More Atari hardware in my house（javiero） | [link](https://forums.atariage.com/blogs/entry/1386-more-atari-hardware-in-my-house/) |
+| `13884` | Collect Tutorial Index | [link](https://forums.atariage.com/blogs/entry/13884-collect-tutorial-index/) |
+| `13894` | Sprite Engine Rebooted | [link](https://forums.atariage.com/blogs/entry/13894-sprite-engine-rebooted/) |
+| `13896` | TIA Audio Noise Generator Redux | [link](https://forums.atariage.com/blogs/entry/13896-tia-audio-noise-generator-redux/) |
+| `13898` | The Collection So Far and a Welcome | [link](https://forums.atariage.com/blogs/entry/13898-the-collection-so-far-and-a-welcome/) |
+| `13903` | Hardware | [link](https://forums.atariage.com/blogs/entry/13903-hardware/) |
+| `13936` | wav2tia Redux | [link](https://forums.atariage.com/blogs/entry/13936-wav2tia-redux/) |
+| `14240` | NES Sprite Programming | [link](https://forums.atariage.com/blogs/entry/14240-nes-sprite-programming/) |
+
+(117 dev-blog entries)
