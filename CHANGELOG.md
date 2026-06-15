@@ -6,6 +6,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+## [Unreleased]
+
+### Added
+- **`docs/casebook.md`** (new) — the *situation → technique* canon, evidence-backed by real commercial-game
+  disassemblies (companion to `cookbook.md`'s forward recipes). Wired into the CLAUDE.md routing table
+  (step 1b) and the authoring-protocol retrieve step; `check_wiring`/`check_provenance` green.
+  - First case study: **Fishing Derby (Activision 1980, David Crane / Dennis Debro disassembly)** — the
+    3-layer casebook pilot (manual=spec × disassembly=impl × Claude reconstruction). Raw pairing lives
+    study-only (non-repo) under `reference/disassemblies/_casestudies/fishing-derby/`.
+- **design-principles.md** — three new principles distilled from the pilot (with provenance):
+  per-scanline **NUSIZ+HMOVE shaping** of one player into an 8px-plus irregular sprite (shark);
+  **fractional-HMOVE slope** drawing of an arbitrary-angle 1px line on a missile/ball (fishing line);
+  background shimmer by streaming a PRNG's bits to `COLUBK` per scanline (near-zero cost).
+- **capability-gap-audit.md** — G9: authoring-craft support for the two shaping/slope patterns the
+  Claude-side reconstruction missed (concrete-driven, build when the next ROM needs it).
+
+### Notes
+- Methodology refinement (user, 2026-06-15): **Layer1 spec = manual + live ROM observation**, not the manual
+  alone — every reconstruction error was corrected by running the real ROM (feedback-play-the-rom-not-just-manual).
+- Proposed release: **1.73.0** (MINOR — additive knowledge). Tag + push deferred to user approval.
+
 ## [1.72.0] - 2026-06-15
 
 ### Added
