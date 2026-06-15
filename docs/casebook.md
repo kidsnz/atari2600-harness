@@ -1,0 +1,38 @@
+# Casebook — 状況 → 技（実在の市販ゲーム逆アセンで裏打ちした事例集）
+
+`cookbook.md` が「**作りたいゲーム型 → 標準レシピ**」（前向き）なのに対し、本書は「**実在の市販ゲームが、ある状況をどの技で解いたか**」の**事例カタログ**（逆向き・エビデンス駆動）。各エントリは **状況 → 採用技 → なぜそれが効くか → 出典（マニュアル＋逆アセン著者）** を持つ。著述ループ（`authoring-protocol.md`）の retrieve で「この状況、実ゲームではどう解いている？」を引くための索引。
+
+> **作り方（3層ケーススタディ）**：商用ゲームを「マニュアル(spec)×逆アセンブル(impl)×Claude再構築(rehearsal)」で学び、**再構築と実装の差分＝能力ギャップ**を一般化散文として昇格する（[[project-casebook-3layer]]）。**クリーンルーム厳守＝逆アセンのコードは転載せず、一般化した散文と出典のみ**。生ペアリングは非リポ `reference/disassemblies/<game>/` 配下の `_casestudies/`。
+>
+> **Layer1 spec はマニュアルだけで足りない＝実プレイ（実ROM観察）を必ず足す**：マニュアルは目的・操作・スコアの「意図」は書くが、画面の実際の動き・物量・描画 craft・手触りは伝えない。`load_rom`→`step_frame`→`get_screen_annotated` で挙動を観察し spec に足す（Fishing Derby では魚=1行1体・斜め釣り糸・水面シマーが全て実走観察で判明＝マニュアルの穴）。[[feedback-play-the-rom-not-just-manual]]。
+
+## 索引
+| ゲーム | 年/設計 | サイズ/型 | 状況→技 エントリ |
+|---|---|---|---|
+| Fishing Derby | 1980 Activision / David Crane（逆アセン Dennis Debro） | 2K / 単画面スポーツ | 大型不定形・斜めの線・多ターゲットのオブジェクト経済・対向スコア・同種衝突・無コスト演出 |
+
+---
+
+## Fishing Derby（Activision, 1980, David Crane）
+出典＝マニュアル `reference/disassemblies/_casestudies/fishing-derby/manual/`（archive.org 原本）＋ Dennis Debro 完全注釈逆アセン（実ROM完全一致）。検証＝`build/fishing_derby.bin` を Gopher2600 実走（2026-06-15）。
+
+- **状況：8px より大きい単体の不定形クリーチャを出したい（魚より大きいサメ等）**
+  → **1個の player を per-走査線 NUSIZ（サイズ/コピー）＋HMOVE テーブルで“引き伸ばして”成形**。GRP は小さいまま横 ~40clock の不定形になる。色は単色割り切り。**フリッカも追加オブジェクトも不要**。実走で確認。→ 原則 `design-principles.md`「8px 超の単体不定形」。
+
+- **状況：2点を結ぶ動く細い斜め線（釣り糸/テザー/ロープ/レーザー）が要る**
+  → **missile/ball を縦に出し、slope を整数+分数で持って毎走査線 `adc`、桁上りで `HMMx`/`HMBL` に ±1px HMOVE**（Bresenham を HMOVE で実装）。右糸=BL・左糸=M1。実走で傾きを確認。→ 原則「任意傾きの1px 直線」。
+
+- **状況：単画面に多数の同種ターゲットを置きたい（"6 rows of fish"）**
+  → **「1行1体 × バンド再利用」が定石**。全6匹を P0 を7バンドで使い回して1匹ずつ描画し、**操作対象（掛かって巻上中の魚）は P1 専任**に分ける。マニュアルの名詞（"rows of fish"）から同時表示数を過大に見積もらない＝**先に「TIA 6枠×バンド再利用で実際に置ける数」を算出**してからゲーム性を当てる。〔Claude 再構築は「群れ＝P0×3+P1×3」と誤認→実走で反証〕
+
+- **状況：左右対向の2桁スコア×2**
+  → **player2枠（P0=十/P1=一）＋数字フォント表＋1走査線内 re-strobe（`Waste18Cycles` を挟み GRP 描き直し）**。PF score は単一/左右対称向き、対向2スコアは player 方式。既存技 `docs/techniques/score-kernel.md` に該当。実走で「スコア行の PF にフォント無し＝数字は player」を確認。
+
+- **状況：同種2オブジェクトの接触判定（ハザードが標的を奪う）**
+  → **`CXPPMM`（P0×P1）一発**。座標計算に逃げない。サメ(P0)×掛かり魚(P1)接触を検出して魚を消す。
+
+- **状況：背景に安い“ゆらぎ”の質感（水面/砂嵐/星）**
+  → **既に回している LFSR/randomSeed のビットを帯ごとに `COLUBK` へ流すだけ**（専用RAM不要・ほぼ無コスト）。→ 原則 色節「背景のゆらぎ」。
+
+### このケースが定量化した能力ギャップ（→ `capability-gap-audit.md`／`roms/EVALUATION.md`）
+Claude の封印再構築 vs 実装の差分＝**衝突・入力・難易度の“ロジック”は読めるが、TIA を絞り切る描画 craft（1スプライト成形・斜線・多重利用・無コスト演出）で実ベテランに劣る**。詳細台帳＝`reference/disassemblies/_casestudies/fishing-derby/diff-gaps.ja.md`。
