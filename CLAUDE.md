@@ -127,6 +127,8 @@ round trip. Also return `png_path` in JSON.
 | provenance map (every technique/rule → its origin; for tracing back when something breaks) | `docs/provenance.md` (gen: `scripts/check_provenance.py --list`) |
 | **known traps** (emu-passes/HW-fails timing+cart+CPU+TIA killers; pre-flight before shipping a kernel) | `docs/known-traps.md` |
 | trap linter (static check of known-traps before shipping a kernel; CI-gated) | `scripts/check_traps.py` |
+| **authoring protocol** (the 6-step loop run on every kernel: retrieve→plan→author→preflight→verify→feedback) | `docs/authoring-protocol.md` |
+| **cookbook** (intent→recipe: game-type → technique stack + traps + checks; canonical build order) | `docs/cookbook.md` |
 | fundamentals audit (verified vs documented vs unknown, with sources; 2026-06) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
