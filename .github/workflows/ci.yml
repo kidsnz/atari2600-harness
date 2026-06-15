@@ -47,3 +47,8 @@ jobs:
 
       - name: Provenance check (every technique/rule records its origin)
         run: python3 scripts/check_provenance.py
+
+      - name: Trap check (no emu-passes/HW-fails static traps in technique kernels)
+        run: |
+          python3 scripts/check_traps.py --selftest
+          python3 scripts/check_traps.py
