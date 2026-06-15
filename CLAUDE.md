@@ -119,6 +119,7 @@ round trip. Also return `png_path` in JSON.
 | **0. START HERE** — the authoring loop (retrieve→plan→author→preflight→verify→feedback) | **`docs/authoring-protocol.md`** |
 | 1. pick the recipe — game-type → technique stack + traps + checks + 14-step build order | `docs/cookbook.md` |
 | 1b. case studies — how real commercial games solved a situation (situation → technique, evidence-backed by disassemblies) | `docs/casebook.md` |
+| 1c. build-to-learn — reusable template for reproducing a real game mechanic-by-mechanic to turn "can read" into "can author" | `docs/build-to-learn.md` |
 | 2. the design rules (color budget, layout, positioning ground-truth, the distilled rules) | `docs/design-principles.md` |
 | 2b. run the executable feasibility checks (color bands, line budget, multiplex, PF windows, craft) | `pkg/design/` |
 | 3. clone the nearest verified technique | `docs/techniques/` (+ catalog `README.md`) |
