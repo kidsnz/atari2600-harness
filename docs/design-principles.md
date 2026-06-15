@@ -25,6 +25,8 @@
 - **横位置 = 2段階**：粗 ÷15（5cy ループ）→ 微 HMOVE。粒度 3px/CPUサイクル（litmus 一致）。〔Davie S22〕 `→ design.PositionSplit/CoarseIterations`
 - **★RESxx の内部描画遅延（位置照合の第一容疑）**：`RESxx` ストロボはカウンタを即リセットするが、**オブジェクトが実際に描き始めるのは遅れる＝player +5 / missile・ball +4 カラークロック**（RESP0 が cycle46 で終わると X≈75）。Stella ソース(`renderCounterOffset`)で実証。**「目標 X が ~5px ずれる」時はまずこれを疑う**。RESxx の粒度は 3 color-clock。〔採掘 294398, 283075, 305780, 172089, 137739, 329611, 304182〕（codified `X=3N−54/55` を裏で説明する量＝**litmus_pos で実測照合**してから定数化）
 - **多オブジェクトの位置式と書込み窓**：可視中の `RESxx` は禁止（即時リセットで曲がる）＝HBLANK/前ラインで先読み。共有ループは consecutive な `RESP0,x`/`HMP0,x` を `DEX/BPL` で回す（`design.shared_setxpos` 実装済）。右端の溢れ限界は X≈134（「N オブジェクト=N+1 走査線」が真因）。〔採掘 67045, 308513, 340965, 311795（RESxx×HMOVE レース＝Gopher2600 実装済）〕
+- **1サイクル潰しで RESP を狙った位置に**：粗位置決めで NOP が無い時、`sta.wx HMP0,x`（dasm `.w`/`.FORCE` で Absolute,X=5cy を強制／ZP,X は4cy）で1cy 足して RESP0 ストロボを**狙ったサイクル**に合わせる。〔採掘 blog SpiceWare 12538〕
+- **マスク式スプライト描画＝21cy**（DoDraw の26cy より安い）：`lda (img),y / and (mask),y / sta GRPx / lda (color),y / sta COLUPx`＝**形のクリップと行毎色更新を同時に**。0パディングでサイズ違いを共有マスク1個に。〔採掘 blog SpiceWare 10890, 339509〕
 - **div15 の微動レンジは実装依存**：素朴な div15 は **−6..8px**、`eor #15`＋`adc #((8+1)<<4)` で対称化すると **−7..8px**。起源は Decuir/Video Olympics。HMOVE 生のハード可動域(−8..+7)とは別＝ルーチンの性質。〔採掘 286698〕（要 litmus 裏取り）
 - **early-HMOVE（WSYNC 前 HMOVE）の「動かさない」値 = HMPx $80（=8）であって $00 ではない**：$00 にすると同一走査線を跨ぐオブジェクトが 8px ドリフトする。15px×11 の専用カーネルで位置決めする型。〔採掘 169471〕（要 litmus）
 - **HMOVE をサイクル 73–74 で撃つと左端のコーム(黒線)が出ない**：Cosmic Ark 系の既知トリック。Omegamatrix の間接ジャンプ位置決め＝HMPx 下位ニブルがジャンプ索引を兼ねる。〔採掘 165428, 183219, 319456 "HMOVE Shuffle"〕（要 litmus）
@@ -75,6 +77,7 @@
 ## 作画 craft（スプライト/文字の絵作り＝⑥craft の具体ルール）
 - **サムネイル可読性を起点**：1ドット相当まで縮小して識別できるかを**先に**検証してから細部を足す。縮小は補間なし（nearest・半分ずつ）。〔326595, 106110〕
 - **2600 ピクセルは横長（横 ≒ 縦の約 1/2・≈2:1）**：正方ドットのプレビューを信じない。実機アスペクトで字形/絵を決める（player=横1px間引き、PF=縦3–4倍で密度を稼ぐ）。**→ プレビューは非正方ピクセルで描く**。〔326595〕 `→ design.PixelAspectRatio/ScanlinesForSquare`
+- **★画像→タイトルの正典ルート（プロの実作ワークフロー）**：SpiceWare は**先に Photoshop でモック→それからカーネル**を作る。ロゴ/タイトルは**フリッカ無し2色48pxカーネル**で「設計した48px画像→安定した画面表示」を実現（SF2 の実例）。＝本proj の Photoshop→2600 の道筋そのもの。`multicolor48`/`bitmap48` がこの実装基盤。〔採掘 blog SpiceWare 10640, 10515〕
   - **⚠ 精密値は要実測（codified 2:1 は過大）**：複数源が「2600 1px は横長」と一致するが**値は割れる**＝5:3≈1.67(190154,172161,334673) / 12:7≈1.71(169128) / 20:11≈1.82(208810,Stella 91%)。**現コード `design.PixelAspectRatio=2`(2.0) は全源より大きい＝確実に過大**だが、**正解は表示前提で 1.67〜1.82 に割れる**。Photoshop モック→2600 のユーザー主ワークフロー直結なので、**forum 値どれかで上書きせず、既知正方ROMを Stella で実測して definitive 値を1つ決めてから `pkg/design` を更新**（[[feedback-verification-first]]）。色も非RGB＝Stella パレットが照合基準（306508, 300805）。〔採掘 190154, 169128, 208810, 172161〕
   - **走査線途中の色は 3CC グリッド上**：横多色は最大 ~18 帯／3色（SAX 流用で4色）。任意4色は不可＝穴(holes)＋重ね(stacking)で代替。SCORE bit(CTRLPF D1)で PF 左右分割。〔採掘 190154〕 `→ design.MinColorBandWidthPx, ScoreModeTwoColor`
 - **字形の誤読ペアを潰す**：L/I/T・U/W・M/H/N・O/0/D。作者は自分の誤読に気づけない→**他者/読み上げで検証**、最終調整は単一ピクセル単位。〔294306, 326595（重複確認＝強い原則）〕
