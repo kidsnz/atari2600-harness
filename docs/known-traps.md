@@ -59,6 +59,7 @@ Detection column: **static** = a source-text linter can flag it · **runtime** =
 |---|---|---|
 | **reading a write-only TIA register** | returns bus float; only **bits 6/7 are driven** (collision/INPT) — don't rely on the full byte | 319781, 328451, 63342 |
 | **2-voice audio phase interference** | two voices can partially cancel to near-silence; Gopher2600's noise (old TIASound) differs from real HW | 294766, 272769, 326549 |
+| **AUDF-change propagation latency** | TIA tone is an LFSR-pair (5+4 stage), not a table; **lowering AUDF can take up to ~32 cycles (~1ms)** before the next output clock (the up-counter must wrap) — pitch changes lag, don't assume instant | blog 1116/1134/1140 |
 | **mid-line NUSIZ double/quad copy trick** | renders on real HW but **not in Gopher2600** → ROMs using it won't pixel-match our oracle | 181903 |
 | **player-width change → 1-clk right shift** | changing NUSIZ player width shifts start by 1 color-clock (missile/ball unaffected) | 143781, 64251, 290654 |
 | **state isn't all in RAM** | sprite X positions live in TIA internal counters → full-state capture needs `read_tia_registers`, not just `read_ram` | 301766 |

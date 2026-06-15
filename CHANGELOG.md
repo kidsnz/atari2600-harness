@@ -6,6 +6,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+## [1.71.1] - 2026-06-15
+
+### Changed
+- Completed the dev-blog gold absorption into `design-principles.md` (the two >2-object flicker algorithms;
+  drop-PF0 cycle/RAM trade; 2-zone complementary-height moving platforms; 8-byte self-modifying init +
+  hotspot placement) and `known-traps.md` (AUDF-lowering ≤32-cycle propagation latency). Beyond-bB findings
+  (DPC+/ARM/CDF data-exchange, Slick/Fast-Fetch kernels, wav2tia, INT2HEX/INT2BITS) logged as technique
+  candidates. All sourced to mined blog entries.
+
 ## [Unreleased]
 
 ### Planned
