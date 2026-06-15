@@ -58,6 +58,12 @@ own authoring loop**, not the editor. The G work stands on its own; M references
   exists to catch (gap B). A `breakif`/assert that flags timer writes on the wraparound cycle would be a
   natural sibling to `assert_line_budget`. Source: design-principles.md (採掘 303277), diagnosed in-thread
   by the Gopher2600 author. Verify the exact behaviour against Gopher2600's RIOT model before implementing.
+- **G9 (surfaced 2026-06-15, Fishing Derby casebook):** *authoring-craft* support for two patterns the
+  Claude-side reconstruction missed (`docs/casebook.md`): (a) **per-scanline NUSIZ+HMOVE shaping** of one
+  player into an 8px-plus irregular sprite (the shark), and (b) **fractional-HMOVE slope** drawing of an
+  arbitrary-angle 1px line on a missile/ball (the fishing line). A `pkg/design` estimator or a
+  `docs/techniques/` skeleton for these would stop the next sports/action build from falling in the same
+  hole. Concrete-driven: build when the next ROM needs it. Source: `_casestudies/fishing-derby/diff-gaps.ja.md`.
 
 ## Recommendation (concrete-driven, per project principle)
 1. ~~**G2 first**~~ **DONE in v1.67.0** — mined rules codified into `pkg/design` (color/position/pf/

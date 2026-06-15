@@ -19,6 +19,7 @@
 - **hue↔色の地図**：hue1=黄 / hue4=赤 / hue8=青 / hue12=緑（hue15≈hue1）。黄は hue1 が定石。〔132561〕
 - **高輝度ほど彩度が落ち白っぽくなる**（特に明るい青は識別が消える）→ **鮮やかに見せたい色は中〜低輝度**で置く。彩度と輝度はトレードオフ。〔132561〕 `→ design.Hue/Luminance/WashoutRisk, HueName, GradientSameHue, InterlaceColorsSafe`
 - **色のデータモデルの最小単位は「走査線ごとの色」＝`colorPerRow[]`**：単一 `color` でなく走査線インデックス→COLUPx 値の配列で持つと、縦多色（最も安い多色化）がそのまま表現できる。TIA Studio M1 の設計判断もこれに収束した。〔研究 w4 / `tools/research-w4-m1-open-questions.md`〕
+- **背景の「ゆらぎ/ノイズ質感」は乱数シードのビットを `COLUBK` に毎走査線流すだけ（専用RAM不要）**：水面のシマー・砂嵐・星の瞬きなどを、既に持っている LFSR/randomSeed のビットを帯ごとに `COLUBK` へ転記して**ほぼ無コスト**で出す。〔Fishing Derby `.colorWaterShimmer`＝randomSeed のビットを per-line COLUBK に流す水面演出〕
 
 ## スプライト（P0/P1）
 - 8 ドット幅・1 レジスタ（GRP 8bit, MSB=左端）。幅 NUSIZ 1x/2x/4x。〔2k6specs, Davie S21〕
@@ -33,6 +34,8 @@
 - **48px** = NUSIZ$03（3 copies）＋ P1 を 8px 右 ＋ VDEL 二重バッファで GRP 時間差差替え。score/bitmap48 を転用。〔48px-positioning〕 `→ pkg/sprite.SplitWide/NUSIZ・design.MaxChars(Text48px)`
 - **絵を先に決めて割当しない**。順序＝色予算→割当表→不足は「色共有・オブジェクト兼用・レイアウト変更」で交渉。
 - missile/ball = 線・縁・縦枠、player = 倍幅/複数コピー/4x で面。1つの見た目を複数オブジェクトの重ねで構成。
+- **8px 超の単体不定形は「1 player を per-走査線 NUSIZ＋HMOVE テーブルで成形」＝フリッカに逃げない**：GRP は小さいまま、各走査線で NUSIZ（サイズ 1/2/4/8・コピー数）と HMOVE を切替えると、1つの player を横 ~40clock 級の不定形（魚/サメ/船/横長クリーチャ）に“引き伸ばせる”。色は単色割り切り。追加オブジェクト/フリッカ不要。〔Fishing Derby (David Crane/Debro逆アセン) SharkTraveling*NUSIZValues＝per-line NUSIZ+HMOVE のサメ・build/fishing_derby.bin 実走で ~40clock 幅を確認〕 `→ casebook.md「大型不定形」`
+- **任意傾きの1px 直線は missile/ball ＋ 分数HMOVE累算（Bresenham in HMOVE）**：縦に出した M/BL を、毎走査線 slope を整数+分数で `adc` し桁上りで `HMMx`/`HMBL` に ±1px HMOVE すると、釣り糸/テザー/ロープ/レーザー等の**斜め線**になる（縦・横しか出せないという思い込みを捨てる）。〔Fishing Derby fishingLineSlope(Integer/Fraction)＋HMOVE・右糸=BL/左糸=M1、実走で右糸の傾きを確認〕 `→ casebook.md「斜めの線」`
 
 ## プレイフィールド
 - 横 40px × 4clk/px。表現力は縦のリズムで稼ぐ。〔Davie S13〕
