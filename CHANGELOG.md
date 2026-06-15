@@ -12,6 +12,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Real game authoring on top of the 1.0 base (1.x).
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
 
+## [1.71.0] - 2026-06-15
+
+### Added
+- **Authoring loop tooling (Track E).**
+  - `scripts/check_traps.py` — static pre-flight linter for the `docs/known-traps.md` traps (unstable illegal
+    opcodes, `NOP $00` bankswitch, stack-collision vars, missing CLD/CLEAN_START). Zero false positives on the
+    31 technique ROMs; `--selftest` proves detectors fire; **CI-gated**.
+  - `docs/authoring-protocol.md` — the 6-step loop (retrieve→plan→author→preflight→verify→**feedback**) run on
+    every kernel; the feedback step makes each production strengthen the system.
+  - `docs/cookbook.md` — intent→recipe (game-type → technique stack + traps + checks) + the canonical bottom-up
+    14-step build order (from SpiceWare's "Collect" tutorial).
+- **AtariAge dev-blog mining (expansion).** 117 dev-blog entries distilled (SpiceWare's *Collect / Stay Frosty /
+  Frantic / Draconian* dev diaries + DPC+/ARM + TIA-audio internals), fetched **Wayback-only** (CDX enumeration
+  of `blogs/entry/*`). Key absorptions into `design-principles.md`: the **Photoshop-mock→48px flicker-free 2-color
+  title** path (the project's image→assembly route), the 21-cy mask-sprite draw, and the `sta.w`/`.FORCE`
+  one-cycle RESP trim. Corpus + gaps recorded in `reference/atariage/RECOVERY-TODO.md`.
+
+### Notes
+- AtariAge automated direct-access suspended (the account hit IPS's login-throttle lockout); mining is
+  Wayback-only henceforth. Remaining gaps (15 blog + a few forum, all re-fetchable) listed in RECOVERY-TODO.
+
 ## [1.70.0] - 2026-06-15
 
 ### Added
