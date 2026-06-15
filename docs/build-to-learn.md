@@ -17,6 +17,7 @@
 ## Phase 0 — 念入り精査（書く前に必ず）
 1. **マニュアル↔コード対応マップ**（`_casestudies/<game>/impl-map.ja.md`・クリーンルーム散文のみ）：マニュアル各節→逆アセンのルーチン/RAM/テーブルへ対応づけ。書式＝表（節｜振る舞い｜コード｜RAM）。
 2. **ground-truth fixtures**（`_casestudies/<game>/fixtures.ja.md`）：実ROMから**数値を1回採取**して各段の照合基準に固定（色のTIA値・座標clock・走査線範囲・初期値）。採取は `peek`(RAM)／`read_row`／`read_tia_registers`。**判定は数値**（Iron rule 1）。
+3. **視覚レイアウト照合**（`_casestudies/<game>/layout-compare.ja.md`）：`get_screen_annotated`（TIA実座標で校正された「目」）でオリジナルと自作のスクショを撮り、**各要素の位置・サイズ(Y/clock/幅)を測って差分表を作り、数値が合うまで自力で寄せる**。色だけでなく**レイアウトも実ROMに収束**させる仕上げ工程。手順＝①オリジナル撮影→測定 ②自作撮影→測定 ③差分 ④`read_row`/annotated で合うまで調整。
 
 ## 制作戦略＝ボトムアップ・ラダー（既定）
 **display→静的要素→動く要素→入力→衝突→ゲーム状態** を1メカニクスずつ。常に動くROMが残り、各段で確実な数値合格＝成功体験を最大化。
