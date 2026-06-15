@@ -6,7 +6,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
-## [Unreleased]
+## [1.73.0] - 2026-06-15
 
 ### Added
 - **`docs/casebook.md`** (new) — the *situation → technique* canon, evidence-backed by real commercial-game
