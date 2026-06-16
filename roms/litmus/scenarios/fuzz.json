@@ -1,0 +1,8 @@
+{
+  "rom": "roms/litmus/smoke.bin",
+  "fuzz": {"seed": 42, "frames": 30, "actions": ["left", "right", "fire"]},
+  "invariants": [
+    {"field": "ram.0x80", "op": "==", "value": 66}
+  ],
+  "checks": {"ntsc_frame_lines": 262}
+}

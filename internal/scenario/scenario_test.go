@@ -107,6 +107,47 @@ func TestInvariantsMonotonic(t *testing.T) {
 	}
 }
 
+// TestFuzz は seed 付き乱数入力で走らせても invariant が保たれ、クラッシュせず、
+// かつ決定論的（同一 seed → 同一結果）であることを確認する。
+func TestFuzz(t *testing.T) {
+	t.Chdir("../..")
+	mk := func() *Scenario {
+		return &Scenario{
+			Rom:        "roms/litmus/smoke.bin",
+			Fuzz:       &Fuzz{Seed: 42, Frames: 30, Actions: []string{"left", "right", "fire"}},
+			Invariants: []Invariant{{Field: "ram.0x80", Op: "==", Value: 66}},
+		}
+	}
+	r1, err := Run(mk(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r1.Pass {
+		for _, a := range r1.Asserts {
+			if !a.Pass {
+				t.Errorf("fuzz unexpectedly failed: %s (got %d)", a.Desc, a.Got)
+			}
+		}
+	}
+	// 決定論: 同一 seed の再走は同一の合否（再現可能 replay の土台）。
+	r2, err := Run(mk(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r1.Pass != r2.Pass || len(r1.Asserts) != len(r2.Asserts) {
+		t.Fatalf("fuzz not deterministic: %+v vs %+v", r1.Asserts, r2.Asserts)
+	}
+}
+
+// TestFuzzNeedsActions は空の actions プールがエラーになることを確認する。
+func TestFuzzNeedsActions(t *testing.T) {
+	t.Chdir("../..")
+	s := &Scenario{Rom: "roms/litmus/smoke.bin", Fuzz: &Fuzz{Seed: 1, Frames: 5}}
+	if _, err := Run(s, false); err == nil {
+		t.Fatalf("expected error for empty fuzz actions")
+	}
+}
+
 // TestRunSamples は同梱サンプルシナリオが実 ROM で全 pass することを確認する（陽性）。
 // ROM パスはリポジトリルート相対なので、テストはルートへ chdir して CLI と同じ前提で走らせる。
 func TestRunSamples(t *testing.T) {

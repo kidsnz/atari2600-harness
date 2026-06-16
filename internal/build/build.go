@@ -16,8 +16,10 @@ func BinPathFor(asmPath string) string {
 
 // Assemble は dasm -f3（生バイナリ出力）で asmPath を binPath にアセンブルする。
 // 失敗行を含む診断のため stdout+stderr を output で返す（成功時も dasm の "Complete." を含む）。
+// `-I<asm のディレクトリ>` を渡すので、cwd に関わらず `include vcs.h` 等が asm 自身の隣から解決する
+// （別ディレクトリから .asm シナリオを走らせても通る）。
 func Assemble(asmPath, binPath string) (output string, err error) {
-	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+binPath).CombinedOutput()
+	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+binPath, "-I"+filepath.Dir(asmPath)).CombinedOutput()
 	return string(out), err
 }
 
@@ -26,7 +28,7 @@ func Assemble(asmPath, binPath string) (output string, err error) {
 func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err error) {
 	lstPath := strings.TrimSuffix(binPath, ".bin") + ".lst"
 	symPath := strings.TrimSuffix(binPath, ".bin") + ".sym"
-	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+binPath, "-l"+lstPath, "-s"+symPath).CombinedOutput()
+	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+binPath, "-l"+lstPath, "-s"+symPath, "-I"+filepath.Dir(asmPath)).CombinedOutput()
 	if err != nil {
 		return string(out), "", "", err
 	}

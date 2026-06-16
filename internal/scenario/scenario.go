@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -54,6 +55,16 @@ type Monotonic struct {
 	Direction string `json:"direction"` // "up"=非減少 / "down"=非増加
 }
 
+// Fuzz は seed 付き乱数入力で Frames フレーム走らせ、毎フレーム invariants/monotonic を監視する
+// ＝決定論シミュレーションテスト（FoundationDB/Antithesis 流儀）の 2600 版。決定論的なので
+// 同じ seed は同じ入力列＝失敗は再現可能（replay）。docs/testing-playbook.md。
+type Fuzz struct {
+	Seed    int64    `json:"seed"`
+	Frames  int      `json:"frames"`
+	Actions []string `json:"actions"` // 乱択する入力プール（例 ["left","right","fire"]）
+	Player  int      `json:"player,omitempty"`
+}
+
 // Checks は run 全体に対する性質（副作用＝フレームを進める計測なのでタイムライン後にまとめて評価）。
 type Checks struct {
 	NTSCFrameLines *int `json:"ntsc_frame_lines,omitempty"` // StepFrame() == この値（NTSC は 262）
@@ -76,6 +87,7 @@ type Scenario struct {
 	Frames     int         `json:"frames,omitempty"`
 	Invariants []Invariant `json:"invariants,omitempty"`
 	Monotonic  []Monotonic `json:"monotonic,omitempty"`
+	Fuzz       *Fuzz       `json:"fuzz,omitempty"`
 
 	srcPath string // Load 時のファイルパス（golden ファイルの場所決めに使う。空＝プログラム生成）
 }
@@ -192,6 +204,18 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 		lastF = s.Frames - 1
 	}
 
+	// fuzz: seed 付き乱数入力で Frames フレーム回す（決定論＝再現可能）。
+	var rng *rand.Rand
+	if s.Fuzz != nil {
+		if len(s.Fuzz.Actions) == 0 {
+			return nil, fmt.Errorf("fuzz needs a non-empty \"actions\" pool")
+		}
+		if s.Fuzz.Frames-1 > lastF {
+			lastF = s.Fuzz.Frames - 1
+		}
+		rng = rand.New(rand.NewSource(s.Fuzz.Seed))
+	}
+
 	res := &Result{Pass: true}
 	record := func(a Assert, got int64, ok bool, evalErr error) error {
 		if evalErr != nil {
@@ -211,7 +235,15 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 	seenMono := make([]bool, len(s.Monotonic))
 	brokenMono := make([]bool, len(s.Monotonic))
 
+	jammed := false
 	for f := 0; f <= lastF; f++ {
+		if s.Fuzz != nil && f < s.Fuzz.Frames { // 乱数入力（scripted の後に適用）
+			act := s.Fuzz.Actions[rng.Intn(len(s.Fuzz.Actions))]
+			pressed := rng.Intn(2) == 1
+			if err := e.SetInput(s.Fuzz.Player, act, pressed); err != nil {
+				return nil, fmt.Errorf("fuzz frame %d input %q: %w", f, act, err)
+			}
+		}
 		for _, in := range inByFrame[f] { // このフレームを走らせる前に入力適用
 			if in.Action == "paddle" {
 				if err := e.SetPaddle(in.Player, in.Value); err != nil {
@@ -228,6 +260,14 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 		}
 		if err := e.RunFrames(1); err != nil {
 			return nil, err
+		}
+		if s.Fuzz != nil && e.VCS.CPU.Jammed { // クラッシュ（KIL/不正命令で CPU 停止）を検出
+			res.Asserts = append(res.Asserts, AssertResult{
+				Desc: fmt.Sprintf("fuzz: CPU jammed (crash) @frame %d [seed=%d]", f, s.Fuzz.Seed),
+				Pass: false})
+			res.Pass = false
+			jammed = true
+			break
 		}
 		for _, a := range asByFrame[f] { // フレーム終了時点で瞬時評価
 			got, err := resolve(e, a.Field)
@@ -289,6 +329,13 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			prevMono[i] = got
 			seenMono[i] = true
 		}
+	}
+
+	// fuzz が完走（クラッシュ無し）したら陽に記録。seed があるので失敗は再現可能。
+	if s.Fuzz != nil && !jammed {
+		res.Asserts = append(res.Asserts, AssertResult{
+			Desc: fmt.Sprintf("fuzz seed=%d frames=%d: no crash", s.Fuzz.Seed, s.Fuzz.Frames),
+			Pass: true})
 	}
 
 	// 破れなかった invariant / monotonic は「N フレーム成立」と陽に記録（合格を可視化）。
