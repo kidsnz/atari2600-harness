@@ -8,6 +8,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.76.0] - 2026-06-16
+
 ### Added
 - **`set_input` now drives the console panel switches** (`reset`/`select`/`color`/`p0pro`/`p1pro`), not just the
   joystick — routes to the existing `emu.SetPanel`. Lets Claude press GAME RESET to actually start a game (e.g.
@@ -22,8 +24,8 @@ versions follow [Semantic Versioning](https://semver.org/).
   `docs/testing-playbook.md` (the differential-vs-original entry). (Differential testing.)
 
 ### Notes
-- Proposed release: **1.76.0** (MINOR — additive: panel-switch input + refdiff with ball-size diff). The MCP
-  server must be rebuilt and reconnected to use the panel switches.
+- **1.76.0** (MINOR — additive: panel-switch input + refdiff with ball-size diff). The MCP server must be
+  rebuilt and reconnected to use the panel switches (`set_input reset` etc.).
 
 ## [1.75.0] - 2026-06-16
 
