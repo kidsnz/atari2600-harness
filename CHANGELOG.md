@@ -8,6 +8,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.75.0] - 2026-06-16
+
 ### Added
 - **`docs/testing-playbook.md`** (new) — imports the established software-testing discipline (the **oracle
   problem** → invariants/contracts, property-based, metamorphic, differential/golden, fuzzing, **deterministic
@@ -45,8 +47,8 @@ versions follow [Semantic Versioning](https://semver.org/).
   RAM-driven destructible PF, BL/P0 positioning, joystick paddle, position-based collision, game-state loop).
 
 ### Notes
-- Proposed release: **1.75.0** (MINOR — additive: build-to-learn + casebook docs, the testing-playbook, and
-  the automated verification suite G10–G14; all backward-compatible). Tag + push deferred to user approval.
+- **1.75.0** (MINOR — additive: build-to-learn + casebook docs, the testing-playbook, and the automated
+  verification suite G10–G14; all backward-compatible).
 - The MCP server (`cmd/harness`) must be **rebuilt** for `run_scenario` to pick up the new scenario features
   (`invariants`/`monotonic`/`fuzz`/`metrics`) — smoke-test with `scripts/mcp_smoke.py` then reconnect.
 - The authored Breakout ROM + its scenarios live in the **roms** repo (`roms/breakout/`), not here.
