@@ -88,6 +88,7 @@ type Scenario struct {
 	Invariants []Invariant `json:"invariants,omitempty"`
 	Monotonic  []Monotonic `json:"monotonic,omitempty"`
 	Fuzz       *Fuzz       `json:"fuzz,omitempty"`
+	Metrics    []string    `json:"metrics,omitempty"` // run 終了時に捕捉する field（metamorphic 比較用）
 
 	srcPath string // Load 時のファイルパス（golden ファイルの場所決めに使う。空＝プログラム生成）
 }
@@ -102,8 +103,9 @@ type AssertResult struct {
 // Result はシナリオ全体の結果。
 type Result struct {
 	Asserts    []AssertResult
-	GoldenHash string // golden_frame 指定時に算出した描画連鎖ハッシュ（決定性確認用）
-	AudioHash  string // golden_audio 指定時に算出した音声連鎖ハッシュ
+	GoldenHash string           // golden_frame 指定時に算出した描画連鎖ハッシュ（決定性確認用）
+	AudioHash  string           // golden_audio 指定時に算出した音声連鎖ハッシュ
+	Metrics    map[string]int64 // run 終了時に捕捉した field（metamorphic 比較用）
 	Pass       bool
 }
 
@@ -351,6 +353,19 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			res.Asserts = append(res.Asserts, AssertResult{
 				Desc: fmt.Sprintf("monotonic %s %s held [%d frames]", m.Field, m.Direction, lastF+1),
 				Pass: true})
+		}
+	}
+
+	// metamorphic 用メトリクスは Checks の副作用計測（StepFrame 等で emu が進む）より先に捕捉する。
+	if len(s.Metrics) > 0 {
+		res.Metrics = make(map[string]int64, len(s.Metrics))
+		for _, fld := range s.Metrics {
+			v, err := resolve(e, fld)
+			if err != nil {
+				return nil, fmt.Errorf("metric %q: %w", fld, err)
+			}
+			res.Metrics[fld] = v
+			res.Asserts = append(res.Asserts, AssertResult{Desc: fmt.Sprintf("metric %s", fld), Got: v, Pass: true})
 		}
 	}
 
