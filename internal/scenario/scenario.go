@@ -505,6 +505,12 @@ func b2i(b bool) int64 {
 	return 0
 }
 
+// ResolveField は field（語彙）の現在値を int64 で返す（副作用なし）。
+// 他パッケージ（invariant マイニング等）が同じ観測語彙を使うための公開ラッパ。
+func ResolveField(e *emu.Emu, field string) (int64, error) {
+	return resolve(e, field)
+}
+
 // resolve は瞬時フィールド（副作用なし）を int64 で返す。未知フィールドはエラー（タイポを握り潰さない）。
 func resolve(e *emu.Emu, field string) (int64, error) {
 	parts := strings.Split(field, ".")
