@@ -14,13 +14,16 @@ versions follow [Semantic Versioning](https://semver.org/).
   the real Breakout, which needs RESET to leave attract mode) so its sprites can be measured live. Motivated by
   a `refdiff` gap: the original's ball height couldn't be rendered/measured because the game wouldn't start.
 - **`internal/refdiff` + `cmd/refdiff`** — differential layout check vs a reference ROM (the original = oracle):
-  extracts a fingerprint (left/right wall clock, ball width) and diffs it against the original. Catches
-  "wrong vs the original" that golden self-regression can't (a wall inset from the screen edge, an undersized
-  ball). First run flagged my Breakout: left wall clock 2 vs 0, ball width 1 vs 2. (Differential testing.)
+  extracts a fingerprint (left/right wall clock, ball **width and height**) and diffs it against the original.
+  `MeasureBall` starts the game (RESET) and tries both control styles (joystick fire / paddle) to render the
+  ball in the open field. Catches "wrong vs the original" that golden self-regression can't (a wall inset from
+  the edge, an undersized ball). Worked example: a user spotted my Breakout's left-wall gap + 1×1 ball by
+  *playing*; refdiff went RED (wall 2 vs 0, ball 1×1 vs 2×4), drove the fix to MATCH. Wired into
+  `docs/testing-playbook.md` (the differential-vs-original entry). (Differential testing.)
 
 ### Notes
-- Proposed release: **1.76.0** (MINOR — additive: panel-switch input + refdiff). The MCP server must be rebuilt
-  and reconnected to use the panel switches.
+- Proposed release: **1.76.0** (MINOR — additive: panel-switch input + refdiff with ball-size diff). The MCP
+  server must be rebuilt and reconnected to use the panel switches.
 
 ## [1.75.0] - 2026-06-16
 

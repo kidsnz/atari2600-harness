@@ -22,7 +22,7 @@ parts. (memory: `feedback-verify-at-claim-level`.)
 | **Invariants / contracts** (Meyer, *Eiffel*; assertions) | "always true" | scenario `invariants` (every frame) + `assert_line_budget` + `ntsc_frame_lines` |
 | **Property-based testing** (Claessen & Hughes, *QuickCheck*, ICFP 2000) | properties over many inputs | assert a *property* not a value — `monotonic` (score ↑, lives ↓), range asserts |
 | **Metamorphic testing** (Chen et al. 1998; Segura et al., *A Survey on Metamorphic Testing*, IEEE TSE 2016) | a *relation* between two runs (no oracle) | scenario `metamorphic`: base + input transform + relation on metrics |
-| **Differential / golden master** (Feathers, *WELC*; characterization tests) | a trusted reference | `golden_frame`/`golden_audio` hashes; `read_row` byte-match vs the real ROM (build-to-learn) |
+| **Differential / golden master** (Feathers, *WELC*; characterization tests) | a trusted reference | `golden_frame`/`golden_audio` hashes (vs the ROM's *own* past); **`cmd/refdiff`** = a layout fingerprint (wall positions, ball size) diffed vs the **original** ROM (the oracle) |
 | **Fuzzing** (Zalewski, *AFL*) | "no invariant breaks under any input" | scenario `fuzz`: seeded random inputs, invariants monitored every frame |
 | **Deterministic simulation testing** (FoundationDB → Antithesis; Wilson, Strange Loop 2014) | seeded run + end-of-run guarantees, reproducible | the emulator is already deterministic → seeded `fuzz` + failure **replay** (seed+frame) |
 | **Mutation testing** (DeMillo/Lipton/Sayward 1978; Offutt) | grade the *tests*, not the code | `mutation`: inject a fault, confirm the suite catches it (kill) or warn (survivor) |
@@ -83,3 +83,7 @@ as fine. Then `mutate` showed the fuzz scenario alone is a weak oracle (5% byte-
   and the `run_scenario` MCP tool. (`docs/scenarios.md`.)
 - `cmd/mutate` (mutation testing), `cmd/metamorphic` (oracle-free relations), `cmd/mine-invariants`
   (Daikon-lite spec drafts) — CLIs over scenarios, runnable in CI / by hand.
+- `cmd/refdiff` — differential check vs the **original** ROM: extracts a layout fingerprint (left/right wall
+  clock, ball width & height) and diffs it. Catches "wrong vs the original" (a wall inset from the edge, an
+  undersized ball) that golden self-regression cannot. Second worked example: a user spotted my Breakout's
+  left-wall gap + 1×1 ball by *playing*; refdiff went RED on both, drove the fix to MATCH (wall 0, ball 2×4).
