@@ -18,11 +18,27 @@ import (
 
 func main() {
 	rom := flag.String("rom", "", "ROM under test (.bin, required)")
-	ref := flag.String("ref", "", "reference/original ROM (.bin, required)")
+	ref := flag.String("ref", "", "reference/original ROM (.bin, required for diff)")
 	warmup := flag.Int("warmup", 10, "frames to settle before measuring")
+	ball := flag.Bool("ball", false, "instead of diffing: start the game (RESET) and measure the ball (width x height) of -rom")
 	flag.Parse()
+
+	if *ball {
+		if *rom == "" {
+			fmt.Fprintln(os.Stderr, "usage: refdiff -ball -rom x.bin")
+			os.Exit(2)
+		}
+		w, h, err := refdiff.MeasureBall(*rom)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+			os.Exit(2)
+		}
+		fmt.Printf("%s: ball = %d clocks wide x %d scanlines tall\n", *rom, w, h)
+		return
+	}
+
 	if *rom == "" || *ref == "" {
-		fmt.Fprintln(os.Stderr, "usage: refdiff -rom mine.bin -ref original.bin [-warmup N]")
+		fmt.Fprintln(os.Stderr, "usage: refdiff -rom mine.bin -ref original.bin [-warmup N]  |  refdiff -ball -rom x.bin")
 		os.Exit(2)
 	}
 

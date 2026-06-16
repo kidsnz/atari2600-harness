@@ -58,6 +58,86 @@ func Extract(romPath string, warmup int) (Fingerprint, error) {
 	return fp, nil
 }
 
+// MeasureBall starts the game (presses GAME RESET to leave attract), serves with
+// the paddle trigger, and measures the ball's rendered width (clocks) and height
+// (scanlines) once it is in the open field. Needs emu.SetPanel (panel switches).
+func MeasureBall(romPath string) (width, height int, err error) {
+	e, err := emu.New("NTSC")
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := e.LoadROM(romPath); err != nil {
+		return 0, 0, err
+	}
+	e.RunFrames(4)
+	// momentary GAME RESET to start a game / leave attract.
+	_ = e.SetPanel("reset", true)
+	e.RunFrames(4)
+	_ = e.SetPanel("reset", false)
+	e.RunFrames(10)
+	// plug the paddle + pull the trigger to serve.
+	_ = e.SetPaddle(0, 0.5)
+	_ = e.SetInput(0, "fire", true)
+	e.RunFrames(6)
+	_ = e.SetInput(0, "fire", false)
+
+	for f := 0; f < 240; f++ {
+		if err := e.RunFrames(1); err != nil {
+			return 0, 0, err
+		}
+		if w, h, ok := findBall(e); ok {
+			return w, h, nil
+		}
+	}
+	return 0, 0, fmt.Errorf("ball never appeared in the open field")
+}
+
+// findBall looks for the ball: an isolated narrow interior run (not a wall, not a
+// full brick row), and measures its width (run length) and height (consecutive
+// scanlines carrying that interior run at the same clock).
+func findBall(e *emu.Emu) (width, height int, ok bool) {
+	interior := func(sl int) (clk, ln int, found bool) {
+		runs, w, err := e.ReadRow(sl)
+		if err != nil {
+			return 0, 0, false
+		}
+		bgIdx := 0
+		for i, r := range runs {
+			if r.Len > runs[bgIdx].Len {
+				bgIdx = i
+			}
+		}
+		bg := runs[bgIdx].Hex
+		var hit []emu.RowRun
+		for _, r := range runs {
+			if r.Hex != bg && r.Clock >= 15 && r.Clock+r.Len <= w-15 && r.Len <= 10 {
+				hit = append(hit, r)
+			}
+		}
+		if len(hit) != 1 {
+			return 0, 0, false
+		}
+		return hit[0].Clock, hit[0].Len, true
+	}
+	for sl := 80; sl <= 205; sl++ {
+		clk, ln, f := interior(sl)
+		if !f {
+			continue
+		}
+		// extend downward while an interior run overlaps the same column.
+		h := 1
+		for d := sl + 1; d <= 215; d++ {
+			c2, l2, f2 := interior(d)
+			if !f2 || c2+l2 <= clk || c2 >= clk+ln {
+				break
+			}
+			h++
+		}
+		return ln, h, true
+	}
+	return 0, 0, false
+}
+
 // wallsFromRow picks out the two narrow side walls from a scanline's run list.
 // Background = the widest run; walls = exactly two non-background runs, narrow
 // (<=12px) and hugging each edge.

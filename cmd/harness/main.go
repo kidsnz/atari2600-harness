@@ -484,7 +484,7 @@ func handleReadRow(ctx context.Context, req *mcp.CallToolRequest, in ReadRowIn) 
 
 type SetInputIn struct {
 	Player  int    `json:"player,omitempty" jsonschema:"player port (0 left/P0 default, 1 right/P1)"`
-	Action  string  `json:"action" jsonschema:"one of left|right|up|down|fire|center|paddle"`
+	Action  string  `json:"action" jsonschema:"joystick: left|right|up|down|fire|center|paddle; console panel switches: reset|select|color|p0pro|p1pro"`
 	Pressed bool    `json:"pressed,omitempty" jsonschema:"press/hold when set, release when unset (ignored for center/paddle)"`
 	Value   float64 `json:"value,omitempty" jsonschema:"paddle position 0.0..1.0 (action=paddle only; plugs the paddle peripheral on first use)"`
 }
@@ -500,12 +500,19 @@ func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn
 	if err != nil {
 		return nil, SetInputOut{}, err
 	}
-	if in.Action == "paddle" {
+	switch in.Action {
+	case "paddle":
 		if err := e.SetPaddle(in.Player, in.Value); err != nil {
 			return nil, SetInputOut{}, err
 		}
-	} else if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
-		return nil, SetInputOut{}, err
+	case "reset", "select", "color", "p0pro", "p1pro": // コンソールパネルのスイッチ
+		if err := e.SetPanel(in.Action, in.Pressed); err != nil {
+			return nil, SetInputOut{}, err
+		}
+	default:
+		if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
+			return nil, SetInputOut{}, err
+		}
 	}
 	return nil, SetInputOut{Coords: coordsOf(e)}, nil
 }
@@ -949,7 +956,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.75.0",
+		Version: "1.76.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -966,7 +973,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_collisions", Description: "Read the 8 TIA collision latches (CXxx, $30-$37; sticky until CXCLR) as named boolean pairs (p0_p1, m0_p0, p0_pf, bl_pf, ...). Structured replacement for raw peeks of the collision registers."}, handleReadCollisions)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_audio", Description: "Read the current TIA audio register values for both channels: control (AUDC, waveform), freq (AUDF, divider), volume (AUDV). Lets you verify sound numerically — read_tia/read_row only cover video."}, handleReadAudio)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
-	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject controller input (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. action left|right|up|down|fire|center|paddle. pressed=true holds, false releases (sticks). action=paddle uses value 0.0..1.0 and plugs the paddle peripheral on first use. center releases all directions."}, handleSetInput)
+	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject controller input or a console panel switch (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. Joystick actions: left|right|up|down|fire|center|paddle. Console panel switches: reset|select|color|p0pro|p1pro (pressed=true is the active state; reset/select are momentary so press then release across frames to start a game). pressed=true holds, false releases (sticks). action=paddle uses value 0.0..1.0 and plugs the paddle peripheral on first use. center releases all directions."}, handleSetInput)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)

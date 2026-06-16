@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`set_input` now drives the console panel switches** (`reset`/`select`/`color`/`p0pro`/`p1pro`), not just the
+  joystick — routes to the existing `emu.SetPanel`. Lets Claude press GAME RESET to actually start a game (e.g.
+  the real Breakout, which needs RESET to leave attract mode) so its sprites can be measured live. Motivated by
+  a `refdiff` gap: the original's ball height couldn't be rendered/measured because the game wouldn't start.
+- **`internal/refdiff` + `cmd/refdiff`** — differential layout check vs a reference ROM (the original = oracle):
+  extracts a fingerprint (left/right wall clock, ball width) and diffs it against the original. Catches
+  "wrong vs the original" that golden self-regression can't (a wall inset from the screen edge, an undersized
+  ball). First run flagged my Breakout: left wall clock 2 vs 0, ball width 1 vs 2. (Differential testing.)
+
+### Notes
+- Proposed release: **1.76.0** (MINOR — additive: panel-switch input + refdiff). The MCP server must be rebuilt
+  and reconnected to use the panel switches.
+
 ## [1.75.0] - 2026-06-16
 
 ### Added
