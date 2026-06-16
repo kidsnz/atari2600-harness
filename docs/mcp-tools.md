@@ -205,6 +205,15 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
 For a manual check, pipe the `initialize`/`tools/call` JSON into harness over stdin, or call it via an MCP
 client (registered in Claude Code's `.mcp.json`).
 
+## run_scenario + the testing suite (v1.75.0)
+
+`run_scenario {paths}` runs declarative scenario JSON in-process (the `cmd/scenario` verdict from the live
+loop). It shares `internal/scenario`, so it automatically supports the testing-discipline fields added in
+v1.75.0 — `invariants` (every-frame property), `monotonic`, the `in` range operator, `fuzz` (seeded random
+input + per-frame invariant monitoring + replay), and `metrics`. Schema: `docs/scenarios.md`; when to use
+each: `docs/testing-playbook.md`. The meta-level tools are CLIs over scenarios (not MCP): `cmd/mutate`
+(mutation testing), `cmd/metamorphic` (oracle-free relations), `cmd/mine-invariants` (Daikon-lite spec drafts).
+
 ## step_clock → recovered as `trace_clocks` (v1.32.0)
 
 `trace_clocks {max_instructions}` executes N instructions and returns each one's beam anatomy

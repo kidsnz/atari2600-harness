@@ -65,25 +65,23 @@ own authoring loop**, not the editor. The G work stands on its own; M references
   `docs/techniques/` skeleton for these would stop the next sports/action build from falling in the same
   hole. Concrete-driven: build when the next ROM needs it. Source: `_casestudies/fishing-derby/diff-gaps.ja.md`.
 
-## Tier 2b — testing/verification discipline import (2026-06-16, `docs/testing-playbook.md`)
-Importing the established software-testing discipline (oracle problem → property/metamorphic/fuzz/mutation,
+## Tier 2b — testing/verification discipline import (2026-06-16, `docs/testing-playbook.md`) — **DONE**
+Imported the established software-testing discipline (oracle problem → property/metamorphic/fuzz/mutation,
 deterministic simulation testing à la FoundationDB/Antithesis) onto the existing deterministic emulator +
-`internal/scenario` substrate. The methodology is usable today (playbook checklist); these are the
-executable backers. Source provenance in `docs/testing-playbook.md`.
+`internal/scenario` substrate. Source provenance in `docs/testing-playbook.md`. **All G10–G14 delivered.**
+First catch: the suite immediately exposed that Breakout rendered 264 lines, not the "262" claimed by eye.
 
-- **G10 — scenario `invariants` / `monotonic` / range operators.** `internal/scenario` only asserts at a
-  named frame. Add conditions checked **every frame** (`invariants`), single-direction guards over the run
-  (`monotonic`: score non-decreasing, lives non-increasing), and `in`/`between` range operators. The
-  foundation the rest build on. (QuickCheck / contracts.)
-- **G11 — `fuzz` (seeded random input + invariant monitoring + replay).** Generate deterministic random
-  inputs over N frames, monitor invariants/checks each frame, and on failure print the seed+frame for
-  reproducible replay. = deterministic simulation testing on a 2600. (AFL / FoundationDB-Antithesis.)
-- **G12 — `metamorphic` (two-run relation).** Run base + an input transform and assert a relation between
-  their metrics — an oracle-free check for emergent claims. (Chen / Segura survey.)
-- **G13 — `mutation` (grade the tests).** Inject a fault (RAM perturbation / known-cell break) and confirm
-  the scenario suite catches it (kill) or warn that the checks are too weak (survivor). (DeMillo / Offutt.)
-- **G14 — `mine-invariants` (Daikon-lite).** Observe field ranges/monotonicity/constants over a run and emit
-  candidate `invariants`/`monotonic`/range asserts as a spec draft. Lowest priority / stretch. (Daikon.)
+- **G10 — scenario `invariants` / `monotonic` / range operators. ✅** Conditions checked **every frame**
+  (`invariants`), single-direction guards (`monotonic`), and the `in` range operator. `internal/scenario`. (QuickCheck.)
+- **G11 — `fuzz` (seeded random input + invariant monitoring + replay). ✅** Deterministic seeded random
+  inputs over N frames, invariants monitored each frame, CPU-jam detection, reproducible by seed.
+  `internal/scenario` `fuzz`. (AFL / FoundationDB-Antithesis.)
+- **G12 — `metamorphic` (two-run relation). ✅** `internal/metamorphic` + `cmd/metamorphic`: assert
+  `A.field <rel> B.field` (oracle-free). (Chen / Segura survey.)
+- **G13 — `mutation` (grade the tests). ✅** `internal/mutate` + `cmd/mutate`: inject a ROM-byte fault, confirm
+  the suite catches it (kill) or flag a survivor. (DeMillo / Offutt.)
+- **G14 — `mine-invariants` (Daikon-lite). ✅** `internal/mine` + `cmd/mine-invariants`: observe fields over a
+  driven run, emit candidate `invariants`/`monotonic`/range as a spec draft. (Daikon.)
 
 ## Recommendation (concrete-driven, per project principle)
 1. ~~**G2 first**~~ **DONE in v1.67.0** — mined rules codified into `pkg/design` (color/position/pf/

@@ -69,7 +69,17 @@ Imported, established techniques (not 2600-specific). Recorded per `feedback-pro
 - Delta debugging — Zeller & Hildebrandt, *Simplifying and Isolating Failure-Inducing Input*, IEEE TSE 28(2),
   2002.
 
-## Status / automation
-The methodology (checklist) is usable today with `run_scenario` + MCP. The executable backers — scenario
-`invariants`/`monotonic`/range, `fuzz`, `mutation`, `metamorphic`, `mine-invariants` — are tracked in
-`docs/capability-gap-audit.md` (G10–G14) and specified in `docs/scenarios.md`.
+## Worked example — the suite's first catch (Breakout, 2026-06-16)
+On its first real run, the Breakout `fuzz` scenario (`ntsc_frame_lines: 262` + game-logic invariants over
+600 frames of random paddle) reported **264 lines, not 262** — exposing that the "stable 262" verdict carried
+through the whole Breakout build was an *eyeball guess, never measured* (it had silently drifted: rung8=262,
+asymmetric PF +1 → 263, channel kernel +1 → 264). Fixed to a true 262 (overscan tuned 30→28) and locked by
+the scenario. This is the playbook's whole point: a numeric, claim-level check finds what the eye certifies
+as fine. Then `mutate` showed the fuzz scenario alone is a weak oracle (5% byte-flip kill rate); adding a
+`golden_frame` scenario raised it to 20%.
+
+## Status / automation — all delivered (G10–G14)
+- Scenario `invariants` / `monotonic` / range, `fuzz`, `metrics` → `internal/scenario`, run by `cmd/scenario`
+  and the `run_scenario` MCP tool. (`docs/scenarios.md`.)
+- `cmd/mutate` (mutation testing), `cmd/metamorphic` (oracle-free relations), `cmd/mine-invariants`
+  (Daikon-lite spec drafts) — CLIs over scenarios, runnable in CI / by hand.

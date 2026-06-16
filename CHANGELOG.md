@@ -18,6 +18,21 @@ versions follow [Semantic Versioning](https://semver.org/).
   Backlog for the executable backers added to `docs/capability-gap-audit.md` as **G10–G14** (scenario
   `invariants`/`monotonic`/range, `fuzz`, `metamorphic`, `mutation`, `mine-invariants`). Provenance recorded
   (QuickCheck, Daikon, AFL, FoundationDB/Antithesis, Chen/Segura, Barr, DeMillo, Zeller).
+- **Automated verification suite — G10–G14 all delivered** (the executable backers of the playbook):
+  - `internal/scenario`: **`invariants`** (a condition checked every frame), **`monotonic`** (a field that
+    only moves one way over the run), the **`in`** range operator, **`fuzz`** (seeded random input +
+    per-frame invariant monitoring + CPU-jam detection, deterministic = replay by seed), and **`metrics`**
+    (fields captured at end of run). `run_scenario` MCP gains all of these automatically.
+  - `internal/mutate` + **`cmd/mutate`** — mutation testing (inject a ROM-byte fault; confirm the suite kills
+    it, or flag a survivor = weak checks; seeded batch kill rate).
+  - `internal/metamorphic` + **`cmd/metamorphic`** — assert a relation `A.field <rel> B.field` between two
+    runs (oracle-free).
+  - `internal/mine` + **`cmd/mine-invariants`** — Daikon-lite: observe a driven run, emit candidate
+    `invariants`/`monotonic` as a spec draft (`scenario.ResolveField` exported for shared vocabulary).
+  - `build.Assemble` now passes `-I<asm dir>` so `.asm` scenarios resolve includes (e.g. `vcs.h`) from any cwd.
+  - **First catch:** the Breakout `fuzz` scenario exposed the frame was 264 lines, not the "262" claimed by
+    eye (never measured); fixed to a true 262 in the roms repo. New litmus scenarios `invariants.json`,
+    `fuzz.json`. Tests added for every package.
 - **`docs/build-to-learn.md`** (new) — reusable methodology: reproduce a real game mechanic-by-mechanic to
   turn "can read" into "can author". Wired into the CLAUDE.md routing table (step 1c) + cross-linked with
   casebook. First worked example = **Breakout** (`roms/breakout/`, 8 rungs from stable frame to a playable
@@ -30,8 +45,11 @@ versions follow [Semantic Versioning](https://semver.org/).
   RAM-driven destructible PF, BL/P0 positioning, joystick paddle, position-based collision, game-state loop).
 
 ### Notes
-- Proposed release: **1.74.0** (MINOR — additive docs/methodology). Tag + push deferred to user approval.
-- The authored Breakout ROM lives in the **roms** repo (`roms/breakout/`), not here.
+- Proposed release: **1.75.0** (MINOR — additive: build-to-learn + casebook docs, the testing-playbook, and
+  the automated verification suite G10–G14; all backward-compatible). Tag + push deferred to user approval.
+- The MCP server (`cmd/harness`) must be **rebuilt** for `run_scenario` to pick up the new scenario features
+  (`invariants`/`monotonic`/`fuzz`/`metrics`) — smoke-test with `scripts/mcp_smoke.py` then reconnect.
+- The authored Breakout ROM + its scenarios live in the **roms** repo (`roms/breakout/`), not here.
 
 ## [1.73.0] - 2026-06-15
 

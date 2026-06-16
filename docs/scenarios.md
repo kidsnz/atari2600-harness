@@ -31,6 +31,12 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
 
   "frames": 600,                        // run length for whole-run monitoring (default = max input/assert frame)
 
+  "fuzz": {                             // deterministic simulation testing: seeded random input over N frames
+    "seed": 7, "frames": 600, "actions": ["left", "right", "fire"], "player": 0
+  },
+
+  "metrics": ["ram.0x85"],              // fields captured at end of run (for cmd/metamorphic comparison)
+
   "invariants": [                       // property: a condition that must hold at EVERY frame (first break reported)
     {"field": "ram.0x9B", "op": "in", "lo": 0, "hi": 5}
   ],
@@ -103,11 +109,25 @@ with warmup excluded (reproducible for the same ROM + same input + same frame co
 Game repositories add their own under `<game>/scenarios/` — e.g. Frogger's `boot.json` (initial FrogY
 144 + 3 lives + 262 lines), `hop.json` (`up` input drives FrogY 144→128), `golden.json`.
 
+- **`fuzz`** = deterministic simulation testing: seeded random inputs from `actions` over `frames`, with
+  `invariants`/`monotonic` monitored every frame and CPU jam (crash) detected. Deterministic, so a found
+  failure reproduces by re-running the same seed (replay). (AFL / FoundationDB-Antithesis.)
+- **`metrics`** = fields captured at the end of the run (before side-effecting checks), exposed in
+  `Result.Metrics`, for `cmd/metamorphic` to relate two runs.
+
+## The wider testing suite (CLIs over scenarios)
+The scenario fields above (`invariants`/`monotonic`/range/`fuzz`/`metrics`) run via `cmd/scenario` and the
+`run_scenario` MCP tool. Two more disciplines operate *over* scenarios as separate CLIs:
+- **`cmd/mutate`** — mutation testing: inject a ROM-byte fault, confirm the scenario suite catches it (kill).
+  Single mode exits 1 on a SURVIVOR; batch mode reports a seeded kill rate. Grades the tests.
+- **`cmd/metamorphic`** — assert a relation `A.field <rel> B.field` between two scenario runs (oracle-free).
+- **`cmd/mine-invariants`** — Daikon-lite: drive a ROM and emit candidate `invariants`/`monotonic` as a spec draft.
+See `docs/testing-playbook.md` for when to use each.
+
 ## Bundled samples (added)
 - `roms/litmus/scenarios/invariants.json` — `invariants` (`ram.0x80 == 66`, range `in [60,70]`) + `monotonic`
   (`frame` up) + the `in` range assert, over `frames: 5`.
+- `roms/litmus/scenarios/fuzz.json` — `fuzz` (seeded random input) + an invariant + 262 lines.
 
 ## Out of scope (next step)
 - Scanline-targeted asserts, audio golden (`digest.Audio`).
-- The wider testing-discipline backers (`fuzz`, `metamorphic`, `mutation`, `mine-invariants`) — see
-  `docs/testing-playbook.md` and `docs/capability-gap-audit.md` G11–G14. (`run_scenario` MCP exists since v1.19.0.)
