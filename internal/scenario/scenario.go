@@ -32,8 +32,26 @@ type Input struct {
 type Assert struct {
 	AtFrame int    `json:"at_frame"` // このフレームを走らせた直後に評価
 	Field   string `json:"field"`    // 語彙（下記 resolve 参照）
-	Op      string `json:"op"`       // == != < <= > >=
+	Op      string `json:"op"`       // == != < <= > >= in
 	Value   int64  `json:"value"`    // 比較値（bool は 0/1）
+	Lo      int64  `json:"lo,omitempty"` // op="in": got が [Lo,Hi] に入るか（範囲演算子）
+	Hi      int64  `json:"hi,omitempty"`
+}
+
+// Invariant は run 全体で「毎フレーム」成り立つべき条件（property-based / 契約）。
+// 最初に破れたフレーム番号を報告する。docs/testing-playbook.md。
+type Invariant struct {
+	Field string `json:"field"`
+	Op    string `json:"op"` // == != < <= > >= in
+	Value int64  `json:"value,omitempty"`
+	Lo    int64  `json:"lo,omitempty"` // op="in"
+	Hi    int64  `json:"hi,omitempty"`
+}
+
+// Monotonic は field が run 全体で一方向にしか動かない性質（score 単調増・lives 単調減など）。
+type Monotonic struct {
+	Field     string `json:"field"`
+	Direction string `json:"direction"` // "up"=非減少 / "down"=非増加
 }
 
 // Checks は run 全体に対する性質（副作用＝フレームを進める計測なのでタイムライン後にまとめて評価）。
@@ -52,6 +70,12 @@ type Scenario struct {
 	Inputs       []Input  `json:"inputs,omitempty"`
 	Asserts      []Assert `json:"asserts,omitempty"`
 	Checks       *Checks  `json:"checks,omitempty"`
+
+	// run 全体の性質（毎フレーム監視）。Frames は監視のために走らせる最小フレーム数
+	// （省略時は inputs/asserts の最大フレームまで）。
+	Frames     int         `json:"frames,omitempty"`
+	Invariants []Invariant `json:"invariants,omitempty"`
+	Monotonic  []Monotonic `json:"monotonic,omitempty"`
 
 	srcPath string // Load 時のファイルパス（golden ファイルの場所決めに使う。空＝プログラム生成）
 }
@@ -162,12 +186,18 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 		}
 	}
 
+	// invariants / monotonic は inputs/asserts の最大フレームを越えても監視したいので run 長を伸ばす。
+	lastF := maxF
+	if s.Frames-1 > lastF {
+		lastF = s.Frames - 1
+	}
+
 	res := &Result{Pass: true}
 	record := func(a Assert, got int64, ok bool, evalErr error) error {
 		if evalErr != nil {
 			return evalErr
 		}
-		desc := fmt.Sprintf("%s %s %d", a.Field, a.Op, a.Value)
+		desc := condDesc(a.Field, a.Op, a.Value, a.Lo, a.Hi)
 		res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
 		if !ok {
 			res.Pass = false
@@ -175,7 +205,13 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 		return nil
 	}
 
-	for f := 0; f <= maxF; f++ {
+	// 毎フレーム監視の状態（最初の破れだけ記録してフレーム数ぶん溢れさせない）。
+	brokenInv := make([]bool, len(s.Invariants))
+	prevMono := make([]int64, len(s.Monotonic))
+	seenMono := make([]bool, len(s.Monotonic))
+	brokenMono := make([]bool, len(s.Monotonic))
+
+	for f := 0; f <= lastF; f++ {
 		for _, in := range inByFrame[f] { // このフレームを走らせる前に入力適用
 			if in.Action == "paddle" {
 				if err := e.SetPaddle(in.Player, in.Value); err != nil {
@@ -198,10 +234,76 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			if err != nil {
 				return nil, fmt.Errorf("frame %d: %w", f, err)
 			}
-			ok, err := compare(got, a.Op, a.Value)
+			ok, err := condPass(got, a.Op, a.Value, a.Lo, a.Hi)
 			if err := record(a, got, ok, err); err != nil {
 				return nil, err
 			}
+		}
+
+		// 毎フレーム: 不変条件（常に真であるべき）。最初に破れたフレームを1回だけ記録。
+		for i, inv := range s.Invariants {
+			if brokenInv[i] {
+				continue
+			}
+			got, err := resolve(e, inv.Field)
+			if err != nil {
+				return nil, fmt.Errorf("frame %d invariant %q: %w", f, inv.Field, err)
+			}
+			ok, err := condPass(got, inv.Op, inv.Value, inv.Lo, inv.Hi)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				res.Asserts = append(res.Asserts, AssertResult{
+					Desc: fmt.Sprintf("invariant %s [broke@frame %d]", condDesc(inv.Field, inv.Op, inv.Value, inv.Lo, inv.Hi), f),
+					Got:  got, Pass: false})
+				res.Pass = false
+				brokenInv[i] = true
+			}
+		}
+
+		// 毎フレーム: 単調性（一方向にしか動かない）。最初の違反を1回だけ記録。
+		for i, m := range s.Monotonic {
+			got, err := resolve(e, m.Field)
+			if err != nil {
+				return nil, fmt.Errorf("frame %d monotonic %q: %w", f, m.Field, err)
+			}
+			if seenMono[i] && !brokenMono[i] {
+				var bad bool
+				switch m.Direction {
+				case "up":
+					bad = got < prevMono[i]
+				case "down":
+					bad = got > prevMono[i]
+				default:
+					return nil, fmt.Errorf("monotonic %q: unknown direction %q (want up|down)", m.Field, m.Direction)
+				}
+				if bad {
+					res.Asserts = append(res.Asserts, AssertResult{
+						Desc: fmt.Sprintf("monotonic %s %s [broke@frame %d: %d->%d]", m.Field, m.Direction, f, prevMono[i], got),
+						Got:  got, Pass: false})
+					res.Pass = false
+					brokenMono[i] = true
+				}
+			}
+			prevMono[i] = got
+			seenMono[i] = true
+		}
+	}
+
+	// 破れなかった invariant / monotonic は「N フレーム成立」と陽に記録（合格を可視化）。
+	for i, inv := range s.Invariants {
+		if !brokenInv[i] {
+			res.Asserts = append(res.Asserts, AssertResult{
+				Desc: fmt.Sprintf("invariant %s held [%d frames]", condDesc(inv.Field, inv.Op, inv.Value, inv.Lo, inv.Hi), lastF+1),
+				Pass: true})
+		}
+	}
+	for i, m := range s.Monotonic {
+		if !brokenMono[i] {
+			res.Asserts = append(res.Asserts, AssertResult{
+				Desc: fmt.Sprintf("monotonic %s %s held [%d frames]", m.Field, m.Direction, lastF+1),
+				Pass: true})
 		}
 	}
 
@@ -314,8 +416,24 @@ func compare(got int64, op string, want int64) (bool, error) {
 	case ">=":
 		return got >= want, nil
 	default:
-		return false, fmt.Errorf("unknown op %q (want == != < <= > >=)", op)
+		return false, fmt.Errorf("unknown op %q (want == != < <= > >= in)", op)
 	}
+}
+
+// condPass は範囲演算子 in（[lo,hi] 内包）を含む条件を評価する。
+func condPass(got int64, op string, value, lo, hi int64) (bool, error) {
+	if op == "in" {
+		return got >= lo && got <= hi, nil
+	}
+	return compare(got, op, value)
+}
+
+// condDesc は条件の人間可読な説明（"in" は範囲表示）。
+func condDesc(field, op string, value, lo, hi int64) string {
+	if op == "in" {
+		return fmt.Sprintf("%s in [%d,%d]", field, lo, hi)
+	}
+	return fmt.Sprintf("%s %s %d", field, op, value)
 }
 
 func b2i(b bool) int64 {

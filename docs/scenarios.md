@@ -29,6 +29,17 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
     {"at_frame": 1, "field": "ram.0x81", "op": "==", "value": 128}
   ],
 
+  "frames": 600,                        // run length for whole-run monitoring (default = max input/assert frame)
+
+  "invariants": [                       // property: a condition that must hold at EVERY frame (first break reported)
+    {"field": "ram.0x9B", "op": "in", "lo": 0, "hi": 5}
+  ],
+
+  "monotonic": [                        // property: a field that only moves one way over the run
+    {"field": "ram.0x85", "direction": "up"},    // score never decreases
+    {"field": "ram.0x9B", "direction": "down"}   // lives never increase
+  ],
+
   "checks": {                           // whole-run properties (measurements with side effects; evaluated after the timeline)
     "ntsc_frame_lines": 262,            // StepFrame() == 262
     "max_line_budget": 76,              // budget guard is never exceeded (equivalent to assert_line_budget)
@@ -38,9 +49,12 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
 }
 ```
 
-- Operators `op`: `==` `!=` `<` `<=` `>` `>=`.
+- Operators `op`: `==` `!=` `<` `<=` `>` `>=` and `in` (range; uses `lo`/`hi`, inclusive — for `asserts` and `invariants`).
 - `value` is an integer (bool fields are 0/1).
 - `at_frame` / `inputs.frame` are 0-based frame numbers **after warmup**. Frame f = "apply input → run one frame → evaluate asserts".
+- **`invariants`** = property-based: each condition is checked at the end of **every** frame (0..`frames`); only the **first** break is recorded (with the frame number). A held invariant is reported as `… held [N frames]`. (QuickCheck / contracts — `docs/testing-playbook.md`.)
+- **`monotonic`** = a field that may only move one way over the run: `up` = non-decreasing, `down` = non-increasing. Catches "score went down" / "lives went up". First violation reported with `prev->got`.
+- **`frames`** extends the run beyond the last input/assert frame so `invariants`/`monotonic` are monitored over a meaningful window.
 
 ## Field vocabulary (`field`)
 
@@ -89,6 +103,11 @@ with warmup excluded (reproducible for the same ROM + same input + same frame co
 Game repositories add their own under `<game>/scenarios/` — e.g. Frogger's `boot.json` (initial FrogY
 144 + 3 lives + 262 lines), `hop.json` (`up` input drives FrogY 144→128), `golden.json`.
 
+## Bundled samples (added)
+- `roms/litmus/scenarios/invariants.json` — `invariants` (`ram.0x80 == 66`, range `in [60,70]`) + `monotonic`
+  (`frame` up) + the `in` range assert, over `frames: 5`.
+
 ## Out of scope (next step)
-- An MCP-tool variant `run_scenario` (could share logic with the CLI).
-- Range operators, scanline-targeted asserts, audio golden (`digest.Audio`).
+- Scanline-targeted asserts, audio golden (`digest.Audio`).
+- The wider testing-discipline backers (`fuzz`, `metamorphic`, `mutation`, `mine-invariants`) — see
+  `docs/testing-playbook.md` and `docs/capability-gap-audit.md` G11–G14. (`run_scenario` MCP exists since v1.19.0.)

@@ -34,6 +34,79 @@ func TestCompare(t *testing.T) {
 	}
 }
 
+// TestCondPassIn は範囲演算子 in（[lo,hi] 内包）を確認する。
+func TestCondPassIn(t *testing.T) {
+	cases := []struct {
+		got, lo, hi int64
+		exp         bool
+	}{
+		{5, 0, 10, true}, {5, 6, 10, false}, {10, 0, 10, true}, {0, 0, 10, true}, {11, 0, 10, false},
+	}
+	for _, c := range cases {
+		got, err := condPass(c.got, "in", 0, c.lo, c.hi)
+		if err != nil {
+			t.Fatalf("condPass in err: %v", err)
+		}
+		if got != c.exp {
+			t.Errorf("%d in [%d,%d] = %v, want %v", c.got, c.lo, c.hi, got, c.exp)
+		}
+	}
+}
+
+// TestInvariantsMonotonic は毎フレーム監視（invariants / monotonic / range）の陽性・陰性を確認する。
+// smoke.bin は ram.0x80 が定数 66、frame は毎フレーム単調増＝決定的な break ケースになる。
+func TestInvariantsMonotonic(t *testing.T) {
+	t.Chdir("../..")
+	// 陽性: 定数の invariant・範囲 assert・frame の単調増。
+	pass := &Scenario{
+		Rom:    "roms/litmus/smoke.bin",
+		Frames: 5,
+		Asserts: []Assert{
+			{AtFrame: 0, Field: "ram.0x80", Op: "in", Lo: 60, Hi: 70}, // 66 ∈ [60,70]
+		},
+		Invariants: []Invariant{
+			{Field: "ram.0x80", Op: "==", Value: 66},
+			{Field: "ram.0x80", Op: "in", Lo: 60, Hi: 70},
+		},
+		Monotonic: []Monotonic{{Field: "frame", Direction: "up"}},
+	}
+	res, err := Run(pass, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Pass {
+		for _, a := range res.Asserts {
+			if !a.Pass {
+				t.Errorf("unexpected fail: %s (got %d)", a.Desc, a.Got)
+			}
+		}
+	}
+
+	// 陰性: 破れる invariant ＋ 単調増の frame に対する "down"。各 break は1回だけ記録される。
+	fail := &Scenario{
+		Rom:        "roms/litmus/smoke.bin",
+		Frames:     5,
+		Invariants: []Invariant{{Field: "ram.0x80", Op: "==", Value: 1}}, // 66≠1 → break
+		Monotonic:  []Monotonic{{Field: "frame", Direction: "down"}},     // frame↑ → break
+	}
+	res2, err := Run(fail, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res2.Pass {
+		t.Fatalf("expected fail")
+	}
+	breaks := 0
+	for _, a := range res2.Asserts {
+		if !a.Pass {
+			breaks++
+		}
+	}
+	if breaks != 2 { // 1 invariant + 1 monotonic、各々最初の破れだけ
+		t.Fatalf("expected exactly 2 recorded breaks, got %d: %+v", breaks, res2.Asserts)
+	}
+}
+
 // TestRunSamples は同梱サンプルシナリオが実 ROM で全 pass することを確認する（陽性）。
 // ROM パスはリポジトリルート相対なので、テストはルートへ chdir して CLI と同じ前提で走らせる。
 func TestRunSamples(t *testing.T) {

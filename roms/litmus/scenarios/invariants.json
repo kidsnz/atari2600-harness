@@ -1,0 +1,15 @@
+{
+  "rom": "roms/litmus/smoke.bin",
+  "frames": 5,
+  "asserts": [
+    {"at_frame": 0, "field": "ram.0x80", "op": "in", "lo": 60, "hi": 70}
+  ],
+  "invariants": [
+    {"field": "ram.0x80", "op": "==", "value": 66},
+    {"field": "ram.0x80", "op": "in", "lo": 60, "hi": 70}
+  ],
+  "monotonic": [
+    {"field": "frame", "direction": "up"}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "max_line_budget": 76}
+}
