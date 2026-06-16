@@ -35,6 +35,9 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
    `breakif`.
 5. **Verify** — `assemble_and_load` → `run_scenario` (numeric asserts + golden + 262) → `get_screen_annotated`
    (visual: not blank, the technique reads). Horizontal verdict = `read_tia` HmovedPixel; vertical = scanline.
+   Choose the oracle and rigour for the claim using `docs/testing-playbook.md` (invariants / property /
+   metamorphic / fuzz / mutation) — and for any *emergent* claim, demonstrate that behaviour directly
+   (free-run, no poke), don't infer it from component checks.
 6. **★Feedback (the compounding core)** — when something fails or a gap surfaces, feed it back:
    - a missed *known* trap → strengthen `check_traps.py`;
    - new knowledge → distil to `design-principles.md` (with provenance);

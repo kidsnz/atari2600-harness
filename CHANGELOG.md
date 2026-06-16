@@ -9,6 +9,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`docs/testing-playbook.md`** (new) — imports the established software-testing discipline (the **oracle
+  problem** → invariants/contracts, property-based, metamorphic, differential/golden, fuzzing, **deterministic
+  simulation testing** à la FoundationDB/Antithesis, mutation testing, invariant mining, delta debugging) and
+  maps each onto this harness, with a per-build verification checklist usable today via `run_scenario` + MCP.
+  Wired into the CLAUDE.md routing (step 5b) + authoring-protocol step 5. Motivated by `feedback-verify-at-claim-level`
+  (verify at the level of the claim — for emergent behaviour, demonstrate it; don't infer it from component checks).
+  Backlog for the executable backers added to `docs/capability-gap-audit.md` as **G10–G14** (scenario
+  `invariants`/`monotonic`/range, `fuzz`, `metamorphic`, `mutation`, `mine-invariants`). Provenance recorded
+  (QuickCheck, Daikon, AFL, FoundationDB/Antithesis, Chen/Segura, Barr, DeMillo, Zeller).
 - **`docs/build-to-learn.md`** (new) — reusable methodology: reproduce a real game mechanic-by-mechanic to
   turn "can read" into "can author". Wired into the CLAUDE.md routing table (step 1c) + cross-linked with
   casebook. First worked example = **Breakout** (`roms/breakout/`, 8 rungs from stable frame to a playable
