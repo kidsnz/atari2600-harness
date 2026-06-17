@@ -9,6 +9,9 @@ must always hold *only* in a doc — burn them here or into memory.
 > per-doc `*.ja.md` copies were **dropped (2026-06-17)** to avoid duplicate, drift-prone files — the English
 > `*.md` is the single source of truth. (A few `.md` bodies still contain Japanese; full English-ization is
 > tracked as **DOC-EN** in `docs/capability-gap-audit.md`.)
+> **Talk to the user in Japanese.** The English-only policy is about *repo artifacts* (docs/code/CHANGELOG) —
+> it does **not** apply to conversation. The user works in Japanese; answer in Japanese. Don't conflate
+> "the repo is English" with "reply in English" (drift caught 2026-06-17).
 
 ## Invariant premises
 - Goal: build a **verification harness** so Claude can author the Atari 2600 in 6502 assembly accurately
