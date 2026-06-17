@@ -8,6 +8,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.82.0] - 2026-06-17
+
+### Added
+- **Temporal-logic trace assertions (VV-5).** New scenario `temporal` block for bounded-temporal-logic
+  properties over the **frame sequence** — things an instantaneous `assert` or a per-frame `invariant` cannot
+  express. Three monitor kinds (`always P` stays as the existing `invariant`, not duplicated):
+  - **`eventually`** — P must hold within `within` frames of the run start (bounded liveness).
+  - **`response`** — whenever trigger A holds at frame *f*, P must hold within `within` frames (*f*..*f*+within).
+  - **`never_for`** — P must not hold for `n` consecutive frames (safety).
+  Implemented in `internal/scenario` by reusing the existing condition vocabulary (`resolve` + `condPass` +
+  `condDesc`): each monitor's proposition (and the response trigger) is observed into a per-frame boolean trace
+  inside the run loop, then the verdict is computed off the trace. Liveness whose window is not fully observed
+  reports **INCONCLUSIVE** (`Pass:false`) so it can never be a vacuous green. **Scenario-only — no MCP tool,
+  hence no server rebuild / reconnect** (a deliberate low-friction choice this session). Self-test:
+  `TestEvalTemporal` fixes pass/fail/inconclusive for all three operators on planted boolean traces
+  (frame-base independent) and `TestTemporalThroughRun` proves the resolve→observe→eval wiring end-to-end on
+  `smoke.bin` (plus inconclusive-is-not-green and invalid-definition rejection). Sample
+  `roms/litmus/scenarios/temporal.json`. Docs: `docs/scenarios.md`, `docs/testing-playbook.md`. **Src:**
+  Bauer/Leucker/Schallhart TOSEM 2011 (LTL₃); STL RV'15.
+
 ## [1.81.0] - 2026-06-17
 
 ### Changed

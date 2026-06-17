@@ -20,6 +20,7 @@ parts. (memory: `feedback-verification-standard`.)
 | Technique (source) | Oracle strategy | In this harness |
 |---|---|---|
 | **Invariants / contracts** (Meyer, *Eiffel*; assertions) | "always true" | scenario `invariants` (every frame) + `assert_line_budget` + `ntsc_frame_lines` |
+| **Runtime verification / bounded temporal logic** (Bauer/Leucker/Schallhart, LTL₃, TOSEM 2011; STL, RV 2015) | properties over a *sequence* of frames, with a deadline | scenario `temporal` (VV-5): `eventually`-within-K (bounded liveness), `response` (A⇒P within K), `never_for` N consecutive; liveness with an unobserved window reports **INCONCLUSIVE**, never a vacuous green |
 | **Property-based testing** (Claessen & Hughes, *QuickCheck*, ICFP 2000) | properties over many inputs | assert a *property* not a value — `monotonic` (score ↑, lives ↓), range asserts |
 | **Metamorphic testing** (Chen et al. 1998; Segura et al., *A Survey on Metamorphic Testing*, IEEE TSE 2016) | a *relation* between two runs (no oracle) | scenario `metamorphic`: base + input transform + relation on metrics |
 | **Differential / golden master** (Feathers, *WELC*; characterization tests) | a trusted reference | `golden_frame`/`golden_audio` hashes (vs the ROM's *own* past); **`cmd/refdiff`** = a layout fingerprint (wall positions, ball size) diffed vs the **original** ROM (the oracle) |

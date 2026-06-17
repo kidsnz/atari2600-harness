@@ -46,6 +46,13 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
     {"field": "ram.0x9B", "direction": "down"}   // lives never increase
   ],
 
+  "temporal": [                         // VV-5: bounded temporal logic over the FRAME SEQUENCE
+    {"kind": "eventually", "field": "ram.0x9B", "op": "==", "value": 3, "within": 60},        // P holds within K frames (bounded liveness)
+    {"kind": "response", "a_field": "ram.0x80", "a_op": "==", "a_value": 1,                    // whenever A holds...
+                         "field": "ram.0x85", "op": ">", "value": 0, "within": 10},           // ...P must hold within K frames
+    {"kind": "never_for", "field": "ram.0x90", "op": "==", "value": 0, "n": 120}              // P must not hold for N consecutive frames
+  ],
+
   "checks": {                           // whole-run properties (measurements with side effects; evaluated after the timeline)
     "ntsc_frame_lines": 262,            // StepFrame() == 262
     "max_line_budget": 76,              // budget guard is never exceeded (equivalent to assert_line_budget)
@@ -60,7 +67,12 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
 - `at_frame` / `inputs.frame` are 0-based frame numbers **after warmup**. Frame f = "apply input → run one frame → evaluate asserts".
 - **`invariants`** = property-based: each condition is checked at the end of **every** frame (0..`frames`); only the **first** break is recorded (with the frame number). A held invariant is reported as `… held [N frames]`. (QuickCheck / contracts — `docs/testing-playbook.md`.)
 - **`monotonic`** = a field that may only move one way over the run: `up` = non-decreasing, `down` = non-increasing. Catches "score went down" / "lives went up". First violation reported with `prev->got`.
-- **`frames`** extends the run beyond the last input/assert frame so `invariants`/`monotonic` are monitored over a meaningful window.
+- **`frames`** extends the run beyond the last input/assert frame so `invariants`/`monotonic`/`temporal` are monitored over a meaningful window.
+- **`temporal`** (VV-5) = bounded-temporal-logic properties over the **frame sequence** (things a per-frame `invariant` can't say). `"always P"` is just an `invariant` — not duplicated here. Three `kind`s:
+  - **`eventually`** — `P` (the `field`/`op`/`value`/`lo`/`hi` condition) must hold within `within` frames of the run start (bounded liveness). If the run ends before the window fully elapses and `P` never held, the result is **INCONCLUSIVE** (a failure, *not* a vacuous pass) — set `frames` large enough to cover the window.
+  - **`response`** — whenever the trigger `A` (`a_field`/`a_op`/`a_value`/`a_lo`/`a_hi`) holds at frame *f*, `P` must hold within `within` frames (*f*..*f*+`within`). An obligation whose window extends past the run end is INCONCLUSIVE.
+  - **`never_for`** — `P` must not hold for `n` consecutive frames (safety; fully decidable on the observed trace).
+  Scenario-side only (runs via `cmd/scenario`, no MCP tool). Self-test: `TestEvalTemporal` (planted traces) + `TestTemporalThroughRun`. Sample: `roms/litmus/scenarios/temporal.json`. **Src:** Bauer/Leucker/Schallhart TOSEM 2011 (LTL₃); STL RV'15.
 
 ## Field vocabulary (`field`)
 

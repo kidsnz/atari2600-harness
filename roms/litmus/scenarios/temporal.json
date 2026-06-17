@@ -1,0 +1,9 @@
+{
+  "rom": "roms/litmus/smoke.bin",
+  "frames": 6,
+  "temporal": [
+    {"kind": "eventually", "field": "ram.0x80", "op": "==", "value": 66, "within": 3},
+    {"kind": "never_for", "field": "ram.0x80", "op": "!=", "value": 66, "n": 3},
+    {"kind": "response", "field": "ram.0x80", "op": "==", "value": 66, "a_field": "ram.0x80", "a_op": "==", "a_value": 66, "within": 1}
+  ]
+}
