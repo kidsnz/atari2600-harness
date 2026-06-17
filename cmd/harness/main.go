@@ -19,6 +19,7 @@ import (
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/motion"
 	"github.com/kidsnz/atari2600-harness/internal/srcmap"
 	"github.com/kidsnz/atari2600-harness/pkg/audio"
 	"github.com/kidsnz/atari2600-harness/internal/ingest"
@@ -478,6 +479,46 @@ func handleReadRow(ctx context.Context, req *mcp.CallToolRequest, in ReadRowIn) 
 		Runs:     runs,
 		Coords:   coordsOf(e),
 	}, nil
+}
+
+// --- read_motion（オブジェクトの動きの滑らかさ＝judder/ブルブルを数値化。VV-4）---
+
+type ReadMotionIn struct {
+	Object string `json:"object,omitempty" jsonschema:"object to track: P0 M0 P1 M1 BL (default BL)"`
+	Frames int    `json:"frames,omitempty" jsonschema:"frames to track (default 40); ADVANCES the emulator this many frames"`
+	YTop   int    `json:"y_top,omitempty" jsonschema:"scanline search window top (grid-y; default 0)"`
+	YBot   int    `json:"y_bot,omitempty" jsonschema:"scanline search window bottom (grid-y; default 260)"`
+}
+type ReadMotionOut struct {
+	Track  motion.Track `json:"track"`
+	Coords Coords       `json:"coords"`
+}
+
+func handleReadMotion(ctx context.Context, req *mcp.CallToolRequest, in ReadMotionIn) (*mcp.CallToolResult, ReadMotionOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ReadMotionOut{}, err
+	}
+	obj := in.Object
+	if obj == "" {
+		obj = "BL"
+	}
+	frames := in.Frames
+	if frames == 0 {
+		frames = 40
+	}
+	yBot := in.YBot
+	if yBot == 0 {
+		yBot = 260
+	}
+	tr, err := motion.TrackObject(e, obj, frames, in.YTop, yBot)
+	if err != nil {
+		return nil, ReadMotionOut{}, err
+	}
+	return nil, ReadMotionOut{Track: tr, Coords: coordsOf(e)}, nil
 }
 
 // --- set_input（ジョイスティック注入。poke は入力に効かない）---
@@ -956,7 +997,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.76.0",
+		Version: "1.79.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -973,6 +1014,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_collisions", Description: "Read the 8 TIA collision latches (CXxx, $30-$37; sticky until CXCLR) as named boolean pairs (p0_p1, m0_p0, p0_pf, bl_pf, ...). Structured replacement for raw peeks of the collision registers."}, handleReadCollisions)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_audio", Description: "Read the current TIA audio register values for both channels: control (AUDC, waveform), freq (AUDF, divider), volume (AUDV). Lets you verify sound numerically — read_tia/read_row only cover video."}, handleReadAudio)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_motion", Description: "Track a TIA object (P0/M0/P1/M1/BL) over N frames and report how smoothly it moves: per-frame velocity (1st difference), acceleration (2nd difference), and jerk_rms (RMS of the 2nd difference; 0 = constant velocity, high = judder/stutter). Tracks the exact horizontal HmovedPixel (x) and the rendered vertical top. Turns 'does it judder / ブルブル' into a number — automates the hand frame-by-frame trace. NOTE: ADVANCES the emulator N frames, so set up the state (serve/step) first; track the rendered top over a window where the object moves on a uniform background (x is always exact)."}, handleReadMotion)
 	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject controller input or a console panel switch (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. Joystick actions: left|right|up|down|fire|center|paddle. Console panel switches: reset|select|color|p0pro|p1pro (pressed=true is the active state; reset/select are momentary so press then release across frames to start a game). pressed=true holds, false releases (sticks). action=paddle uses value 0.0..1.0 and plugs the paddle peripheral on first use. center releases all directions."}, handleSetInput)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)

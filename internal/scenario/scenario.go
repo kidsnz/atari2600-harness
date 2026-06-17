@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/motion"
 )
 
 // Input はあるフレームで与えるジョイスティック操作（D-2: 入力タイムライン）。
@@ -71,6 +73,22 @@ type Checks struct {
 	MaxLineBudget  *int `json:"max_line_budget,omitempty"`  // RunUntilBudget が超過しない（既定予算 76）
 	GoldenFrame    bool `json:"golden_frame,omitempty"`     // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
 	GoldenAudio    bool `json:"golden_audio,omitempty"`     // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
+	Motion         *MotionCheck `json:"motion,omitempty"`   // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
+}
+
+// MotionCheck gates an object's motion smoothness: it tracks the object for
+// Frames frames (after Warmup) and requires the chosen axis's jerk_rms (RMS of
+// the rendered position's 2nd difference; 0 = constant velocity) to stay <=
+// MaxJerkRMS. Catches a judder/stutter regression. Track over a window where the
+// object moves on a uniform background; axis "x" (HmovedPixel) is always exact.
+type MotionCheck struct {
+	Object     string  `json:"object"`               // P0 M0 P1 M1 BL
+	Axis       string  `json:"axis,omitempty"`       // "top" (rendered vertical, default) or "x"
+	Frames     int     `json:"frames,omitempty"`     // default 40
+	Warmup     int     `json:"warmup,omitempty"`     // frames to settle before tracking
+	YTop       int     `json:"y_top,omitempty"`      // scanline search window (grid-y)
+	YBot       int     `json:"y_bot,omitempty"`      // default 260
+	MaxJerkRMS float64 `json:"max_jerk_rms"`         // gate: jerk_rms must be <= this
 }
 
 // Scenario は 1 本のシナリオ定義。
@@ -410,6 +428,37 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			}
 			res.Asserts = append(res.Asserts, AssertResult{
 				Desc: fmt.Sprintf("max_line_budget %d: no overrun", *s.Checks.MaxLineBudget), Got: got, Pass: ok})
+			if !ok {
+				res.Pass = false
+			}
+		}
+		if s.Checks.Motion != nil {
+			mc := s.Checks.Motion
+			frames := mc.Frames
+			if frames == 0 {
+				frames = 40
+			}
+			yBot := mc.YBot
+			if yBot == 0 {
+				yBot = 260
+			}
+			if mc.Warmup > 0 {
+				if err := e.RunFrames(mc.Warmup); err != nil {
+					return nil, err
+				}
+			}
+			tr, err := motion.TrackObject(e, mc.Object, frames, mc.YTop, yBot)
+			if err != nil {
+				return nil, err
+			}
+			jerk, axis := tr.Top.JerkRMS, "top"
+			if mc.Axis == "x" {
+				jerk, axis = tr.X.JerkRMS, "x"
+			}
+			ok := jerk <= mc.MaxJerkRMS
+			res.Asserts = append(res.Asserts, AssertResult{
+				Desc: fmt.Sprintf("motion %s.%s jerk_rms %.3g <= %.3g (missing %d)", mc.Object, axis, jerk, mc.MaxJerkRMS, tr.Missing),
+				Got:  int64(math.Round(jerk * 1000)), Pass: ok})
 			if !ok {
 				res.Pass = false
 			}

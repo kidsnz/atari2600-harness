@@ -1,0 +1,7 @@
+{
+  "rom": "roms/litmus/motion_glide.asm",
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "motion": {"object": "BL", "frames": 40, "warmup": 5, "y_top": 40, "y_bot": 230, "max_jerk_rms": 0.5}
+  }
+}
