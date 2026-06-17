@@ -8,6 +8,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.81.0] - 2026-06-17
+
+### Changed
+- **VV-2 prover precision S0–S3 (fewer false positives, same proof strength).** The static per-scanline
+  cycle-budget prover gained an abstract-interpretation layer so it stops flagging sound kernels:
+  - **S0 — abstract-interpretation engine** (`internal/cyclebound/absint.go`): tracks a per-address
+    value-range state (registers / known constants) by forward dataflow from the reset/IRQ/NMI entries.
+  - **S1 — region recognition**: VSYNC/VBLANK and timer-driven (TIM64T) intervals are classified and skipped,
+    so a legitimately long blank region is no longer reported as over-budget.
+  - **S3 — page-cross precision**: an `abs,X`/`abs,Y` read's +1 page-cross penalty is now resolved from the
+    proven index range — if `[base+lo, base+hi]` provably stays inside one 256-byte page the penalty is 0;
+    an unknown index, or a pointer-based `(ind),Y` whose base we don't track, stays conservative (+1). The
+    abstract state is wired into the solver (`solver.absStates`) and applied via `baseCost()+pagePenalty()`.
+    Loop-body costing keeps the conservative `nodeCost` (sound, over-approximating).
+- The proof stays **sound**: every relaxation is on the false-positive side only. `TestCycleboundSelfTest`
+  (planted-discrepancy, "no false-negatives") stays green, and prove⇔assert agreement was re-verified on the
+  litmus set (`cb_clean`/`cb_timer` certified; `cb_roll`/`cyclebound_branch` (101>76)/`litmus_overrun` (108)
+  flagged).
+
+### Notes
+- **Finding (recorded to memory `feedback-verification-standard`):** a *small* per-scanline overrun (one heavy
+  line = 262→263 scanlines) is **visually invisible** — the TV's auto-sync absorbs a one-line slip, so
+  `cb_roll` and `cb_clean` render pixel-identically. This is precisely why a static ∀-prover exists: the
+  defect is unseeable, only the numbers differ. Visual verification is unfit for this class of timing defect.
+
 ## [1.80.0] - 2026-06-17
 
 ### Added
