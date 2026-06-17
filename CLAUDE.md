@@ -59,7 +59,9 @@ must always hold *only* in a doc — burn them here or into memory.
   **`read_bank`** (v0.43.0, current cartridge bank at PC + is_ram; **F8/F6/F4 verified** (litmus_bank, _f6, _f4), scenario fields `bank.number`/`bank.is_ram`) /
   **`analyze_image`** (v1.12.0+, screenshot→TIA data; multi-frame `paths[]` = static/dynamic separation + union tracks + flicker; `docs/ingest.md`) /
   **`analyze_screen`** (v1.19.0, ingest on the current emulator frame) / **`run_scenario`** (v1.19.0, regression verdicts live) /
-  **`watch_ram`** (v1.20.0, RAM-change trap with writing PC). `step_clock`/`watch(bus)` parked (docs/mcp-tools.md).
+  **`watch_ram`** (v1.20.0, RAM-change trap with writing PC) /
+  **`read_motion`** (v1.79.0, VV-4: object motion-smoothness / jerk_rms over N frames = judder/ブルブル as a number) /
+  **`prove_line_budget`** (v1.80.0, VV-2: STATIC per-scanline budget PROVER over ALL paths = the ∀ sibling of `assert_line_budget`; `cmd/cyclebound`+`internal/cyclebound`). `step_clock`/`watch(bus)` parked (docs/mcp-tools.md).
   
 
 ## Constants you must never get wrong (source: `docs/resources.md`)

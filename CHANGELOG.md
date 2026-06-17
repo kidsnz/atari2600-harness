@@ -8,6 +8,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.80.0] - 2026-06-17
+
+### Added
+- **Static per-scanline cycle-budget PROVER (VV-2).** Proves the worst-case CPU cycles of every
+  `STA WSYNC`-to-`STA WSYNC` region over **ALL reachable paths** (∀) — the static sibling of the runtime
+  `assert_line_budget` (which observes only one run, ∃) and the flagship attack on gap B (timing).
+  `internal/cyclebound` recursive-descent-decodes the ROM from its reset/IRQ/NMI vectors (so inline data
+  isn't misdecoded), costs each instruction from the in-tree exact table (`instructions.Definitions`: cycles
+  + branch-taken/page penalties), cuts the CFG at every `STA WSYNC` ($02), and proves each region's DAG
+  longest path ≤ budget (default 76, no solver). Counted loops (`ldx/ldy #N` + `dex/dey` + `bne/bpl`) are
+  folded by their bound; JSR / indirect JMP / unbounded loops are reported honestly as out-of-scope, never
+  silently passed; over-budget regions return a cycle-by-cycle worst path + source location. Shipped 3 ways:
+  the `cmd/cyclebound` CLI, the **`prove_line_budget` MCP tool** (run it before executing a kernel), and the
+  scenario **`checks.prove_line_budget`** regression gate (`cyclebound_safe.json` certifies smoke). New litmus
+  `cyclebound_branch` overruns only on one branch (~101cy) so a live run is a lucky pass yet the proof flags
+  it; the planted-discrepancy self-test (`TestCycleboundSelfTest`) also bounds `litmus_overrun`'s counted
+  delay loop (108cy), certifies `smoke` (worst 19cy), flips smoke to a violation under a tight budget
+  (non-vacuous), and checks the certified bound holds at runtime (observed-within-proven dual). The only
+  ∀-claim member of the suite. Scope: single-bank flat 2K/4K. Src: Li & Malik IPET (DAC'95); Ballabriga &
+  Cassé (WCET'08).
+
 ## [1.79.0] - 2026-06-17
 
 ### Added
