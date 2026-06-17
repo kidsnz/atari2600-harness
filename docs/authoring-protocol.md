@@ -37,7 +37,9 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
    (visual: not blank, the technique reads). Horizontal verdict = `read_tia` HmovedPixel; vertical = scanline.
    Choose the oracle and rigour for the claim using `docs/testing-playbook.md` (invariants / property /
    metamorphic / fuzz / mutation) — and for any *emergent* claim, demonstrate that behaviour directly
-   (free-run, no poke), don't infer it from component checks.
+   (free-run, no poke), don't infer it from component checks. Apply the **verification standard**'s MAX
+   checklist (memory `feedback-verification-standard`): continuous frame-by-frame trace, full-window reads,
+   formula↔pixel cross-check, eliminate each hypothesis with data, prove the negative, present the measured table.
 6. **★Feedback (the compounding core)** — when something fails or a gap surfaces, feed it back:
    - a missed *known* trap → strengthen `check_traps.py`;
    - new knowledge → distil to `design-principles.md` (with provenance);

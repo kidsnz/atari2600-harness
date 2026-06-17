@@ -18,7 +18,10 @@ must always hold *only* in a doc — burn them here or into memory.
 
 ## Iron rules (follow every time)
 1. **Judgment is numeric; screenshots are a supplement.** The final horizontal verdict is the TIA register
-   value; vertical is the integer scanline. Don't decide by eyeballing pixel counts.
+   value; vertical is the integer scanline. Don't decide by eyeballing pixel counts. When investigating any
+   timing/rendering/behaviour claim, follow the **verification standard** (memory `feedback-verification-standard`)
+   — its MAX checklist: trace frame-by-frame, read the full object window (no partial reads), cross-check derived
+   formulas against raw pixels, kill each hypothesis with data, prove the negative, present the measured table.
 2. **Get cycles from the simulator** (Gopher2600 / sim65). Don't trust the DASM listing or mental arithmetic.
 3. **Small steps.** edit → assemble → run → numeric check → commit. Revert to the previous step on failure.
    No bulk changes.
