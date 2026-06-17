@@ -21,6 +21,7 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/cyclebound"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 	"github.com/kidsnz/atari2600-harness/internal/motion"
+	"github.com/kidsnz/atari2600-harness/internal/ocr"
 )
 
 // Input はあるフレームで与えるジョイスティック操作（D-2: 入力タイムライン）。
@@ -111,6 +112,15 @@ type Checks struct {
 	Motion         *MotionCheck `json:"motion,omitempty"`   // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
 	NoTimerWrap    *int `json:"no_timer_wrap,omitempty"`     // VV-10 T-1: この frame 数を監視し read-after-wrap(G8) が起きないことをゲート
 	NoHMOVEHazard  *int `json:"no_hmove_hazard,omitempty"`   // VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込みが無いことをゲート
+	ScoreEqualsRAM *ScoreCheck `json:"score_equals_ram,omitempty"` // VV-9: 描画された2桁BCDスコア == RAM の値
+}
+
+// ScoreCheck は VV-9 OCR ゲート：score2 レイアウトで描画された2桁を OCR し、packed BCD が
+// 指定 RAM バイトと一致するか検証する。グリフの正本フォントは `<scenario>.font`（80 バイト=
+// 10字×8行）から読む（ROM 由来でなく外部スペックなので font-index バグを捕捉できる）。
+type ScoreCheck struct {
+	Ram    string `json:"ram"`              // スコアの packed BCD を持つ RAM フィールド（例 "ram.0x80"）
+	Frames int    `json:"frames,omitempty"` // 計測前に走らせるフレーム数（既定 4）
 }
 
 // MotionCheck gates an object's motion smoothness: it tracks the object for
@@ -550,6 +560,34 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				res.Pass = false
 			}
 		}
+		if s.Checks.ScoreEqualsRAM != nil {
+			// VV-9: 描画した2桁BCDスコアを OCR し RAM 値と一致するか。正本フォントは <scenario>.font。
+			sc := s.Checks.ScoreEqualsRAM
+			frames := sc.Frames
+			if frames <= 0 {
+				frames = 4
+			}
+			font, ferr := loadScoreFont(strings.TrimSuffix(s.srcPath, filepath.Ext(s.srcPath)) + ".font")
+			if ferr != nil {
+				return nil, ferr
+			}
+			if err := e.RunFrames(frames); err != nil {
+				return nil, err
+			}
+			img, _ := e.Snapshot()
+			r := ocr.ReadScore2(img, font)
+			want, err := resolve(e, sc.Ram)
+			if err != nil {
+				return nil, err
+			}
+			ok := r.OK && int64(r.ExpectedBCD()) == want
+			res.Asserts = append(res.Asserts, AssertResult{
+				Desc: fmt.Sprintf("score_equals_ram %s: displayed 0x%02X (decoded %d%d)", sc.Ram, r.ExpectedBCD(), r.Tens, r.Ones),
+				Got:  int64(r.ExpectedBCD()), Pass: ok})
+			if !ok {
+				res.Pass = false
+			}
+		}
 		if s.Checks.ProveLineBudget != nil {
 			// VV-2: 全到達パスの worst-case を静的に証明（assert_line_budget の ∀ 版）。
 			// ソース必須なので rom が .asm のときだけ実行（.bin 直指定は skip と明記）。
@@ -789,6 +827,22 @@ func evalTemporal(t Temporal, p, a []bool) (desc string, pass bool) {
 		return fmt.Sprintf("response (%s -> %s) within %d frames: ok [%d trigger(s) satisfied]", aDesc, pDesc, K, triggers), true
 	}
 	return fmt.Sprintf("temporal: unknown kind %q", t.Kind), false
+}
+
+// loadScoreFont は <scenario>.font（80 バイト = 10字 × 8行）を ocr.Font に読み込む。
+func loadScoreFont(path string) (ocr.Font, error) {
+	var f ocr.Font
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return f, fmt.Errorf("score font %s: %w", path, err)
+	}
+	if len(b) < 80 {
+		return f, fmt.Errorf("score font %s: need 80 bytes, got %d", path, len(b))
+	}
+	for d := 0; d < 10; d++ {
+		copy(f[d][:], b[d*8:d*8+8])
+	}
+	return f, nil
 }
 
 func b2i(b bool) int64 {

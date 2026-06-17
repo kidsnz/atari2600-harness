@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.87.0] - 2026-06-17
+
+### Added
+- **Score OCR semantic oracle (VV-9).** `internal/ocr` reads the RENDERED digit pixels (not the registers) and
+  decodes a displayed 2-digit packed-BCD score, matching each glyph against templates rendered from a
+  ground-truth font (the spec — PF1=MSB-first / PF2=LSB-first per the verified playfield bit order). It asserts
+  displayed == `decode(RAM)`, tying the display back to program meaning — catching display-kernel / BCD-split /
+  font-index bugs that an exact frame hash would pass (a hash also accepts a consistently-wrong glyph). The band
+  is located by detecting its top then sampling at the kernel's fixed row spacing (robust to blank glyph rows).
+  Exposed as the scenario check `checks.score_equals_ram` (ground-truth font from a `<scenario>.font` sibling
+  file, like golden files; no MCP tool, no reconnect). Litmus `score2.asm` renders RAM $80 (packed BCD '42') via
+  PF1/PF2. Self-test `TestScoreOCRSelfTest`: the genuine ROM decodes 42 == RAM; a font-index mutation (glyph 8
+  copied over glyph 4 in the ROM, RAM untouched) is caught as displayed≠RAM. **Src:** pHash Hamming primitive.
+
 ## [1.86.0] - 2026-06-17
 
 ### Added

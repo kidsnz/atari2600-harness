@@ -126,7 +126,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-6** | **MAME headless cross-oracle** (`cmd/mamecheck`) | a **3rd independent** full-system oracle, **fully headless** (no keypress unlike Stella) | A1 | M | 2 |
 | **VV-7** | **perfect6502 hardware-grade CPU oracle** (`cmd/cpucheck`) + **N-oracle majority vote** (`cmd/oraclevote`) | silicon-netlist truth (catches bugs ALL hand-written emulators share); fuses oracles into one verdict | A2/A3/B-C3 | M | 2 |
 | **VV-8** ✅v1.84.0 | **Behavioral trajectory diff vs original ROM** (`cmd/trajdiff`) | full **time-extended** state-trajectory diff (refdiff is a static snapshot) | F-2 | M | 2 |
-| **VV-9** | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
+| **VV-9** ✅v1.87.0 | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
 | **VV-10** 🔨T-1✅v1.85.0 T-2✅v1.86.0 | **HW-divergence trap detectors** (timer-wrap=G8 ✅, HMOVE-latch ✅, uninit-RAM-read ⏳) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
 | **VV-11** | **State-coverage matrix** (zone/VDEL-parity/NUSIZ/bank) + **coverage-aware mutation** | did tests exercise every TIA mode; honest mutation kill-rate (closes the playbook's 5–20% thread) | D-3/D-4 | S–M | 3 |
 | **VV-12** | **SSIM / pHash tolerant frame compare** | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
@@ -202,7 +202,15 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   (`TestTrajdiffSelfTest`): identity = MATCH (also a determinism guard); a corrupted reset vector diverges
   (behavior-sensitive); a behaviorally dead-byte flip = MATCH (behavioral, not a byte compare). CLI exits 1 on
   divergence. **Src:** Martignoni TOSEM'13; EXAMINER ASPLOS'22; McKeeman 1998.
-- **VV-9 (score OCR):** template-match 2600 fixed-bitmap digits (learn templates from the ROM font table; Hamming match) → assert displayed == decode(RAM score); catches display-kernel/BCD/font-index bugs exact hashes miss. `internal/ocr` + scenario `checks.score_equals_ram`. Pure-Go. Self-test: mutate one font byte (garbled glyph) without touching RAM → displayed≠RAM caught. **Src:** pHash Hamming primitive.
+- **VV-9 ✅ DONE (v1.87.0):** `internal/ocr` reads the RENDERED digit pixels (not registers), matches each glyph
+  against templates rendered from a **ground-truth font (the spec, not the ROM's own table)** — PF1=MSB-first /
+  PF2=LSB-first per the verified playfield bit order — and decodes the displayed 2-digit packed-BCD score. Asserts
+  displayed == `decode(RAM)`, tying display to program meaning (catches display-kernel/BCD-split/font-index bugs an
+  exact hash would pass — it would also accept a consistently-wrong glyph). Band located by detecting its top then
+  sampling at the kernel's fixed row spacing (robust to blank glyph rows). Pure-Go, scenario check
+  `checks.score_equals_ram` (ground-truth font from `<scenario>.font`; no MCP tool / no reconnect). Litmus
+  `score2.asm` (RAM $80 packed BCD '42' via PF1/PF2). Self-test `TestScoreOCRSelfTest`: genuine ROM decodes 42 ==
+  RAM; a font-index mutation (glyph 8 copied over glyph 4, RAM untouched) is caught as displayed≠RAM. **Src:** pHash Hamming primitive.
 - **VV-10 (HW-trap detectors):** siblings of `assert_line_budget` in `internal/emu`. **T-1 ✅ DONE (v1.85.0):**
   RIOT timer-wrap (=G8). `Emu.TimerState` exposes the timer (INTIM/TIMINT/Expired/Divider/ticks); `Emu.WatchTimerWrap`
   flags the first **read of INTIM while the timer has already wrapped (Expired)** — the real G8 signature. **Key
