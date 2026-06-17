@@ -17,6 +17,7 @@ import (
 	"github.com/jetsetilly/gopher2600/hardware/peripherals/controllers"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports/plugging"
+	"github.com/jetsetilly/gopher2600/hardware/riot/timer"
 	"github.com/jetsetilly/gopher2600/hardware/television"
 	"github.com/jetsetilly/gopher2600/hardware/television/coords"
 	"github.com/jetsetilly/gopher2600/hardware/tia/video"
@@ -296,6 +297,28 @@ func (e *Emu) StepScanline() error {
 // PeekRAM は副作用なしでメモリを読む（read_ram / peek の土台）。
 func (e *Emu) PeekRAM(addr uint16) (uint8, error) {
 	return e.VCS.Mem.Peek(addr)
+}
+
+// TimerState は RIOT タイマの現在状態（VV-10 T-1 timer-wrap 検出の土台）。
+type TimerState struct {
+	INTIM          uint8 // 現在のカウンタ値
+	TIMINT         uint8 // INSTAT/TIMINT レジスタ（bit7=expired/underflow, bit6=PA7）
+	Expired        bool  // タイマが 0 を下回って wrap した（INTIM 0x00→0xFF・1T へ flip）＝G8 ハザード信号
+	Divider        int   // 直近に要求された分周（1/8/64/1024）
+	TicksRemaining int   // 次の減算までの CPU サイクル
+}
+
+// TimerState は副作用なしで RIOT タイマ内部状態を読む（PeekState 経由）。
+func (e *Emu) TimerState() TimerState {
+	t := e.VCS.RIOT.Timer
+	timint := t.PeekState("timint").(uint8)
+	return TimerState{
+		INTIM:          t.PeekState("intim").(uint8),
+		TIMINT:         timint,
+		Expired:        timint&0x80 != 0,
+		Divider:        int(t.PeekState("divider").(timer.Divider)),
+		TicksRemaining: t.PeekState("ticksRemaining").(int),
+	}
 }
 
 // Poke はメモリへ 1 バイト書き込む（poke ツール）。
