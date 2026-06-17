@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
+	"github.com/kidsnz/atari2600-harness/internal/cyclebound"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 	"github.com/kidsnz/atari2600-harness/internal/motion"
 )
@@ -70,7 +71,8 @@ type Fuzz struct {
 // Checks は run 全体に対する性質（副作用＝フレームを進める計測なのでタイムライン後にまとめて評価）。
 type Checks struct {
 	NTSCFrameLines *int `json:"ntsc_frame_lines,omitempty"` // StepFrame() == この値（NTSC は 262）
-	MaxLineBudget  *int `json:"max_line_budget,omitempty"`  // RunUntilBudget が超過しない（既定予算 76）
+	MaxLineBudget  *int `json:"max_line_budget,omitempty"`  // RunUntilBudget が超過しない（runtime・∃: ある1回の実行を観測。既定予算 76）
+	ProveLineBudget *int `json:"prove_line_budget,omitempty"` // VV-2: cyclebound が全パスの worst <= 予算を静的に証明（∀。rom が .asm のときのみ）
 	GoldenFrame    bool `json:"golden_frame,omitempty"`     // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
 	GoldenAudio    bool `json:"golden_audio,omitempty"`     // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
 	Motion         *MotionCheck `json:"motion,omitempty"`   // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
@@ -430,6 +432,26 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				Desc: fmt.Sprintf("max_line_budget %d: no overrun", *s.Checks.MaxLineBudget), Got: got, Pass: ok})
 			if !ok {
 				res.Pass = false
+			}
+		}
+		if s.Checks.ProveLineBudget != nil {
+			// VV-2: 全到達パスの worst-case を静的に証明（assert_line_budget の ∀ 版）。
+			// ソース必須なので rom が .asm のときだけ実行（.bin 直指定は skip と明記）。
+			if !strings.EqualFold(filepath.Ext(s.Rom), ".asm") {
+				res.Asserts = append(res.Asserts, AssertResult{
+					Desc: "prove_line_budget: skipped (needs .asm source)", Pass: true})
+			} else {
+				rep, perr := cyclebound.Prove(s.Rom, *s.Checks.ProveLineBudget)
+				if perr != nil {
+					return nil, perr
+				}
+				res.Asserts = append(res.Asserts, AssertResult{
+					Desc: fmt.Sprintf("prove_line_budget %d: all paths certified (worst %d, %d violation(s), %d unbounded)",
+						*s.Checks.ProveLineBudget, rep.MaxWorst, len(rep.Violations), len(rep.Unbounded)),
+					Got: int64(rep.MaxWorst), Pass: rep.Certified})
+				if !rep.Certified {
+					res.Pass = false
+				}
 			}
 		}
 		if s.Checks.Motion != nil {

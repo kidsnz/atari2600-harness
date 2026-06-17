@@ -1,0 +1,7 @@
+{
+  "rom": "roms/litmus/smoke.asm",
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "prove_line_budget": 76
+  }
+}
