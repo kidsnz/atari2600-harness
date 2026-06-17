@@ -45,6 +45,19 @@ jobs:
           CGO_ENABLED: "0"
         run: go run ./cmd/scenario roms/litmus/scenarios/*.json roms/techniques/scenarios/*.json roms/exerciser/scenarios/*.json
 
+      - name: CPU conformance self-test (the gate must reject a planted-wrong expectation)
+        env:
+          CGO_ENABLED: "0"
+        run: bash scripts/check_cpu_conformance.sh --selftest
+
+      - name: CPU conformance — Klaus + Tom-Harte subset (external authoritative suites)
+        # Certifies the embedded Gopher2600 CPU core against suites the harness does NOT author:
+        # Klaus 6502 functional+decimal (embedded in the clone) + a Tom-Harte/SingleStepTests subset
+        # (per-cycle bus; fetched on demand, MIT, not vendored). Full 256-opcode run is local-only (1GB).
+        env:
+          CGO_ENABLED: "0"
+        run: bash scripts/check_cpu_conformance.sh
+
       - name: Provenance check (every technique/rule records its origin)
         run: python3 scripts/check_provenance.py
 
