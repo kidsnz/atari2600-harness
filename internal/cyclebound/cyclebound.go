@@ -209,13 +209,14 @@ const (
 )
 
 type solver struct {
-	nodes  map[uint16]Instr
-	sinks  map[uint16]bool
-	folds  map[uint16]loopInfo
-	memo   map[uint16]result
-	state  map[uint16]int
-	cyclic bool
-	sm     *srcmap.Map
+	nodes     map[uint16]Instr
+	sinks     map[uint16]bool
+	folds     map[uint16]loopInfo
+	memo      map[uint16]result
+	state     map[uint16]int
+	absStates map[uint16]State // S3: abstract state per address, for page-cross precision
+	cyclic    bool
+	sm        *srcmap.Map
 }
 
 func prepend(s Step, rest []Step) []Step {
@@ -270,9 +271,10 @@ func (s *solver) longest(addr uint16) result {
 				best = result{cyc: ntTot, path: prepend(Step{Addr: in.Addr, Cyc: in.Def.Cycles, Loc: s.loc(in.Addr)}, nt.path)}
 			}
 		default:
+			cost := in.baseCost() + in.pagePenalty(s.absStates[addr]) // S3: page penalty from the index range
 			sub := s.longest(theSucc(in))
-			best = result{cyc: in.nodeCost() + sub.cyc,
-				path: prepend(Step{Addr: in.Addr, Cyc: in.nodeCost(), Loc: s.loc(in.Addr)}, sub.path)}
+			best = result{cyc: cost + sub.cyc,
+				path: prepend(Step{Addr: in.Addr, Cyc: cost, Loc: s.loc(in.Addr)}, sub.path)}
 		}
 	}
 
@@ -418,12 +420,13 @@ func regionTouchesDisplay(nodes map[uint16]Instr) bool {
 func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.Map, states map[uint16]State) Region {
 	reg := Region{Start: start.Addr, StartLoc: sm.Locate(start.Addr), Budget: budget, Bounded: true, Kind: "visible"}
 	s := &solver{
-		nodes: map[uint16]Instr{},
-		sinks: map[uint16]bool{},
-		folds: map[uint16]loopInfo{},
-		memo:  map[uint16]result{},
-		state: map[uint16]int{},
-		sm:    sm,
+		nodes:     map[uint16]Instr{},
+		sinks:     map[uint16]bool{},
+		folds:     map[uint16]loopInfo{},
+		memo:      map[uint16]result{},
+		state:     map[uint16]int{},
+		absStates: states, // S3: page-cross penalty resolved from tracked index ranges
+		sm:        sm,
 	}
 
 	// Collect the region subgraph: from the instruction after `start`, follow the

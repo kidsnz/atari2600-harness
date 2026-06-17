@@ -528,3 +528,38 @@ func computeStates(instrs map[uint16]Instr, entries []uint16) map[uint16]State {
 	}
 	return entryState
 }
+
+// baseCost is the instruction's cycle count WITHOUT the page-cross penalty.
+func (in Instr) baseCost() int { return in.Def.Cycles }
+
+// pagePenalty returns the worst-case +1 page-cross cycle for a page-sensitive
+// READ (S3). For abs,X / abs,Y with a known index range we prove whether
+// [base+lo, base+hi] crosses a 256-byte page; if it provably can't, the penalty
+// is 0. An unknown index, or a pointer-based (ind),Y whose base we don't track,
+// stays conservative (+1) — sound. Branches are costed on the CFG edges, not here.
+func (in Instr) pagePenalty(s State) int {
+	d := in.Def
+	if !d.PageSensitive || d.IsBranch() {
+		return 0
+	}
+	if !s.valid {
+		return 1 // no tracked state at this point -> conservative
+	}
+	var idx ValueRange
+	switch d.AddressingMode {
+	case instructions.AbsoluteX:
+		idx = s.X
+	case instructions.AbsoluteY:
+		idx = s.Y
+	default:
+		return 1 // (ind),Y / other indexed: base unknown -> conservative
+	}
+	if idx.Top {
+		return 1
+	}
+	base := int(in.Operand)
+	if (base+idx.Lo)>>8 != (base+idx.Hi)>>8 {
+		return 1 // the indexed access may cross a page
+	}
+	return 0 // provably within one page
+}
