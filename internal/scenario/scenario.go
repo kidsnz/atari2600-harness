@@ -109,6 +109,7 @@ type Checks struct {
 	GoldenFrame    bool `json:"golden_frame,omitempty"`     // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
 	GoldenAudio    bool `json:"golden_audio,omitempty"`     // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
 	Motion         *MotionCheck `json:"motion,omitempty"`   // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
+	NoTimerWrap    *int `json:"no_timer_wrap,omitempty"`     // VV-10 T-1: この frame 数を監視し read-after-wrap(G8) が起きないことをゲート
 }
 
 // MotionCheck gates an object's motion smoothness: it tracks the object for
@@ -506,6 +507,25 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			}
 			res.Asserts = append(res.Asserts, AssertResult{
 				Desc: fmt.Sprintf("max_line_budget %d: no overrun", *s.Checks.MaxLineBudget), Got: got, Pass: ok})
+			if !ok {
+				res.Pass = false
+			}
+		}
+		if s.Checks.NoTimerWrap != nil {
+			// VV-10 T-1: read-after-wrap(G8) を監視。clean なタイマ使用は flag されない。
+			hit, err := e.WatchTimerWrap(*s.Checks.NoTimerWrap)
+			if err != nil {
+				return nil, err
+			}
+			ok := hit == nil
+			got := int64(0)
+			desc := fmt.Sprintf("no_timer_wrap over %d frames: clean", *s.Checks.NoTimerWrap)
+			if hit != nil {
+				got = int64(hit.PC)
+				desc = fmt.Sprintf("no_timer_wrap over %d frames: read-after-wrap @frame %d pc 0x%04X",
+					*s.Checks.NoTimerWrap, hit.Frame, hit.PC)
+			}
+			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
 			if !ok {
 				res.Pass = false
 			}

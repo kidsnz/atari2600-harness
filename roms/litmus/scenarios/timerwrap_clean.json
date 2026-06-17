@@ -1,0 +1,6 @@
+{
+  "rom": "roms/litmus/timerwrap_clean.bin",
+  "checks": {
+    "no_timer_wrap": 3
+  }
+}

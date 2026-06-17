@@ -14,6 +14,8 @@ import (
 	"github.com/jetsetilly/gopher2600/digest"
 	"github.com/jetsetilly/gopher2600/environment"
 	"github.com/jetsetilly/gopher2600/hardware"
+	"github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
+	"github.com/jetsetilly/gopher2600/hardware/memory/memorymap"
 	"github.com/jetsetilly/gopher2600/hardware/peripherals/controllers"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports/plugging"
@@ -35,10 +37,10 @@ type Emu struct {
 	cpuCycles int64 // ROM ロード以降に実行した CPU サイクルの累積（命令完了ごとに加算）
 	cycleMark int64 // 区間計測の基準点（MarkCycles で現在の cpuCycles に揃える）
 
-	vdigest *digest.Video // ゴールデンフレーム回帰用の連鎖ハッシュ（任意・EnableVideoDigest で有効化）
-	adigest *digest.Audio // ゴールデン音声回帰用の連鎖ハッシュ（任意・EnableAudioDigest で有効化）
-	acap    *audioCapture // 生音声サンプル取得（任意・EnableAudioCapture で有効化, V2-15）
-	paddlePlugged [2]bool // SetPaddle がポートへ paddle peripheral を差したか（冪等化, V2-4b）
+	vdigest       *digest.Video // ゴールデンフレーム回帰用の連鎖ハッシュ（任意・EnableVideoDigest で有効化）
+	adigest       *digest.Audio // ゴールデン音声回帰用の連鎖ハッシュ（任意・EnableAudioDigest で有効化）
+	acap          *audioCapture // 生音声サンプル取得（任意・EnableAudioCapture で有効化, V2-15）
+	paddlePlugged [2]bool       // SetPaddle がポートへ paddle peripheral を差したか（冪等化, V2-4b）
 
 	cov *Coverage // PC/分岐カバレッジ記録（任意・EnableCoverage で有効化, VV-3）。nil=無効でゼロコスト
 }
@@ -308,6 +310,44 @@ type TimerState struct {
 	TicksRemaining int   // 次の減算までの CPU サイクル
 }
 
+// TimerWrapHit は read-after-wrap（G8）検出の記録。
+type TimerWrapHit struct {
+	Frame int    // 検出したフレーム
+	PC    uint16 // INTIM を読んだ命令のアドレス
+}
+
+const intimCanonical = 0x0284 // INTIM の正規アドレス（全ミラーをここへ畳む）
+
+// WatchTimerWrap は ROM を命令単位で frames フレーム進め、タイマが既に underflow/wrap
+// 済み（Expired）の状態で INTIM を**読んだ**最初の箇所を flag する＝G8「timer-wrap」ハザード
+// （区間が短すぎる／ポーリングが 0 を取り逃して wrap 後の値を消費している）。INTIM==0 で正しく
+// 抜ける通常のポーリング（wrap 前に exit）は flag しない。該当が無ければ nil。
+//
+// 注意: INTIM の読み出しは Expired を解除する副作用がある（timer.go の reversion）。よって
+// Expired は各命令の**実行前**に標本化し、「直前から Expired だった状態で INTIM を読んだ」を検出する
+// （ポーリングが wrap をまたいで回り続けていれば次の反復で必ず捕捉される）。
+func (e *Emu) WatchTimerWrap(frames int) (*TimerWrapHit, error) {
+	start := e.Coords().Frame
+	for e.Coords().Frame-start < frames {
+		preExpired := e.TimerState().Expired
+		if err := e.StepInstruction(); err != nil {
+			return nil, err
+		}
+		lr := e.VCS.CPU.LastResult
+		if lr.Defn == nil || lr.Defn.Effect != instructions.Read {
+			continue
+		}
+		canon, area := memorymap.MapAddress(lr.InstructionData, true)
+		if area != memorymap.RIOT || canon != intimCanonical {
+			continue
+		}
+		if preExpired {
+			return &TimerWrapHit{Frame: e.Coords().Frame, PC: lr.Address}, nil
+		}
+	}
+	return nil, nil
+}
+
 // TimerState は副作用なしで RIOT タイマ内部状態を読む（PeekState 経由）。
 func (e *Emu) TimerState() TimerState {
 	t := e.VCS.RIOT.Timer
@@ -432,7 +472,7 @@ type RowRun struct {
 // 目視でなく数値で確かめるための土台。width は可視幅（通常 160）。
 // 注: グリッドの y ラベルは visibleTop + 画像行（annotate.Render と同じ式）。ここでも
 // visibleTop を引いて画像行へ変換する＝「グリッドで見えた y をそのまま渡せる」を守る
-//（v1.4.0 修正: 以前はクロップ後の画像行を直接受けており、グリッドと ~visibleTop ずれていた）。
+// （v1.4.0 修正: 以前はクロップ後の画像行を直接受けており、グリッドと ~visibleTop ずれていた）。
 func (e *Emu) ReadRow(scanline int) (runs []RowRun, width int, err error) {
 	img, visibleTop := e.cap.snapshot()
 	w := img.Bounds().Dx()
