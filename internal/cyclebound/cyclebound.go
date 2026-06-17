@@ -182,6 +182,7 @@ type Step struct {
 type Region struct {
 	Start    uint16 `json:"start"`             // address of the WSYNC store that opens the region
 	StartLoc string `json:"start_loc,omitempty"`
+	Kind     string `json:"kind,omitempty"`    // "visible" (budget-checked) or "blank" (VSYNC/VBLANK; skipped)
 	Worst    int    `json:"worst"`             // proven worst-case cycles from here to the next WSYNC
 	Budget   int    `json:"budget"`
 	Over     bool   `json:"over"`              // Worst > Budget
@@ -397,10 +398,25 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr) int {
 	return bestN
 }
 
+// regionTouchesDisplay reports whether any node stores to VSYNC($00)/VBLANK($01),
+// i.e. could change the display state within the region.
+func regionTouchesDisplay(nodes map[uint16]Instr) bool {
+	for _, in := range nodes {
+		switch in.Def.Operator {
+		case instructions.STA, instructions.STX, instructions.STY:
+			if a, ok := storeAddr(in); ok && (a == 0x00 || a == 0x01) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // analyzeRegion proves the worst case of the WSYNC-to-WSYNC region opened by the
-// WSYNC store `start`.
-func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.Map) Region {
-	reg := Region{Start: start.Addr, StartLoc: sm.Locate(start.Addr), Budget: budget, Bounded: true}
+// WSYNC store `start`. states gives the abstract state at each address, used to
+// classify the region's display interval (S1).
+func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.Map, states map[uint16]State) Region {
+	reg := Region{Start: start.Addr, StartLoc: sm.Locate(start.Addr), Budget: budget, Bounded: true, Kind: "visible"}
 	s := &solver{
 		nodes: map[uint16]Instr{},
 		sinks: map[uint16]bool{},
@@ -452,6 +468,14 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.
 			work = append(work, in.next())
 		}
 	}
+	// S1: if the beam is provably in VSYNC/VBLANK at region entry AND the region
+	// never stores to $00/$01 (so it can't turn the display on inside itself), it
+	// is not a visible-scanline timing risk — skip it soundly. Its only failure
+	// mode is total frame-line drift, which is a separate check (ntsc_frame_lines).
+	if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes) {
+		reg.Kind = "blank"
+		return reg
+	}
 	if len(s.sinks) == 0 {
 		return unbounded("no WSYNC reached from region start")
 	}
@@ -478,8 +502,9 @@ type Report struct {
 	Asm        string   `json:"asm"`
 	Budget     int      `json:"budget"`
 	Regions    int      `json:"regions"`              // WSYNC-to-WSYNC regions analyzed
-	MaxWorst   int      `json:"max_worst"`            // largest proven worst-case among bounded regions
-	Certified  bool     `json:"certified"`            // all regions bounded AND <= budget
+	Blank      int      `json:"blank,omitempty"`      // regions skipped as VSYNC/VBLANK (not visible-line risks)
+	MaxWorst   int      `json:"max_worst"`            // largest proven worst-case among bounded VISIBLE regions
+	Certified  bool     `json:"certified"`            // all visible regions bounded AND <= budget
 	Violations []Region `json:"violations,omitempty"` // regions whose worst case exceeds the budget
 	Unbounded  []Region `json:"unbounded,omitempty"`  // regions that could not be proven (out of scope)
 }
@@ -507,14 +532,17 @@ func Prove(asmPath string, budget int) (*Report, error) {
 
 	// Decode from the reset, NMI and IRQ/BRK vectors (duplicates dedupe).
 	instrs := map[uint16]Instr{}
+	var entries []uint16
 	for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
 		lo, _ := p.byteAt(va)
 		hi, _ := p.byteAt(va + 1)
 		t := uint16(lo) | uint16(hi)<<8
 		if t >= p.base {
 			p.decodeInto(instrs, t)
+			entries = append(entries, t)
 		}
 	}
+	states := computeStates(instrs, entries) // S1+: VSYNC/VBLANK & value-range tracking
 
 	var starts []uint16
 	for a, in := range instrs {
@@ -526,8 +554,12 @@ func Prove(asmPath string, budget int) (*Report, error) {
 
 	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget}
 	for _, sa := range starts {
-		reg := analyzeRegion(instrs, instrs[sa], budget, sm)
+		reg := analyzeRegion(instrs, instrs[sa], budget, sm, states)
 		rep.Regions++
+		if reg.Kind == "blank" {
+			rep.Blank++ // beam in VSYNC/VBLANK: not a visible-line budget risk
+			continue
+		}
 		if !reg.Bounded {
 			rep.Unbounded = append(rep.Unbounded, reg)
 			continue

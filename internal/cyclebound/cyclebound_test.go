@@ -124,6 +124,29 @@ func TestObservedWithinProven(t *testing.T) {
 	}
 }
 
+// TestProveTimerBlankSkipped (S1): a timer-driven VBLANK region — a busy-wait
+// with no WSYNC and no display store, beam display-off — must be SKIPPED as
+// blank: neither flagged as a 1-line overrun nor reported as an unbounded loop.
+// The visible kernel stays budget-checked, so a tight budget still flags it
+// (blank-skip must never disable a visible check = soundness).
+func TestProveTimerBlankSkipped(t *testing.T) {
+	const timerAsm = "../../roms/litmus/cb_timer.asm"
+	rep := mustProve(t, timerAsm, 76)
+	if rep.Blank == 0 {
+		t.Fatal("timer-driven VBLANK region must be blank-skipped (Blank>0)")
+	}
+	if len(rep.Unbounded) != 0 {
+		t.Fatalf("timer busy-wait must be blank-skipped, not reported unbounded: %+v", rep.Unbounded)
+	}
+	if !rep.Certified {
+		t.Fatalf("cb_timer's visible kernel is clean -> must certify; violations=%+v", rep.Violations)
+	}
+	// soundness: the visible kernel is still checked — a tight budget flags it.
+	if tight := mustProve(t, timerAsm, 4); tight.Certified {
+		t.Fatal("budget=4 must flag the visible kernel — blank-skip must not disable visible checks")
+	}
+}
+
 // TestProveNoWSYNCNotCertified guards against a vacuous "0 regions, all safe"
 // certification: a ROM with no reachable STA WSYNC (a bank-switched kernel whose
 // display loop lives in another bank) must NOT certify — 0 regions means "can't

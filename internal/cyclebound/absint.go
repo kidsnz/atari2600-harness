@@ -1,9 +1,9 @@
 // Abstract-interpretation engine for the cycle-budget prover (VV-2 v2). It tracks,
 // statically and SOUNDLY, the value ranges of the 6502 registers/flags and a few
-// zero-page cells along the CFG, so the prover can later: classify regions by the
-// VBLANK display bit (S1), decide whether an indexed read crosses a page (S3),
-// bound counted/divide loops from a counter's range (S4), and prune provably
-// unreachable branch paths (S5).
+// zero-page cells along the CFG, so the prover can: classify regions by the
+// VSYNC/VBLANK display state (S1), decide whether an indexed read crosses a page
+// (S3), bound counted/divide loops from a counter's range (S4), and prune
+// provably unreachable branch paths (S5).
 //
 // SOUNDNESS is the invariant: every abstract value OVER-approximates the real set
 // of values. Anything not tracked precisely collapses to Top (unknown value) or
@@ -98,6 +98,7 @@ type State struct {
 	C, Z, N TriBool
 	Mem     map[uint16]ValueRange
 	VBlank  TriBool // VBLANK display-disable bit (bit1 of the last value stored to $01)
+	VSync   TriBool // VSYNC bit (bit1 of the last value stored to $00)
 	valid   bool
 }
 
@@ -120,6 +121,12 @@ func (s State) memGet(a uint16) ValueRange {
 	return vTop()
 }
 
+// displayOff reports that the beam is provably in VSYNC or VBLANK (not drawing a
+// visible scanline). Unknown stays false (sound: treat as visible and check it).
+func (s State) displayOff() bool {
+	return s.VSync == triTrue || s.VBlank == triTrue
+}
+
 // joinState is the least-upper-bound of two states (used at CFG merges/fixpoint).
 func (s State) joinState(o State) State {
 	if !s.valid {
@@ -131,7 +138,7 @@ func (s State) joinState(o State) State {
 	r := topState()
 	r.A, r.X, r.Y = s.A.join(o.A), s.X.join(o.X), s.Y.join(o.Y)
 	r.C, r.Z, r.N = s.C.join(o.C), s.Z.join(o.Z), s.N.join(o.N)
-	r.VBlank = s.VBlank.join(o.VBlank)
+	r.VBlank, r.VSync = s.VBlank.join(o.VBlank), s.VSync.join(o.VSync)
 	r.Mem = map[uint16]ValueRange{}
 	for k, v := range s.Mem {
 		if v2, ok := o.Mem[k]; ok { // only cells known in BOTH survive; others -> Top
@@ -147,7 +154,8 @@ func (s State) eqState(o State) bool {
 	if !s.valid {
 		return true
 	}
-	if !(s.A.eq(o.A) && s.X.eq(o.X) && s.Y.eq(o.Y) && s.C == o.C && s.Z == o.Z && s.N == o.N && s.VBlank == o.VBlank) {
+	if !(s.A.eq(o.A) && s.X.eq(o.X) && s.Y.eq(o.Y) && s.C == o.C && s.Z == o.Z && s.N == o.N &&
+		s.VBlank == o.VBlank && s.VSync == o.VSync) {
 		return false
 	}
 	if len(s.Mem) != len(o.Mem) {
@@ -270,6 +278,24 @@ func storeAddr(in Instr) (uint16, bool) {
 	return 0, false
 }
 
+// applyStore updates VSYNC/VBLANK tracking and a tracked zero-page cell for a
+// store of value v to a statically known address.
+func (n *State) applyStore(in Instr, v ValueRange) {
+	a, ok := storeAddr(in)
+	if !ok {
+		return
+	}
+	if a < 0x100 {
+		n.Mem[a] = v
+	}
+	switch a {
+	case 0x00:
+		n.VSync = vblankBit(v)
+	case 0x01:
+		n.VBlank = vblankBit(v)
+	}
+}
+
 // transfer returns the abstract state after executing in. Unmodeled effects are
 // over-approximated (Top / triUnknown) so the result is always sound.
 func (s State) transfer(in Instr) State {
@@ -345,32 +371,11 @@ func (s State) transfer(in Instr) State {
 	case instructions.CPY:
 		n.setCmp(s.Y, src())
 	case instructions.STA:
-		if a, ok := storeAddr(in); ok {
-			if a < 0x100 {
-				n.Mem[a] = s.A
-			}
-			if a == 0x01 {
-				n.VBlank = vblankBit(s.A)
-			}
-		}
+		n.applyStore(in, s.A)
 	case instructions.STX:
-		if a, ok := storeAddr(in); ok {
-			if a < 0x100 {
-				n.Mem[a] = s.X
-			}
-			if a == 0x01 {
-				n.VBlank = vblankBit(s.X)
-			}
-		}
+		n.applyStore(in, s.X)
 	case instructions.STY:
-		if a, ok := storeAddr(in); ok {
-			if a < 0x100 {
-				n.Mem[a] = s.Y
-			}
-			if a == 0x01 {
-				n.VBlank = vblankBit(s.Y)
-			}
-		}
+		n.applyStore(in, s.Y)
 	case instructions.AND, instructions.ORA, instructions.EOR:
 		n.A = vTop()
 		n.setNZ(n.A)
@@ -391,6 +396,10 @@ func (s State) transfer(in Instr) State {
 		n.C, n.Z, n.N = triUnknown, triUnknown, triUnknown
 	case instructions.PHA, instructions.PHP:
 		// no tracked change
+	case instructions.JMP, instructions.JSR, instructions.RTS, instructions.RTI, instructions.BRK,
+		instructions.BEQ, instructions.BNE, instructions.BCS, instructions.BCC,
+		instructions.BMI, instructions.BPL, instructions.BVS, instructions.BVC:
+		// control flow: registers/flags unchanged here (branch refinement is separate)
 	default:
 		// Unknown/illegal opcode: forget everything that could change (sound).
 		n.A, n.X, n.Y = vTop(), vTop(), vTop()
@@ -436,4 +445,86 @@ func (s State) refineBranch(in Instr) (taken, notTaken State) {
 		prune(&taken, &notTaken, s.N, triFalse)
 	}
 	return
+}
+
+// absEdge is a CFG successor address paired with the abstract state on entry.
+type absEdge struct {
+	addr  uint16
+	state State
+}
+
+// absSuccessors lists the CFG successors of in with the abstract state flowing to
+// each (branches refine the tested flag; a JSR's return point is reset to Top
+// since the callee's effect is not modeled).
+func absSuccessors(in Instr, st State) []absEdge {
+	d := in.Def
+	switch d.Operator {
+	case instructions.JMP:
+		if d.AddressingMode == instructions.Indirect {
+			return nil
+		}
+		return []absEdge{{in.Operand, st}}
+	case instructions.JSR:
+		return []absEdge{{in.Operand, st}, {in.next(), topState()}}
+	case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
+		return nil
+	}
+	if d.IsBranch() {
+		tk, nt := st.refineBranch(in)
+		var es []absEdge
+		if tk.valid {
+			es = append(es, absEdge{in.branchTarget(), tk})
+		}
+		if nt.valid {
+			es = append(es, absEdge{in.next(), nt})
+		}
+		return es
+	}
+	return []absEdge{{in.next(), st.transfer(in)}}
+}
+
+// computeStates runs a forward abstract interpretation (worklist fixpoint) from
+// the entry points and returns the abstract state on entry to each instruction.
+// The lattice is finite (8-bit ranges + tri-bools), so it converges; maxIter is a
+// safety cap (on hit the partial result is still sound — callers treat an absent
+// address as Top / display-unknown, i.e. checked conservatively).
+func computeStates(instrs map[uint16]Instr, entries []uint16) map[uint16]State {
+	entryState := map[uint16]State{}
+	var work []uint16
+	inWork := map[uint16]bool{}
+	push := func(a uint16, s State) {
+		old, ok := entryState[a]
+		merged := s
+		if ok {
+			merged = old.joinState(s)
+		}
+		if !ok || !merged.eqState(old) {
+			entryState[a] = merged
+			if !inWork[a] {
+				work = append(work, a)
+				inWork[a] = true
+			}
+		}
+	}
+	for _, e := range entries {
+		push(e, topState())
+	}
+	const maxIter = 300000
+	for it := 0; len(work) > 0 && it < maxIter; it++ {
+		addr := work[0]
+		work = work[1:]
+		inWork[addr] = false
+		in, ok := instrs[addr]
+		if !ok {
+			continue
+		}
+		st := entryState[addr]
+		if !st.valid {
+			continue
+		}
+		for _, e := range absSuccessors(in, st) {
+			push(e.addr, e.state)
+		}
+	}
+	return entryState
 }
