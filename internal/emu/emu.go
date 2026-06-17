@@ -38,6 +38,8 @@ type Emu struct {
 	adigest *digest.Audio // ゴールデン音声回帰用の連鎖ハッシュ（任意・EnableAudioDigest で有効化）
 	acap    *audioCapture // 生音声サンプル取得（任意・EnableAudioCapture で有効化, V2-15）
 	paddlePlugged [2]bool // SetPaddle がポートへ paddle peripheral を差したか（冪等化, V2-4b）
+
+	cov *Coverage // PC/分岐カバレッジ記録（任意・EnableCoverage で有効化, VV-3）。nil=無効でゼロコスト
 }
 
 // EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。
@@ -112,11 +114,25 @@ func (e *Emu) stepInstr() (executed bool, err error) {
 		return false, err
 	}
 	if ready {
-		e.cpuCycles += int64(e.VCS.CPU.LastResult.Cycles)
+		lr := e.VCS.CPU.LastResult
+		e.cpuCycles += int64(lr.Cycles)
+		if e.cov != nil && lr.Defn != nil { // VV-3: 命令完了時だけ記録（nil=無効でゼロコスト）
+			e.cov.record(lr.Address, lr.Defn.IsBranch(), lr.BranchSuccess)
+		}
 		return true, nil
 	}
 	return false, nil
 }
+
+// EnableCoverage は PC/分岐カバレッジ記録を有効化する（以後の実行を記録）。冪等。
+func (e *Emu) EnableCoverage() {
+	if e.cov == nil {
+		e.cov = newCoverage()
+	}
+}
+
+// Coverage は記録したカバレッジを返す（EnableCoverage していなければ nil）。
+func (e *Emu) Coverage() *Coverage { return e.cov }
 
 // LastCycles は直近に完了した 1 命令のサイクル数を返す。
 func (e *Emu) LastCycles() int { return e.VCS.CPU.LastResult.Cycles }
