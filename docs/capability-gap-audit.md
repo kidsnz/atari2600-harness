@@ -127,7 +127,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-7** | **perfect6502 hardware-grade CPU oracle** (`cmd/cpucheck`) + **N-oracle majority vote** (`cmd/oraclevote`) | silicon-netlist truth (catches bugs ALL hand-written emulators share); fuses oracles into one verdict | A2/A3/B-C3 | M | 2 |
 | **VV-8** ✅v1.84.0 | **Behavioral trajectory diff vs original ROM** (`cmd/trajdiff`) | full **time-extended** state-trajectory diff (refdiff is a static snapshot) | F-2 | M | 2 |
 | **VV-9** | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
-| **VV-10** | **HW-divergence trap detectors** (timer-wrap=G8, HMOVE-latch, uninit-RAM-read) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
+| **VV-10** 🔨T-1✅v1.85.0 | **HW-divergence trap detectors** (timer-wrap=G8 ✅, HMOVE-latch, uninit-RAM-read) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
 | **VV-11** | **State-coverage matrix** (zone/VDEL-parity/NUSIZ/bank) + **coverage-aware mutation** | did tests exercise every TIA mode; honest mutation kill-rate (closes the playbook's 5–20% thread) | D-3/D-4 | S–M | 3 |
 | **VV-12** | **SSIM / pHash tolerant frame compare** | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
 | **VV-13** | **Audio spectral (FFT) + RMS-envelope diff** | frequency-domain timbre check (out-resolves `golden_audio` on V2-14 inverted twins) | E-4 | S–M | 3 |
@@ -203,7 +203,16 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   (behavior-sensitive); a behaviorally dead-byte flip = MATCH (behavioral, not a byte compare). CLI exits 1 on
   divergence. **Src:** Martignoni TOSEM'13; EXAMINER ASPLOS'22; McKeeman 1998.
 - **VV-9 (score OCR):** template-match 2600 fixed-bitmap digits (learn templates from the ROM font table; Hamming match) → assert displayed == decode(RAM score); catches display-kernel/BCD/font-index bugs exact hashes miss. `internal/ocr` + scenario `checks.score_equals_ram`. Pure-Go. Self-test: mutate one font byte (garbled glyph) without touching RAM → displayed≠RAM caught. **Src:** pHash Hamming primitive.
-- **VV-10 (HW-trap detectors):** siblings of `assert_line_budget` in `internal/emu`: T-1 RIOT timer-wrap (=G8; Gopher2600 `timer.go` models the 1T flip and cites AtariAge 303277 in-source), T-2 HMOVE-then-HMxx<24cy, T-3 uninitialized-RAM read (shadow-memory mask). Each with a planted-trap ROM vs a clean twin, both directions CI-locked. Start with T-1/G8. **Src:** known-traps.md §A/§D; Valgrind Memcheck (shadow memory).
+- **VV-10 (HW-trap detectors):** siblings of `assert_line_budget` in `internal/emu`. **T-1 ✅ DONE (v1.85.0):**
+  RIOT timer-wrap (=G8). `Emu.TimerState` exposes the timer (INTIM/TIMINT/Expired/Divider/ticks); `Emu.WatchTimerWrap`
+  flags the first **read of INTIM while the timer has already wrapped (Expired)** — the real G8 signature. **Key
+  finding (measured):** the naive "flag any wrap" is wrong — a *clean* kernel's timer also wraps later in the
+  frame (after the poll exits at 0), but nothing reads INTIM then; so the trap is specifically *read-after-wrap*
+  (and `Expired` must be sampled BEFORE the step, since reading INTIM clears it). Exposed as scenario check
+  `checks.no_timer_wrap` (no MCP tool / no reconnect). Planted/clean litmus: `timerwrap_trap` (TIM1T, ~7cy poll
+  overshoots 0 → reads post-wrap = hit) vs `timerwrap_clean` (TIM64T polled to 0 = no hit); `TestTimerWrapDetector`
+  locks both directions. **Still open:** T-2 HMOVE-then-HMxx<24cy, T-3 uninitialized-RAM read (shadow-memory
+  mask) are follow-ons. **Src:** known-traps.md §A/§D; AtariAge 303277 (timer.go in-source); Valgrind Memcheck (shadow memory).
 
 ## Tier 3 — polish / softer / defer
 - **VV-11** state-coverage matrix + coverage-filtered mutation (honest kill-rate; discharges the playbook's flagged 5–20%). **VV-12** SSIM/pHash tolerant lane (adds magnitude+locality; does **not** replace exact golden). **VV-13** audio FFT/RMS-envelope (new modality; audio rarer on the roadmap). **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.

@@ -8,6 +8,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.85.0] - 2026-06-17
+
+### Added
+- **HW-divergence trap detector T-1: RIOT timer-wrap / G8 (VV-10, partial).** `Emu.TimerState` exposes the RIOT
+  timer (INTIM/TIMINT/Expired/Divider/ticksRemaining) and `Emu.WatchTimerWrap` flags the first time a program
+  **reads INTIM while the timer has already underflowed/wrapped (Expired set)** — the G8 hazard (too-small
+  interval, or a poll loop that stepped over 0 and is consuming post-wrap values). Exposed as the scenario check
+  `checks.no_timer_wrap` (frames to watch) — no MCP tool, no reconnect.
+- **Key finding (measured):** the audit's one-line spec "flag the wrap" is too naive and would false-positive on
+  a *correct* kernel — `cb_timer` (which polls INTIM to 0 properly) also lets the timer wrap later in the frame,
+  but nothing reads INTIM then. So the trap is narrowed to *read-after-wrap*, and `Expired` is sampled BEFORE
+  each instruction because reading INTIM clears it (the timer's reversion). Planted/clean litmus pair
+  (`timerwrap_trap` TIM1T poll overshoots 0 = hit; `timerwrap_clean` TIM64T polled to 0 = no hit) with
+  `TestTimerWrapDetector` locking both directions. T-2 (HMOVE-then-HMxx<24cy) and T-3 (uninitialized-RAM read)
+  remain follow-ons. **Src:** known-traps.md §A/§D; AtariAge 303277; Valgrind Memcheck (shadow memory).
+
 ## [1.84.0] - 2026-06-17
 
 ### Added

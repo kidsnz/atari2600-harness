@@ -57,7 +57,8 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
     "ntsc_frame_lines": 262,            // StepFrame() == 262
     "max_line_budget": 76,              // budget guard is never exceeded (equivalent to assert_line_budget)
     "golden_frame": true,              // D-3: compare the rendered frame-chain hash against <scenario>.golden
-    "golden_audio": true               // A-2: compare the audio-chain hash against <scenario>.audio.golden
+    "golden_audio": true,              // A-2: compare the audio-chain hash against <scenario>.audio.golden
+    "no_timer_wrap": 3                 // VV-10 T-1: watch N frames; fail if INTIM is read after the timer wrapped (G8)
   }
 }
 ```
