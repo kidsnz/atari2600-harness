@@ -224,9 +224,8 @@ def main():
         rows = list(csv.DictReader(f))
     blog = blog_section()
     open(os.path.join(DOCS, "mining-digest.md"), "w", encoding="utf-8").write(emit(rows, "en") + blog)
-    open(os.path.join(DOCS, "mining-digest.ja.md"), "w", encoding="utf-8").write(emit(rows, "ja") + blog)
     nblog = blog.count("| `") if blog else 0
-    print("mining-digest: %d threads + %d dev-blogs -> docs/mining-digest.md(+ja)" % (len(rows), nblog))
+    print("mining-digest: %d threads + %d dev-blogs -> docs/mining-digest.md" % (len(rows), nblog))
 
 
 if __name__ == "__main__":

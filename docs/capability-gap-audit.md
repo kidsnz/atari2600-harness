@@ -154,3 +154,24 @@ Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-
 surface (testing-playbook methods, `stellacheck`, litmus V2-1…18, golden/regress/refdiff, G1–G14) — see each
 angle's dedup note (now folded above). The list is **ranked and bounded (14 items, best first)**; implement
 concrete-driven, top-tier first, not all at once. Implementation of any VV item is a **separate approval**.
+
+---
+
+# Doc-consolidation note (2026-06-17)
+
+**This file is now the single live backlog.** The former `improvement-roadmap.md` and `hardening-roadmap.md`
+were retired here (the user's "no duplicate files / 1 source" discipline): both had become ~95% "✅ DONE"
+logs duplicating `CHANGELOG.md` (the canonical version history) + git. Their delivered work stays in the
+CHANGELOG; the only still-open carryovers were already tracked above as **G5** (mid-line HMOVE/RESP
+litmus-lock) and **G7** (`step_clock` color-clock granularity · `watch/trap` on bus/collision — the ex-
+`hardening-roadmap` F-5 stubs). `improvement-roadmap`'s game-side items (Freeway port, audio recipes) are
+roms-side builds, not harness capability gaps. The verified-facts catalog remains `verified-coverage.md`; the
+knowledge-state audit remains `fundamentals-audit.md`.
+
+## Housekeeping backlog (docs/repo, not a harness capability)
+- **DOC-EN — translate the JA-heavy canonical docs to English** to finish the public-repo English-only pass
+  (`design-principles.md` ~98 JA lines, `casebook.md` ~39, `build-to-learn.md` ~33). Deferred from the
+  2026-06-17 docs cleanup (which dropped the 13 `.ja.md` duplicate files); these `.md` bodies are the *only*
+  copy so they were left intact, but the user asked that the English-ization "reliably happen later" — tracked
+  here so it is not dropped. `mining-digest.md` is **excluded** (generated from Japanese-source thread data —
+  translating would break source fidelity). Size: medium; needs review. Separate approval.

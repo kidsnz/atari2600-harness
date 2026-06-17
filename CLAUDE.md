@@ -5,9 +5,10 @@ premises, settled decisions, constants you must never get wrong, and which doc t
 Deep dives go in `docs/` (routing table below). Assume anything not here is unread. Don't put facts that
 must always hold *only* in a doc — burn them here or into memory.
 
-> **Language policy:** the published repo is English-only. The author works in Japanese and communicates in
-> Japanese; Japanese copies of each `*.md` are kept locally as `*.ja.md` (gitignored, never published). When
-> editing docs, keep the English `*.md` as the source of truth for the public repo.
+> **Language policy:** docs are **English-only**. The author works/communicates in Japanese, but the former
+> per-doc `*.ja.md` copies were **dropped (2026-06-17)** to avoid duplicate, drift-prone files — the English
+> `*.md` is the single source of truth. (A few `.md` bodies still contain Japanese; full English-ization is
+> tracked as **DOC-EN** in `docs/capability-gap-audit.md`.)
 
 ## Invariant premises
 - Goal: build a **verification harness** so Claude can author the Atari 2600 in 6502 assembly accurately
@@ -138,7 +139,7 @@ round trip. Also return `png_path` in JSON.
 | Tool selection rationale / alternatives | `docs/tool-landscape.md` |
 | Implementation spec (Gopher2600 API / MCP / Stella flags) / source of constants | `docs/resources.md` |
 | MCP tool implementation spec (go-sdk API, per-tool I/O) | `docs/mcp-tools.md` |
-| harness capability gaps (G1–G8, prioritized strengthening) | `docs/capability-gap-audit.md` |
+| harness backlog — capability gaps (G1–G14) + verification-variety (VV-*); **the single live backlog** (ex improvement/hardening-roadmap folded in) | `docs/capability-gap-audit.md` |
 | 8bitworkshop sample cross-check (book techniques vs our library) | `docs/8bitworkshop-crosscheck.md` |
 | provenance map (every technique/rule → its origin) | `docs/provenance.md` (gen: `check_provenance.py --list`) |
 | fundamentals audit (verified vs documented vs unknown, with sources) | `docs/fundamentals-audit.md` |
@@ -146,9 +147,7 @@ round trip. Also return `png_path` in JSON.
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
 | Image ingestion (screenshot/ROM → TIA data) + input contract v3 | `docs/ingest.md` |
 | RAM maps per ROM (auto-extracted audit) | `docs/ram-maps.md` |
-| Roadmap / next moves (prioritized) | `docs/improvement-roadmap.md` |
-| Strengthening roadmap (sprites / audio / CI hardening) | `docs/hardening-roadmap.md` |
-| Decision history and changelog | `CHANGELOG.md` |
+| Decision history and changelog (delivered-work log) | `CHANGELOG.md` |
 
 > **Anti-rot:** every `docs/*.md` must be reachable from this table or the authoring protocol — `scripts/check_wiring.py`
 > (CI-gated) fails on orphaned knowledge, so nothing accrued ever rots unused.

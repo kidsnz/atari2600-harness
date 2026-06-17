@@ -12,8 +12,8 @@ constant-level claim was cross-checked against ≥2 sources or flagged.
 primary spec or ≥2 independent sources, *not yet measured by us*. ⬜ **unknown**: no authoritative source
 found, or sources conflict — measure it ourselves. ⚠️ **caution**: a trap, contradiction, or correction.
 
-The actionable follow-ups live in `hardening-roadmap.md` § "v2 backlog". Verified facts remain cataloged in
-`verified-coverage.md`.
+The actionable follow-ups (now delivered — see `CHANGELOG.md`) and any remaining gaps live in the single live
+backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-coverage.md`.
 
 ---
 
@@ -183,7 +183,8 @@ The actionable follow-ups live in `hardening-roadmap.md` § "v2 backlog". Verifi
 
 ## Where the follow-ups live
 The prioritized work items distilled from this audit (new litmus ROMs, `read_bank`, audio sample capture,
-Stella oracle automation, `pkg/audio` tables) are tracked in **`hardening-roadmap.md` § v2 backlog**.
+Stella oracle automation, `pkg/audio` tables) were tracked in the v2 backlog — now **delivered (see
+`CHANGELOG.md`)**, with any remaining gaps folded into the single live backlog **`capability-gap-audit.md`**.
 
 ## Mid-line HMOVE — verified (2026-06-12, litmus_hmove_mid)
 

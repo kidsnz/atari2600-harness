@@ -144,9 +144,8 @@ go build -o bin/harness ./cmd/harness   # produce the binary referenced by .mcp.
 | Fundamentals audit (verified vs documented vs unknown, sourced) | [`docs/fundamentals-audit.md`](docs/fundamentals-audit.md) |
 | The Exerciser ROM (integration showcase; v1.0.0 keystone) | [`docs/exerciser.md`](docs/exerciser.md) |
 | Stella oracle cross-check (`cmd/stellacheck`) | [`docs/stella-oracle.md`](docs/stella-oracle.md) |
-| Roadmap / next moves | [`docs/improvement-roadmap.md`](docs/improvement-roadmap.md) |
-| Strengthening roadmap (sprites / audio / CI) | [`docs/hardening-roadmap.md`](docs/hardening-roadmap.md) |
-| Decisions and changelog | [`CHANGELOG.md`](CHANGELOG.md) |
+| Backlog / roadmap (capability gaps G1–G14 + verification-variety VV-*) | [`docs/capability-gap-audit.md`](docs/capability-gap-audit.md) |
+| Decisions and changelog (delivered-work log) | [`CHANGELOG.md`](CHANGELOG.md) |
 
 As far as a public search (GitHub/web, 2026-06) shows, no MCP server for the Atari 2600 exists yet —
 emulator MCPs exist for other systems (C64 = vice-mcp, Game Boy = mcp-gameboy, Atari Lynx = gearlynx).

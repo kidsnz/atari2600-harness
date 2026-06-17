@@ -100,4 +100,4 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 ## Not yet covered (open)
 Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, paddles (INPT0–3 charge timing),
 SECAM, and a Stella-oracle *pixel* cross-check (RAM cross-check now works via `cmd/stellacheck`).
-See `docs/hardening-roadmap.md` § v2 backlog.
+See the single live backlog `docs/capability-gap-audit.md`.

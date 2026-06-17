@@ -3,7 +3,7 @@
 // 任意 ROM では RESPx を打つ位置が kernel 依存なので、遅延量を RAM から読む協調 ROM
 // （roms/litmus/litmus_pos.bin: DELAY=$80, SBC/BCS ループ=5 CPU サイクル/ユニット）を使い、
 // ハーネスが poke で DELAY を掃引 → read_tia の ResetPixel を実測 → 直線回帰する。
-// litmus を「一度きりの手作業」から「kernel ごとに再現可能」へ（出典: docs/improvement-roadmap B-4）。
+// litmus を「一度きりの手作業」から「kernel ごとに再現可能」へ（出典: B-4・delivered, see CHANGELOG.md）。
 package calibrate
 
 import (
