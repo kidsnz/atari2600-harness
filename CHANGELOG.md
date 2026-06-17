@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.86.0] - 2026-06-17
+
+### Added
+- **HW-divergence trap detector T-2: HMOVE-then-HMxx-within-24cy (VV-10).** `Emu.WatchHMOVEHazard` flags the
+  first write to a motion register (HMP0/HMP1/HMM0/HMM1/HMBL or HMCLR) within 24 CPU cycles of an HMOVE strobe —
+  the documented "unpredictable motion" hazard (Stella PG). The 24-cycle window is measured in **color clocks**
+  (72 = 24 CPU cy) via `Coords`, not the executed-cycle counter (which excludes WSYNC stalls), so a clean
+  kernel that separates HMOVE from HMxx with a WSYNC is correctly judged outside the window. Exposed as the
+  scenario check `checks.no_hmove_hazard`. Planted/clean litmus pair (`hmove_trap` writes HMP0 ~3cy after HMOVE
+  = hit; `hmove_clean` sets HMxx in VBLANK and strobes HMOVE right after a WSYNC = no hit) with
+  `TestHMOVEHazardDetector` locking both directions. VV-10's T-3 (uninitialized-RAM read) remains a follow-on:
+  a correct shadow-memory detector needs full effective-address resolution for indexed/`(ind),Y` writes.
+  **Src:** Stella Programmer's Guide (HMOVE timing); known-traps.md §A/§D.
+
 ## [1.85.0] - 2026-06-17
 
 ### Added
