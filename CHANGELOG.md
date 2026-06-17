@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.77.0] - 2026-06-17
+
+### Changed
+- **Verification discipline consolidated into a single canonical standard** (`feedback-verification-standard`,
+  "MAX"). Iron rule 1 (`CLAUDE.md`) and the authoring-protocol Verify step (step 5) now **reference** that
+  standard's MAX checklist instead of restating it: trace frame-by-frame, read the full object window (no
+  partial reads), cross-check derived formulas against raw pixels, kill each hypothesis with data, prove the
+  negative, present the measured table. Born from the Breakout ball-judder investigation (proved "not a bug"
+  purely by `read_row` measurement).
+- **Rule-base de-duplicated to "1 rule = 1 source of truth."** Memory feedback rules merged 18→10 (the
+  verification cluster collapsed 5→1; goal 3→1; execution 2→1; work-tracking 2→1). Stale `[[memory-links]]`
+  in `docs/` (design-principles, build-to-learn, casebook, testing-playbook) repointed to the new canonical
+  names. No behavioural code change; CI/wiring unaffected.
+
 ## [1.76.0] - 2026-06-16
 
 ### Added
