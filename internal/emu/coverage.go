@@ -59,6 +59,22 @@ func (c *Coverage) OneSidedBranches() []uint16 {
 	return out
 }
 
+// Signature は coverage-guided fuzz のフィードバック用に、踏んだ「カバレッジ標識」を比較可能な
+// キー集合で返す（命令アドレス＋分岐エッジ taken/not）。新しい標識が増える入力＝interesting。
+func (c *Coverage) Signature() map[uint64]bool {
+	sig := make(map[uint64]bool, len(c.pcSeen)+len(c.brTaken)+len(c.brNot))
+	for a := range c.pcSeen {
+		sig[uint64(a)] = true
+	}
+	for a := range c.brTaken {
+		sig[1<<32|uint64(a)<<1|1] = true
+	}
+	for a := range c.brNot {
+		sig[1<<32|uint64(a)<<1|0] = true
+	}
+	return sig
+}
+
 // SeenPCs は踏んだ命令アドレスを昇順で返す（dump 用）。
 func (c *Coverage) SeenPCs() []uint16 {
 	out := make([]uint16, 0, len(c.pcSeen))
