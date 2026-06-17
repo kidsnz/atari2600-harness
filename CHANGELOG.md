@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.78.0] - 2026-06-17
+
+### Added
+- **CPU-core conformance gate in CI (VV-1).** The embedded Gopher2600 CPU is now certified against two
+  external authoritative suites already vendored in the clone but never run by harness CI: **Klaus Dormann**
+  6502 functional+decimal (embedded `.bin`, always-on) and a **Tom Harte / SingleStepTests 65x02** subset
+  (per-cycle bus addr/data/read-write + final state + cycle count; 12-opcode smoke fetched on demand, MIT,
+  not vendored; full 256 is local-only, ~1GB). Suites run via the full import path
+  `go test github.com/jetsetilly/gopher2600/hardware/cpu/tests/{klaus2m5,thomharte}/...` (`replace`-resolved).
+  New `scripts/check_cpu_conformance.sh` (+ `--selftest`) and two CI steps. The gate is **self-validated** by a
+  planted-discrepancy: a corrupted expected value must make the run go RED (proven live, not vacuous). First
+  Tier-1 pilot of the verification-variety backlog (`docs/capability-gap-audit.md`). Src: Klaus2m5 repo;
+  SingleStepTests/65x02.
+
 ## [1.77.0] - 2026-06-17
 
 ### Changed

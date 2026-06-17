@@ -97,6 +97,18 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | RAM $80–$FF agreement at frame 5, `smoke` | `cmd/stellacheck` PASS (128/128 bytes) |
 | RAM agreement for the **6502-precision measurement suite** (`litmus_6502`): BCD/Z-flag, JMP($xxFF) bug, page-cross/store cycles, DCP, timer | `cmd/stellacheck` PASS (128/128) — two independent emulators agree |
 
+## CPU core — external authoritative conformance (VV-1, v1.78.0)
+The embedded Gopher2600 CPU (on which *every* numeric verdict rests) is certified in CI against suites the
+harness does **not** author. Runner: `scripts/check_cpu_conformance.sh` + two CI steps.
+| Suite | What it proves | Evidence |
+|---|---|---|
+| **Klaus Dormann 6502 functional + decimal** (GPL) | end-to-end functional + NMOS-decimal correctness (run-to-success-trap PC=`$347D` / RAM `$000B==0`) | `go test …/klaus2m5` PASS — embedded `.bin`, always-on, no provisioning |
+| **Tom Harte / SingleStepTests 65x02** (MIT) | per-opcode **cycle-by-cycle bus** (addr/data/read-write) + final registers + cycle count | `go test …/thomharte` PASS — 12-opcode smoke subset in CI (fetched on demand); full 256 local-only |
+
+The gate is **self-validated** (`--selftest`): a planted-wrong expected value must make the run go RED, so
+it can never be vacuously green. Src: Klaus2m5 `https://github.com/Klaus2m5/6502_65C02_functional_tests`;
+SingleStepTests `https://github.com/SingleStepTests/65x02`.
+
 ## Not yet covered (open)
 Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, paddles (INPT0–3 charge timing),
 SECAM, and a Stella-oracle *pixel* cross-check (RAM cross-check now works via `cmd/stellacheck`).
