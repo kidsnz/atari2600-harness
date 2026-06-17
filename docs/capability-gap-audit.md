@@ -120,7 +120,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 |---|---|---|---|---|---|
 | **VV-1** ✅v1.78.0 | Activate vendored **Klaus + Tom-Harte 65x02** CPU suites in CI (gated) | external, exhaustive, all-256-opcode + **per-cycle bus** certification of the engine | B-C1 | S–M | ★1 |
 | **VV-2** ✅v1.80.0 | **Static per-scanline cycle-budget PROVER** (`cmd/cyclebound`) | **proof over ALL paths** (∀) vs observe-one-run — the only ∀-claim member; attacks gap B | C-1 | M | ★1 |
-| **VV-3** | **PC/branch coverage map** (`cmd/cover`) → **coverage-guided fuzzing** | test-adequacy axis + AFL-style feedback fuzz (today's fuzz is blind) | D-1→D-2 | S→M | ★1 |
+| **VV-3** ✅v1.83.0 | **PC/branch coverage map** (`cmd/cover`) → **coverage-guided fuzzing** (`cmd/guidedfuzz`) | test-adequacy axis + AFL-style feedback fuzz (today's fuzz is blind) | D-1→D-2 | S→M | ★1 |
 | **VV-4** ✅v1.79.0 | **Motion-smoothness / jerk metric** (`cmd/motion` + `read_motion` MCP + `checks.motion`) | per-frame motion-jerk NUMBER = "judder/ブルブル" automated (closes the Breakout hand-trace) | E-1 | S–M | ★1 |
 | **VV-5** ✅v1.82.0 | **Temporal-logic trace assertions** (`temporal` block: eventually-within-K/response/never-for-N; `always`=existing invariant) | properties over a **sequence** of frames (per-frame invariants can't) | F-1 | M | ★1 |
 | **VV-6** | **MAME headless cross-oracle** (`cmd/mamecheck`) | a **3rd independent** full-system oracle, **fully headless** (no keypress unlike Stella) | A1 | M | 2 |
@@ -168,7 +168,18 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   (all real kernels runtime-verified over 600 frames); the over-budget reports are a budget-model mismatch, not
   a kernel defect. To be picked up later in normal Tier order (display-region limiting + per-line-count budget;
   full green-ification = infeasible-path exclusion = VV-14). **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
-- **VV-3** *(unlocks a whole adequacy axis cheaply):* add `pcSeen`/`branchEdges` recorder inside `emu.stepInstr()` (uses `LastResult.Address`/`IsBranch()`/`BranchSuccess`); `cmd/cover` emits dead-code + one-sided-branch map; then `RunGuidedFuzz` keeps inputs hitting new edges. Self-test: planted unreachable branch reads as uncovered; guided fuzz reaches a deeply-guarded state blind fuzz misses. **Src:** Zalewski AFL whitepaper; Go native fuzzing.
+- **VV-3 ✅ DONE (v1.83.0):** opt-in coverage recorder hooked into `emu.stepInstr()` at instruction completion
+  (`LastResult.Address`/`Defn.IsBranch()`/`BranchSuccess`) → `internal/emu.Coverage` (pcSeen + per-branch
+  taken/fall-through edges; `OneSidedBranches`, `Signature`); nil until `EnableCoverage` = zero cost. **`cmd/cover`**
+  emits reached-coverage + one-sided branches (on `cyclebound_branch` it flags `0xF036` — the very path VV-2
+  statically proves overruns but runtime never takes = an independent cross-check). **`internal/guidedfuzz`** +
+  **`cmd/guidedfuzz`** = AFL-style search: a corpus of input sequences grown whenever a mutation reveals a new
+  coverage marker (search core decoupled from the emu via `Evaluator`, so it is unit-testable). Self-test:
+  `TestCoverageLogic` (one-sided detection; an unrecorded address reads as uncovered), `TestGuidedBeatsBlind`
+  (synthetic staircase oracle — guided reaches full depth 9 markers while blind stalls at 4 on the same 6000-iter
+  budget, deterministically), plus emu-wiring integration tests. **Scope (honest):** full dead-code over the
+  *decodable* universe (reusing the cyclebound decoder) is a follow-on; today's map is reached-coverage +
+  one-sided branches. **Src:** Zalewski AFL whitepaper; Go native fuzzing.
 - **VV-4 ✅ DONE (v1.79.0):** `internal/motion` (pure `Analyze` + `TrackObject`) tracks an object's exact X (`Markers().HmovedPixel`) and rendered top (column scan over a uniform-background window) over N frames → velocity / accel / **jerk_rms** (RMS of the 2nd difference; 0 = constant velocity) + `max_accel`/`monotonic` (glitch vs benign staircase). Shipped 3 ways: `cmd/motion` CLI, **`read_motion` MCP tool** (interactive — used live on the Breakout ball: vertical jerk 0, horizontal jerk 1 = the benign 1px/2-frame staircase, not a bug), and scenario **`checks.motion: max_jerk_rms`** (regression gate). Litmus `motion_glide` (clean +1/frame → jerk 0) + `motion_stutter` (+2,0,+2,0 → jerk 2). Self-test = Go `TestMotionSelfTest` (glide jerk 0 vs stutter ≫) + scenario probe. **Validated against the user's own perception: motion_stutter run in Stella reproduced their exact "ブルブル" symptom.** **Src:** Flash & Hogan min-jerk 1985.
 - **VV-5 ✅ DONE (v1.82.0):** `temporal` block in `internal/scenario` with bounded LTL₃/MTL monitors, reusing the
   existing condition vocabulary (`resolve` + `condPass` + `condDesc`). Three new `kind`s — **`eventually`** (P

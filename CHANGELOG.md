@@ -8,6 +8,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.83.0] - 2026-06-17
+
+### Added
+- **PC/branch coverage + coverage-guided fuzzing (VV-3).** Closes the last Tier-★1 gap — the test-adequacy
+  axis plus AFL-style feedback fuzzing (the existing scenario `fuzz` is blind).
+  - **Coverage recorder** (`internal/emu.Coverage`): an opt-in hook in `stepInstr` (at instruction completion,
+    reading `LastResult.Address`/`Defn.IsBranch()`/`BranchSuccess`) records executed instruction addresses and
+    per-branch taken/fall-through edges. Exposes `PCCount`/`BranchCount`/`EdgeCount`/`OneSidedBranches`
+    (a branch whose other side was never exercised)/`Seen`/`Signature`. Nil until `EnableCoverage` = zero cost.
+  - **`cmd/cover`**: drives a ROM and reports reached coverage + one-sided branches. On `cyclebound_branch` it
+    flags `0xF036` — the same path VV-2 statically proves overruns (101>76) but runtime never takes, an
+    independent cross-check between the two tools.
+  - **`internal/guidedfuzz` + `cmd/guidedfuzz`**: AFL-style search that keeps a corpus of input sequences and
+    grows it whenever a mutation reveals a new coverage marker (`Coverage.Signature`), climbing toward
+    deeply-guarded states blind fuzz essentially never reaches. The search core is decoupled from the emulator
+    via `Evaluator`, so it is unit-testable; `EmuEvaluator` wires it to a fresh deterministic emu per run.
+  - Self-test: `TestCoverageLogic` (one-sided detection; an unrecorded address reads as uncovered),
+    `TestGuidedBeatsBlind` (synthetic staircase oracle — guided reaches full depth = 9 markers while blind
+    stalls at 4 on the same 6000-iteration budget, deterministic and ROM-independent), plus emu-wiring
+    integration tests. Scope (honest): full dead-code over the decodable universe is a follow-on; today's map
+    is reached-coverage + one-sided branches. **Src:** Zalewski AFL whitepaper; Go native fuzzing.
+
 ## [1.82.0] - 2026-06-17
 
 ### Added
