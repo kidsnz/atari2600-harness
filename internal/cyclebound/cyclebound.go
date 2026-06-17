@@ -539,6 +539,13 @@ func Prove(asmPath string, budget int) (*Report, error) {
 			rep.Violations = append(rep.Violations, reg)
 		}
 	}
-	rep.Certified = len(rep.Violations) == 0 && len(rep.Unbounded) == 0
+	if rep.Regions == 0 {
+		// No reachable STA WSYNC: a bank-switched kernel (display loop in another
+		// bank we don't follow) or a non-kernel ROM. Never vacuously certify "0
+		// regions, all safe" — that would be the prover lying. Report it.
+		rep.Unbounded = append(rep.Unbounded, Region{Budget: budget,
+			Reason: "no STA WSYNC reached from the reset/IRQ/NMI vectors — bank-switched or not a single-bank kernel (out of scope)"})
+	}
+	rep.Certified = rep.Regions > 0 && len(rep.Violations) == 0 && len(rep.Unbounded) == 0
 	return rep, nil
 }

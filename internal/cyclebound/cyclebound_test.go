@@ -123,3 +123,18 @@ func TestObservedWithinProven(t *testing.T) {
 		t.Fatal("certified kernel overran at runtime under a 76cy budget — proof and observation disagree")
 	}
 }
+
+// TestProveNoWSYNCNotCertified guards against a vacuous "0 regions, all safe"
+// certification: a ROM with no reachable STA WSYNC (a bank-switched kernel whose
+// display loop lives in another bank) must NOT certify — 0 regions means "can't
+// prove", not "proven safe". Found by running the prover on real kernels (the
+// litmus ROMs all use WSYNC, so they never hit this path).
+func TestProveNoWSYNCNotCertified(t *testing.T) {
+	rep := mustProve(t, "../../roms/techniques/banked_game.asm", 76)
+	if rep.Regions != 0 {
+		t.Skipf("banked_game now exposes %d WSYNC regions; the 0-region premise changed", rep.Regions)
+	}
+	if rep.Certified {
+		t.Fatal("a 0-region ROM must NOT certify (no WSYNC reached = out of scope, not proven safe)")
+	}
+}

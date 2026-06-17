@@ -146,8 +146,14 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   smoke). Self-test `TestCycleboundSelfTest` (planted discrepancy): `cyclebound_branch` overruns only on one
   branch (~101cy) so a live run is a lucky pass yet the proof FLAGS it (∀ catches what ∃ misses); `litmus_overrun`'s
   counted delay loop bounded + flagged (108cy); `smoke` certified (worst 19cy); a tight budget flips smoke to a
-  violation (non-vacuous); the certified bound holds at runtime (observed-within-proven dual). Scope: single-bank
-  flat 2K/4K. **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
+  violation (non-vacuous); the certified bound holds at runtime (observed-within-proven dual). **Scope (v1 —
+  honest over guessing, found by running it on the real technique kernels):** single-bank flat 2K/4K; loops
+  bounded only via the `ldx/ldy #N`+`dex/dey`+`bne/bpl` idiom — **divide-by-15 coarse-positioning** (A-register
+  `sbc/bcs`) and other A-reg/memory-counter loops are reported **unbounded**, not over-estimated into a false
+  violation; page-sensitive reads charged a conservative worst-case +1 (false-positive side, never
+  false-negative); a ROM with no reachable `STA WSYNC` (bank-switched display loop) is reported unbounded,
+  never vacuously certified. Tightening these (constant-propagation / value-range to bound divide-by-15) is
+  **VV-14** territory. **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
 - **VV-3** *(unlocks a whole adequacy axis cheaply):* add `pcSeen`/`branchEdges` recorder inside `emu.stepInstr()` (uses `LastResult.Address`/`IsBranch()`/`BranchSuccess`); `cmd/cover` emits dead-code + one-sided-branch map; then `RunGuidedFuzz` keeps inputs hitting new edges. Self-test: planted unreachable branch reads as uncovered; guided fuzz reaches a deeply-guarded state blind fuzz misses. **Src:** Zalewski AFL whitepaper; Go native fuzzing.
 - **VV-4 ✅ DONE (v1.79.0):** `internal/motion` (pure `Analyze` + `TrackObject`) tracks an object's exact X (`Markers().HmovedPixel`) and rendered top (column scan over a uniform-background window) over N frames → velocity / accel / **jerk_rms** (RMS of the 2nd difference; 0 = constant velocity) + `max_accel`/`monotonic` (glitch vs benign staircase). Shipped 3 ways: `cmd/motion` CLI, **`read_motion` MCP tool** (interactive — used live on the Breakout ball: vertical jerk 0, horizontal jerk 1 = the benign 1px/2-frame staircase, not a bug), and scenario **`checks.motion: max_jerk_rms`** (regression gate). Litmus `motion_glide` (clean +1/frame → jerk 0) + `motion_stutter` (+2,0,+2,0 → jerk 2). Self-test = Go `TestMotionSelfTest` (glide jerk 0 vs stutter ≫) + scenario probe. **Validated against the user's own perception: motion_stutter run in Stella reproduced their exact "ブルブル" symptom.** **Src:** Flash & Hogan min-jerk 1985.
 - **VV-5** *(one file, every game needs it):* `temporal` block in `internal/scenario` with 4 O(1)–O(K) LTL₃/bounded-MTL monitors (always / eventually-within-K / response{after,then,within} / never-P-for-N), reusing the existing condition struct + `resolve()`; "inconclusive" reported distinctly so liveness can't be vacuously green. Self-test: `eventually` fails on a never-written cell; `response` with `within` one frame too tight fails, true latency passes. **Src:** Bauer/Leucker/Schallhart TOSEM 2011; STL RV'15.

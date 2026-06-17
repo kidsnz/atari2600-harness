@@ -26,7 +26,10 @@ versions follow [Semantic Versioning](https://semver.org/).
   it; the planted-discrepancy self-test (`TestCycleboundSelfTest`) also bounds `litmus_overrun`'s counted
   delay loop (108cy), certifies `smoke` (worst 19cy), flips smoke to a violation under a tight budget
   (non-vacuous), and checks the certified bound holds at runtime (observed-within-proven dual). The only
-  ∀-claim member of the suite. Scope: single-bank flat 2K/4K. Src: Li & Malik IPET (DAC'95); Ballabriga &
+  ∀-claim member of the suite. Scope (v1, honest over guessing): single-bank flat 2K/4K; only the
+  `ldx/ldy #N`+`dex/dey`+`bne/bpl` loop idiom is bounded (divide-by-15 positioning and other A-reg/memory-counter
+  loops report unbounded rather than risk a false violation); page-sensitive reads charged a conservative +1; a
+  0-WSYNC ROM is reported unbounded, never vacuously certified. Src: Li & Malik IPET (DAC'95); Ballabriga &
   Cassé (WCET'08).
 
 ## [1.79.0] - 2026-06-17
