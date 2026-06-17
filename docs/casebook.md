@@ -6,7 +6,7 @@
 
 > **作り方（3層ケーススタディ）**：商用ゲームを「マニュアル(spec)×逆アセンブル(impl)×Claude再構築(rehearsal)」で学び、**再構築と実装の差分＝能力ギャップ**を一般化散文として昇格する（[[project-casebook-3layer]]）。**クリーンルーム厳守＝逆アセンのコードは転載せず、一般化した散文と出典のみ**。生ペアリングは非リポ `reference/disassemblies/<game>/` 配下の `_casestudies/`。
 >
-> **Layer1 spec はマニュアルだけで足りない＝実プレイ（実ROM観察）を必ず足す**：マニュアルは目的・操作・スコアの「意図」は書くが、画面の実際の動き・物量・描画 craft・手触りは伝えない。`load_rom`→`step_frame`→`get_screen_annotated` で挙動を観察し spec に足す（Fishing Derby では魚=1行1体・斜め釣り糸・水面シマーが全て実走観察で判明＝マニュアルの穴）。[[feedback-play-the-rom-not-just-manual]]。
+> **Layer1 spec はマニュアルだけで足りない＝実プレイ（実ROM観察）を必ず足す**：マニュアルは目的・操作・スコアの「意図」は書くが、画面の実際の動き・物量・描画 craft・手触りは伝えない。`load_rom`→`step_frame`→`get_screen_annotated` で挙動を観察し spec に足す（Fishing Derby では魚=1行1体・斜め釣り糸・水面シマーが全て実走観察で判明＝マニュアルの穴）。[[feedback-verification-standard]]。
 
 ## 索引
 | ゲーム | 年/設計 | サイズ/型 | 状況→技 エントリ |
@@ -31,7 +31,7 @@
 2. **アーキタイプ**：単画面 → 迷路/スポーツ/固定シューター → スクロール/多画面 → プラットフォーマー/3D。
 3. **マニュアルの詳しさ（spec の濃さ・ユーザー指摘 2026-06-15）**：説明が厚いゲームほど Layer1 spec が濃く、diff が豊かになる＝学びが大きい。例＝**Asteroids は説明が非常に厚い**（ただし 8K バンク切替＝バンク keystone 帯）。マニュアル濃度は良い選定信号だが、難易度昇順（1）と両立させる。
 4. **逆アセンの入手性**（完全注釈・実ROM一致が望ましい）。
-- **必須工程**：どのゲームでも **Layer1 spec＝マニュアル＋実ROM観察の二本立て**（[[feedback-play-the-rom-not-just-manual]]）。マニュアルだけでは挙動を把握し切れない。
+- **必須工程**：どのゲームでも **Layer1 spec＝マニュアル＋実ROM観察の二本立て**（[[feedback-verification-standard]]）。マニュアルだけでは挙動を把握し切れない。
 
 ---
 

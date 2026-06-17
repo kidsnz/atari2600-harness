@@ -14,7 +14,7 @@ there is rarely a ready oracle ("is this the correct frame?"). Almost every tech
 **Lesson that motivated this doc:** component checks passing (per-cell collision works, tunnel pass-through
 works) does *not* prove the emergent claim (the ball clears the back row from behind). Verify at the level of
 what you assert. When you claim a high-level behaviour, demonstrate *that behaviour* — don't infer it from
-parts. (memory: `feedback-verify-at-claim-level`.)
+parts. (memory: `feedback-verification-standard`.)
 
 ## Technique → harness mapping
 | Technique (source) | Oracle strategy | In this harness |
@@ -49,7 +49,7 @@ the MCP tools; the automated `fuzz`/`mutation`/`metamorphic`/`mine-invariants` m
 6. **Claim-level demonstration** — for any *emergent* claim ("the tunnel-behind technique works", "this is
    playable"), demonstrate *that behaviour* directly: free-run from a realistic state with no `poke`
    intervention and observe the claimed phenomenon in the numbers + annotated frame. Do not infer it from
-   component checks. (memory: `feedback-verify-at-claim-level`.)
+   component checks. (memory: `feedback-verification-standard`.)
 
 ## Provenance
 Imported, established techniques (not 2600-specific). Recorded per `feedback-provenance-always`:

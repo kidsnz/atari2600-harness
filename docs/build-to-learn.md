@@ -3,7 +3,7 @@
 > **これは叩き台＝再利用可能な方法論テンプレ**（どのセッションからでも参照可能）。`casebook.md`（実ゲームを*読んで*"状況→技"を学ぶ＝受動）の対になる**能動版**＝実ゲームのメカニクスを**1個ずつ自分で asm に再現し、実ROMに数値照合**して、「説明できる」を「書ける」に変える。初出＝Breakout（2026-06-15）。著述ループ `authoring-protocol.md` の実地版。
 
 ## いつ使うか
-- casebook study で「自分の描画/実装 craft が弱い」と判明したとき（[[feedback-mastery-not-just-passing]]）。
+- casebook study で「自分の描画/実装 craft が弱い」と判明したとき（[[feedback-goal-standard]]）。
 - 紙の再構築でなく**手を動かして技を身体化**したいとき。狙い＝**小さな成功体験の積み上げ**で能力を底上げ。
 
 ## 前提＝3素材（すべて出典記録・[[feedback-provenance-always]]）
@@ -12,7 +12,7 @@
 | 検証済み ROM | 挙動の ground-truth | atarimania（[[reference-atarimania-roms]]）／padはdd抽出 | md5 が正規版と一致 |
 | 公式マニュアル | spec（仕様） | archive.org（PDF＋OCR `_djvu.txt`） | 公式版を primary（Sears等の別ブランドに注意） |
 | 注釈付き逆アセン | impl（実装の答え） | AtariAge（Debro 等）／無ければ distella で自前 | **`dasm -f3`→実ROMとバイト完全一致**を確認 |
-- マニュアルだけでは挙動を把握し切れない＝**必ず実プレイ観察を足す**（[[feedback-play-the-rom-not-just-manual]]）。
+- マニュアルだけでは挙動を把握し切れない＝**必ず実プレイ観察を足す**（[[feedback-verification-standard]]）。
 
 ## Phase 0 — 念入り精査（書く前に必ず）
 1. **マニュアル↔コード対応マップ**（`_casestudies/<game>/impl-map.ja.md`・クリーンルーム散文のみ）：マニュアル各節→逆アセンのルーチン/RAM/テーブルへ対応づけ。書式＝表（節｜振る舞い｜コード｜RAM）。
@@ -26,7 +26,7 @@
 ## 1段の回し方（毎段・小ステップ）
 1. **DoD を数値で先に定義**（verification-first）＝「何が出れば合格か」を fixtures 基準で。scenario も先に書き `roms/<game>/scenarios/` に回帰として残す。
 2. **sealed で自分で挑戦**（簡単な段）。難段は挑戦→詰まったら**逆アセンの方法を読んで技を学ぶ**→**自分で書く**（クリーンルーム＝転載しない）。
-3. assemble（`assemble_and_load`）→実走→**数値照合**（`read_row`/`read_tia_registers`/`read_collisions`/`step_frame`/`set_input`）→**1コミット**（[[feedback-fine-grained-commits]]）。おかしければ**即 revert**（Iron rule 3）。
+3. assemble（`assemble_and_load`）→実走→**数値照合**（`read_row`/`read_tia_registers`/`read_collisions`/`step_frame`/`set_input`）→**1コミット**（[[feedback-execution-discipline]]）。おかしければ**即 revert**（Iron rule 3）。
 4. **差分を記録**（自分の方法 vs 逆アセンの方法）＝`diff-gaps.ja.md`＝能力ギャップ＝学び。
 
 ## エンジニアリングの作法
