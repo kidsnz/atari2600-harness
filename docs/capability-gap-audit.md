@@ -94,3 +94,63 @@ First catch: the suite immediately exposed that Breakout rendered 264 lines, not
 
 → The harness **can** be strengthened more — G2 done (v1.67.0); remaining order is **G1 (advanced
 carts) → G4 (oracle)**, not more mining. A **finite backlog**, not infinite mining.
+
+---
+
+# Verification-Variety backlog (VV-*) — 2026-06-17
+
+> Motivated by the user's insight: *"Claude's accuracy comes down to how much it can verify itself — accurate
+> changes at accurate **values** let it commit accurately to the result."* So the fastest capability lift is
+> **more independent KINDS of verification**. Six parallel research agents surveyed six angles (provenance in
+> each finding; raw agent scratch was consolidated here and deleted). Center of gravity = **technical +
+> perceptual-numeric** (oracles the user can judge by number); subjective game-craft stays the user's call.
+> Every VV item ships via the usual pipeline (litmus/numeric verify → CI → tag) and **must carry a
+> planted-discrepancy self-test** (the new oracle must itself be falsifiable — like `stellacheck` proving it
+> catches an injected diff). Provenance per item = `feedback-provenance-always`.
+
+**Cross-cutting finding:** the three highest-leverage items need **almost no new infrastructure** — the
+substrate is already vendored. Klaus + Tom-Harte CPU suites + their Go runners are already in the embedded
+Gopher2600 tree (just never run by harness CI); the exact 256-opcode cycle table is in-tree (`instructions.
+Definitions`) for the static prover; PC/branch coverage is a few lines inside the existing `emu.stepInstr()`
+loop. Much of the highest-value verification is **activation + ownership**, not new building.
+
+## Ranked backlog
+
+| ID | Capability | New class it adds | Source | Size | Tier |
+|---|---|---|---|---|---|
+| **VV-1** | Activate vendored **Klaus + Tom-Harte 65x02** CPU suites in CI (gated) | external, exhaustive, all-256-opcode + **per-cycle bus** certification of the engine | B-C1 | S–M | ★1 |
+| **VV-2** | **Static per-scanline cycle-budget PROVER** (`cmd/cyclebound`) | **proof over ALL paths** (∀) vs observe-one-run — the only ∀-claim member; attacks gap B | C-1 | M | ★1 |
+| **VV-3** | **PC/branch coverage map** (`cmd/cover`) → **coverage-guided fuzzing** | test-adequacy axis + AFL-style feedback fuzz (today's fuzz is blind) | D-1→D-2 | S→M | ★1 |
+| **VV-4** | **Motion-smoothness / jerk metric** (`cmd/motion`) | per-frame motion-jerk NUMBER = "judder/ブルブル" automated (closes the Breakout hand-trace) | E-1 | S–M | ★1 |
+| **VV-5** | **Temporal-logic trace assertions** (`temporal` block: always/eventually-within-K/response/never-for-N) | properties over a **sequence** of frames (per-frame invariants can't) | F-1 | M | ★1 |
+| **VV-6** | **MAME headless cross-oracle** (`cmd/mamecheck`) | a **3rd independent** full-system oracle, **fully headless** (no keypress unlike Stella) | A1 | M | 2 |
+| **VV-7** | **perfect6502 hardware-grade CPU oracle** (`cmd/cpucheck`) + **N-oracle majority vote** (`cmd/oraclevote`) | silicon-netlist truth (catches bugs ALL hand-written emulators share); fuses oracles into one verdict | A2/A3/B-C3 | M | 2 |
+| **VV-8** | **Behavioral trajectory diff vs original ROM** (`cmd/trajdiff`) | full **time-extended** state-trajectory diff (refdiff is a static snapshot) | F-2 | M | 2 |
+| **VV-9** | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
+| **VV-10** | **HW-divergence trap detectors** (timer-wrap=G8, HMOVE-latch, uninit-RAM-read) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
+| **VV-11** | **State-coverage matrix** (zone/VDEL-parity/NUSIZ/bank) + **coverage-aware mutation** | did tests exercise every TIA mode; honest mutation kill-rate (closes the playbook's 5–20% thread) | D-3/D-4 | S–M | 3 |
+| **VV-12** | **SSIM / pHash tolerant frame compare** | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
+| **VV-13** | **Audio spectral (FFT) + RMS-envelope diff** | frequency-domain timbre check (out-resolves `golden_audio` on V2-14 inverted twins) | E-4 | S–M | 3 |
+| **VV-14** | `cmd/cpucert` owned certificate · **ILP/SMT (Z3)** prover upgrade · external TIA/Sim2600 ROMs | citable cert; infeasible-path tightening + value-range proofs; silicon-TIA tie-breaker | B-C2/C-2/B-C3 | M–L | 3 (defer) |
+
+## Tier ★1 — recommended pilots (highest value × feasibility, substrate mostly in-tree)
+- **VV-1** *(smallest, certifies the foundation):* wire `go test …/hardware/cpu/tests/{klaus2m5,thomharte}` into CI (Klaus always-on; Harte subset/push + full/nightly, gated by `GOPHER2600_SINGLESTEP_TEST`). Touch `.github/workflows/ci.yml` + `scripts/check_cpu_conformance.sh`. Self-test: corrupt a Harte cycle tuple / flip the Klaus `$347D` success address → must fail. **Src:** Klaus2m5 repo; SingleStepTests/65x02 (MIT).
+- **VV-2** *(flagship new class — proof, attacks the #1 gap B):* `cmd/cyclebound`+`internal/cyclebound` builds a 6502 CFG between `STA WSYNC` strobes, costs each block from in-tree `instructions.Definitions` (exact cycles + page/branch penalty), proves longest reachable path ≤76cy (DAG longest-path, no solver). Reuse `internal/build.AssembleWithListing` + `internal/srcmap`. Out-of-scope = unbounded loops → reported, never silently passed. Self-test: a litmus that overruns only on one branch must be FLAGGED though a lucky run passes; observed max ≤ proven bound = CI assertion. **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
+- **VV-3** *(unlocks a whole adequacy axis cheaply):* add `pcSeen`/`branchEdges` recorder inside `emu.stepInstr()` (uses `LastResult.Address`/`IsBranch()`/`BranchSuccess`); `cmd/cover` emits dead-code + one-sided-branch map; then `RunGuidedFuzz` keeps inputs hitting new edges. Self-test: planted unreachable branch reads as uncovered; guided fuzz reaches a deeply-guarded state blind fuzz misses. **Src:** Zalewski AFL whitepaper; Go native fuzzing.
+- **VV-4** *(small, user-visible, closes the judder loop):* `cmd/motion` tracks an object's X (`Markers().HmovedPixel`) + top-scanline over N frames → velocity/accel/**RMS-jerk**; auto-classifies even staircase (our Breakout verdict) vs judder; scenario `checks.motion: jerk_rms<=tol` = a regression gate. Pure integer math, no vision. Self-test: a +2,0,+2,0 stutter ROM must score jerk_rms ≫ a clean +1/frame ROM. **Src:** Flash&Hogan min-jerk 1985.
+- **VV-5** *(one file, every game needs it):* `temporal` block in `internal/scenario` with 4 O(1)–O(K) LTL₃/bounded-MTL monitors (always / eventually-within-K / response{after,then,within} / never-P-for-N), reusing the existing condition struct + `resolve()`; "inconclusive" reported distinctly so liveness can't be vacuously green. Self-test: `eventually` fails on a never-written cell; `response` with `within` one frame too tight fails, true latency passes. **Src:** Bauer/Leucker/Schallhart TOSEM 2011; STL RV'15.
+
+## Tier 2 — high value, more dependent or larger
+- **VV-6 / VV-7 (cross-oracle):** MAME a2600 runs `-video none -autoboot_script <lua> -seconds_to_run` = a genuinely independent, **hands-free** 3rd oracle (catches corners Gopher2600+Stella both get wrong); perfect6502 is the **silicon-netlist** CPU tier (CPU-only; shelled-out to keep the main build CGO-free); `oraclevote` fuses Gopher2600+Stella+MAME(+perfect6502) into a majority verdict that surfaces "all software agrees but the hardware-grade member dissents" = the project's reason to exist. FPGA/real-2600 = manual escalation tier only (human cost). Extract shared `internal/oracle/` from today's `cmd/stellacheck`. **Src:** MAME luascript docs; mist64/perfect6502 (from visual6502).
+- **VV-8 (trajectory diff):** `cmd/trajdiff` steps original vs authored ROM in lockstep on one input timeline, reports first-divergence frame+field (reuses `scenario.ResolveField`). The strongest oracle for a reproduction task. Self-test: identity = MATCH (also a determinism guard); a one-byte mutant diverges at the right frame; a dead-byte mutant = MATCH (diffs behavior, not bytes). **Src:** Martignoni TOSEM'13; EXAMINER ASPLOS'22; McKeeman 1998.
+- **VV-9 (score OCR):** template-match 2600 fixed-bitmap digits (learn templates from the ROM font table; Hamming match) → assert displayed == decode(RAM score); catches display-kernel/BCD/font-index bugs exact hashes miss. `internal/ocr` + scenario `checks.score_equals_ram`. Pure-Go. Self-test: mutate one font byte (garbled glyph) without touching RAM → displayed≠RAM caught. **Src:** pHash Hamming primitive.
+- **VV-10 (HW-trap detectors):** siblings of `assert_line_budget` in `internal/emu`: T-1 RIOT timer-wrap (=G8; Gopher2600 `timer.go` models the 1T flip and cites AtariAge 303277 in-source), T-2 HMOVE-then-HMxx<24cy, T-3 uninitialized-RAM read (shadow-memory mask). Each with a planted-trap ROM vs a clean twin, both directions CI-locked. Start with T-1/G8. **Src:** known-traps.md §A/§D; Valgrind Memcheck (shadow memory).
+
+## Tier 3 — polish / softer / defer
+- **VV-11** state-coverage matrix + coverage-filtered mutation (honest kill-rate; discharges the playbook's flagged 5–20%). **VV-12** SSIM/pHash tolerant lane (adds magnitude+locality; does **not** replace exact golden). **VV-13** audio FFT/RMS-envelope (new modality; audio rarer on the roadmap). **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.
+
+## How this stays finite & honest
+Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
+surface (testing-playbook methods, `stellacheck`, litmus V2-1…18, golden/regress/refdiff, G1–G14) — see each
+angle's dedup note (now folded above). The list is **ranked and bounded (14 items, best first)**; implement
+concrete-driven, top-tier first, not all at once. Implementation of any VV item is a **separate approval**.
