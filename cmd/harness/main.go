@@ -18,6 +18,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
+	"github.com/kidsnz/atari2600-harness/internal/cyclebound"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 	"github.com/kidsnz/atari2600-harness/internal/motion"
 	"github.com/kidsnz/atari2600-harness/internal/srcmap"
@@ -673,6 +674,28 @@ func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetI
 	return nil, out, nil
 }
 
+// --- prove_line_budget（VV-2: 静的に全到達パスの per-scanline 予算を証明＝assert_line_budget の ∀ 版）---
+
+type ProveLineBudgetIn struct {
+	AsmPath string `json:"asm_path" jsonschema:"path to the kernel .asm to prove (relative to the harness working dir)"`
+	Budget  int    `json:"budget,omitempty" jsonschema:"per-WSYNC-interval CPU-cycle budget (default 76 = one scanline)"`
+}
+type ProveLineBudgetOut struct {
+	Report *cyclebound.Report `json:"report"`
+}
+
+func handleProveLineBudget(ctx context.Context, req *mcp.CallToolRequest, in ProveLineBudgetIn) (*mcp.CallToolResult, ProveLineBudgetOut, error) {
+	// Static analysis on a source file; touches no emulator state, so no lock/get.
+	if in.AsmPath == "" {
+		return nil, ProveLineBudgetOut{}, fmt.Errorf("asm_path is required")
+	}
+	rep, err := cyclebound.Prove(in.AsmPath, in.Budget)
+	if err != nil {
+		return nil, ProveLineBudgetOut{}, err
+	}
+	return nil, ProveLineBudgetOut{Report: rep}, nil
+}
+
 // --- get_screen_annotated（ユーザー↔Claude 通信回線）---
 
 type ScreenIn struct {
@@ -997,7 +1020,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.79.0",
+		Version: "1.80.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -1019,7 +1042,8 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
-	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed)."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed). Observes ONE run (∃) — for an all-paths proof use prove_line_budget."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "prove_line_budget", Description: "Statically PROVE a kernel's per-scanline cycle budget over ALL reachable paths (∀) — the static sibling of assert_line_budget, which observes only one run (∃). Assembles asm_path, decodes from the reset/IRQ/NMI vectors, cuts the CFG at every STA WSYNC, and proves each WSYNC-to-WSYNC region's worst-case CPU cycles <= budget (default 76). Returns certified plus any over-budget regions (each with a cycle-by-cycle worst path + source location) and any regions it could not bound (unbounded loop / JSR / indirect JMP), reported honestly rather than passed. Run it BEFORE executing a kernel to catch a branch path that overruns only sometimes — the timing trap that rolls the screen on hardware while a lucky run looks fine. Single-bank flat 2K/4K kernels."}, handleProveLineBudget)
 	mcp.AddTool(server, &mcp.Tool{Name: "trace_clocks", Description: "Execute the next N instructions and return each one's beam anatomy: PC, opcode, CPU cycles (WSYNC stalls visible as large counts), and start/end (scanline, color clock). Sub-instruction OBSERVATION granularity — the practical recovery of step_clock (Gopher2600 cannot suspend mid-instruction; see docs/mcp-tools.md)."}, handleTraceClocks)
 	mcp.AddTool(server, &mcp.Tool{Name: "watch_ram", Description: "Run instruction-by-instruction until RAM[addr] CHANGES (returns old/new value and the PC of the writing instruction), bounded by max_frames. Granularity is per-instruction (Gopher2600 cannot suspend mid-instruction); same-value stores are invisible to change detection."}, handleWatchRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "run_scenario", Description: "Run regression scenario JSON files (input timeline + numeric assertions) in-process and return pass/fail with failing assertion details — the cmd/scenario verdict from the live loop."}, handleRunScenario)
