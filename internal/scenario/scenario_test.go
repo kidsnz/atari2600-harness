@@ -3,6 +3,7 @@ package scenario
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -314,5 +315,110 @@ func TestGoldenDetectsMismatch(t *testing.T) {
 	}
 	if res.Pass {
 		t.Fatalf("expected golden mismatch to fail, got pass (hash=%s)", res.GoldenHash)
+	}
+}
+
+// TestEvalTemporal は時相判定ロジックを純関数として planted トレースで検証する（VV-5 の
+// falsifiable 自己テスト）。pass / fail / inconclusive を 3 演算子すべてで固定する。フレーム
+// base やエミュに依存しないので決定的。
+func TestEvalTemporal(t *testing.T) {
+	tt := func(kind, field string, within, n int) Temporal {
+		return Temporal{Kind: kind, Field: field, Op: "==", Value: 1, Within: within, N: n}
+	}
+	cases := []struct {
+		name string
+		mon  Temporal
+		p    []bool
+		a    []bool
+		want bool // 期待 pass
+		incl bool // desc に INCONCLUSIVE を含むべきか
+	}{
+		// eventually: 窓内に成立=pass / 窓を観測しても不成立=fail / 窓未観測=inconclusive。
+		{"eventually-holds", tt("eventually", "x", 5, 0), []bool{false, false, true, false, false}, nil, true, false},
+		{"eventually-misses", tt("eventually", "x", 5, 0), []bool{false, false, false, false, false}, nil, false, false},
+		{"eventually-too-tight", tt("eventually", "x", 2, 0), []bool{false, false, true}, nil, false, false},
+		{"eventually-inconclusive", tt("eventually", "x", 5, 0), []bool{false, false, false}, nil, false, true},
+		// never_for: N 連続で成立=fail / 未満=pass。
+		{"never-violated", tt("never_for", "x", 0, 3), []bool{true, true, true}, nil, false, false},
+		{"never-ok", tt("never_for", "x", 0, 4), []bool{true, true, true}, nil, true, false},
+		{"never-ok-broken-run", tt("never_for", "x", 0, 3), []bool{true, true, false, true, true}, nil, true, false},
+		// response: 期限内に応答=pass / 期限切れ=fail / 窓が run 終了をまたぐ=inconclusive。
+		{"response-ok", Temporal{Kind: "response", Field: "x", Op: "==", Value: 1, AField: "a", AOp: "==", AValue: 1, Within: 2},
+			[]bool{false, false, false, true, false}, []bool{false, true, false, false, false}, true, false},
+		{"response-too-tight", Temporal{Kind: "response", Field: "x", Op: "==", Value: 1, AField: "a", AOp: "==", AValue: 1, Within: 1},
+			[]bool{false, false, false, true, false}, []bool{false, true, false, false, false}, false, false},
+		{"response-inconclusive", Temporal{Kind: "response", Field: "x", Op: "==", Value: 1, AField: "a", AOp: "==", AValue: 1, Within: 3},
+			[]bool{false, false, false, false, false}, []bool{false, false, false, false, true}, false, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			desc, pass := evalTemporal(c.mon, c.p, c.a)
+			if pass != c.want {
+				t.Fatalf("pass=%v want %v (%s)", pass, c.want, desc)
+			}
+			incl := strings.Contains(desc, "INCONCLUSIVE")
+			if incl != c.incl {
+				t.Fatalf("inconclusive=%v want %v (%s)", incl, c.incl, desc)
+			}
+		})
+	}
+}
+
+// TestTemporalThroughRun は resolve→観測→evalTemporal の配線を smoke.bin で end-to-end 検証する。
+// ram.0x80 は定数 66（base 非依存）なので always-true / never-true の命題を作れる。
+func TestTemporalThroughRun(t *testing.T) {
+	t.Chdir("../..")
+
+	// 陽性: 即成立する eventually ＋ 決して成立しない never_for。
+	pass := &Scenario{
+		Rom:    "roms/litmus/smoke.bin",
+		Frames: 6,
+		Temporal: []Temporal{
+			{Kind: "eventually", Field: "ram.0x80", Op: "==", Value: 66, Within: 3},
+			{Kind: "never_for", Field: "ram.0x80", Op: "==", Value: 999, N: 3},
+		},
+	}
+	res, err := Run(pass, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Pass {
+		t.Fatalf("expected pass, got: %+v", res.Asserts)
+	}
+
+	// 陰性: 窓を完全に観測しても決して成立しない eventually。
+	fail := &Scenario{
+		Rom:      "roms/litmus/smoke.bin",
+		Frames:   6,
+		Temporal: []Temporal{{Kind: "eventually", Field: "ram.0x80", Op: "==", Value: 999, Within: 3}},
+	}
+	if res, err := Run(fail, false); err != nil {
+		t.Fatal(err)
+	} else if res.Pass {
+		t.Fatalf("expected fail, got pass: %+v", res.Asserts)
+	}
+
+	// inconclusive ≠ 緑: 窓 (within 10) が run (3 フレーム) より長い→未確定で pass にしない。
+	incl := &Scenario{
+		Rom:      "roms/litmus/smoke.bin",
+		Frames:   3,
+		Temporal: []Temporal{{Kind: "eventually", Field: "ram.0x80", Op: "==", Value: 999, Within: 10}},
+	}
+	res3, err := Run(incl, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res3.Pass {
+		t.Fatalf("inconclusive must not be a vacuous pass: %+v", res3.Asserts)
+	}
+	if !strings.Contains(res3.Asserts[len(res3.Asserts)-1].Desc, "INCONCLUSIVE") {
+		t.Fatalf("expected INCONCLUSIVE in desc, got: %+v", res3.Asserts)
+	}
+
+	// 不正な定義は run 前に拒否。
+	bad := &Scenario{Rom: "roms/litmus/smoke.bin", Frames: 3,
+		Temporal: []Temporal{{Kind: "eventually", Field: "ram.0x80", Op: "==", Value: 1, Within: 0}}}
+	if _, err := Run(bad, false); err == nil {
+		t.Fatalf("expected error for within<=0")
 	}
 }

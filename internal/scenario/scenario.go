@@ -68,6 +68,39 @@ type Fuzz struct {
 	Player  int      `json:"player,omitempty"`
 }
 
+// Temporal は frame 系列に対する有界時相論理モニタ（VV-5）。瞬時 Assert / 毎フレーム
+// Invariant では書けない「系列の性質」＝有界 liveness と期限つき応答を表す。条件 P は既存
+// Assert/Invariant と同じ語彙（resolve + condPass）を使う。"always P" は既存 Invariant そのもの
+// なので重複実装せず、ここでは系列特有の3種だけを足す（docs/scenarios.md で相互参照）。
+//
+// Kind:
+//   "eventually" — P が run 開始から Within フレーム以内（先頭 Within フレーム f∈[0,Within-1]）に
+//                  少なくとも一度成立する（有界 liveness）。窓 [0,Within-1] が run 終了までに
+//                  完全に観測されないまま P が成立しなければ INCONCLUSIVE（≠pass）＝空虚な緑を禁止。
+//   "response"   — A（AField...）が成立するたび、その frame f から Within フレーム以内（g∈[f,f+Within]）
+//                  に P が成立する。各 A 発火は義務。窓が run 終了をまたぐ未充足義務は INCONCLUSIVE。
+//   "never_for"  — P が N フレーム連続して成立してはならない（安全性。観測列で完全に判定可能）。
+type Temporal struct {
+	Kind string `json:"kind"` // eventually | response | never_for
+
+	// P（監視対象の命題。Assert と同形）。
+	Field string `json:"field"`
+	Op    string `json:"op"`
+	Value int64  `json:"value,omitempty"`
+	Lo    int64  `json:"lo,omitempty"`
+	Hi    int64  `json:"hi,omitempty"`
+
+	// A（先行条件＝トリガ。kind="response" のみ使用）。
+	AField string `json:"a_field,omitempty"`
+	AOp    string `json:"a_op,omitempty"`
+	AValue int64  `json:"a_value,omitempty"`
+	ALo    int64  `json:"a_lo,omitempty"`
+	AHi    int64  `json:"a_hi,omitempty"`
+
+	Within int `json:"within,omitempty"` // 期限（フレーム数。eventually/response）
+	N      int `json:"n,omitempty"`      // 連続フレーム数（never_for）
+}
+
 // Checks は run 全体に対する性質（副作用＝フレームを進める計測なのでタイムライン後にまとめて評価）。
 type Checks struct {
 	NTSCFrameLines *int `json:"ntsc_frame_lines,omitempty"` // StepFrame() == この値（NTSC は 262）
@@ -107,6 +140,7 @@ type Scenario struct {
 	Frames     int         `json:"frames,omitempty"`
 	Invariants []Invariant `json:"invariants,omitempty"`
 	Monotonic  []Monotonic `json:"monotonic,omitempty"`
+	Temporal   []Temporal  `json:"temporal,omitempty"` // VV-5: 系列に対する有界時相論理モニタ
 	Fuzz       *Fuzz       `json:"fuzz,omitempty"`
 	Metrics    []string    `json:"metrics,omitempty"` // run 終了時に捕捉する field（metamorphic 比較用）
 
@@ -257,6 +291,14 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 	seenMono := make([]bool, len(s.Monotonic))
 	brokenMono := make([]bool, len(s.Monotonic))
 
+	// VV-5 temporal: 各モニタの P（と response の A）を毎フレーム観測して bool 列に貯め、
+	// run 後に系列として判定する（観測と時相評価を分離＝自己テストしやすい）。
+	if err := validateTemporal(s.Temporal); err != nil {
+		return nil, err
+	}
+	pTrace := make([][]bool, len(s.Temporal))
+	aTrace := make([][]bool, len(s.Temporal))
+
 	jammed := false
 	for f := 0; f <= lastF; f++ {
 		if s.Fuzz != nil && f < s.Fuzz.Frames { // 乱数入力（scripted の後に適用）
@@ -351,6 +393,30 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			prevMono[i] = got
 			seenMono[i] = true
 		}
+
+		// 毎フレーム: temporal モニタの命題を観測（評価は run 後）。
+		for i, t := range s.Temporal {
+			got, err := resolve(e, t.Field)
+			if err != nil {
+				return nil, fmt.Errorf("frame %d temporal %q: %w", f, t.Field, err)
+			}
+			p, err := condPass(got, t.Op, t.Value, t.Lo, t.Hi)
+			if err != nil {
+				return nil, err
+			}
+			pTrace[i] = append(pTrace[i], p)
+			if t.Kind == "response" {
+				gotA, err := resolve(e, t.AField)
+				if err != nil {
+					return nil, fmt.Errorf("frame %d temporal a_field %q: %w", f, t.AField, err)
+				}
+				a, err := condPass(gotA, t.AOp, t.AValue, t.ALo, t.AHi)
+				if err != nil {
+					return nil, err
+				}
+				aTrace[i] = append(aTrace[i], a)
+			}
+		}
 	}
 
 	// fuzz が完走（クラッシュ無し）したら陽に記録。seed があるので失敗は再現可能。
@@ -373,6 +439,16 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			res.Asserts = append(res.Asserts, AssertResult{
 				Desc: fmt.Sprintf("monotonic %s %s held [%d frames]", m.Field, m.Direction, lastF+1),
 				Pass: true})
+		}
+	}
+
+	// VV-5: temporal モニタを観測列から判定（pass / fail / inconclusive）。
+	// inconclusive は Pass:false（窓が来ていないのに緑、を禁止）。
+	for i, t := range s.Temporal {
+		desc, pass := evalTemporal(t, pTrace[i], aTrace[i])
+		res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Pass: pass})
+		if !pass {
+			res.Pass = false
 		}
 	}
 
@@ -567,6 +643,112 @@ func condDesc(field, op string, value, lo, hi int64) string {
 		return fmt.Sprintf("%s in [%d,%d]", field, lo, hi)
 	}
 	return fmt.Sprintf("%s %s %d", field, op, value)
+}
+
+// validateTemporal は temporal モニタの形を run 前に検証する（不正は即エラー）。
+func validateTemporal(ts []Temporal) error {
+	for _, t := range ts {
+		if t.Field == "" {
+			return fmt.Errorf("temporal %q: \"field\" is required", t.Kind)
+		}
+		switch t.Kind {
+		case "eventually", "response":
+			if t.Within <= 0 {
+				return fmt.Errorf("temporal %q: \"within\" must be > 0", t.Kind)
+			}
+			if t.Kind == "response" && t.AField == "" {
+				return fmt.Errorf("temporal response: \"a_field\" (trigger) is required")
+			}
+		case "never_for":
+			if t.N <= 0 {
+				return fmt.Errorf("temporal never_for: \"n\" must be > 0")
+			}
+		default:
+			return fmt.Errorf("temporal: unknown kind %q (want eventually|response|never_for)", t.Kind)
+		}
+	}
+	return nil
+}
+
+// evalTemporal は観測した bool 列（p = 命題, a = response のトリガ）から1モニタの判定を返す。
+// L = len(p) = 観測フレーム数。窓が観測列に収まらない liveness は inconclusive（pass=false）。
+func evalTemporal(t Temporal, p, a []bool) (desc string, pass bool) {
+	L := len(p)
+	pDesc := condDesc(t.Field, t.Op, t.Value, t.Lo, t.Hi)
+
+	switch t.Kind {
+	case "eventually":
+		K := t.Within
+		limit := K
+		if L < limit {
+			limit = L
+		}
+		for f := 0; f < limit; f++ {
+			if p[f] {
+				return fmt.Sprintf("eventually (%s) within %d frames: held@frame %d", pDesc, K, f), true
+			}
+		}
+		if L >= K {
+			return fmt.Sprintf("eventually (%s) within %d frames: NOT held in window", pDesc, K), false
+		}
+		return fmt.Sprintf("INCONCLUSIVE eventually (%s) within %d frames: run ended at frame %d before the window elapsed (increase frames)", pDesc, K, L-1), false
+
+	case "never_for":
+		N := t.N
+		run, maxRun, failAt := 0, 0, -1
+		for f := 0; f < L; f++ {
+			if p[f] {
+				run++
+				if run > maxRun {
+					maxRun = run
+				}
+				if run >= N && failAt < 0 {
+					failAt = f
+				}
+			} else {
+				run = 0
+			}
+		}
+		if failAt >= 0 {
+			return fmt.Sprintf("never (%s) for %d frames: VIOLATED [held frames %d..%d]", pDesc, N, failAt-N+1, failAt), false
+		}
+		return fmt.Sprintf("never (%s) for %d frames: ok [max %d consecutive]", pDesc, N, maxRun), true
+
+	case "response":
+		K := t.Within
+		aDesc := condDesc(t.AField, t.AOp, t.AValue, t.ALo, t.AHi)
+		triggers, inconclusive := 0, false
+		for f := 0; f < L; f++ {
+			if !a[f] {
+				continue
+			}
+			triggers++
+			deadline := f + K
+			last := deadline
+			if last > L-1 {
+				last = L - 1
+			}
+			found := false
+			for g := f; g <= last; g++ {
+				if p[g] {
+					found = true
+					break
+				}
+			}
+			if found {
+				continue
+			}
+			if deadline <= L-1 { // 窓は完全に観測した→違反
+				return fmt.Sprintf("response (%s -> %s) within %d frames: VIOLATED [trigger@frame %d, no P within window]", aDesc, pDesc, K, f), false
+			}
+			inconclusive = true // 窓が run 終了をまたぐ
+		}
+		if inconclusive {
+			return fmt.Sprintf("INCONCLUSIVE response (%s -> %s) within %d frames: an obligation's window extends past the run end (increase frames)", aDesc, pDesc, K), false
+		}
+		return fmt.Sprintf("response (%s -> %s) within %d frames: ok [%d trigger(s) satisfied]", aDesc, pDesc, K, triggers), true
+	}
+	return fmt.Sprintf("temporal: unknown kind %q", t.Kind), false
 }
 
 func b2i(b bool) int64 {
