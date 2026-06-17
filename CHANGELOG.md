@@ -8,6 +8,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.84.0] - 2026-06-17
+
+### Added
+- **Behavioral trajectory diff (VV-8).** `internal/trajdiff` + `cmd/trajdiff` step an original and a candidate
+  ROM in lockstep on the same input timeline and report the first frame+field where their observable state
+  diverges, or MATCH. The default trajectory is the 128-byte RAM each frame (`emu.PeekRAM`); custom fields reuse
+  `scenario.ResolveField`. It compares **behavior over time, not bytes**, so a dead/cosmetic byte difference is
+  a MATCH while a real behavioral change is caught at the exact frame — the strongest oracle for a reproduction
+  task (and a step beyond `refdiff`'s static snapshot). Pure Go, no external dependency, no reconnect. Self-test
+  (`TestTrajdiffSelfTest`): identity = MATCH (determinism guard), a corrupted reset vector diverges, a
+  behaviorally dead-byte flip = MATCH. The CLI exits 1 on divergence, 0 on MATCH. **Src:** Martignoni TOSEM'13;
+  EXAMINER ASPLOS'22; McKeeman 1998.
+
 ## [1.83.0] - 2026-06-17
 
 ### Added

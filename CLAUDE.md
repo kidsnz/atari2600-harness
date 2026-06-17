@@ -175,6 +175,7 @@ any game; even its tests reference only its own `roms/litmus`).
   `cmd/dissect` (runtime trace × ROM matching → asset table addresses + annotated DiStella disassembly) /
   `cmd/jingle` (melody notation → playable ROM) / `cmd/rammap` (RAM usage audit → markdown map) /
   `cmd/cover` (VV-3 PC/branch coverage + one-sided branches) / `cmd/guidedfuzz` (VV-3 coverage-guided AFL-style fuzz) /
+  `cmd/trajdiff` (VV-8 behavioral trajectory diff vs a reference ROM) /
   `cmd/stellacheck` (Stella oracle: RAM + pixel compare; hands-free via scripts/stella_oracle.sh) / `internal/emu` (driving) / `internal/annotate` (annotation) /
   `internal/scenario` (scenario regression = input timeline + numeric assertions, ROM-agnostic) /
   `internal/calibrate` (position calibration = poke sweep + linear regression) /
