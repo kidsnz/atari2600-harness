@@ -8,6 +8,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.79.0] - 2026-06-17
+
+### Added
+- **Motion-smoothness / jerk metric (VV-4).** Turns "does this object judder / ブルブル" into numbers:
+  `internal/motion` tracks a TIA object's exact X (`Markers().HmovedPixel`) and rendered top over N frames →
+  velocity (1st diff), acceleration (2nd diff), and **jerk_rms** (RMS of the 2nd difference; 0 = constant
+  velocity) plus `max_accel`/`monotonic` (a real glitch/snap vs a benign integer-pixel staircase). Shipped as
+  the `cmd/motion` CLI, the **`read_motion` MCP tool** (interactive — automates the hand frame-by-frame trace),
+  and the scenario **`checks.motion`** regression gate. New litmus `motion_glide` (clean +1/frame → jerk 0) and
+  `motion_stutter` (+2,0,+2,0 → jerk 2); the planted-discrepancy self-test (`TestMotionSelfTest` +
+  `scenarios/motion_glide.json`) locks that the stutter scores above the glide, so the metric can't be vacuous.
+  Used live on the Breakout ball (vertical jerk 0, horizontal jerk 1 = the benign 1px/2-frame staircase) and
+  validated against the user's own perception (motion_stutter in Stella reproduced their reported judder).
+  First Tier-1 perceptual oracle of the verification-variety backlog. Src: Flash & Hogan 1985 (minimum-jerk).
+
 ## [1.78.0] - 2026-06-17
 
 ### Added

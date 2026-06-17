@@ -109,6 +109,18 @@ The gate is **self-validated** (`--selftest`): a planted-wrong expected value mu
 it can never be vacuously green. Src: Klaus2m5 `https://github.com/Klaus2m5/6502_65C02_functional_tests`;
 SingleStepTests `https://github.com/SingleStepTests/65x02`.
 
+## Motion smoothness (VV-4, v1.79.0)
+Frame-to-frame motion of a TIA object turned into numbers (velocity / accel / jerk_rms; 0 = constant
+velocity). `internal/motion`, surfaced as `cmd/motion`, the `read_motion` MCP tool, and scenario `checks.motion`.
+| Behavior | ROM | Evidence |
+|---|---|---|
+| Constant-velocity glide reads as perfectly smooth | `motion_glide` (+1 scanline/frame) | `read_motion` top `jerk_rms == 0`, `max_accel == 0` |
+| A deliberate +2,0,+2,0 stutter reads as judder | `motion_stutter` | `read_motion` top `jerk_rms == 2` (≫ the clean 0) — `scenarios/motion_glide.json` + `TestMotionSelfTest` lock the separation |
+
+The metric is **self-validated** (the stutter must score above the glide, else it is vacuous) and was
+confirmed against the user's perception — `motion_stutter` run in Stella reproduced their reported "ブルブル".
+Src: Flash & Hogan, *The coordination of arm movements*, J. Neurosci. 1985 (minimum-jerk).
+
 ## Not yet covered (open)
 Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, paddles (INPT0–3 charge timing),
 SECAM, and a Stella-oracle *pixel* cross-check (RAM cross-check now works via `cmd/stellacheck`).
