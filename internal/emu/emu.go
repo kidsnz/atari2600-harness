@@ -348,6 +348,57 @@ func (e *Emu) WatchTimerWrap(frames int) (*TimerWrapHit, error) {
 	return nil, nil
 }
 
+// HMOVEHazardHit records an HMxx motion-register write too soon after an HMOVE (T-2).
+type HMOVEHazardHit struct {
+	Frame       int    // frame on which it occurred
+	PC          uint16 // address of the HMxx-writing instruction
+	CyclesAfter int    // CPU cycles since the HMOVE strobe (< 24 = the hazard)
+}
+
+// clockPos は現在のビーム位置を「絶対カラークロック」で返す（フレーム内 0..）。HMOVE 後の
+// 危険窓は**実時間**なので CPU サイクル累積（WSYNC stall を含まない）ではなくこれで測る。
+func (e *Emu) clockPos() (frame int, pos int64) {
+	c := e.Coords()
+	return c.Frame, int64(c.Scanline)*228 + int64(c.Clock) + 68 // Clock 規約 -68..159 を 0..227 へ
+}
+
+// WatchHMOVEHazard は ROM を命令単位で frames フレーム進め、HMOVE ストローブ後 **24 CPU
+// サイクル（=72 カラークロック）以内**に動き系レジスタ（HMP0/HMP1/HMM0/HMM1/HMBL・HMCLR）へ
+// 書き込んだ最初の箇所を flag する＝「動きが不定になる」既知ハザード（Stella PG）。WSYNC を挟む
+// 正しいパターン（HMOVE は WSYNC 直後・HMxx は窓外）は flag しない。該当が無ければ nil。
+func (e *Emu) WatchHMOVEHazard(frames int) (*HMOVEHazardHit, error) {
+	start := e.Coords().Frame
+	var hf int
+	var hp int64
+	armed := false
+	for e.Coords().Frame-start < frames {
+		if err := e.StepInstruction(); err != nil {
+			return nil, err
+		}
+		lr := e.VCS.CPU.LastResult
+		if lr.Defn == nil || lr.Defn.Effect != instructions.Write {
+			continue
+		}
+		canon, area := memorymap.MapAddress(lr.InstructionData, false)
+		if area != memorymap.TIA {
+			continue
+		}
+		switch reg := canon; {
+		case reg == 0x2A: // HMOVE ストローブ
+			hf, hp = e.clockPos()
+			armed = true
+		case (reg >= 0x20 && reg <= 0x24) || reg == 0x2B: // HMP0..HMBL / HMCLR
+			if armed {
+				f, p := e.clockPos()
+				if d := p - hp; f == hf && d >= 0 && d < 72 { // 72 clk = 24 CPU cy・同一フレーム
+					return &HMOVEHazardHit{Frame: f, PC: lr.Address, CyclesAfter: int(d / 3)}, nil
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
 // TimerState は副作用なしで RIOT タイマ内部状態を読む（PeekState 経由）。
 func (e *Emu) TimerState() TimerState {
 	t := e.VCS.RIOT.Timer

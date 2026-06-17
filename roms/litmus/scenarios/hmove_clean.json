@@ -1,0 +1,6 @@
+{
+  "rom": "roms/litmus/hmove_clean.bin",
+  "checks": {
+    "no_hmove_hazard": 2
+  }
+}

@@ -110,6 +110,7 @@ type Checks struct {
 	GoldenAudio    bool `json:"golden_audio,omitempty"`     // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
 	Motion         *MotionCheck `json:"motion,omitempty"`   // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
 	NoTimerWrap    *int `json:"no_timer_wrap,omitempty"`     // VV-10 T-1: この frame 数を監視し read-after-wrap(G8) が起きないことをゲート
+	NoHMOVEHazard  *int `json:"no_hmove_hazard,omitempty"`   // VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込みが無いことをゲート
 }
 
 // MotionCheck gates an object's motion smoothness: it tracks the object for
@@ -524,6 +525,25 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				got = int64(hit.PC)
 				desc = fmt.Sprintf("no_timer_wrap over %d frames: read-after-wrap @frame %d pc 0x%04X",
 					*s.Checks.NoTimerWrap, hit.Frame, hit.PC)
+			}
+			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
+			if !ok {
+				res.Pass = false
+			}
+		}
+		if s.Checks.NoHMOVEHazard != nil {
+			// VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込み（動き不定ハザード）を監視。
+			hit, err := e.WatchHMOVEHazard(*s.Checks.NoHMOVEHazard)
+			if err != nil {
+				return nil, err
+			}
+			ok := hit == nil
+			got := int64(0)
+			desc := fmt.Sprintf("no_hmove_hazard over %d frames: clean", *s.Checks.NoHMOVEHazard)
+			if hit != nil {
+				got = int64(hit.PC)
+				desc = fmt.Sprintf("no_hmove_hazard over %d frames: HMxx written %dcy after HMOVE @frame %d pc 0x%04X",
+					*s.Checks.NoHMOVEHazard, hit.CyclesAfter, hit.Frame, hit.PC)
 			}
 			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
 			if !ok {
