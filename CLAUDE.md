@@ -220,3 +220,10 @@ Clone Gopher2600 into the **harness/** root (untracked, referenced via `go.mod` 
 For each meaningful change, append to `CHANGELOG.md` (Keep a Changelog) and tag with SemVer. Record decisions
 in the CHANGELOG's "Decisions" section. **When tagging, also bump `Version:` in cmd/harness/main.go**
 (serverInfo) — it has drifted twice; treat it as part of the release checklist.
+
+**Before pushing, mirror CI — don't trust a plain local build+test.** A local `go test` runs under the
+umbrella `go.work` and effectively serially, which HIDES what CI hits. Run CI's actual invocation:
+`GOWORK=off CGO_ENABLED=0 go vet ./... && go test -p 1 ./...` (CI uses `-p 1`: parallel package tests race on
+the shared ROM `.bin` fixtures), then the scenario + `check_*` steps. **Lesson (2026-06-18):** a docs-only push
+went CI-red on a flaky parallel-test file race that local build+test never showed — CI is the gate, so verify
+against it, not a proxy, before every push.
