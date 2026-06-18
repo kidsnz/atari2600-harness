@@ -16,6 +16,8 @@
 *.test
 /bin/probe
 /bin/harness
+# stray harness MCP-server binary built to repo root (build to /bin instead)
+/harness
 # stray standalone cmd binaries built to repo root (build to /bin instead)
 /rammap
 /jingle

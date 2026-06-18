@@ -177,6 +177,7 @@ any game; even its tests reference only its own `roms/litmus`).
   `cmd/cover` (VV-3 PC/branch coverage + one-sided branches) / `cmd/guidedfuzz` (VV-3 coverage-guided AFL-style fuzz) /
   `cmd/trajdiff` (VV-8 behavioral trajectory diff vs a reference ROM) /
   `cmd/oraclevote` (VV-6 N-oracle majority RAM vote: Gopher2600 + MAME headless; `internal/oracle`) /
+  `cmd/cpucheck` (VV-7 silicon CPU differential: Gopher2600 CPU vs perfect6502 netlist per-instruction; `internal/cpudiff`; needs `bin/p6502step` via `scripts/install_perfect6502.sh`) /
   `cmd/stellacheck` (Stella oracle: RAM + pixel compare; hands-free via scripts/stella_oracle.sh) / `internal/emu` (driving) / `internal/annotate` (annotation) /
   `internal/scenario` (scenario regression = input timeline + numeric assertions, ROM-agnostic) /
   `internal/calibrate` (position calibration = poke sweep + linear regression) /

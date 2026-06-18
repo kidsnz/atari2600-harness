@@ -8,6 +8,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.91.0] - 2026-06-17
+
+### Added
+- **perfect6502 silicon CPU differential (VV-7).** New `internal/cpudiff` + `cmd/cpucheck`: a hardware-grade
+  differential of the embedded Gopher2600 CPU core against the perfect6502 transistor netlist (mist64/perfect6502,
+  the visual6502 model), one instruction at a time. This is a **CPU-layer** oracle — perfect6502 has no TIA/RIOT
+  and cannot run a 2600 ROM, so it is **not** a member of the full-system RAM vote (`cmd/oraclevote`). Its value:
+  catching a CPU bug that Gopher2600 and MAME (both software) could share, and covering undocumented / decimal
+  opcodes that the fixed Tom Harte corpus (VV-1) excludes.
+  - `internal/cpudiff/p6502step/p6502step.c` (first-party): runs exactly one instruction on the netlist. Register
+    injection via a `measure.c`-style prologue (perfect6502 exposes no register writers); the single-instruction
+    boundary is taken from the **SYNC line** (node 539), making it robust even when control flow returns to the
+    instruction (e.g. a branch with offset −2); writes captured as a memory diff. Cycle count and PC pinned
+    empirically against known answers.
+  - `internal/cpudiff`: **symmetric** execution — both engines run the identical 64K image from the same prologue,
+    reaching identical pre-instruction state by construction (`buildImage` mirrors the C harness). Differ masks P
+    bits 4/5 (B/unused — convention-only). Seeded deterministic vector generator. Empirically established
+    **allow-list** of the only opcodes permitted to diverge: 11 illegal/unstable ones (ANC `0B`/`2B`, ALR `4B`,
+    ARR `6B`, ANE `8B`, LXA `AB`, SH* `93`/`9B`/`9C`/`9E`/`9F`, LAS `BB`).
+  - `cmd/cpucheck`: CLI (`-seed`/`-n`/`-opcodes all|smoke`), JSON summary, exit 1 on any **unexpected** divergence
+    (a documented-opcode disagreement = a real CPU bug or a harness artifact). Gated on `bin/p6502step`.
+  - `scripts/install_perfect6502.sh`: fetch the pinned clone (`09fc542`, MIT) + build `bin/p6502step`. The
+    perfect6502 source is gitignored, never vendored — mirroring how the Gopher2600 clone is handled.
+- Self-tests: always-on differ-logic (planted-mutant, both directions, no binary needed) locks the comparator in
+  CI; gated silicon differential confirms 0 documented-opcode divergences across many seeds + determinism.
+
+### Notes
+- Main build remains **CGO-free** (`CGO_ENABLED=0 go build ./...`): perfect6502 is an external binary, shelled out.
+- `.gitignore`: added `/third_party/perfect6502/`, MAME scratch (`/cfg/`, `/snap/`), and stray root binaries
+  `/cpucheck`, `/oraclevote`.
+
 ## [1.90.0] - 2026-06-17
 
 ### Added

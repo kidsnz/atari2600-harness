@@ -124,7 +124,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-4** ✅v1.79.0 | **Motion-smoothness / jerk metric** (`cmd/motion` + `read_motion` MCP + `checks.motion`) | per-frame motion-jerk NUMBER = "judder/ブルブル" automated (closes the Breakout hand-trace) | E-1 | S–M | ★1 |
 | **VV-5** ✅v1.82.0 | **Temporal-logic trace assertions** (`temporal` block: eventually-within-K/response/never-for-N; `always`=existing invariant) | properties over a **sequence** of frames (per-frame invariants can't) | F-1 | M | ★1 |
 | **VV-6** ✅v1.90.0 | **MAME headless cross-oracle** (`internal/oracle.Mame` + `cmd/oraclevote`) | a **3rd independent** full-system oracle, **fully headless** (no keypress unlike Stella) | A1 | M | 2 |
-| **VV-7** 🔲 | **perfect6502 hardware-grade CPU oracle** (`cmd/cpucheck`) + **N-oracle majority vote** (`cmd/oraclevote` ✅) | silicon-netlist truth (catches bugs ALL hand-written emulators share); fuses oracles into one verdict | A2/A3/B-C3 | M | 2 |
+| **VV-7** ✅v1.91.0 | **perfect6502 silicon CPU differential** (`internal/cpudiff` + `cmd/cpucheck`) | transistor-netlist truth at the **CPU layer** (catches a CPU bug ALL software emulators could share); covers undocumented/decimal opcodes Harte (VV-1) excludes | A2/A3/B-C3 | M | 2 |
 | **VV-8** ✅v1.84.0 | **Behavioral trajectory diff vs original ROM** (`cmd/trajdiff`) | full **time-extended** state-trajectory diff (refdiff is a static snapshot) | F-2 | M | 2 |
 | **VV-9** ✅v1.87.0 | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
 | **VV-10** ✅v1.88.0 (T-1/T-2/T-3) | **HW-divergence trap detectors** (timer-wrap=G8 ✅, HMOVE-latch ✅, uninit-RAM-read ✅) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
@@ -203,9 +203,22 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   oracle into a majority verdict that surfaces "all software agrees but the hardware-grade member dissents" =
   the project's reason to exist. Self-test (gated on MAME present): MAME agrees with Gopher2600 on all 128 RAM
   bytes of `smoke` and they vote unanimously; `TestVoteDissent` proves a planted lone dissenter is named.
-- **VV-7 🔲 (next):** perfect6502 is the **silicon-netlist** CPU oracle (CPU-only; shelled out to a `cmd/cpucheck`
-  with CGO isolated so the main build stays CGO-free); plugs into the existing `cmd/oraclevote` as a hardware-grade
-  member. FPGA/real-2600 = manual escalation tier only. **Src:** MAME luascript docs; mist64/perfect6502 (from visual6502).
+- **VV-7 ✅ DONE (v1.91.0):** perfect6502 (mist64, the visual6502 transistor netlist) as a hardware-grade
+  **CPU differential**. It is CPU-only (no TIA/RIOT) so it is **NOT** a member of the full-system RAM vote
+  (`cmd/oraclevote`) — forcing it in would mean hand-writing a 2600 around it, defeating the point. Instead it
+  cross-checks at the **instruction layer**, where Gopher2600 and MAME (both software) could share a CPU bug no
+  software-vs-software vote would catch, and it is **generative** (random states, all 256 opcodes incl. the
+  unstable undocumented ones Harte excludes). `internal/cpudiff/p6502step/p6502step.c` runs one instruction on the
+  netlist (register injection via a measure.c-style prologue; instruction boundary from the **SYNC line**, node
+  539, so it is robust even when control flow returns to the instruction; writes via memory diff). `internal/cpudiff`
+  runs the SAME image+prologue on the embedded Gopher2600 CPU (`cpu.NewCPU`) — **symmetric**, so both reach
+  identical pre-instruction state by construction — and diffs registers/cycles/writes with P bits 4/5 masked.
+  `cmd/cpucheck` sweeps seeded random vectors and exits 1 on any **unexpected** divergence. Empirically, all 256
+  opcodes agree across many seeds **except 11 illegal/unstable opcodes** (ANC/ALR/ARR/ANE/LXA/SH*/LAS), which form
+  a classified allow-list. Main build stays **CGO-free** (perfect6502 is an external binary, shelled out;
+  `scripts/install_perfect6502.sh` fetches the pinned clone + builds `bin/p6502step`). Self-tests: always-on
+  differ-logic (planted-mutant, no binary) + gated silicon differential. FPGA/real-2600 = manual escalation only.
+  **Src:** mist64/perfect6502 @ 09fc542 (MIT; measure.c register-injection idiom); visual6502 SYNC node 539.
 - **VV-8 ✅ DONE (v1.84.0):** `internal/trajdiff` + `cmd/trajdiff` step original vs candidate ROM in lockstep on
   one input timeline and report the first-divergence frame+field, or MATCH. Default trajectory = the 128-byte
   RAM each frame (`emu.PeekRAM`); custom fields reuse `scenario.ResolveField`. Diffs **behavior over time**, not
