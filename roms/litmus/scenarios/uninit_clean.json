@@ -1,0 +1,6 @@
+{
+  "rom": "roms/litmus/uninit_clean.bin",
+  "checks": {
+    "no_uninit_read": 2
+  }
+}

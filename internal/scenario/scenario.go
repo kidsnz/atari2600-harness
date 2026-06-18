@@ -113,6 +113,7 @@ type Checks struct {
 	NoTimerWrap    *int `json:"no_timer_wrap,omitempty"`     // VV-10 T-1: この frame 数を監視し read-after-wrap(G8) が起きないことをゲート
 	NoHMOVEHazard  *int `json:"no_hmove_hazard,omitempty"`   // VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込みが無いことをゲート
 	ScoreEqualsRAM *ScoreCheck `json:"score_equals_ram,omitempty"` // VV-9: 描画された2桁BCDスコア == RAM の値
+	NoUninitRead   *int `json:"no_uninit_read,omitempty"`     // VV-10 T-3: reset から N frame、未初期化 RAM 読みが無いことをゲート
 }
 
 // ScoreCheck は VV-9 OCR ゲート：score2 レイアウトで描画された2桁を OCR し、packed BCD が
@@ -554,6 +555,32 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				got = int64(hit.PC)
 				desc = fmt.Sprintf("no_hmove_hazard over %d frames: HMxx written %dcy after HMOVE @frame %d pc 0x%04X",
 					*s.Checks.NoHMOVEHazard, hit.CyclesAfter, hit.Frame, hit.PC)
+			}
+			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
+			if !ok {
+				res.Pass = false
+			}
+		}
+		if s.Checks.NoUninitRead != nil {
+			// VV-10 T-3: 未初期化 RAM 読みは reset からの性質なので、フレッシュな emu を reset から走らせる。
+			fe, ferr := emu.New(spec)
+			if ferr != nil {
+				return nil, ferr
+			}
+			if ferr := fe.LoadROM(romPath); ferr != nil {
+				return nil, ferr
+			}
+			hit, ferr := fe.WatchUninitRead(*s.Checks.NoUninitRead)
+			if ferr != nil {
+				return nil, ferr
+			}
+			ok := hit == nil
+			got := int64(0)
+			desc := fmt.Sprintf("no_uninit_read over %d frames: clean", *s.Checks.NoUninitRead)
+			if hit != nil {
+				got = int64(hit.Addr)
+				desc = fmt.Sprintf("no_uninit_read over %d frames: uninitialized RAM 0x%04X read @frame %d pc 0x%04X",
+					*s.Checks.NoUninitRead, hit.Addr, hit.Frame, hit.PC)
 			}
 			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
 			if !ok {

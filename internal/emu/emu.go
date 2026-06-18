@@ -348,6 +348,90 @@ func (e *Emu) WatchTimerWrap(frames int) (*TimerWrapHit, error) {
 	return nil, nil
 }
 
+// UninitReadHit records a read of a RAM byte never written since reset (T-3).
+type UninitReadHit struct {
+	Frame int    // frame on which it occurred
+	PC    uint16 // address of the reading instruction
+	Addr  uint16 // the RAM address read before any write
+}
+
+// effectiveAddr は直近に完了した命令のメモリオペランドの実効アドレスを返す（mem=false なら
+// メモリ非アクセス）。Gopher2600 は zero-page を Absolute/AbsoluteX/Y に畳む（Defn.Bytes==2 が
+// zp）。X/Y は命令完了後の値（indexed load/store はインデクス用レジスタを破壊しないので不変）。
+func (e *Emu) effectiveAddr() (addr uint16, mem bool) {
+	lr := e.VCS.CPU.LastResult
+	d := lr.Defn
+	if d == nil {
+		return 0, false
+	}
+	zp := d.Bytes == 2
+	base := lr.InstructionData
+	x := uint16(e.VCS.CPU.X.Value())
+	y := uint16(e.VCS.CPU.Y.Value())
+	peek := func(a uint16) uint16 { v, _ := e.VCS.Mem.Peek(a); return uint16(v) }
+	switch d.AddressingMode {
+	case instructions.Absolute:
+		return base, true
+	case instructions.AbsoluteX:
+		if zp {
+			return (base + x) & 0xFF, true
+		}
+		return base + x, true
+	case instructions.AbsoluteY:
+		if zp {
+			return (base + y) & 0xFF, true
+		}
+		return base + y, true
+	case instructions.PreIndexed: // (ind,X)
+		ptr := (base + x) & 0xFF
+		return peek(ptr) | peek((ptr+1)&0xFF)<<8, true
+	case instructions.PostIndexed: // (ind),Y
+		ptr := base & 0xFF
+		return (peek(ptr) | peek((ptr+1)&0xFF)<<8) + y, true
+	}
+	return 0, false // Immediate / Implied / Relative / Indirect(JMP)
+}
+
+// WatchUninitRead は ROM を命令単位で frames 進め、reset 以降に一度も書かれていない RAM バイト
+// ($80-$FF) を**読んだ**最初の箇所を flag する＝未初期化 RAM 読み（emu では決定値で通るが実機では
+// 電源投入ゴミ＝"passes-in-emu / fails-on-HW"）。indexed/(ind),Y を含む実効アドレスで write を
+// 追跡するので RAM クリアループ（`sta $80,x` 等＝1命令で多数書き）を誤検出しない。スタック
+// (push/pull) は implied でオペランド無し＝対象外（自己整合的に push 済み）。該当が無ければ nil。
+func (e *Emu) WatchUninitRead(frames int) (*UninitReadHit, error) {
+	start := e.Coords().Frame
+	var written [128]bool
+	for e.Coords().Frame-start < frames {
+		if err := e.StepInstruction(); err != nil {
+			return nil, err
+		}
+		lr := e.VCS.CPU.LastResult
+		if lr.Defn == nil {
+			continue
+		}
+		isRead := lr.Defn.Effect == instructions.Read
+		if !isRead && lr.Defn.Effect != instructions.Write {
+			continue
+		}
+		eff, isMem := e.effectiveAddr()
+		if !isMem {
+			continue
+		}
+		canon, area := memorymap.MapAddress(eff, isRead)
+		if area != memorymap.RAM {
+			continue
+		}
+		idx := canon & 0x7F
+		if isRead {
+			if !written[idx] {
+				return &UninitReadHit{Frame: e.Coords().Frame, PC: lr.Address, Addr: canon}, nil
+			}
+		} else {
+			written[idx] = true
+		}
+	}
+	return nil, nil
+}
+
 // HMOVEHazardHit records an HMxx motion-register write too soon after an HMOVE (T-2).
 type HMOVEHazardHit struct {
 	Frame       int    // frame on which it occurred
