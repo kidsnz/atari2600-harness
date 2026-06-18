@@ -211,14 +211,21 @@ const (
 	black = 2
 )
 
+// lkey keys the longest-path memo/colour by (address, active return address). The
+// return address is the interprocedural call context (2A): 0 = no active call, so
+// the same subroutine address called from different sites is solved per-caller.
+type lkey struct{ addr, ret uint16 }
+
 type solver struct {
 	nodes     map[uint16]Instr
 	sinks     map[uint16]bool
 	folds     map[uint16]loopInfo
-	memo      map[uint16]result
-	state     map[uint16]int
+	memo      map[lkey]result
+	state     map[lkey]int
 	absStates map[uint16]State // S3: abstract state per address, for page-cross precision
 	cyclic    bool
+	unbounded bool   // 2A: a path needs interprocedural support we don't model (nested call / RTS w/o caller)
+	unbReason string // why
 	sm        *srcmap.Map
 }
 
@@ -237,21 +244,28 @@ func theSucc(in Instr) uint16 {
 // WSYNC sink. It assumes the region subgraph is a DAG (loops already folded);
 // any remaining back-edge sets cyclic so the caller reports the region as
 // unbounded rather than returning a bogus number.
-func (s *solver) longest(addr uint16) result {
-	if r, ok := s.memo[addr]; ok {
+// longest returns the worst-case cycles (and breakdown) from addr to the next
+// WSYNC sink, within call context ret (2A: the return address of the active
+// JSR, or 0 at top level). Memoised per (addr, ret). Anything we cannot bound
+// soundly (a back-edge, a nested call, or an RTS with no caller in context) sets
+// s.cyclic / s.unbounded so the caller reports the region unbounded rather than
+// trusting a low number.
+func (s *solver) longest(addr, ret uint16) result {
+	k := lkey{addr, ret}
+	if r, ok := s.memo[k]; ok {
 		return r
 	}
-	if s.state[addr] == gray {
+	if s.state[k] == gray {
 		s.cyclic = true
 		return result{}
 	}
-	s.state[addr] = gray
+	s.state[k] = gray
 
 	var best result
 	switch {
 	case s.foldHit(addr):
 		lf := s.folds[addr]
-		sub := s.longest(lf.exit)
+		sub := s.longest(lf.exit, ret)
 		best = result{cyc: lf.cost + sub.cyc,
 			path: prepend(Step{Addr: addr, Cyc: lf.cost, Loop: lf.n, Loc: s.loc(addr)}, sub.path)}
 	default:
@@ -259,9 +273,30 @@ func (s *solver) longest(addr uint16) result {
 		switch {
 		case s.sinks[addr]:
 			best = result{cyc: in.Def.Cycles, path: []Step{{Addr: addr, Cyc: in.Def.Cycles, Loc: s.loc(addr)}}}
+		case in.Def.Operator == instructions.JSR:
+			// 2A: follow into the callee with the return address threaded. Only one
+			// level deep — a call while a call is already active is not modeled.
+			if ret != 0 {
+				s.unbounded = true
+				s.unbReason = "nested subroutine call (single-level interprocedural only)"
+				break
+			}
+			sub := s.longest(in.Operand, in.next())
+			best = result{cyc: in.Def.Cycles + sub.cyc,
+				path: prepend(Step{Addr: in.Addr, Cyc: in.Def.Cycles, Loc: s.loc(in.Addr)}, sub.path)}
+		case in.Def.Operator == instructions.RTS || in.Def.Operator == instructions.RTI:
+			// 2A: return to the active call site; no caller in context => cannot bound.
+			if ret == 0 {
+				s.unbounded = true
+				s.unbReason = "RTS/RTI with no caller in context"
+				break
+			}
+			sub := s.longest(ret, 0)
+			best = result{cyc: in.Def.Cycles + sub.cyc,
+				path: prepend(Step{Addr: in.Addr, Cyc: in.Def.Cycles, Loc: s.loc(in.Addr)}, sub.path)}
 		case in.Def.IsBranch():
-			nt := s.longest(in.next())
-			tk := s.longest(in.branchTarget())
+			nt := s.longest(in.next(), ret)
+			tk := s.longest(in.branchTarget(), ret)
 			pen := 1
 			if (in.next() >> 8) != (in.branchTarget() >> 8) {
 				pen = 2 // taken branch crossing a page costs +2 total over base
@@ -275,14 +310,14 @@ func (s *solver) longest(addr uint16) result {
 			}
 		default:
 			cost := in.baseCost() + in.pagePenalty(s.absStates[addr]) // S3: page penalty from the index range
-			sub := s.longest(theSucc(in))
+			sub := s.longest(theSucc(in), ret)
 			best = result{cyc: cost + sub.cyc,
 				path: prepend(Step{Addr: in.Addr, Cyc: cost, Loc: s.loc(in.Addr)}, sub.path)}
 		}
 	}
 
-	s.state[addr] = black
-	s.memo[addr] = best
+	s.state[k] = black
+	s.memo[k] = best
 	return best
 }
 
@@ -426,8 +461,8 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.
 		nodes:     map[uint16]Instr{},
 		sinks:     map[uint16]bool{},
 		folds:     map[uint16]loopInfo{},
-		memo:      map[uint16]result{},
-		state:     map[uint16]int{},
+		memo:      map[lkey]result{},
+		state:     map[lkey]int{},
 		absStates: states, // S3: page-cross penalty resolved from tracked index ranges
 		sm:        sm,
 	}
@@ -454,9 +489,15 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.
 		}
 		switch in.Def.Operator {
 		case instructions.JSR:
-			return unbounded("JSR in region (subroutine timing not modeled in v1)")
+			// 2A: follow the callee AND the return point; the callee's own WSYNC is a
+			// sink as usual, and longest() threads the return address. (Collection
+			// terminates via the seen-set; longest() guards against nesting.)
+			work = append(work, in.Operand, in.next())
+			continue
 		case instructions.RTS, instructions.RTI:
-			return unbounded("RTS/RTI in region (return target not modeled)")
+			// 2A: a leaf for collection — the return target is the call context,
+			// resolved in longest() via the threaded return address.
+			continue
 		case instructions.BRK:
 			return unbounded("BRK in region")
 		case instructions.JAM:
@@ -489,9 +530,12 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.
 		return unbounded(msg)
 	}
 
-	r := s.longest(start.next())
+	r := s.longest(start.next(), 0)
 	if s.cyclic {
 		return unbounded("unbounded loop in region (no counted-loop bound found)")
+	}
+	if s.unbounded {
+		return unbounded(s.unbReason)
 	}
 	reg.Worst = r.cyc
 	reg.Over = r.cyc > budget

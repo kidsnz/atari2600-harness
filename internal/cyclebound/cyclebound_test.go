@@ -12,7 +12,41 @@ const (
 	overrunAsm = "../../roms/litmus/litmus_overrun.asm"
 	overrunBin = "../../roms/litmus/litmus_overrun.bin"
 	smokeAsm   = "../../roms/litmus/smoke.asm"
+	jsrAsm     = "../../roms/litmus/cb_jsr.asm"
 )
+
+// TestProveInterproceduralJSR locks 2A: the prover FOLLOWS a JSR into a
+// (WSYNC-free) subroutine, charges the callee's cycles, and bounds the region —
+// where v1 reported "JSR in region — unbounded". Both directions: it certifies
+// when the call fits one scanline; a tight budget flips the JSR region to a
+// violation whose worst path runs THROUGH the callee (so the cost is counted,
+// not ignored).
+func TestProveInterproceduralJSR(t *testing.T) {
+	rep := mustProve(t, jsrAsm, 76)
+	if !rep.Certified {
+		t.Fatalf("cb_jsr must certify at 76 (the JSR+callee fit one scanline); unbounded=%+v violations=%+v",
+			rep.Unbounded, rep.Violations)
+	}
+	if len(rep.Unbounded) != 0 {
+		t.Fatalf("cb_jsr must have NO unbounded regions (the call is followed), got %+v", rep.Unbounded)
+	}
+
+	tight := mustProve(t, jsrAsm, 10)
+	if tight.Certified {
+		t.Fatal("cb_jsr must NOT certify at budget 10 (the JSR region's cost exceeds it)")
+	}
+	throughCallee := false
+	for _, v := range tight.Violations {
+		for _, st := range v.Path {
+			if len(st.Loc) >= 4 && st.Loc[:4] == "Work" {
+				throughCallee = true
+			}
+		}
+	}
+	if !throughCallee {
+		t.Fatal("the JSR region's worst path must run through the callee (Work) — the callee cost must be counted")
+	}
+}
 
 func mustProve(t *testing.T, asm string, budget int) *Report {
 	t.Helper()
