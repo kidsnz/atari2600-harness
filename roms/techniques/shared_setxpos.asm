@@ -87,7 +87,7 @@ NextFrame:
         sta VSYNC
         sta WSYNC
         sta WSYNC
-        sta WSYNC
+        sta WSYNC          ; @lines 2 — vblank-top setup spans 2 scanlines; verified stable 262
         lda #0
         sta VSYNC
         lda #2

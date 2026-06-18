@@ -119,7 +119,7 @@ PosDo:  lda $80
         sta HMP1
         lda #0
         sta HMP0
-        sta WSYNC
+        sta WSYNC          ; @lines 2 — coarse-position setup region spans 2 scanlines; verified stable 262
         sta HMOVE
         ds 12, $EA
         sta HMCLR

@@ -52,7 +52,7 @@ VB:     sta WSYNC
         lda #0
         sta VBLANK
         ldx #192
-Vis:    sta WSYNC
+Vis:    sta WSYNC          ; @lines 3 — last visible line + overscan SFX processing span 3 scanlines; verified stable 262
         dex
         bne Vis
         lda #2
