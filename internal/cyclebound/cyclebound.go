@@ -680,7 +680,7 @@ func Prove(asmPath string, budget int) (*Report, error) {
 			entries = append(entries, t)
 		}
 	}
-	states := computeStates(instrs, entries) // S1+: VSYNC/VBLANK & value-range tracking
+	states := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
 
 	var starts []uint16
 	for a, in := range instrs {

@@ -16,7 +16,22 @@ const (
 	divAsm     = "../../roms/litmus/cb_divloop.asm"
 	andAsm     = "../../roms/litmus/cb_andloop.asm"
 	arrAsm     = "../../roms/litmus/cb_arrloop.asm"
+	romTabAsm  = "../../roms/litmus/cb_romtable.asm"
 )
+
+// TestProveRomTableBoundsLoop locks 3D: a divide loop fed by a ROM data-table
+// read at a known index is bounded from the table's actual byte values (read out
+// of the binary), where the load was Top before. Both directions.
+func TestProveRomTableBoundsLoop(t *testing.T) {
+	rep := mustProve(t, romTabAsm, 76)
+	if !rep.Certified || len(rep.Unbounded) != 0 {
+		t.Fatalf("cb_romtable must certify at 76 (ROM table range bounds the loop); unbounded=%+v violations=%+v",
+			rep.Unbounded, rep.Violations)
+	}
+	if tight := mustProve(t, romTabAsm, 12); tight.Certified {
+		t.Fatal("cb_romtable must NOT certify at budget 12 (the table-fed divide loop's cost exceeds it)")
+	}
+}
 
 // TestProveArrayLoopBounded locks 3B: a divide loop fed by a ZERO-PAGE-RAM array
 // element (read via an index, `lda arr,x`) is bounded from the RAM value range

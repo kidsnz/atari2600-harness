@@ -80,6 +80,33 @@ func oraImm(a ValueRange, m int) ValueRange {
 	return vRange(lo, 255)
 }
 
+// romTableRange (3D) returns the value range of a ROM data table read as
+// `lda base,x` over the proven index range idx. The table bytes are constant and
+// in the binary, so this is exact: [min,max] over base+idx.Lo .. base+idx.Hi.
+// Unknown index, unreadable address, or an over-wide span ⇒ Top (sound).
+func romTableRange(romAt func(uint16) (byte, bool), base uint16, idx ValueRange) ValueRange {
+	if romAt == nil || idx.Top || idx.Hi-idx.Lo > 255 {
+		return vTop()
+	}
+	lo, hi := 256, -1
+	for i := idx.Lo; i <= idx.Hi; i++ {
+		b, ok := romAt(base + uint16(i))
+		if !ok {
+			return vTop()
+		}
+		if int(b) < lo {
+			lo = int(b)
+		}
+		if int(b) > hi {
+			hi = int(b)
+		}
+	}
+	if hi < 0 {
+		return vTop()
+	}
+	return vRange(lo, hi)
+}
+
 // incWrap / decWrap model ±1 in the 8-bit domain. A wrap (0xFF->0x00 / 0x00->0xFF)
 // can't be expressed as one interval, so we fall back to Top (sound).
 func incWrap(r ValueRange) ValueRange {
@@ -125,6 +152,11 @@ type State struct {
 	// array/index is used (no per-array aliasing reasoning needed). Top = untracked
 	// (no recognized init), so indexed ZP loads stay Top = unbounded, as before.
 	ZPVal ValueRange
+	// romAt (3D) reads a cartridge ROM byte (nil outside Prove). Lets an indexed
+	// load from a ROM data table (`lda table,x`) return the table's actual value
+	// range over the proven index range — the data is constant and in the binary.
+	// Not part of state equality (it is a constant capability, not a value).
+	romAt func(uint16) (byte, bool)
 	valid bool
 }
 
@@ -166,6 +198,9 @@ func (s State) joinState(o State) State {
 	r.C, r.Z, r.N = s.C.join(o.C), s.Z.join(o.Z), s.N.join(o.N)
 	r.VBlank, r.VSync = s.VBlank.join(o.VBlank), s.VSync.join(o.VSync)
 	r.ZPVal = s.ZPVal.join(o.ZPVal)
+	if r.romAt = s.romAt; r.romAt == nil { // constant capability — carry it through
+		r.romAt = o.romAt
+	}
 	r.Mem = map[uint16]ValueRange{}
 	for k, v := range s.Mem {
 		if v2, ok := o.Mem[k]; ok { // only cells known in BOTH survive; others -> Top
@@ -347,15 +382,21 @@ func (s State) transfer(in Instr) State {
 		if d.AddressingMode == instructions.Absolute {
 			return s.memGet(in.Operand)
 		}
-		// 3B: an indexed load from a zero-page RAM base ($80-$FF) reads some RAM cell
-		// → the RAM value range (sound over-approx of any element, any index). Other
-		// indexed/indirect (TIA/RIOT regs, abs,X/Y outside ZP, (ind,X), (ind),Y) stays
-		// unknown.
-		if (d.AddressingMode == instructions.AbsoluteX || d.AddressingMode == instructions.AbsoluteY) &&
-			in.Operand >= 0x80 && in.Operand < 0x100 {
-			return s.ZPVal
+		if d.AddressingMode == instructions.AbsoluteX || d.AddressingMode == instructions.AbsoluteY {
+			// 3B: an indexed load from a zero-page RAM base ($80-$FF) reads some RAM
+			// cell → the RAM value range (sound over-approx of any element/index).
+			if in.Operand >= 0x80 && in.Operand < 0x100 {
+				return s.ZPVal
+			}
+			// 3D: an indexed load from a ROM address is a data-table read → its actual
+			// value range over the proven index range (X for abs,X; Y for abs,Y).
+			idx := s.X
+			if d.AddressingMode == instructions.AbsoluteY {
+				idx = s.Y
+			}
+			return romTableRange(s.romAt, in.Operand, idx)
 		}
-		return vTop() // indexed/indirect source value unknown
+		return vTop() // indirect ((ind,X)/(ind),Y) source value unknown
 	}
 	switch d.Operator {
 	case instructions.LDA:
@@ -596,7 +637,7 @@ func zpInitRange(instrs map[uint16]Instr) ValueRange {
 // The lattice is finite (8-bit ranges + tri-bools), so it converges; maxIter is a
 // safety cap (on hit the partial result is still sound — callers treat an absent
 // address as Top / display-unknown, i.e. checked conservatively).
-func computeStates(instrs map[uint16]Instr, entries []uint16) map[uint16]State {
+func computeStates(instrs map[uint16]Instr, entries []uint16, romAt func(uint16) (byte, bool)) map[uint16]State {
 	entryState := map[uint16]State{}
 	var work []uint16
 	inWork := map[uint16]bool{}
@@ -618,6 +659,7 @@ func computeStates(instrs map[uint16]Instr, entries []uint16) map[uint16]State {
 	for _, e := range entries {
 		seed := topState()
 		seed.ZPVal = zpInit
+		seed.romAt = romAt // 3D: ROM-table reads
 		push(e, seed)
 	}
 	const maxIter = 300000
