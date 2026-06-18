@@ -8,6 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **CI: run `go test -p 1 ./...` (serial package tests).** Several packages assemble/read the SAME shared ROM
+  `.bin` fixtures (`roms/litmus`, `roms/techniques`) during their tests; under `go test ./...` (parallel test
+  binaries) one process can truncate a `.bin` mid-assemble while another loads it → a flaky panic (e.g.
+  `TestCoverageThroughRun` / `TestTrajdiffSelfTest`, "index out of range … length 0"). This was a long-standing
+  test-isolation flake (also red on old commits like VV-9 @105932d), surfaced more often after the AT-* sprint
+  added more assembling tests. Serial package tests fix it deterministically; the engine is single-emu in
+  production, so this is a test-only concern. (No server-code change → server version unchanged.)
+
 ## [1.102.0] - 2026-06-18
 
 ### Added

@@ -38,7 +38,12 @@ jobs:
         run: |
           go build ./...
           go vet ./...
-          go test ./...
+          # -p 1: several packages assemble/read the SAME shared ROM .bin fixtures
+          # (roms/litmus, roms/techniques) during their tests, so running package test
+          # binaries serially avoids a flaky on-disk file race (one process truncating a
+          # .bin mid-assemble while another loads it). The engine is single-emu in
+          # production, so this is a test-isolation concern only, not a runtime bug.
+          go test -p 1 ./...
 
       - name: Regression scenarios (litmus + techniques)
         env:
