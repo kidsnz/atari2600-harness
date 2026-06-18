@@ -60,7 +60,8 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
     "golden_audio": true,              // A-2: compare the audio-chain hash against <scenario>.audio.golden
     "no_timer_wrap": 3,                // VV-10 T-1: watch N frames; fail if INTIM is read after the timer wrapped (G8)
     "no_hmove_hazard": 2,              // VV-10 T-2: watch N frames; fail if HMxx is written within 24cy of HMOVE
-    "score_equals_ram": {"ram": "ram.0x80", "frames": 4} // VV-9: OCR the rendered 2-digit BCD score == RAM (font from <scenario>.font)
+    "score_equals_ram": {"ram": "ram.0x80", "frames": 4}, // VV-9: OCR the rendered 2-digit BCD score == RAM (font from <scenario>.font)
+    "no_uninit_read": 2                // VV-10 T-3: from reset, fail if a RAM byte is read before it was ever written
   }
 }
 ```

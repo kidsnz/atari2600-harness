@@ -8,6 +8,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.88.0] - 2026-06-17
+
+### Added
+- **HW-divergence trap detector T-3: uninitialized-RAM read — VV-10 complete.** `Emu.WatchUninitRead` flags the
+  first read of a RAM byte ($80-$FF) never written since reset = the passes-in-emu (deterministic value) /
+  fails-on-HW (power-up garbage) hazard. The enabler is `Emu.effectiveAddr`, which resolves the true memory
+  address of every operand mode — Absolute (zero-page folded in via `Defn.Bytes==2`), AbsoluteX/Y (with zp
+  wrap), and `(ind,X)`/`(ind),Y` via pointer dereference — so an indexed clear loop (`sta $00,x` writing 128
+  RAM bytes in one instruction) is fully tracked and **not** a false positive. Stack push/pull are implied (no
+  operand) and so fall outside this operand-based tracker, self-consistently. Exposed as the scenario check
+  `checks.no_uninit_read`, run on a **fresh emu from reset** (uninit-read is a from-reset property, unlike the
+  per-frame T-1/T-2). Planted/clean litmus (`uninit_trap` reads $90 with no clear = hit; `uninit_clean` indexed-
+  clears then reads = no hit) with `TestUninitReadDetector` locking both directions (proving the indexed clear
+  is not a false positive). **VV-10 is now complete (T-1 timer-wrap / T-2 HMOVE-latch / T-3 uninit-RAM-read).**
+  **Src:** known-traps.md §A/§D; Valgrind Memcheck (shadow memory).
+
 ## [1.87.0] - 2026-06-17
 
 ### Added
