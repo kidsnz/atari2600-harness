@@ -8,6 +8,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.100.0] - 2026-06-18
+
+### Added
+- **Beam-race / too-late-write detection (authoring aid, AT-3) — a SOUND dual, not a blanket detector.**
+  `internal/beamrace` + scenario `checks.no_beam_race` + `cmd/beamtrace -race`, plus a thin `emu.ObjectX`
+  accessor (player/missile/ball HmovedPixel). A write to an object's pixel-data register
+  (GRP0/GRP1/ENAM0/ENAM1/ENABL) at beam clock C while the object sits at X reaches the beam in time iff C ≤ X;
+  otherwise that line draws the previous value (a one-line lag).
+  - **`cmd/beamtrace -race` — advisory report (automatic, factual, NO verdict):** per object, every pixel-data
+    write with clock vs object X marked in-time / LATE. Cannot false-positive because it asserts nothing.
+  - **`checks.no_beam_race` — verdict the author OPTS INTO:** `{object, line_from, line_to}` declares "object O
+    must be updated before the beam on these scanlines"; the check fails on any late write. Sound because the
+    intent is supplied, not guessed. Generalises the hardware-fixed `no_hmove_hazard` gate.
+- **Litmus + self-tests:** `roms/litmus/beamrace_clean.asm` (P0 updated in HBLANK → in-time) and
+  `beamrace_late.asm` (P0 graphics written deep in the visible line → one-line lag). `TestCheckEvalPure`,
+  `TestBeamraceCleanPasses`, `TestBeamraceLateFails` (beamrace) + `TestBeamRaceScenario` (both directions
+  through the scenario engine) + `roms/litmus/scenarios/beamrace_clean.json` in the regression set.
+
+### Notes
+- **Why no fully-automatic verdict (measured/reasoned, on the record):** whether a late write is a *bug* depends
+  on author intent — the same late `sta GRP0` is correct when it pre-loads the NEXT line and wrong when meant for
+  THIS line. Validated on the real `multicolor48` kernel: P0 at X=87, the 48px technique's right-side GRP0
+  rewrites land at clk +139/+157 = "LATE" — **correct facts, not bugs**. An automatic verdict would
+  false-positive there, violating the zero-false-positive bar; hence the advisory (no verdict) + opt-in check
+  (intent supplied). A heuristic auto-detector is **deferred, not closed** (see audit AT-3) per the user's
+  request to keep it on the books.
+- Pre-existing flake noted (not from this change): `internal/trajdiff` `TestTrajdiffSelfTest` panics rarely under
+  the fully-parallel `go test ./...` (a latent gopher2600 lazy-init data race); passes deterministically alone
+  and under `go test -p 1`. Tracked for a later look.
+
 ## [1.99.0] - 2026-06-18
 
 ### Added

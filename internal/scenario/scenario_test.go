@@ -158,6 +158,7 @@ func TestRunSamples(t *testing.T) {
 		"roms/litmus/scenarios/smoke_src.json",
 		"roms/litmus/scenarios/collide.json",
 		"roms/litmus/scenarios/golden.json",
+		"roms/litmus/scenarios/beamrace_clean.json",
 	} {
 		t.Run(filepath.Base(f), func(t *testing.T) {
 			s, err := Load(f)
@@ -193,6 +194,31 @@ func TestRunAsmSource(t *testing.T) {
 	}
 	if !res.Pass {
 		t.Fatalf("asm-source scenario failed: %+v", res.Asserts)
+	}
+}
+
+// TestBeamRaceScenario locks the no_beam_race check (AT-3) both directions through
+// the scenario engine: the clean fixture (P0 updated in HBLANK) passes; the late
+// fixture (P0 graphics written deep into the visible line) fails.
+func TestBeamRaceScenario(t *testing.T) {
+	t.Chdir("../..")
+	clean := &Scenario{
+		Rom:    "roms/litmus/beamrace_clean.asm",
+		Checks: &Checks{NoBeamRace: &BeamRaceCheck{Object: "P0", LineFrom: 40, LineTo: 54, Frames: 1, Warmup: 2}},
+	}
+	if res, err := Run(clean, false); err != nil {
+		t.Fatal(err)
+	} else if !res.Pass {
+		t.Errorf("clean fixture must pass no_beam_race: %+v", res.Asserts)
+	}
+	late := &Scenario{
+		Rom:    "roms/litmus/beamrace_late.asm",
+		Checks: &Checks{NoBeamRace: &BeamRaceCheck{Object: "P0", LineFrom: 40, LineTo: 54, Frames: 1, Warmup: 2}},
+	}
+	if res, err := Run(late, false); err != nil {
+		t.Fatal(err)
+	} else if res.Pass {
+		t.Errorf("late fixture must FAIL no_beam_race: %+v", res.Asserts)
 	}
 }
 

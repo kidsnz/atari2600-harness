@@ -340,7 +340,7 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
   technique kernels** (first sweep's 6 hits were two detector gaps — missed indexed `sta HMP0,x` stores, and a
   benign zero-clear — both fixed; a latent hazard false-negative in the cycle accounting also fixed). Litmus
   `lint_r1/_r2/_r3` + `lint_clean`; `TestLint*` lock both directions + the corpus guard. Pure Go, CLI only (no
-  MCP/reconnect). **AT-3/4 + a single batched MCP exposure remain.**
+  MCP/reconnect). **AT-4 + a single batched MCP exposure remain.**
 - **AT-2 ✅ DONE (v1.99.0): write→visible-pixel timeline** (`cmd/beamtrace` + `internal/beamtrace`, new thin
   `emu.LastTIAWrite` accessor). Runs the ROM instruction-by-instruction, records every TIA write with the beam
   clock it lands at, and tabulates per scanline which visible pixels each write governs — the causal map
@@ -350,6 +350,23 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
   `multicolor48` 48px kernel (staggered GRP0/GRP1 rewrites reproduced with correct interleaved spans; an
   HBLANK-superseded write shows an empty span). `TestTimelineSpans` (pure) + `TestTraceGRP0Marker` (fixture,
   deterministic + localized). Pure Go, CLI only.
+- **AT-3 ✅ DONE (v1.100.0): beam-race / too-late-write detection — a SOUND dual, not a blanket detector**
+  (`internal/beamrace` + scenario `checks.no_beam_race` + `cmd/beamtrace -race` + `emu.ObjectX`). A pixel-data
+  write (GRP0/GRP1/ENAM0/ENAM1/ENABL) at clock C with the object at X reaches the beam iff C ≤ X. Two pieces:
+  **(a) advisory `-race` report** — factual per-object in-time/LATE map, no verdict ⇒ cannot false-positive;
+  **(b) `no_beam_race` check** — the author declares `{object, line_from, line_to}` (which object must update
+  before the beam on which lines) and the check fails on any late write — sound because intent is supplied.
+  Generalises the hardware-fixed `no_hmove_hazard` gate. Both directions locked (`beamrace_clean.asm` passes,
+  `beamrace_late.asm` fails) at unit + scenario level.
+  - **Measured design decision — no fully-automatic verdict (the key finding):** whether a late write is a bug
+    is intent-dependent (same late `sta GRP0` = correct as next-line pre-load, wrong if meant for this line).
+    Shown on the real `multicolor48` kernel: P0 at X=87, the 48px right-side GRP0 rewrites land "LATE" at clk
+    +139/+157 — **correct facts, not bugs**; an automatic detector would false-positive there. So the verdict is
+    opt-in (intent supplied) and the automatic part is advisory-only.
+  - **DEFERRED, NOT CLOSED (per user, 2026-06-18):** a fully-automatic *heuristic* detector (guess intent, accept
+    rare false positives, tune to minimise them on the corpus) remains a live future option should a concrete
+    need appear — kept on the books deliberately rather than declared done. The substrate to revisit it
+    (`beamrace.Trace` events carrying object X + before/after-beam) is already in place.
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing

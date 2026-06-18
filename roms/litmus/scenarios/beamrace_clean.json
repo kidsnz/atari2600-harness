@@ -1,0 +1,6 @@
+{
+  "rom": "roms/litmus/beamrace_clean.asm",
+  "checks": {
+    "no_beam_race": {"object": "P0", "line_from": 40, "line_to": 54, "frames": 1, "warmup": 2}
+  }
+}

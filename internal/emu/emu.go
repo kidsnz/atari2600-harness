@@ -987,6 +987,25 @@ func (e *Emu) LastTIAWrite() (TIAWrite, bool) {
 	return w, true
 }
 
+// ObjectX は object の現在の水平位置（HmovedPixel・可視 0..159）を返す。obj は
+// "P0"/"P1"/"M0"/"M1"/"BL"。HMOVE 適用後の実描画位置（HMOVE 未使用なら ResetPixel と同値）。
+func (e *Emu) ObjectX(obj string) (int, bool) {
+	v := e.VCS.TIA.Video
+	switch obj {
+	case "P0":
+		return v.Player0.HmovedPixel, true
+	case "P1":
+		return v.Player1.HmovedPixel, true
+	case "M0":
+		return v.Missile0.HmovedPixel, true
+	case "M1":
+		return v.Missile1.HmovedPixel, true
+	case "BL":
+		return v.Ball.HmovedPixel, true
+	}
+	return 0, false
+}
+
 // PeekROM は副作用なしの 1 バイト読み（命令ストリームのデコード用）。
 func (e *Emu) PeekROM(addr uint16) uint8 {
 	v, err := e.VCS.Mem.Peek(addr)

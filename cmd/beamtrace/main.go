@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kidsnz/atari2600-harness/internal/beamrace"
 	"github.com/kidsnz/atari2600-harness/internal/beamtrace"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
@@ -26,6 +27,7 @@ func main() {
 	warmup := flag.Int("warmup", 1, "frames to run before tracing (let positions settle)")
 	frames := flag.Int("frames", 1, "frames to trace")
 	scanline := flag.Int("scanline", -1, "scanline to report (default: all with writes)")
+	race := flag.Bool("race", false, "advisory beam-race report: per object, was its graphics written before the beam reached it (factual, no verdict)")
 	asJSON := flag.Bool("json", false, "emit JSON")
 	flag.Parse()
 	if *rom == "" {
@@ -45,6 +47,12 @@ func main() {
 			fail(err)
 		}
 	}
+
+	if *race {
+		raceReport(e, *rom, *frames, *asJSON)
+		return
+	}
+
 	ws, err := beamtrace.Trace(e, *frames)
 	if err != nil {
 		fail(err)
@@ -84,6 +92,43 @@ func main() {
 			}
 			fmt.Printf("    clk %+4d  %-6s %-8s %s pixels[%3d..%3d)  @$%04X\n",
 				w.Clock, w.Name, "("+string(w.Kind)+")", val, w.VisFrom, w.VisTo, w.PC)
+		}
+	}
+}
+
+// raceReport prints the advisory beam-race map: per object, every pixel-data write
+// with the beam clock vs the object's X and whether it reached the beam in time.
+// Purely factual — a "late" line is NOT necessarily a bug (it may pre-load the next
+// line); use a scenario `no_beam_race` check when you can declare the intent.
+func raceReport(e *emu.Emu, rom string, frames int, asJSON bool) {
+	ev, err := beamrace.Trace(e, frames)
+	if err != nil {
+		fail(err)
+	}
+	if asJSON {
+		b, _ := json.MarshalIndent(ev, "", "  ")
+		fmt.Println(string(b))
+		return
+	}
+	byObj := beamrace.ByObject(ev)
+	fmt.Printf("beamtrace -race: %s — advisory (a 'late' line may be intentional next-line pre-load)\n", rom)
+	if len(ev) == 0 {
+		fmt.Println("  (no GRP0/GRP1/ENAM0/ENAM1/ENABL writes observed)")
+		return
+	}
+	for _, obj := range []string{"P0", "P1", "M0", "M1", "BL"} {
+		es := byObj[obj]
+		if len(es) == 0 {
+			continue
+		}
+		fmt.Printf("  %s:\n", obj)
+		for _, x := range es {
+			tag := "in-time"
+			if !x.BeforeBeam {
+				tag = fmt.Sprintf("LATE +%d", x.Clock-x.ObjectX)
+			}
+			fmt.Printf("    line %3d  %-5s clk %+4d  X=%3d  %s  @$%04X\n",
+				x.Scanline, x.Reg, x.Clock, x.ObjectX, tag, x.PC)
 		}
 	}
 }

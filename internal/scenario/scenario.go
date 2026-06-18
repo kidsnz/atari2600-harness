@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kidsnz/atari2600-harness/internal/beamrace"
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/cyclebound"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
@@ -114,6 +115,22 @@ type Checks struct {
 	NoHMOVEHazard  *int `json:"no_hmove_hazard,omitempty"`   // VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込みが無いことをゲート
 	ScoreEqualsRAM *ScoreCheck `json:"score_equals_ram,omitempty"` // VV-9: 描画された2桁BCDスコア == RAM の値
 	NoUninitRead   *int `json:"no_uninit_read,omitempty"`     // VV-10 T-3: reset から N frame、未初期化 RAM 読みが無いことをゲート
+	NoBeamRace     *BeamRaceCheck `json:"no_beam_race,omitempty"` // AT-3: object の pixel-data 書込が指定 scanline 範囲で毎行ビーム到達前か（意図を著者が宣言＝健全）
+}
+
+// BeamRaceCheck is the author-supplied beam-race deadline (AT-3): object O's
+// pixel-data register (GRP0/GRP1/ENAM0/ENAM1/ENABL) must be written BEFORE the beam
+// reaches O on every scanline in [LineFrom, LineTo]; otherwise that line draws the
+// previous value (a one-line lag). Sound because the intent — which object, which
+// lines must update in time — is declared, not guessed (a fully-automatic verdict
+// can't be sound; see docs/capability-gap-audit AT-3). Generalises the
+// hardware-fixed no_hmove_hazard gate.
+type BeamRaceCheck struct {
+	Object   string `json:"object"`             // P0 P1 M0 M1 BL
+	LineFrom int    `json:"line_from"`           // inclusive scanline range the deadline applies to
+	LineTo   int    `json:"line_to"`
+	Frames   int    `json:"frames,omitempty"`    // frames to scan (default 1)
+	Warmup   int    `json:"warmup,omitempty"`    // frames to settle first (default 1)
 }
 
 // ScoreCheck は VV-9 OCR ゲート：score2 レイアウトで描画された2桁を OCR し、packed BCD が
@@ -633,6 +650,46 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				if !rep.Certified {
 					res.Pass = false
 				}
+			}
+		}
+		if s.Checks.NoBeamRace != nil {
+			// AT-3: author-declared beam-race deadline. Fresh emu from reset (a runtime
+			// property), warm up, then trace pixel-data writes against the object's X.
+			bc := s.Checks.NoBeamRace
+			frames := bc.Frames
+			if frames == 0 {
+				frames = 1
+			}
+			warmup := bc.Warmup
+			if warmup == 0 {
+				warmup = 1
+			}
+			fe, ferr := emu.New(spec)
+			if ferr != nil {
+				return nil, ferr
+			}
+			if ferr := fe.LoadROM(romPath); ferr != nil {
+				return nil, ferr
+			}
+			if ferr := fe.RunFrames(warmup); ferr != nil {
+				return nil, ferr
+			}
+			ev, ferr := beamrace.Trace(fe, frames)
+			if ferr != nil {
+				return nil, ferr
+			}
+			viol := beamrace.Check{Object: bc.Object, LineFrom: bc.LineFrom, LineTo: bc.LineTo}.Eval(ev)
+			ok := len(viol) == 0
+			got := int64(0)
+			desc := fmt.Sprintf("no_beam_race %s lines %d..%d: clean", bc.Object, bc.LineFrom, bc.LineTo)
+			if !ok {
+				got = int64(viol[0].Clock)
+				desc = fmt.Sprintf("no_beam_race %s lines %d..%d: %d late write(s); first %s",
+					bc.Object, bc.LineFrom, bc.LineTo, len(viol), viol[0].Detail)
+			}
+			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
+			if !ok {
+				res.Pass = false
 			}
 		}
 		if s.Checks.Motion != nil {
