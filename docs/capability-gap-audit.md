@@ -375,9 +375,10 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
   offset 0) for the calibrated routine; `spritepos -object BL -all` lands 160/160 targets exactly. `TestSolve*`
   (exact landing, emulator-verified) + `TestAchieveDiscriminates` (wrong input misses ⇒ non-vacuous) + a fixed
   `Decompose` carry bug (caught by the emulator disagreeing with the math). Pure Go, CLI only.
-- **AT-5 (remaining): one batched MCP exposure** of the interactive aids (`beamtrace` timeline + `-race`
-  advisory, `spritepos` solver) added to `cmd/harness` in a single commit → rebuild → smoke → one reconnect
-  ([[feedback-smoke-test-harness-before-reconnect]]). The linter (AT-1) stays CLI/CI-only (no MCP needed).
+- **AT-5 ✅ DONE (v1.102.0): one batched MCP exposure** of the interactive aids — `beamtrace` (timeline),
+  `beam_race` (advisory), `spritepos` (solver) added to `cmd/harness` in a single commit → `bin/harness` rebuilt
+  → `scripts/mcp_smoke.py` extended to call all three → one reconnect. The linter (AT-1) stays CLI/CI-only (no
+  MCP needed — proactive source check). **Authoring-tools sprint complete (AT-1..AT-5).**
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing

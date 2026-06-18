@@ -8,6 +8,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.102.0] - 2026-06-18
+
+### Added
+- **MCP exposure of the interactive authoring aids (AT-5), batched into one reconnect.** Three new `cmd/harness`
+  tools so the timeline/solver are usable in the authoring loop, not just the CLI:
+  - **`beamtrace`** — write→visible-pixel timeline for the loaded ROM (per scanline, each TIA write's beam clock,
+    register name/kind, value, and governed visible span). Advances the emulator.
+  - **`beam_race`** — advisory beam-race map (per pixel-data write, object X + in-time/late). Factual, no verdict;
+    paired with the existing scenario `checks.no_beam_race`. Advances the emulator.
+  - **`spritepos`** — forward sprite-position solver (target X → routine input + decomposition + snippet +
+    emulator-verified achieved X). Self-contained: builds its own calibration kernel, does not disturb the loaded ROM.
+- `scripts/mcp_smoke.py` extended to call all three over stdio (smoke now covers beamtrace/beam_race/spritepos).
+
+### Notes
+- The static linter (AT-1, `cmd/timinglint`) stays CLI/CI-only — no MCP tool, by design (proactive source check,
+  no live emulator state needed). **This release adds MCP tool schema → requires one `bin/harness` rebuild +
+  client reconnect** (smoke-tested green at v1.102.0 first). Concludes the authoring-tools sprint (AT-1..AT-5).
+
 ## [1.101.0] - 2026-06-18
 
 ### Added

@@ -61,7 +61,10 @@ must always hold *only* in a doc — burn them here or into memory.
   **`analyze_screen`** (v1.19.0, ingest on the current emulator frame) / **`run_scenario`** (v1.19.0, regression verdicts live) /
   **`watch_ram`** (v1.20.0, RAM-change trap with writing PC) /
   **`read_motion`** (v1.79.0, VV-4: object motion-smoothness / jerk_rms over N frames = judder/ブルブル as a number) /
-  **`prove_line_budget`** (v1.80.0, VV-2: STATIC per-scanline budget PROVER over ALL paths = the ∀ sibling of `assert_line_budget`; `cmd/cyclebound`+`internal/cyclebound`). `step_clock`/`watch(bus)` parked (docs/mcp-tools.md).
+  **`prove_line_budget`** (v1.80.0, VV-2: STATIC per-scanline budget PROVER over ALL paths = the ∀ sibling of `assert_line_budget`; `cmd/cyclebound`+`internal/cyclebound`) /
+  **`beamtrace`** (v1.102.0, AT-2: write→visible-pixel timeline = per scanline, each TIA write's beam clock + the visible span it governs) /
+  **`beam_race`** (v1.102.0, AT-3: advisory object-graphics-vs-beam map, factual/no-verdict; paired with scenario `checks.no_beam_race`) /
+  **`spritepos`** (v1.102.0, AT-4: forward sprite-position solver = target X → SetXPos input + decomposition + snippet + emulator-verified achieved X). `step_clock`/`watch(bus)` parked (docs/mcp-tools.md).
   
 
 ## Constants you must never get wrong (source: `docs/resources.md`)

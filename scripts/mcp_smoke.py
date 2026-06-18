@@ -35,5 +35,14 @@ sc=r["result"]["structuredContent"]
 assert sc["over"] and "litmus_overrun.asm:" in sc.get("at",""), sc
 r=call(10,"trace_clocks",{"max_instructions":3})
 assert "at" in r["result"]["structuredContent"]["trace"][0], r
-print("smoke OK (load/step/analyze_screen/watch_ram/trace_clocks/run_scenario/srcmap)")
+# AT-2/3/4: authoring aids (beamtrace timeline / beam_race advisory / spritepos solver)
+r=call(11,"load_rom",{"path":"roms/litmus/smoke.bin"})
+r=call(12,"beamtrace",{"frames":1})
+assert not r["result"].get("isError") and "rows" in r["result"]["structuredContent"], r
+r=call(13,"beam_race",{"frames":1})
+assert not r["result"].get("isError"), r
+r=call(14,"spritepos",{"x":96,"object":"P0"})
+sc=r["result"]["structuredContent"]
+assert sc["solution"]["exact"] and sc["solution"]["achieved_x"]==96, sc
+print("smoke OK (load/step/analyze_screen/watch_ram/trace_clocks/run_scenario/srcmap/beamtrace/beam_race/spritepos)")
 p.terminate()

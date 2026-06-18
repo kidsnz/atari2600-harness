@@ -17,9 +17,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kidsnz/atari2600-harness/internal/beamrace"
+	"github.com/kidsnz/atari2600-harness/internal/beamtrace"
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/cyclebound"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/spritepos"
 	"github.com/kidsnz/atari2600-harness/internal/motion"
 	"github.com/kidsnz/atari2600-harness/internal/srcmap"
 	"github.com/kidsnz/atari2600-harness/pkg/audio"
@@ -696,6 +699,112 @@ func handleProveLineBudget(ctx context.Context, req *mcp.CallToolRequest, in Pro
 	return nil, ProveLineBudgetOut{Report: rep}, nil
 }
 
+// --- authoring aids: beamtrace timeline / beam_race advisory / spritepos solver ---
+
+type BeamtraceIn struct {
+	Scanline *int `json:"scanline,omitempty" jsonschema:"scanline to report (omit = every scanline that has writes)"`
+	Frames   int  `json:"frames,omitempty" jsonschema:"frames to trace (default 1); ADVANCES the emulator"`
+}
+type BeamtraceOut struct {
+	Frame  int             `json:"frame"`
+	Rows   []beamtrace.Row `json:"rows"`
+	Coords Coords          `json:"coords"`
+}
+
+// handleBeamtrace returns the write→visible-pixel timeline for the current ROM:
+// per scanline, every TIA write with the beam clock it lands at and the visible
+// span it governs (until the next write to the same register).
+func handleBeamtrace(ctx context.Context, req *mcp.CallToolRequest, in BeamtraceIn) (*mcp.CallToolResult, BeamtraceOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	e, err := get()
+	if err != nil {
+		return nil, BeamtraceOut{}, err
+	}
+	frames := in.Frames
+	if frames < 1 {
+		frames = 1
+	}
+	ws, err := beamtrace.Trace(e, frames)
+	if err != nil {
+		return nil, BeamtraceOut{}, err
+	}
+	frs := beamtrace.Frames(ws)
+	if len(frs) == 0 {
+		return nil, BeamtraceOut{Coords: coordsOf(e)}, nil
+	}
+	frame := frs[0]
+	var rows []beamtrace.Row
+	if in.Scanline != nil {
+		rows = append(rows, beamtrace.Timeline(ws, frame, *in.Scanline))
+	} else {
+		for _, sl := range beamtrace.Scanlines(ws, frame) {
+			rows = append(rows, beamtrace.Timeline(ws, frame, sl))
+		}
+	}
+	return nil, BeamtraceOut{Frame: frame, Rows: rows, Coords: coordsOf(e)}, nil
+}
+
+type BeamRaceIn struct {
+	Frames int `json:"frames,omitempty" jsonschema:"frames to scan (default 1); ADVANCES the emulator"`
+}
+type BeamRaceOut struct {
+	Events []beamrace.Event `json:"events"`
+	Coords Coords           `json:"coords"`
+}
+
+// handleBeamRace returns the advisory beam-race map for the current ROM: per
+// pixel-data write (GRP0/1, ENAM0/1, ENABL), the object's X and whether the write
+// reached the beam in time. FACTUAL, no verdict — a "late" line may be an intended
+// next-line pre-load; use a scenario no_beam_race check when you can state intent.
+func handleBeamRace(ctx context.Context, req *mcp.CallToolRequest, in BeamRaceIn) (*mcp.CallToolResult, BeamRaceOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	e, err := get()
+	if err != nil {
+		return nil, BeamRaceOut{}, err
+	}
+	frames := in.Frames
+	if frames < 1 {
+		frames = 1
+	}
+	ev, err := beamrace.Trace(e, frames)
+	if err != nil {
+		return nil, BeamRaceOut{}, err
+	}
+	return nil, BeamRaceOut{Events: ev, Coords: coordsOf(e)}, nil
+}
+
+type SpriteposIn struct {
+	X      int    `json:"x" jsonschema:"target X position 0..159"`
+	Object string `json:"object,omitempty" jsonschema:"object: P0 P1 M0 M1 BL (default P0)"`
+}
+type SpriteposOut struct {
+	Solution spritepos.Solution `json:"solution"`
+	Snippet  string             `json:"snippet"`
+}
+
+// handleSpritepos solves a target X to the SetXPos routine input and verifies the
+// achieved position on its own calibration emulator (independent of the loaded
+// ROM), so the answer is measured, not trusted. Returns a paste-able snippet.
+func handleSpritepos(ctx context.Context, req *mcp.CallToolRequest, in SpriteposIn) (*mcp.CallToolResult, SpriteposOut, error) {
+	// Self-contained calculator: builds its own template ROM, does not touch the
+	// shared emulator, so it takes no lock.
+	obj := in.Object
+	if obj == "" {
+		obj = "P0"
+	}
+	p, err := spritepos.NewPositioner()
+	if err != nil {
+		return nil, SpriteposOut{}, err
+	}
+	sol, err := p.Solve(obj, in.X)
+	if err != nil {
+		return nil, SpriteposOut{}, err
+	}
+	return nil, SpriteposOut{Solution: sol, Snippet: spritepos.Snippet(obj, sol.InputA)}, nil
+}
+
 // --- get_screen_annotated（ユーザー↔Claude 通信回線）---
 
 type ScreenIn struct {
@@ -1020,7 +1129,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.101.0",
+		Version: "1.102.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -1045,6 +1154,9 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed). Observes ONE run (∃) — for an all-paths proof use prove_line_budget."}, handleBudgetGuard)
 	mcp.AddTool(server, &mcp.Tool{Name: "prove_line_budget", Description: "Statically PROVE a kernel's per-scanline cycle budget over ALL reachable paths (∀) — the static sibling of assert_line_budget, which observes only one run (∃). Assembles asm_path, decodes from the reset/IRQ/NMI vectors, cuts the CFG at every STA WSYNC, and proves each WSYNC-to-WSYNC region's worst-case CPU cycles <= budget (default 76). Returns certified plus any over-budget regions (each with a cycle-by-cycle worst path + source location) and any regions it could not bound (unbounded loop / JSR / indirect JMP), reported honestly rather than passed. Run it BEFORE executing a kernel to catch a branch path that overruns only sometimes — the timing trap that rolls the screen on hardware while a lucky run looks fine. Single-bank flat 2K/4K kernels."}, handleProveLineBudget)
 	mcp.AddTool(server, &mcp.Tool{Name: "trace_clocks", Description: "Execute the next N instructions and return each one's beam anatomy: PC, opcode, CPU cycles (WSYNC stalls visible as large counts), and start/end (scanline, color clock). Sub-instruction OBSERVATION granularity — the practical recovery of step_clock (Gopher2600 cannot suspend mid-instruction; see docs/mcp-tools.md)."}, handleTraceClocks)
+	mcp.AddTool(server, &mcp.Tool{Name: "beamtrace", Description: "Write→visible-pixel timeline (authoring aid): trace `frames` frames and return, per scanline, every TIA write with the beam clock it lands at, the register name/kind, the value, and the visible-pixel span [vis_from,vis_to) it governs (until the next write to the same register). Answers 'where on the line does this sta GRP0 actually paint?'. Omit `scanline` for all scanlines that have writes. ADVANCES the emulator `frames` frames — set up the state first."}, handleBeamtrace)
+	mcp.AddTool(server, &mcp.Tool{Name: "beam_race", Description: "Advisory beam-race report (authoring aid): for every pixel-data write (GRP0/GRP1/ENAM0/ENAM1/ENABL) over `frames` frames, the controlled object's X and whether the write reached the beam in time (before_beam = clock<=X; otherwise that line draws the PREVIOUS value = one-line lag). FACTUAL, no verdict — a 'late' line may be an intended next-line pre-load; use scenario checks.no_beam_race when you can declare intent. ADVANCES the emulator `frames` frames."}, handleBeamRace)
+	mcp.AddTool(server, &mcp.Tool{Name: "spritepos", Description: "Forward sprite-position solver (authoring aid): given target X (0..159) return the SetXPos routine input, the div-15-coarse/HMOVE-fine decomposition, a paste-able snippet, and the position the hardware ACTUALLY reaches (achieved_x = HmovedPixel, measured by running a calibration kernel — exact=true when it equals the target). The X(N) offset is kernel-specific, so the answer is verified, not trusted. Self-contained: does not use or disturb the loaded ROM."}, handleSpritepos)
 	mcp.AddTool(server, &mcp.Tool{Name: "watch_ram", Description: "Run instruction-by-instruction until RAM[addr] CHANGES (returns old/new value and the PC of the writing instruction), bounded by max_frames. Granularity is per-instruction (Gopher2600 cannot suspend mid-instruction); same-value stores are invisible to change detection."}, handleWatchRAM)
 	mcp.AddTool(server, &mcp.Tool{Name: "run_scenario", Description: "Run regression scenario JSON files (input timeline + numeric assertions) in-process and return pass/fail with failing assertion details — the cmd/scenario verdict from the live loop."}, handleRunScenario)
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_screen", Description: "Run the ingest analyzer on the CURRENT emulator frame (no file needed): playfield bands as PF bytes, sprite candidates with GRP bytes + per-row colors, groups, fidelity, plus the TIA-grid overlay. The reverse-direction read of whatever is on screen right now."}, handleAnalyzeScreen)
