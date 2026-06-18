@@ -955,6 +955,38 @@ func (e *Emu) A() uint8    { return e.VCS.CPU.A.Value() }
 func (e *Emu) XReg() uint8 { return e.VCS.CPU.X.Value() }
 func (e *Emu) YReg() uint8 { return e.VCS.CPU.Y.Value() }
 
+// TIAWrite は直近 StepInstruction が行った TIA 書込（beamtrace 用）。
+type TIAWrite struct {
+	Reg    uint16 // 正規化した書込専用レジスタアドレス（$00-$2C）
+	Val    uint8  // 書き込んだバイト（STA/STX/STY のとき HasVal=true）
+	HasVal bool   // strobe / read-modify-write は値不明 → false
+	PC     uint16 // 書込命令のアドレス
+}
+
+// LastTIAWrite は直近 StepInstruction が TIA 書込専用レジスタへ書いたかを返す。検出は
+// WatchHMOVEHazard と同じ（Effect==Write かつ実効アドレスが TIA 領域）。値は store の
+// ソースレジスタを命令後に読む（store はソースを変えないので一致）。ストローブ等は値不明。
+func (e *Emu) LastTIAWrite() (TIAWrite, bool) {
+	lr := e.VCS.CPU.LastResult
+	if lr.Defn == nil || lr.Defn.Effect != instructions.Write {
+		return TIAWrite{}, false
+	}
+	canon, area := memorymap.MapAddress(lr.InstructionData, false)
+	if area != memorymap.TIA {
+		return TIAWrite{}, false
+	}
+	w := TIAWrite{Reg: canon, PC: lr.Address}
+	switch lr.Defn.Operator {
+	case instructions.STA:
+		w.Val, w.HasVal = e.A(), true
+	case instructions.STX:
+		w.Val, w.HasVal = e.XReg(), true
+	case instructions.STY:
+		w.Val, w.HasVal = e.YReg(), true
+	}
+	return w, true
+}
+
 // PeekROM は副作用なしの 1 バイト読み（命令ストリームのデコード用）。
 func (e *Emu) PeekROM(addr uint16) uint8 {
 	v, err := e.VCS.Mem.Peek(addr)

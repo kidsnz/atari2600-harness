@@ -340,7 +340,16 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
   technique kernels** (first sweep's 6 hits were two detector gaps — missed indexed `sta HMP0,x` stores, and a
   benign zero-clear — both fixed; a latent hazard false-negative in the cycle accounting also fixed). Litmus
   `lint_r1/_r2/_r3` + `lint_clean`; `TestLint*` lock both directions + the corpus guard. Pure Go, CLI only (no
-  MCP/reconnect). **AT-2/3/4 + a single batched MCP exposure remain.**
+  MCP/reconnect). **AT-3/4 + a single batched MCP exposure remain.**
+- **AT-2 ✅ DONE (v1.99.0): write→visible-pixel timeline** (`cmd/beamtrace` + `internal/beamtrace`, new thin
+  `emu.LastTIAWrite` accessor). Runs the ROM instruction-by-instruction, records every TIA write with the beam
+  clock it lands at, and tabulates per scanline which visible pixels each write governs — the causal map
+  `trace_clocks`/`read_row` only show piecemeal. Sound by construction: a write at clock C can affect a pixel
+  only if rendered at clock ≥ C, and a later write to the **same** register supersedes it → governed span
+  `[C, next-same-reg-write)`. Register name+kind table; pure strobes carry no value. Validated against the real
+  `multicolor48` 48px kernel (staggered GRP0/GRP1 rewrites reproduced with correct interleaved spans; an
+  HBLANK-superseded write shows an empty span). `TestTimelineSpans` (pure) + `TestTraceGRP0Marker` (fixture,
+  deterministic + localized). Pure Go, CLI only.
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing

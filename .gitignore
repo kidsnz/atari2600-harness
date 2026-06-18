@@ -30,6 +30,7 @@
 /cpucheck
 /cpucert
 /timinglint
+/beamtrace
 /oraclevote
 /trajdiff
 /framesim

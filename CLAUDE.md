@@ -181,6 +181,7 @@ any game; even its tests reference only its own `roms/litmus`).
   `cmd/audiospec` (VV-13 frequency-domain audio compare: FFT spectral + RMS-envelope distance, separates inverted twins; `internal/audiospec`) /
   `cmd/cpucert` (VV-14 citable cycle-budget certificate: VV-2 proof + @lines lemmas + provenance/hashes; `cyclebound.Certify`) /
   `cmd/timinglint` (static TIA-timing linter — proactive authoring aid: warns BEFORE running about HMOVE-without-HMxx / non-zero-HMxx-without-HMOVE / HMxx-write-<24cy-after-HMOVE; zero false positives on the known-good technique corpus; `cyclebound.Lint`) /
+  `cmd/beamtrace` (write→visible-pixel timeline — authoring aid: per scanline, every TIA write with the beam clock it lands at + the visible-pixel span it governs (until the next write to the same reg); `internal/beamtrace`, `emu.LastTIAWrite`) /
   `cmd/trajdiff` (VV-8 behavioral trajectory diff vs a reference ROM) /
   `cmd/oraclevote` (VV-6 N-oracle majority RAM vote: Gopher2600 + MAME headless; `internal/oracle`) /
   `cmd/cpucheck` (VV-7 silicon CPU differential: Gopher2600 CPU vs perfect6502 netlist per-instruction; `internal/cpudiff`; needs `bin/p6502step` via `scripts/install_perfect6502.sh`) /

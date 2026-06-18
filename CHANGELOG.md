@@ -8,6 +8,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.99.0] - 2026-06-18
+
+### Added
+- **`cmd/beamtrace` + `internal/beamtrace` — write→visible-pixel timeline (authoring aid, AT-2).** Runs a ROM
+  instruction-by-instruction and tabulates, per scanline, every TIA write with the beam clock it lands at and
+  the visible-pixel span it governs — answering "where on the line does this `sta GRP0` actually paint?". The
+  causal map the runtime tools (`trace_clocks`/`read_row`) only show piecemeal. States only what is sound: a
+  write at clock C can affect a pixel only if rendered at clock ≥ C, and a later write to the **same** register
+  supersedes it — so the governed span is `[C, next-same-reg-write)`. Register name+kind table
+  (color/graphics/position/motion/control/audio/strobe); pure strobes (WSYNC/RESPx/HMOVE/HMCLR/CXCLR/RSYNC)
+  report no value. New thin `emu.LastTIAWrite` accessor (same detection as `WatchHMOVEHazard`). Pure Go, CLI only.
+- **Self-tests:** `TestTimelineSpans` (pure span logic on synthetic writes: ordering, same-reg supersede, HBLANK
+  clamp, empty span when superseded in HBLANK) and `TestTraceGRP0Marker` (fixture `roms/litmus/beamtrace_grp0.asm`
+  writes GRP0=$A5 once per frame → surfaced with right value/kind, localized to its scanline, deterministic).
+
+### Notes
+- Validated against the real `multicolor48` kernel: the timeline reproduces the staggered GRP0/GRP1 rewrites
+  with correctly interleaved spans, and a write superseded during HBLANK correctly shows an empty `[0,0)` span.
+- Interpreting whether a write is *too late* (the effect window is fully passed) is the next tool's job (AT-3
+  beam-race detector); beamtrace only lays out the facts.
+
 ## [1.98.0] - 2026-06-18
 
 ### Added
