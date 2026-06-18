@@ -30,6 +30,7 @@
 /cpucheck
 /oraclevote
 /trajdiff
+/framesim
 /guidedfuzz
 /cover
 /mutate
