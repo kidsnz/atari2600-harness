@@ -130,7 +130,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-10** ✅v1.88.0 (T-1/T-2/T-3) | **HW-divergence trap detectors** (timer-wrap=G8 ✅, HMOVE-latch ✅, uninit-RAM-read ✅) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
 | **VV-11** ✅v1.92.0 | **State-coverage matrix** (NUSIZ/size/VDEL/PF-mode/bank; `internal/statecov`+`cmd/statecov`) + **coverage-filtered mutation** (`mutate.EvalRandomCovered`, `cmd/mutate -covered`) | did tests exercise every TIA mode; **honest** mutation kill-rate (closes the playbook's 5–20% thread — smoke: 2%→68%) | D-3/D-4 | S–M | 3 |
 | **VV-12** ✅v1.93.0 | **SSIM / pHash tolerant frame compare** (`internal/framesim`+`cmd/framesim`) | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
-| **VV-13** | **Audio spectral (FFT) + RMS-envelope diff** | frequency-domain timbre check (out-resolves `golden_audio` on V2-14 inverted twins) | E-4 | S–M | 3 |
+| **VV-13** ✅v1.94.0 | **Audio spectral (FFT) + RMS-envelope diff** (`internal/audiospec`+`cmd/audiospec`) | frequency-domain timbre check (out-resolves `golden_audio` on V2-14 inverted twins) | E-4 | S–M | 3 |
 | **VV-14** | `cmd/cpucert` owned certificate · **ILP/SMT (Z3)** prover upgrade · external TIA/Sim2600 ROMs | citable cert; infeasible-path tightening + value-range proofs; silicon-TIA tie-breaker | B-C2/C-2/B-C3 | M–L | 3 (defer) |
 
 ## Tier ★1 — recommended pilots (highest value × feasibility, substrate mostly in-tree)
@@ -279,7 +279,13 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   (each a rendered `.bin` or a `.png`), JSON report, exit 1 below `-min`. It **adds** magnitude+locality; it does
   **not** replace the boolean exact golden. Self-test both directions (identity=1.0/0; tolerant to 1px; monotonic
   in damage; worst block localises; real cross-ROM measurably lower). Pure Go. **Src:** Wang et al. SSIM 2004; pHash.
-  **VV-13** audio FFT/RMS-envelope (new modality; audio rarer on the roadmap). **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.
+- **VV-13 ✅ DONE (v1.94.0):** `internal/audiospec`+`cmd/audiospec` add the **frequency-domain** modality.
+  `golden_audio` hashes the audio register chain and an RMS envelope says "how loud over time"; neither separates
+  **inverted twins** — sounds with the same loudness contour but different pitch/timbre. A pure-Go radix-2 FFT
+  magnitude spectrum + cosine **spectral distance** does, alongside an **RMS-envelope distance** and a
+  dominant-frequency readout, over the captured PCM (`emu.AudioSamples`). The self-test makes the point numerically:
+  two equal-amplitude tones at different pitch score **envelope distance 0.0000 vs spectral distance 0.9980**. The
+  CLI separates real ROMs (music_driver's 523 Hz tone vs sfx_demo). Pure Go. **Src:** Cooley-Tukey FFT. **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing

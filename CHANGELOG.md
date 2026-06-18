@@ -8,6 +8,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.94.0] - 2026-06-18
+
+### Added
+- **Frequency-domain audio comparison (VV-13).** New `internal/audiospec` + `cmd/audiospec`. The `golden_audio`
+  scenario check hashes the audio register chain and an RMS envelope says "how loud over time"; neither separates
+  two sounds with the same loudness contour but different pitch/timbre ("inverted twins"). audiospec adds the
+  spectral modality: a pure-Go radix-2 FFT magnitude spectrum with a cosine **spectral distance**, alongside an
+  **RMS-envelope distance** and a dominant-frequency readout, over the captured PCM stream (`emu.AudioSamples`).
+  `cmd/audiospec` compares two ROMs' audio on a chosen channel, prints a JSON report, and exits 1 above `-max`.
+
+### Notes
+- Self-test demonstrates the axis numerically: two equal-amplitude tones at different pitch score **envelope
+  distance 0.0000 vs spectral distance 0.9980** — the spectral axis out-resolves the envelope. FFT recovers a known
+  tone within bin resolution; identity is zero; a real capture (sfx_demo) runs the full pipeline. Pure Go, no
+  reconnect. `.gitignore`: ignore stray `/audiospec`.
+- **Phase C complete** — Tier-3 VV-11/12/13 all done; VV-14 (Z3/ILP prover upgrade + external silicon-TIA ROMs)
+  remains deliberately deferred per the audit until a kernel demands it.
+
 ## [1.93.0] - 2026-06-18
 
 ### Added
