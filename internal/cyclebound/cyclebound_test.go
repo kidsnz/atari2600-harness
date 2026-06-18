@@ -15,7 +15,23 @@ const (
 	jsrAsm     = "../../roms/litmus/cb_jsr.asm"
 	divAsm     = "../../roms/litmus/cb_divloop.asm"
 	andAsm     = "../../roms/litmus/cb_andloop.asm"
+	arrAsm     = "../../roms/litmus/cb_arrloop.asm"
 )
+
+// TestProveArrayLoopBounded locks 3B: a divide loop fed by a ZERO-PAGE-RAM array
+// element (read via an index, `lda arr,x`) is bounded from the RAM value range
+// (cleared to 0 + masked writes), where the indexed load was Top before. Both
+// directions: certifies at 76 with no unbounded region; a tight budget flips it.
+func TestProveArrayLoopBounded(t *testing.T) {
+	rep := mustProve(t, arrAsm, 76)
+	if !rep.Certified || len(rep.Unbounded) != 0 {
+		t.Fatalf("cb_arrloop must certify at 76 (RAM array range bounds the loop); unbounded=%+v violations=%+v",
+			rep.Unbounded, rep.Violations)
+	}
+	if tight := mustProve(t, arrAsm, 12); tight.Certified {
+		t.Fatal("cb_arrloop must NOT certify at budget 12 (the array-fed divide loop's cost exceeds it)")
+	}
+}
 
 // TestProveAndMaskBoundsLoop locks 3A: a divide loop fed by an UNKNOWN source is
 // bounded once the source is masked with `and #imm` (range model), where without

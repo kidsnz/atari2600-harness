@@ -119,12 +119,18 @@ type State struct {
 	Mem     map[uint16]ValueRange
 	VBlank  TriBool // VBLANK display-disable bit (bit1 of the last value stored to $01)
 	VSync   TriBool // VSYNC bit (bit1 of the last value stored to $00)
-	valid   bool
+	// ZPVal (3B): the join of EVERY value stored anywhere in zero page, seeded to
+	// the ZP power-on/clear value. Reading via an index (`lda base,x`) returns this
+	// — sound because it over-approximates any zero-page cell regardless of which
+	// array/index is used (no per-array aliasing reasoning needed). Top = untracked
+	// (no recognized init), so indexed ZP loads stay Top = unbounded, as before.
+	ZPVal ValueRange
+	valid bool
 }
 
 func botState() State { return State{} } // bottom: valid=false (unreachable)
 func topState() State {
-	return State{A: vTop(), X: vTop(), Y: vTop(), Mem: map[uint16]ValueRange{}, valid: true}
+	return State{A: vTop(), X: vTop(), Y: vTop(), Mem: map[uint16]ValueRange{}, ZPVal: vTop(), valid: true}
 }
 func (s State) clone() State {
 	m := make(map[uint16]ValueRange, len(s.Mem))
@@ -159,6 +165,7 @@ func (s State) joinState(o State) State {
 	r.A, r.X, r.Y = s.A.join(o.A), s.X.join(o.X), s.Y.join(o.Y)
 	r.C, r.Z, r.N = s.C.join(o.C), s.Z.join(o.Z), s.N.join(o.N)
 	r.VBlank, r.VSync = s.VBlank.join(o.VBlank), s.VSync.join(o.VSync)
+	r.ZPVal = s.ZPVal.join(o.ZPVal)
 	r.Mem = map[uint16]ValueRange{}
 	for k, v := range s.Mem {
 		if v2, ok := o.Mem[k]; ok { // only cells known in BOTH survive; others -> Top
@@ -175,7 +182,7 @@ func (s State) eqState(o State) bool {
 		return true
 	}
 	if !(s.A.eq(o.A) && s.X.eq(o.X) && s.Y.eq(o.Y) && s.C == o.C && s.Z == o.Z && s.N == o.N &&
-		s.VBlank == o.VBlank && s.VSync == o.VSync) {
+		s.VBlank == o.VBlank && s.VSync == o.VSync && s.ZPVal.eq(o.ZPVal)) {
 		return false
 	}
 	if len(s.Mem) != len(o.Mem) {
@@ -301,6 +308,16 @@ func storeAddr(in Instr) (uint16, bool) {
 // applyStore updates VSYNC/VBLANK tracking and a tracked zero-page cell for a
 // store of value v to a statically known address.
 func (n *State) applyStore(in Instr, v ValueRange) {
+	// 3B: any store landing in zero-page RAM ($80-$FF) contributes to the RAM value
+	// range. Restricted to $80-$FF on purpose: $00-$7F is TIA/RIOT registers (not
+	// RAM), which kernels write with computed values constantly — including those
+	// would force ZPVal to Top in every kernel. Sound (join over all RAM writes).
+	switch in.Def.AddressingMode {
+	case instructions.Absolute, instructions.AbsoluteX, instructions.AbsoluteY:
+		if in.Operand >= 0x80 && in.Operand < 0x100 {
+			n.ZPVal = n.ZPVal.join(v)
+		}
+	}
 	a, ok := storeAddr(in)
 	if !ok {
 		return
@@ -329,6 +346,14 @@ func (s State) transfer(in Instr) State {
 		}
 		if d.AddressingMode == instructions.Absolute {
 			return s.memGet(in.Operand)
+		}
+		// 3B: an indexed load from a zero-page RAM base ($80-$FF) reads some RAM cell
+		// → the RAM value range (sound over-approx of any element, any index). Other
+		// indexed/indirect (TIA/RIOT regs, abs,X/Y outside ZP, (ind,X), (ind),Y) stays
+		// unknown.
+		if (d.AddressingMode == instructions.AbsoluteX || d.AddressingMode == instructions.AbsoluteY) &&
+			in.Operand >= 0x80 && in.Operand < 0x100 {
+			return s.ZPVal
 		}
 		return vTop() // indexed/indirect source value unknown
 	}
@@ -517,6 +542,55 @@ func absSuccessors(in Instr, st State) []absEdge {
 	return []absEdge{{in.next(), st.transfer(in)}}
 }
 
+// zpInitRange returns the value every zero-page cell is known to hold at start:
+// vConst(0) when the program clears ZP with the canonical idiom (a backward loop
+// containing `sta $00,x`+`dex/dey`, with a `lda #0` present), else vTop(). Used to
+// seed State.ZPVal so indexed ZP loads are bounded ONLY when ZP is provably
+// initialised — otherwise they stay Top (unbounded), which is sound.
+func zpInitRange(instrs map[uint16]Instr) ValueRange {
+	hasLdaZero := false
+	for _, in := range instrs {
+		if in.Def.Operator == instructions.LDA && in.Def.AddressingMode == instructions.Immediate && (in.Operand&0xFF) == 0 {
+			hasLdaZero = true
+			break
+		}
+	}
+	if !hasLdaZero {
+		return vTop()
+	}
+	for _, latch := range instrs {
+		if latch.Def.Operator != instructions.BNE && latch.Def.Operator != instructions.BPL {
+			continue
+		}
+		hdr := latch.branchTarget()
+		if hdr > latch.Addr {
+			continue // forward branch, not a loop latch
+		}
+		hasClear, hasDec := false, false
+		for a := hdr; ; {
+			in, ok := instrs[a]
+			if !ok {
+				break
+			}
+			op, m := in.Def.Operator, in.Def.AddressingMode
+			if op == instructions.STA && (m == instructions.AbsoluteX || m == instructions.AbsoluteY) && in.Operand < 0x02 {
+				hasClear = true // `sta $00,x` / `sta $01,x` — clearing zero page
+			}
+			if op == instructions.DEX || op == instructions.DEY {
+				hasDec = true
+			}
+			if in.Addr == latch.Addr {
+				break
+			}
+			a = in.next()
+		}
+		if hasClear && hasDec {
+			return vConst(0)
+		}
+	}
+	return vTop()
+}
+
 // computeStates runs a forward abstract interpretation (worklist fixpoint) from
 // the entry points and returns the abstract state on entry to each instruction.
 // The lattice is finite (8-bit ranges + tri-bools), so it converges; maxIter is a
@@ -540,8 +614,11 @@ func computeStates(instrs map[uint16]Instr, entries []uint16) map[uint16]State {
 			}
 		}
 	}
+	zpInit := zpInitRange(instrs) // 3B: seed ZP value range (0 if cleared, else Top)
 	for _, e := range entries {
-		push(e, topState())
+		seed := topState()
+		seed.ZPVal = zpInit
+		push(e, seed)
 	}
 	const maxIter = 300000
 	for it := 0; len(work) > 0 && it < maxIter; it++ {
