@@ -21,6 +21,8 @@ func main() {
 	value := flag.Int("value", -1, "single mutation: new byte value (0-255)")
 	count := flag.Int("count", 0, "batch: number of random mutations")
 	seed := flag.Int64("seed", 1, "batch: PRNG seed (deterministic)")
+	covered := flag.Bool("covered", false, "batch: restrict mutations to executed code = honest kill rate (VV-11)")
+	frames := flag.Int("frames", 4, "batch -covered: frames of the baseline run that define covered code")
 	flag.Parse()
 	scenarios := flag.Args()
 	if *rom == "" || len(scenarios) == 0 {
@@ -29,7 +31,13 @@ func main() {
 	}
 
 	if *count > 0 { // バッチ＝検査スイートの強さ（kill 率）を採点
-		rs, err := mutate.EvalRandom(*rom, *count, *seed, scenarios)
+		var rs []mutate.Result
+		var err error
+		if *covered {
+			rs, err = mutate.EvalRandomCovered(*rom, *count, *seed, scenarios, *frames)
+		} else {
+			rs, err = mutate.EvalRandom(*rom, *count, *seed, scenarios)
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 			os.Exit(2)
@@ -41,7 +49,11 @@ func main() {
 				fmt.Printf("SURVIVED  offset=%d %02x->%02x  (no scenario caught it)\n", r.Mutation.Offset, r.OrigByte, r.Mutation.Value)
 			}
 		}
-		fmt.Printf("kill rate: %.0f%% (%d/%d killed; %d survived)\n", mutate.KillRate(rs)*100, len(rs)-survived, len(rs), survived)
+		mode := "all bytes"
+		if *covered {
+			mode = fmt.Sprintf("covered code only, %d-frame baseline = honest", *frames)
+		}
+		fmt.Printf("kill rate: %.0f%% (%d/%d killed; %d survived) [%s]\n", mutate.KillRate(rs)*100, len(rs)-survived, len(rs), survived, mode)
 		return
 	}
 

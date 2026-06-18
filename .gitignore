@@ -29,6 +29,10 @@
 /ingest
 /cpucheck
 /oraclevote
+/trajdiff
+/guidedfuzz
+/cover
+/mutate
 
 # external dependency: Gopher2600 upstream clone (obtain per README)
 /Gopher2600/
