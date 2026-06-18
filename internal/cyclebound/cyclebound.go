@@ -376,9 +376,9 @@ func (s *solver) foldLoops() string {
 		}
 	}
 
-	n := determineBound(s.nodes, header, latch)
+	n := determineBound(s.nodes, header, latch, s.absStates)
 	if n <= 0 {
-		return "loop bound unknown (need ldx/ldy #N + dex/dey + bne/bpl in the region)"
+		return "loop bound unknown (need a counted dex/dey or sbc-divide idiom with a proven range)"
 	}
 	pen := 1
 	if (latch.next() >> 8) != (header >> 8) {
@@ -390,9 +390,63 @@ func (s *solver) foldLoops() string {
 	return ""
 }
 
-// determineBound returns the iteration count of the simple counted loop
-// header..latch (decrement-to-zero idiom), or 0 if undeterminable.
-func determineBound(nodes map[uint16]Instr, header uint16, latch Instr) int {
+// determineBound returns an iteration upper bound for the simple counted loop
+// header..latch, or 0 if undeterminable. Two idioms:
+//   - decrement-to-zero (ldx/ldy #N + dex/dey + bne/bpl), and
+//   - (2B) divide / sbc-counter (sec; A reduced by a constant; bcs/bcc),
+//     bounded from the proven range of A on entry to the loop header.
+func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absStates map[uint16]State) int {
+	// 2B: divide-by-N coarse-positioning idiom — the body subtracts a constant from
+	// A and loops while no borrow (BCS) / while borrow (BCC). Max iterations =
+	// floor(Amax/const)+1 (with carry set); +1 more covers an unknown entry carry.
+	// SOUND: over-approximates the count (more iterations = higher cost). Unknown A
+	// range or non-constant subtrahend => 0 (stay unbounded, no false bound).
+	if latch.Def.Operator == instructions.BCS || latch.Def.Operator == instructions.BCC {
+		sub, nbody := 0, 0
+		a := header
+		for {
+			in, ok := nodes[a]
+			if !ok {
+				return 0
+			}
+			if in.Addr == latch.Addr {
+				break
+			}
+			nbody++
+			if in.Def.Operator == instructions.SBC && in.Def.AddressingMode == instructions.Immediate {
+				sub = int(in.Operand & 0xFF)
+			}
+			a = in.next()
+		}
+		// only the canonical single-instruction `sbc #const` body is modeled
+		if sub == 0 || nbody != 1 {
+			return 0
+		}
+		// A's LOOP-ENTRY upper bound. absStates[header] is the in-loop join, which the
+		// final wrapping subtraction can pollute to Top, so prefer the closest
+		// immediate `lda #imm` initializer before the loop (exact); otherwise use a
+		// non-Top tracked range. Unknown => 0 (stay unbounded, no false bound).
+		amax := -1
+		bestAddr := -1
+		for addr, in := range nodes {
+			if int(addr) >= int(header) {
+				continue
+			}
+			if in.Def.Operator == instructions.LDA && in.Def.AddressingMode == instructions.Immediate && int(addr) > bestAddr {
+				bestAddr = int(addr)
+				amax = int(in.Operand & 0xFF)
+			}
+		}
+		if amax < 0 {
+			if st, ok := absStates[header]; ok && !st.A.Top {
+				amax = st.A.Hi
+			}
+		}
+		if amax < 0 {
+			return 0
+		}
+		return amax/sub + 2
+	}
 	if latch.Def.Operator != instructions.BNE && latch.Def.Operator != instructions.BPL {
 		return 0
 	}

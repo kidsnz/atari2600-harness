@@ -13,7 +13,23 @@ const (
 	overrunBin = "../../roms/litmus/litmus_overrun.bin"
 	smokeAsm   = "../../roms/litmus/smoke.asm"
 	jsrAsm     = "../../roms/litmus/cb_jsr.asm"
+	divAsm     = "../../roms/litmus/cb_divloop.asm"
 )
+
+// TestProveDivideLoopBounded locks 2B: a divide-by-15 / sbc-counter loop is
+// bounded from A's proven loop-entry range and the region certifies (v1 reported
+// "loop bound unknown"). Both directions: it certifies at 76 with no unbounded
+// region; a tight budget flips it (the loop's per-iteration cycles are counted).
+func TestProveDivideLoopBounded(t *testing.T) {
+	rep := mustProve(t, divAsm, 76)
+	if !rep.Certified || len(rep.Unbounded) != 0 {
+		t.Fatalf("cb_divloop must certify at 76 with no unbounded; unbounded=%+v violations=%+v",
+			rep.Unbounded, rep.Violations)
+	}
+	if tight := mustProve(t, divAsm, 15); tight.Certified {
+		t.Fatal("cb_divloop must NOT certify at budget 15 (the divide loop's cost exceeds it)")
+	}
+}
 
 // TestProveInterproceduralJSR locks 2A: the prover FOLLOWS a JSR into a
 // (WSYNC-free) subroutine, charges the callee's cycles, and bounds the region —
