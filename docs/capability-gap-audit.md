@@ -131,7 +131,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-11** ✅v1.92.0 | **State-coverage matrix** (NUSIZ/size/VDEL/PF-mode/bank; `internal/statecov`+`cmd/statecov`) + **coverage-filtered mutation** (`mutate.EvalRandomCovered`, `cmd/mutate -covered`) | did tests exercise every TIA mode; **honest** mutation kill-rate (closes the playbook's 5–20% thread — smoke: 2%→68%) | D-3/D-4 | S–M | 3 |
 | **VV-12** ✅v1.93.0 | **SSIM / pHash tolerant frame compare** (`internal/framesim`+`cmd/framesim`) | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
 | **VV-13** ✅v1.94.0 | **Audio spectral (FFT) + RMS-envelope diff** (`internal/audiospec`+`cmd/audiospec`) | frequency-domain timbre check (out-resolves `golden_audio` on V2-14 inverted twins) | E-4 | S–M | 3 |
-| **VV-14** ◑v1.95.0 | **`cmd/cpucert` citable certificate** ✅ · `@lines` applied to real kernels ✅ · ILP/SMT(Z3) + external TIA/Sim2600 ROMs (defer) | citable cert done; remaining false positives were multi-line-region (fixed by `@lines`), not infeasible-path (0 real kernels) | B-C2/C-2/B-C3 | M–L | 3 (partial) |
+| **VV-14** ◑v1.96.0 | **`cmd/cpucert`** ✅ · `@lines` real kernels ✅ · **interprocedural JSR/RTS + divide-loop bounding** ✅ (2A/2B) · ILP/SMT(Z3) + external TIA/Sim2600 ROMs (defer) | citable cert + prover scope expansion done; no false-positive violations remain (14/31 certified); rest are honest UNBOUNDED scope limits | B-C2/C-2/B-C3 | M–L | 3 (partial) |
 
 ## Tier ★1 — recommended pilots (highest value × feasibility, substrate mostly in-tree)
 - **VV-1 ✅ DONE (v1.78.0):** the suites are run via the full import path `go test github.com/jetsetilly/gopher2600/hardware/cpu/tests/{klaus2m5,thomharte}/...` (resolved through go.mod's `replace`; `cd Gopher2600` is wrong — go binds the harness module). **Klaus** always-on (embedded .bin committed upstream, no provisioning). **Harte** runs a 12-opcode smoke subset in CI — `a9 69 e9 d0 4c 6c 20 b1 9d fe 00 ca` — fetched on demand from SingleStepTests (the 1GB corpus is `.gitignore`'d upstream); full 256 is local-only (`scripts/check_cpu_conformance.sh full`). New `scripts/check_cpu_conformance.sh` (+ `--selftest`) + two CI steps. **Self-test (mandatory):** corrupt one expected `final.a` in a Harte case → the gate must go RED (proven live, not vacuous). **Src:** Klaus2m5 repo; SingleStepTests/65x02 (MIT).
@@ -169,6 +169,14 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   check; an un-annotated over-76 region still flags (litmus `cb_2line` vs `cb_2line_noann`,
   `TestTwoLineBudgetAnnotation` both directions). Applying the annotations to the actual game ROMs is a
   roms-repo follow-on. (Full infeasible-path green-ification stays **VV-14**.) **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
+- **VV-2 scope expansion (v1.96.0, via VV-14 2A/2B):** the prover now (2A) **follows subroutine calls** —
+  `longest()` threads a single-level return address (memo keyed by `(addr,ret)`), JSR descends into the callee and
+  RTS returns; nested call / RTS-without-caller ⇒ UNBOUNDED (sound) — and (2B) **bounds the divide-by-15 /
+  sbc-counter idiom** from A's proven loop-entry range. Self-tests `cb_jsr.asm`/`cb_divloop.asm` (both directions).
+  Measured: removes the JSR blocker and bounds known-range divide loops, but only flips +1 kernel to certified by
+  itself (sfx_demo, via the 2C `@lines` once 2A exposed its region) — the rest are blocked by a combination of
+  honest scope limits (no-WSYNC, multi-call-site RTS context, nested loops, WSYNC-in-loop, divide loops whose
+  counter lives in untracked indexed RAM). Those stay UNBOUNDED (correct), not false positives.
 - **VV-3 ✅ DONE (v1.83.0):** opt-in coverage recorder hooked into `emu.stepInstr()` at instruction completion
   (`LastResult.Address`/`Defn.IsBranch()`/`BranchSuccess`) → `internal/emu.Coverage` (pcSeen + per-branch
   taken/fall-through edges; `OneSidedBranches`, `Signature`); nil until `EnableCoverage` = zero cost. **`cmd/cover`**

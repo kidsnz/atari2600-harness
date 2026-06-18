@@ -8,6 +8,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.96.0] - 2026-06-18
+
+### Added
+- **Interprocedural cycle-budget proving (VV-14 2A).** `internal/cyclebound` now FOLLOWS subroutine calls
+  instead of reporting "JSR in region — unbounded". `longest()` threads a single-level return address (memo keyed
+  by `(addr, ret)`): a JSR descends into the callee with the return point threaded, an RTS/RTI returns to it, and
+  the callee's own WSYNC remains a region sink. Sound by construction — a nested call or an RTS with no caller in
+  context sets the region UNBOUNDED rather than under-estimating. Locked by `roms/litmus/cb_jsr.asm` +
+  `TestProveInterproceduralJSR` (a JSR'd subroutine certifies; a tight budget flips the region with the callee on
+  the worst path = its cycles are counted).
+- **Divide-by-15 / sbc-counter loop bounding (VV-14 2B).** `determineBound` now bounds the coarse-positioning
+  idiom (`sec; sbc #const; bcs/bcc`) from A's proven loop-entry range: iterations ≤ floor(Amax/const)+2. The
+  entry bound comes from the closest immediate `lda #imm` before the loop (the in-loop join is polluted to Top by
+  the final wrapping subtraction), falling back to a non-Top tracked range. Sound: over-approximates the count;
+  unknown range / non-constant subtrahend ⇒ stays unbounded. Locked by `roms/litmus/cb_divloop.asm` +
+  `TestProveDivideLoopBounded`.
+
+### Changed
+- **VV-14 2C — last false-positive violations cleared.** After 2A exposed them, four stable-262 kernels showed a
+  genuine multi-line region as a violation; `@lines` declares the true span (sfx_demo Vis ×3 ⇒ now CERTIFIED;
+  shared_setxpos/text12/text24 positioning-setup ×2 ⇒ violation cleared, other regions stay honestly UNBOUNDED).
+  Result: **no false-positive violation remains in any technique kernel**; certified 13 → 14 / 31.
+
+### Notes
+- Honest measured outcome: 2A/2B add real, self-tested prover capabilities, but raised the kernel certify count by
+  only +1 — the remaining uncertified kernels are blocked by a *combination* of hard/honest issues (no-WSYNC,
+  multi-call-site RTS context, nested loops, WSYNC-in-loop, and divide loops whose counter lives in untracked
+  indexed RAM, plus bank-switched display). Those UNBOUNDED verdicts are the correct honest scope limit, not false
+  alarms; reducing them further needs larger absint work (indexed-memory range tracking, multi-context returns) —
+  diminishing returns, deferred along with ②Z3/④external-ROMs.
+
 ## [1.95.0] - 2026-06-18
 
 ### Added
