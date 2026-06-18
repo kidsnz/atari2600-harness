@@ -131,7 +131,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-11** ✅v1.92.0 | **State-coverage matrix** (NUSIZ/size/VDEL/PF-mode/bank; `internal/statecov`+`cmd/statecov`) + **coverage-filtered mutation** (`mutate.EvalRandomCovered`, `cmd/mutate -covered`) | did tests exercise every TIA mode; **honest** mutation kill-rate (closes the playbook's 5–20% thread — smoke: 2%→68%) | D-3/D-4 | S–M | 3 |
 | **VV-12** ✅v1.93.0 | **SSIM / pHash tolerant frame compare** (`internal/framesim`+`cmd/framesim`) | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
 | **VV-13** ✅v1.94.0 | **Audio spectral (FFT) + RMS-envelope diff** (`internal/audiospec`+`cmd/audiospec`) | frequency-domain timbre check (out-resolves `golden_audio` on V2-14 inverted twins) | E-4 | S–M | 3 |
-| **VV-14** | `cmd/cpucert` owned certificate · **ILP/SMT (Z3)** prover upgrade · external TIA/Sim2600 ROMs | citable cert; infeasible-path tightening + value-range proofs; silicon-TIA tie-breaker | B-C2/C-2/B-C3 | M–L | 3 (defer) |
+| **VV-14** ◑v1.95.0 | **`cmd/cpucert` citable certificate** ✅ · `@lines` applied to real kernels ✅ · ILP/SMT(Z3) + external TIA/Sim2600 ROMs (defer) | citable cert done; remaining false positives were multi-line-region (fixed by `@lines`), not infeasible-path (0 real kernels) | B-C2/C-2/B-C3 | M–L | 3 (partial) |
 
 ## Tier ★1 — recommended pilots (highest value × feasibility, substrate mostly in-tree)
 - **VV-1 ✅ DONE (v1.78.0):** the suites are run via the full import path `go test github.com/jetsetilly/gopher2600/hardware/cpu/tests/{klaus2m5,thomharte}/...` (resolved through go.mod's `replace`; `cd Gopher2600` is wrong — go binds the harness module). **Klaus** always-on (embedded .bin committed upstream, no provisioning). **Harte** runs a 12-opcode smoke subset in CI — `a9 69 e9 d0 4c 6c 20 b1 9d fe 00 ca` — fetched on demand from SingleStepTests (the 1GB corpus is `.gitignore`'d upstream); full 256 is local-only (`scripts/check_cpu_conformance.sh full`). New `scripts/check_cpu_conformance.sh` (+ `--selftest`) + two CI steps. **Self-test (mandatory):** corrupt one expected `final.a` in a Harte case → the gate must go RED (proven live, not vacuous). **Src:** Klaus2m5 repo; SingleStepTests/65x02 (MIT).
@@ -285,7 +285,29 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   magnitude spectrum + cosine **spectral distance** does, alongside an **RMS-envelope distance** and a
   dominant-frequency readout, over the captured PCM (`emu.AudioSamples`). The self-test makes the point numerically:
   two equal-amplitude tones at different pitch score **envelope distance 0.0000 vs spectral distance 0.9980**. The
-  CLI separates real ROMs (music_driver's 523 Hz tone vs sfx_demo). Pure Go. **Src:** Cooley-Tukey FFT. **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.
+  CLI separates real ROMs (music_driver's 523 Hz tone vs sfx_demo). Pure Go. **Src:** Cooley-Tukey FFT.
+- **VV-14 ◑ PARTIAL (v1.95.0):** scoped to ①pure-Go prover precision + ③citable certificate (②Z3/SMT and
+  ④external silicon-TIA ROMs stay deferred). **Key empirical correction (measured, not assumed):** the prover's
+  over-warnings on the real technique kernels are **NOT** infeasible-path or page-cross artifacts (the prior memo's
+  guess) — sweeping all 30 kernels found **0** whose conservatism is infeasible-branch-caused. Every over-budget
+  region is on a kernel that runs at a verified-**stable 262 scanlines/frame**, so a region with worst W>76 cy
+  **legitimately spans ⌈W/76⌉ scanlines** (the frame budgets for it; no roll). The honest, sound fix is therefore
+  **`@lines`** (declare the true scanline span — the v1.89.0 mechanism), applied to the 9 affected kernels
+  (multicolor48/score6/hscroll/bitmap48/two_line_vdel/zone_multiplex/tia_pcm/bullets/rpgmap): 5 now fully certify;
+  4 clear their false-positive *violation* but stay UNBOUNDED on other regions. **③ `cmd/cpucert`** (+
+  `cyclebound.Certify`) emits a reproducible, falsifiable certificate: per-region proven bounds + verdict, the
+  `@lines` lemmas relied on, and provenance (prover version, Gopher2600 pin, DASM version, asm+ROM SHA-256). Exit 1
+  if not certified; self-test both directions (smoke certifies deterministically; overrun rejected; tamper changes
+  the hash). **Assessed and NOT built (measured 0/low real-kernel payoff):** ① the *display-off region
+  reclassification* — instrumentation showed the VSYNC→VBLANK transition has VBLANK provably-unknown (init clears
+  it; the first frame can briefly run with display on), so skipping those regions would be **unsound** (reverted);
+  *value-range loop bounding* (S3) — the unbounded loops are nested (zone_multiplex's divide-by-15 inside an outer
+  loop), hardware-timer waits (bitmap48 `INTIM`), or **JSR/RTS subroutine timing**, none of which a divide-by-15
+  bounder fixes; *infeasible-branch pruning* (S4) — 0 real kernels need it. The remaining UNBOUNDED verdicts (JSR
+  subroutine timing, nested loops, timer waits) are the **correct honest** outcome, not false positives; tightening
+  them is a larger future lever (subroutine-timing modeling), kept deferred. C-3 ESIL/radare2 symbolic exec was
+  **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it
+  isn't re-litigated. **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing

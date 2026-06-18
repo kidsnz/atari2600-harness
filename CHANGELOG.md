@@ -8,6 +8,34 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.95.0] - 2026-06-18
+
+### Added
+- **Citable cycle-budget certificate (VV-14, ③).** New `cmd/cpucert` + `cyclebound.Certify`. Wraps the VV-2 static
+  prover in a reproducible, attestable proof artifact: per-region proven worst-case + verdict, the `@lines`
+  declarations the proof relies on, and full provenance — prover version, Gopher2600 pin, DASM version, and SHA-256
+  of both the `.asm` and the assembled ROM. Text or `-json`; exit 1 when not certified. Self-test both directions:
+  smoke certifies with a deterministic ROM-core + hashes; litmus_overrun is rejected; multicolor48's cert records
+  the `@lines 2` lemma it relies on; distinct ROMs hash distinctly (tamper-evident).
+
+### Changed
+- **VV-14 ① prover precision — applied `@lines` to real kernels.** Empirically (sweeping all 30 technique kernels),
+  the prover's over-warnings are **multi-line-region** false positives, not infeasible-path ones (0 kernels). Each
+  affected kernel runs at a verified-stable 262 scanlines/frame, so an over-budget region (worst W>76) legitimately
+  spans ⌈W/76⌉ scanlines; declaring that with `@lines` is the sound fix. Annotated 9 kernels (multicolor48, score6,
+  hscroll, bitmap48, two_line_vdel, zone_multiplex, tia_pcm, bullets, rpgmap): 5 now fully certify, 4 clear their
+  false-positive violation (other regions stay honestly UNBOUNDED). No prover-code change; existing cyclebound
+  self-tests stay green (no-false-negative preserved).
+
+### Notes
+- **Assessed and deliberately NOT built (measured 0/low payoff on real kernels):** display-off region
+  reclassification (the VSYNC→VBLANK transition has VBLANK provably-unknown — first frame can run with display on —
+  so skipping would be unsound; reverted), value-range loop bounding (the unbounded loops are nested / hardware-timer
+  waits / JSR-RTS subroutine timing, which a divide-by-15 bounder cannot fix), and infeasible-branch pruning (no
+  real kernel needs it). The remaining UNBOUNDED verdicts are the correct honest outcome; tightening them needs
+  subroutine-timing modeling — a larger future lever, kept deferred along with ②Z3/SMT and ④external silicon-TIA ROMs.
+- `.gitignore`: ignore stray `/cpucert`.
+
 ## [1.94.0] - 2026-06-18
 
 ### Added
