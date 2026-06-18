@@ -147,7 +147,7 @@ VB:     sta WSYNC
         ; --- スコア 8 行（6-store 振付・ストア完了 55/58/61/64cy） ---
         lda #7
         sta row
-Krow:   sta WSYNC
+Krow:   sta WSYNC          ; @lines 2 — last kernel line + sprite-clear cleanup span 2 visible lines; verified stable 262
         ldy row             ; 3
         lda (p0),y          ; 8
         sta GRP0            ; 11  B0→P0新

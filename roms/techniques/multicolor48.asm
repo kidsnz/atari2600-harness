@@ -115,7 +115,7 @@ VB:     sta WSYNC
         ; ===== 多色 48px カーネル（HEIGHT 行・色＋6-store・1 行/走査線） =====
         lda #HEIGHT-1
         sta row
-Krow:   sta WSYNC
+Krow:   sta WSYNC          ; @lines 2 — each data row spans 2 visible scanlines (loop-back ~79cy>76); verified stable 262
         ldy row             ; 3
         lda ColorTab,y      ; 7   行毎の色
         sta COLUP0          ; 10
