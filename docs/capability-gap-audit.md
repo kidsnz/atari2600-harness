@@ -162,12 +162,13 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   why this prover exists:** a *small* per-scanline overrun (one heavy line = 262→263 scanlines) is **visually
   invisible** — the TV's auto-sync absorbs a one-line slip, so `cb_roll` (over) and `cb_clean` (clean) look
   pixel-identical (verified 2026-06-17). Visual checking is unfit for this class of defect; only the numbers
-  differ — the unseen overrun is exactly VV-2's territory. **🔨 Still open (honest):** applying the prover to the
-  real technique kernels green ("緑化") is **unfinished** — the **2-line-kernel** family (budget 152, not 76:
-  multicolor48 / score6 / tia_pcm / exerciser) is not yet supported and stays red. Triaged as **no real bugs**
-  (all real kernels runtime-verified over 600 frames); the over-budget reports are a budget-model mismatch, not
-  a kernel defect. To be picked up later in normal Tier order (display-region limiting + per-line-count budget;
-  full green-ification = infeasible-path exclusion = VV-14). **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
+  differ — the unseen overrun is exactly VV-2's territory. **Green-ification (2-line kernels) ✅ mechanism done
+  (v1.89.0):** a `; @lines N` note on the source line that opens a WSYNC region sets that region's budget to
+  N*76, so a legitimate 2-line kernel (~152cy between WSYNCs: multicolor48 / score6 / tia_pcm / exerciser) is
+  certified instead of falsely flagged. Sound — it only scales a specific region's budget, never disables a
+  check; an un-annotated over-76 region still flags (litmus `cb_2line` vs `cb_2line_noann`,
+  `TestTwoLineBudgetAnnotation` both directions). Applying the annotations to the actual game ROMs is a
+  roms-repo follow-on. (Full infeasible-path green-ification stays **VV-14**.) **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
 - **VV-3 ✅ DONE (v1.83.0):** opt-in coverage recorder hooked into `emu.stepInstr()` at instruction completion
   (`LastResult.Address`/`Defn.IsBranch()`/`BranchSuccess`) → `internal/emu.Coverage` (pcSeen + per-branch
   taken/fall-through edges; `OneSidedBranches`, `Signature`); nil until `EnableCoverage` = zero cost. **`cmd/cover`**

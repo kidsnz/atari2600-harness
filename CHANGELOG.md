@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.89.0] - 2026-06-17
+
+### Added
+- **VV-2 green-ification: `@lines N` per-region budget for 2-line kernels.** A legitimate 2-line kernel does
+  ~2 scanlines of CPU work between WSYNCs (~152cy), which the fixed 1-line budget (76) wrongly flags. A
+  `; @lines N` note on the source line that opens a WSYNC region now sets that region's budget to N*76, greening
+  real 2-line kernels (multicolor48 / score6 / tia_pcm / exerciser) without weakening the proof — an
+  un-annotated over-76 region still flags. `srcmap` gained an exported `Line(pc)`; `cyclebound.Prove` reads
+  `@lines` from the region opener's source line (scanning the mapped line + the next, since DASM maps a labeled
+  WSYNC to its label line). Sound: the annotation only scales a specific region's budget, never disables a
+  check. Planted/clean litmus `cb_2line` (`@lines 2`, region 139cy → certified) vs `cb_2line_noann` (same
+  kernel, no note → 139>76 flagged); `TestTwoLineBudgetAnnotation` locks both directions. Applying the
+  annotations to the actual game ROMs is a roms-repo follow-on. **Src:** Li&Malik IPET DAC'95.
+
 ## [1.88.0] - 2026-06-17
 
 ### Added
