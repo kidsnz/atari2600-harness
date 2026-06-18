@@ -36,6 +36,28 @@ func invert(src *image.RGBA) *image.RGBA {
 	return dst
 }
 
+// TestNormalizeSizeRescales locks the scale-normalization that lets a 1× ROM frame
+// compare to a 2× screenshot: an image vs its clean 2× upscale, normalized to the
+// common (min) size, scores SSIM ~1.0 instead of erroring on a bounds mismatch.
+func TestNormalizeSizeRescales(t *testing.T) {
+	orig := patternImage(32, 24)
+	up := Resize(orig, 64, 48) // 2× nearest-neighbor, as a 2× screenshot would be
+	na, nb, sz := NormalizeSize(orig, up)
+	if sz.X != 32 || sz.Y != 24 {
+		t.Fatalf("common size = %v, want 32x24 (per-axis min)", sz)
+	}
+	ss, ok := SSIM(na, nb)
+	if !ok {
+		t.Fatal("SSIM should succeed after NormalizeSize")
+	}
+	if ss.Mean < 0.99 {
+		t.Errorf("an image vs its own 2× upscale should score ~1.0 after normalize, got %.4f", ss.Mean)
+	}
+	if _, _, s := NormalizeSize(orig, clone(orig)); s.X != 32 || s.Y != 24 {
+		t.Errorf("equal-size inputs must pass through unchanged, got %v", s)
+	}
+}
+
 // perturb flips the luma of the first k pixels to mid-grey.
 func perturb(src *image.RGBA, k int) *image.RGBA {
 	dst := clone(src)

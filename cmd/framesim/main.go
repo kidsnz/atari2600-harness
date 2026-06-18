@@ -83,21 +83,25 @@ func main() {
 		os.Exit(2)
 	}
 
-	ss, ok := framesim.SSIM(ia, ib)
+	// Normalize scale so a 1× ROM render and a 2× screenshot compare instead of
+	// erroring (the common size is the per-axis min — downscale only).
+	na, nb, sz := framesim.NormalizeSize(ia, ib)
+	ss, ok := framesim.SSIM(na, nb)
 	if !ok {
-		fmt.Fprintf(os.Stderr, "ERROR: frame size mismatch (%v vs %v)\n", ia.Bounds().Size(), ib.Bounds().Size())
+		fmt.Fprintf(os.Stderr, "ERROR: cannot compare frames (normalized to %dx%d)\n", sz.X, sz.Y)
 		os.Exit(2)
 	}
-	ham := framesim.HammingDistance(framesim.PHash(ia), framesim.PHash(ib))
+	ham := framesim.HammingDistance(framesim.PHash(na), framesim.PHash(nb))
 
 	out := struct {
 		A          string  `json:"a"`
 		B          string  `json:"b"`
+		Normalized string  `json:"normalized"`
 		SSIMMean   float64 `json:"ssim_mean"`
 		SSIMWorst  float64 `json:"ssim_worst"`
 		WorstBlock string  `json:"worst_block"`
 		PHashHam   int     `json:"phash_hamming"`
-	}{*a, *b, ss.Mean, ss.Worst, ss.WorstBlock.String(), ham}
+	}{*a, *b, fmt.Sprintf("%dx%d", sz.X, sz.Y), ss.Mean, ss.Worst, ss.WorstBlock.String(), ham}
 	j, _ := json.MarshalIndent(out, "", "  ")
 	fmt.Println(string(j))
 

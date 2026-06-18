@@ -72,6 +72,42 @@ func SSIM(a, b *image.RGBA) (SSIMResult, bool) {
 	return res, true
 }
 
+// Resize returns a nearest-neighbor rescale of src to w×h. TIA frames are blocky
+// (no anti-aliasing), so nearest-neighbor preserves hard edges without inventing
+// interpolated colors that would skew SSIM.
+func Resize(src *image.RGBA, w, h int) *image.RGBA {
+	sb := src.Bounds()
+	sw, sh := sb.Dx(), sb.Dy()
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	if sw == 0 || sh == 0 || w == 0 || h == 0 {
+		return dst
+	}
+	for y := 0; y < h; y++ {
+		sy := sb.Min.Y + y*sh/h
+		for x := 0; x < w; x++ {
+			dst.SetRGBA(x, y, src.RGBAAt(sb.Min.X+x*sw/w, sy))
+		}
+	}
+	return dst
+}
+
+// NormalizeSize rescales a and b to a common size so frames captured at different
+// SCALES — e.g. a 1× ROM render (160×N) vs a 2× Stella screenshot (320×M) — can be
+// compared instead of erroring on a bounds mismatch. The common size is the
+// per-axis minimum (downscale only — never invent detail). It returns the rescaled
+// pair and the common size. NOTE: this normalizes scale, NOT vertical framing — for
+// a meaningful score both frames should cover the same visible region (differing
+// VBLANK/overscan margins shift content; aligning that is a separate concern).
+func NormalizeSize(a, b *image.RGBA) (*image.RGBA, *image.RGBA, image.Point) {
+	wa, ha := a.Bounds().Dx(), a.Bounds().Dy()
+	wb, hb := b.Bounds().Dx(), b.Bounds().Dy()
+	if wa == wb && ha == hb {
+		return a, b, image.Pt(wa, ha)
+	}
+	w, h := min(wa, wb), min(ha, hb)
+	return Resize(a, w, h), Resize(b, w, h), image.Pt(w, h)
+}
+
 func blockSSIM(a, b *image.RGBA, ax, ay, bx, by int) float64 {
 	var sa, sb, saa, sbb, sab float64
 	const nn = ssimBlock * ssimBlock

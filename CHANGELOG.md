@@ -8,6 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`framesim` scale-normalized comparison (`framesim.Resize` + `NormalizeSize`).** `framesim -a rom.bin -b
+  screenshot.png` previously errored on a bounds mismatch (a 1× ROM render, 160×N, vs a 2× Stella screenshot,
+  320×M), so a ROM could not be compared to a target screenshot. Both inputs are now downscaled (nearest-neighbor,
+  per-axis min) to a common raster before SSIM/pHash, and the CLI reports the `normalized` size. Found and fixed
+  during the PONG dogfooding campaign (it blocked the Phase-1 "framesim matches the target screenshot" metric).
+  `TestNormalizeSizeRescales` locks it (an image vs its own 2× upscale scores ~1.0). Known limitation: normalizes
+  scale, not vertical framing (differing VBLANK/overscan margins still shift content — alignment is future work).
+
 ### Fixed
 - **CI: run `go test -p 1 ./...` (serial package tests).** Several packages assemble/read the SAME shared ROM
   `.bin` fixtures (`roms/litmus`, `roms/techniques`) during their tests; under `go test ./...` (parallel test

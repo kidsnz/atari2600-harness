@@ -380,6 +380,19 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
   → `scripts/mcp_smoke.py` extended to call all three → one reconnect. The linter (AT-1) stays CLI/CI-only (no
   MCP needed — proactive source check). **Authoring-tools sprint complete (AT-1..AT-5).**
 
+## PONG dogfooding campaign — tool findings (live, 2026-06-18+)
+Building a real PONG (`sandbox/practice/pong/`, structure = `apong_2.png`) while exercising + critically
+evaluating EVERY tool (log: `sandbox/practice/pong/TOOL-EVAL.md`). Findings that became backlog/improvements:
+- **framesim — scale-normalized screenshot compare: ✅ DONE.** `framesim -a rom.bin -b screenshot.png` errored on
+  a bounds mismatch (1× ROM 160×N vs 2× shot 320×M); added `Resize`+`NormalizeSize` (downscale both to the
+  per-axis min) so a ROM compares to a target screenshot. **Open:** normalize *vertical framing* too (VBLANK/
+  overscan margins shift content; SSIM is discounted when the two don't cover the same visible region).
+- **ingest/analyze_image — single-frame structure recognition on a PONG-class layout (open).** On `apong_2.png`
+  it split the dashed net into ~24 separate "ball" sprites, classified the two symmetric scores inconsistently
+  (one player, one PF), missed the full-width walls, and quantized white to $0A. Improvements: repeated-pattern
+  (net) summarisation, symmetric/same-kind recognition, thin full-width wall detection, PF↔foreground split,
+  B&W quantization. (The richer path is `fieldtest` multi-frame + `dissect` on the real ROM — to be evaluated.)
+
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
 surface (testing-playbook methods, `stellacheck`, litmus V2-1…18, golden/regress/refdiff, G1–G14) — see each
