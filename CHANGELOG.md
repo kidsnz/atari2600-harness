@@ -8,6 +8,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.97.0] - 2026-06-18
+
+### Added
+- **Value-range absint enhancements for the cycle-budget prover (VV-2 "array-range" arc).** Three sound,
+  composable building blocks, each litmus-locked both directions:
+  - **3A — AND/ORA #imm range.** `and #m` ⇒ [0,min(A.Hi,m)], `ora #m` ⇒ [max(A.Lo,m),255] (EOR stays Top); and
+    `determineBound` now reads a divide loop's entry value from the fall-through predecessor's post-state (the loop
+    header is polluted to Top by the final wrapping subtraction on the back-edge). Litmus `cb_andloop.asm`.
+  - **3B — zero-page RAM array-element range.** `State.ZPVal` = join of all values stored to RAM ($80–$FF), seeded
+    to the recognised clear value; an indexed RAM load (`lda arr,x`) returns it (sound over-approx of any element;
+    $00–$7F TIA/RIOT excluded). Litmus `cb_arrloop.asm`.
+  - **3D — ROM data-table value range.** An indexed load from a ROM address returns the table's actual byte range
+    over the proven index range (constant data, read from the binary). Litmus `cb_romtable.asm`.
+
+### Notes
+- **Honest measured outcome: +0 real kernels (still 14/31 certified, 0 false-positive violations).** All three are
+  sound and certify their clean litmus, but real kernels need a *cascade* of further precision: their loop counters
+  and array indices are **loop-carried**, so the abstract interpreter over-approximates them to Top at the loop
+  header (the dec/sbc wraps on the exit edge). Recovering the in-loop counter range (narrowing it on the loop
+  branch) — and tight table extents — is the recurring root limitation; it is an open-ended precision tail with
+  diminishing per-kernel payoff (a kernel only flips once its *entire* chain is closed). The building blocks are in
+  for when that root fix is tackled. ②Z3 / ④external-ROMs remain inapplicable to what's left.
+
 ## [1.96.0] - 2026-06-18
 
 ### Added

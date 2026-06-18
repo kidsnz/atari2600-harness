@@ -177,6 +177,16 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   itself (sfx_demo, via the 2C `@lines` once 2A exposed its region) — the rest are blocked by a combination of
   honest scope limits (no-WSYNC, multi-call-site RTS context, nested loops, WSYNC-in-loop, divide loops whose
   counter lives in untracked indexed RAM). Those stay UNBOUNDED (correct), not false positives.
+- **VV-2 value-range arc (v1.97.0, "諦め悪い" array-range push):** three more sound, composable absint capabilities,
+  each litmus-locked — **3A** AND/ORA #imm range + reading a divide loop's entry value from the fall-through
+  predecessor (header is back-edge-polluted); **3B** zero-page **RAM** array-element range (`State.ZPVal`, $80–$FF
+  only — TIA/RIOT regs at $00–$7F excluded); **3D** **ROM data-table** value range (constant bytes read from the
+  binary over the proven index). Litmus `cb_andloop`/`cb_arrloop`/`cb_romtable`. **Measured: +0 real kernels.** The
+  recurring root limitation is now precise: real kernels' counters/indices are **loop-carried**, so they are
+  over-approximated to Top at the loop header (the dec/sbc wraps on the exit edge); recovering the in-loop counter
+  range (narrowing it on the loop branch) + tight table extents is an open-ended precision tail with diminishing
+  per-kernel payoff. The building blocks are in for when the root fix is tackled. **Src:** Cousot&Cousot (interval
+  domain); array-smashing (Blanchet et al.).
 - **VV-3 ✅ DONE (v1.83.0):** opt-in coverage recorder hooked into `emu.stepInstr()` at instruction completion
   (`LastResult.Address`/`Defn.IsBranch()`/`BranchSuccess`) → `internal/emu.Coverage` (pcSeen + per-branch
   taken/fall-through edges; `OneSidedBranches`, `Signature`); nil until `EnableCoverage` = zero cost. **`cmd/cover`**
