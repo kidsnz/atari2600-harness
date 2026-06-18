@@ -25,9 +25,19 @@
 /scenario
 /stellacheck
 /ingest
+/cpucheck
+/oraclevote
 
 # external dependency: Gopher2600 upstream clone (obtain per README)
 /Gopher2600/
+
+# external dependency: perfect6502 upstream clone (VV-7 silicon CPU oracle;
+# fetched + built by scripts/install_perfect6502.sh, never vendored)
+/third_party/perfect6502/
+
+# MAME scratch (cfg/nvram) left by manual a2600 runs (the oracle uses a temp dir)
+/cfg/
+/snap/
 
 # annotated screenshot output (user<->Claude comms channel; overwritten each call)
 /preview/
