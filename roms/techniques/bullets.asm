@@ -158,7 +158,7 @@ VBwait: lda INTIM
 
         ; ===== 可視 184 行（X=行カウンタ・番兵方式で全行 ~62cy） =====
         ldx #0
-KLine:  sta WSYNC
+KLine:  sta WSYNC          ; @lines 2 — 2-line sprite kernel (data row spans 2 visible scanlines); verified stable 262
         txa                 ; 敵（行 30-37）
         sec
         sbc #ENEMYROW
