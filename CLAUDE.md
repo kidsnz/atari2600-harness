@@ -165,12 +165,13 @@ round trip. Also return `png_path` in JSON.
 split into a **separate repo**. Dependency is **one-way game → harness** (the harness has zero dependence on
 any game; even its tests reference only its own `roms/litmus`).
 - Module = `github.com/kidsnz/atari2600-harness`. Gopher2600 via `go.mod` `replace => ./Gopher2600`.
-- Physical layout (under the umbrella folder `260609_atari2600-dev/`, two sibling repos bound by `go.work`):
+- Physical layout (under the umbrella folder `260609_atari2600-dev/`, three sibling repos bound by `go.work`):
   ```
   260609_atari2600-dev/        ← umbrella (the folder Claude Code opens; .mcp.json/.claude live here)
-  ├── go.work                   ← binds harness + roms locally
-  ├── harness/                  ← this repo (atari2600-harness)
-  └── roms/                     ← separate repo (atari2600-roms); frogger etc. live here
+  ├── go.work                   ← binds harness + roms + sandbox locally
+  ├── harness/                  ← this repo (atari2600-harness) = verification engine
+  ├── roms/                     ← separate repo (atari2600-roms) = deliverables only (frogger; future pong/pizza-boy)
+  └── sandbox/                  ← local-only repo = practice / experiments / studies (skill-building; not pushed)
   ```
 - Base contents: `cmd/harness` (MCP server) / `cmd/probe` (plumbing) / `cmd/scenario` (regression runner CLI) /
   `cmd/calibrate` (horizontal X(N) sweep-fit) /
@@ -194,10 +195,14 @@ any game; even its tests reference only its own `roms/litmus`).
   `internal/calibrate` (position calibration = poke sweep + linear regression) /
   **`pkg/playfield`** (public encoder `EncodeSymmetric` etc. = universal Atari 2600 knowledge; the roms-side `gen` imports it).
 - Verification ROMs: `roms/litmus/` (litmus_* / smoke / golden) = **the base's own property**, kept in this repo.
-- Game artifacts (separate repo `atari2600-roms`): `<game>/` (`*.asm`/`*.bin`) + `<game>/gen/` (scene
+- Game deliverables (separate repo `atari2600-roms`): `<game>/` (`*.asm`/`*.bin`) + `<game>/gen/` (scene
   definitions + kernel generation, importing `atari2600-harness/pkg/playfield`) + `<game>/scenarios/*.json`.
-  Example: `frogger/` (Monet Frogger).
-- Add new games under the roms repo as `<name>/` (+`gen/`). Promote kernels you want to generalize to `pkg/`
+  Example: `frogger/` (Monet Frogger). **roms = deliverables only.**
+- Skill-building (local-only repo `sandbox/`, not pushed): `practice/` (practice ROMs), `experiments/`
+  (throwaway spikes: frogger-spikes/, monet-frogger/), `studies/` (commercial-game reconstructions), plus
+  `ROADMAP.md`/`EVALUATION.md`. Same `go.work`/`replace` wiring as roms; run scenarios from `sandbox/`
+  (rom paths like `practice/<game>/...`).
+- Add new games (deliverables) under the roms repo as `<name>/` (+`gen/`). Promote kernels you want to generalize to `pkg/`
   (like the encoder; YAGNI).
 
 ## Development environment (macOS / Apple Silicon)
