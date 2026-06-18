@@ -49,3 +49,4 @@
 /roms/**/*.lst
 /roms/**/*.sym
 /stellacheck
+/statecov
