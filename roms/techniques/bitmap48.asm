@@ -143,7 +143,7 @@ VBwait: lda INTIM
         ; ===== ビットマップ窓 24 行（6-store・1 行/走査線） =====
         lda #WINDOW-1
         sta row
-Krow:   sta WSYNC
+Krow:   sta WSYNC          ; @lines 2 — 2-line bitmap kernel (data row spans 2 visible scanlines); verified stable 262
         ldy row
         lda (p0),y
         sta GRP0

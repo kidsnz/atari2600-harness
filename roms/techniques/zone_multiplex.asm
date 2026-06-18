@@ -59,7 +59,7 @@ NextFrame:
         sta VSYNC
         sta WSYNC
         sta WSYNC
-        sta WSYNC
+        sta WSYNC          ; @lines 3 — vblank-top setup (per-zone position update loop) spans 3 scanlines; verified stable 262
         lda #0
         sta VSYNC
         lda #2

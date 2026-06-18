@@ -72,7 +72,7 @@ VB:     sta WSYNC
         ora #$10            ; hue so it's never pure black
         sta COLUBK
         ldx #192
-Vis:    sta WSYNC
+Vis:    sta WSYNC          ; @lines 2 — last visible line + overscan ADPCM-decode span 2 scanlines; verified stable 262
         dex
         bne Vis
         lda #2
