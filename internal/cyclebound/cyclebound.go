@@ -31,7 +31,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
 	"github.com/kidsnz/atari2600-harness/internal/build"
@@ -524,6 +527,34 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		return nil, fmt.Errorf("assemble %s failed:\n%s", asmPath, out)
 	}
 	sm := srcmap.Parse(lst, sym, asmPath)
+
+	// `; @lines N` on the source line that OPENS a WSYNC region declares it spans
+	// N scanlines (a 2-line kernel does ~2 lines of CPU work between WSYNCs), so
+	// that region's budget is N*budget. Default 1. Greens legitimate 2-line kernels
+	// without weakening the proof (an un-annotated over-76 region still flags).
+	src, _ := os.ReadFile(asmPath)
+	srcLines := strings.Split(string(src), "\n")
+	atLinesRe := regexp.MustCompile(`@lines\s+(\d+)`)
+	regionLines := func(sa uint16) int {
+		ln, ok := sm.Line(sa)
+		if !ok {
+			return 1
+		}
+		// Scan the mapped line and the next: DASM maps a labeled WSYNC to its LABEL
+		// line, so `@lines N` written on the `sta WSYNC` line sits one line below.
+		for i := ln - 1; i <= ln && i < len(srcLines); i++ {
+			if i < 0 {
+				continue
+			}
+			if g := atLinesRe.FindStringSubmatch(srcLines[i]); g != nil {
+				if n, e := strconv.Atoi(g[1]); e == nil && n >= 1 {
+					return n
+				}
+			}
+		}
+		return 1
+	}
+
 	rom, err := os.ReadFile(bin)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", bin, err)
@@ -557,7 +588,7 @@ func Prove(asmPath string, budget int) (*Report, error) {
 
 	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget}
 	for _, sa := range starts {
-		reg := analyzeRegion(instrs, instrs[sa], budget, sm, states)
+		reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa), sm, states)
 		rep.Regions++
 		if reg.Kind == "blank" {
 			rep.Blank++ // beam in VSYNC/VBLANK: not a visible-line budget risk

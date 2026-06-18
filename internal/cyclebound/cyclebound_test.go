@@ -161,3 +161,27 @@ func TestProveNoWSYNCNotCertified(t *testing.T) {
 		t.Fatal("a 0-region ROM must NOT certify (no WSYNC reached = out of scope, not proven safe)")
 	}
 }
+
+// TestTwoLineBudgetAnnotation: a legitimate 2-line kernel region is certified when
+// its opening WSYNC is annotated `; @lines 2` (budget 2*76=152), and the same
+// region WITHOUT the note is flagged — proving the annotation is load-bearing, not
+// a blanket budget relaxation (VV-2 green-ification of 2-line kernels).
+func TestTwoLineBudgetAnnotation(t *testing.T) {
+	ann := mustProve(t, "../../roms/litmus/cb_2line.asm", 0)
+	if !ann.Certified {
+		t.Fatalf("cb_2line (@lines 2) must certify; violations=%+v", ann.Violations)
+	}
+	// the 2-line region is genuinely over the 1-line budget, so certification can
+	// only come from the scaled @lines budget (the un-annotated twin proves it).
+	if ann.MaxWorst <= 76 {
+		t.Fatalf("the 2-line region should be >76 (got %d) — the annotation isn't being exercised", ann.MaxWorst)
+	}
+
+	noann := mustProve(t, "../../roms/litmus/cb_2line_noann.asm", 0)
+	if noann.Certified {
+		t.Fatalf("cb_2line_noann (no @lines) must NOT certify (region 139>76)")
+	}
+	if len(noann.Violations) == 0 || noann.Violations[0].Worst <= 76 {
+		t.Fatalf("expected an over-76 violation in the un-annotated twin, got %+v", noann.Violations)
+	}
+}

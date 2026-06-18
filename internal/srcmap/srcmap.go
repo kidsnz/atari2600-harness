@@ -69,6 +69,15 @@ func Parse(lst, sym, asmPath string) *Map {
 	return m
 }
 
+// Line は PC に対応するソース行番号（1 起点）を返す。対応が無ければ ok=false。
+func (m *Map) Line(pc uint16) (int, bool) {
+	if m == nil {
+		return 0, false
+	}
+	ln, ok := m.lines[pc]
+	return ln, ok
+}
+
 // Locate は PC を「Label+off (file:line)」へ。対応が無ければ空文字。
 // ROM ミラー（$F000 域以外の PC）は下位 13bit を $E000|… に正規化せず素朴に直照合のみ。
 func (m *Map) Locate(pc uint16) string {

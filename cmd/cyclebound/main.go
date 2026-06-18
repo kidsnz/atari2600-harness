@@ -44,7 +44,7 @@ func main() {
 
 	// Human summary on stderr (stdout stays clean JSON for piping).
 	if rep.Certified {
-		fmt.Fprintf(os.Stderr, "CERTIFIED: %d regions, worst %d cy <= budget %d\n", rep.Regions, rep.MaxWorst, rep.Budget)
+		fmt.Fprintf(os.Stderr, "CERTIFIED: %d regions within budget (base %d cy/line; worst region %d cy, scaled per @lines)\n", rep.Regions, rep.Budget, rep.MaxWorst)
 		return
 	}
 	fmt.Fprintf(os.Stderr, "NOT CERTIFIED: %d violation(s), %d unbounded region(s) (budget %d)\n",
