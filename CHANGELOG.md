@@ -8,6 +8,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.93.0] - 2026-06-18
+
+### Added
+- **Tolerant frame compare: SSIM + perceptual hash (VV-12).** New `internal/framesim` + `cmd/framesim`. The exact
+  `golden_frame` scenario check answers a boolean "identical?"; framesim answers "how wrong, and where". Windowed
+  **SSIM** over 8×8 luma blocks gives a magnitude (mean, 1.0 = identical) plus locality (the worst-matching block);
+  a **DCT perceptual hash** gives a shift-tolerant Hamming distance. This complements — does not replace — the
+  exact golden: a 1-pixel jitter that flips the exact rendering hash still scores SSIM ~1.0, while a genuinely
+  corrupted frame scores far lower (multicolor48 vs smoke ≈ 0.08). `cmd/framesim` compares two frames (each a
+  rendered `.bin` or a `.png`), prints a JSON report (ssim mean/worst, worst block, pHash distance), and exits 1
+  when SSIM falls below `-min` (a tolerant regression gate).
+
+### Notes
+- Self-test both directions: identical ⇒ SSIM 1.0 / pHash 0; a 1-pixel change stays >0.99 (tolerant) but < 1;
+  inverted < 0.5; SSIM monotonic in damage; the worst block localises injected damage; real cross-ROM frames score
+  measurably below self. Pure Go, no reconnect. `.gitignore`: ignore stray `/framesim`.
+
 ## [1.92.0] - 2026-06-18
 
 ### Added

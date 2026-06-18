@@ -177,6 +177,7 @@ any game; even its tests reference only its own `roms/litmus`).
   `cmd/cover` (VV-3 PC/branch coverage + one-sided branches) / `cmd/guidedfuzz` (VV-3 coverage-guided AFL-style fuzz) /
   `cmd/statecov` (VV-11 TIA state-coverage matrix: which NUSIZ/size/VDEL/PF-mode/bank the test exercised; `internal/statecov`) /
   `cmd/mutate` (mutation testing → kill rate; `-covered` = VV-11 honest kill rate over executed code only) /
+  `cmd/framesim` (VV-12 tolerant frame compare: SSIM + perceptual-hash distance, "how wrong & where"; `internal/framesim`) /
   `cmd/trajdiff` (VV-8 behavioral trajectory diff vs a reference ROM) /
   `cmd/oraclevote` (VV-6 N-oracle majority RAM vote: Gopher2600 + MAME headless; `internal/oracle`) /
   `cmd/cpucheck` (VV-7 silicon CPU differential: Gopher2600 CPU vs perfect6502 netlist per-instruction; `internal/cpudiff`; needs `bin/p6502step` via `scripts/install_perfect6502.sh`) /

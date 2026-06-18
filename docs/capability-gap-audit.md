@@ -129,7 +129,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-9** ✅v1.87.0 | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
 | **VV-10** ✅v1.88.0 (T-1/T-2/T-3) | **HW-divergence trap detectors** (timer-wrap=G8 ✅, HMOVE-latch ✅, uninit-RAM-read ✅) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
 | **VV-11** ✅v1.92.0 | **State-coverage matrix** (NUSIZ/size/VDEL/PF-mode/bank; `internal/statecov`+`cmd/statecov`) + **coverage-filtered mutation** (`mutate.EvalRandomCovered`, `cmd/mutate -covered`) | did tests exercise every TIA mode; **honest** mutation kill-rate (closes the playbook's 5–20% thread — smoke: 2%→68%) | D-3/D-4 | S–M | 3 |
-| **VV-12** | **SSIM / pHash tolerant frame compare** | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
+| **VV-12** ✅v1.93.0 | **SSIM / pHash tolerant frame compare** (`internal/framesim`+`cmd/framesim`) | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
 | **VV-13** | **Audio spectral (FFT) + RMS-envelope diff** | frequency-domain timbre check (out-resolves `golden_audio` on V2-14 inverted twins) | E-4 | S–M | 3 |
 | **VV-14** | `cmd/cpucert` owned certificate · **ILP/SMT (Z3)** prover upgrade · external TIA/Sim2600 ROMs | citable cert; infeasible-path tightening + value-range proofs; silicon-TIA tie-breaker | B-C2/C-2/B-C3 | M–L | 3 (defer) |
 
@@ -271,7 +271,15 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   removes dead-code dilution that deflates the naive number — on smoke.bin the same suite scores **2% naive vs
   68% covered**, discharging the playbook's flagged 5–20% thread. Self-tests both directions (matrix must
   distinguish rich/poor ROMs; covered kill-rate must exceed naive and be non-vacuous + deterministic). Pure Go,
-  no reconnect. **Src:** DeMillo/Offutt (mutation); coverage-guided testing. **VV-12** SSIM/pHash tolerant lane (adds magnitude+locality; does **not** replace exact golden). **VV-13** audio FFT/RMS-envelope (new modality; audio rarer on the roadmap). **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.
+  no reconnect. **Src:** DeMillo/Offutt (mutation); coverage-guided testing.
+- **VV-12 ✅ DONE (v1.93.0):** `internal/framesim`+`cmd/framesim` — the **tolerant** lane beside exact
+  `golden_frame`. Windowed **SSIM** over 8×8 luma blocks gives magnitude (mean) + locality (worst block); a DCT
+  **perceptual hash** gives a shift-tolerant distance. A 1-pixel jitter that flips the exact rendering hash still
+  scores SSIM ~1.0; a corrupted frame scores far lower (mc48 vs smoke = 0.08). `cmd/framesim` compares two frames
+  (each a rendered `.bin` or a `.png`), JSON report, exit 1 below `-min`. It **adds** magnitude+locality; it does
+  **not** replace the boolean exact golden. Self-test both directions (identity=1.0/0; tolerant to 1px; monotonic
+  in damage; worst block localises; real cross-ROM measurably lower). Pure Go. **Src:** Wang et al. SSIM 2004; pHash.
+  **VV-13** audio FFT/RMS-envelope (new modality; audio rarer on the roadmap). **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
