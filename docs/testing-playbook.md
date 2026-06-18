@@ -80,6 +80,14 @@ the scenario. This is the playbook's whole point: a numeric, claim-level check f
 as fine. Then `mutate` showed the fuzz scenario alone is a weak oracle (5% byte-flip kill rate); adding a
 `golden_frame` scenario raised it to 20%.
 
+**Honest kill rate (VV-11).** Those naive percentages are deflated by dead-code dilution: a 4K ROM is mostly
+unexecuted padding, so most random byte-flips land where no scenario could ever catch them and survive by
+construction. `cmd/mutate -covered` (and `mutate.EvalRandomCovered`) restricts fault injection to offsets a
+baseline run actually executes (PC coverage), measuring the suite against *live* code only. On `smoke.bin` the
+same suite scores **2% naive vs 68% covered** — the suite was never that weak; the low number was the metric
+lying. Pair it with `cmd/statecov` (the TIA state-coverage matrix) to see whether the test even exercised the
+modes worth mutating.
+
 ## Status / automation — all delivered (G10–G14)
 - Scenario `invariants` / `monotonic` / range, `fuzz`, `metrics` → `internal/scenario`, run by `cmd/scenario`
   and the `run_scenario` MCP tool. (`docs/scenarios.md`.)

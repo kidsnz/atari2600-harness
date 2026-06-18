@@ -8,6 +8,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.92.0] - 2026-06-18
+
+### Added
+- **State-coverage matrix (VV-11, part 1).** New `internal/statecov` + `cmd/statecov`: a coverage axis orthogonal
+  to PC/branch coverage (VV-3). Instead of "which instructions ran", it answers "which TIA *modes* did the test
+  exercise" — NUSIZ copies, missile/ball size, VDELP0/P1/BL, playfield reflect/score/priority, and bank switches —
+  by sampling `emu.ReadTIARegisters` + `Bank` once per scanline over a multi-frame run. An axis stuck at its reset
+  value is a verification blind spot. `cmd/statecov` reports distinct values + a coverage fraction per axis (JSON).
+- **Coverage-filtered mutation = honest kill rate (VV-11, part 2).** `mutate.EvalRandomCovered` (and
+  `cmd/mutate -covered -frames N`) restricts fault injection to ROM offsets that a baseline run actually executes
+  (PC coverage via `emu.SeenPCs`). Naive mutation dilutes the kill rate with mutations in never-executed code that
+  can never be killed; the covered variant measures the suite against live code only. On `smoke.bin` (mostly
+  unexecuted 4K padding) the same suite scores **2% naive vs 68% covered** — closing the testing-playbook's
+  misleading 5–20% kill-rate thread.
+
+### Notes
+- Self-tests both directions: the matrix must distinguish a mode-exercising ROM (multicolor48) from one that never
+  moves that mode (smoke), and a bank-switching ROM from a flat one; the covered kill rate must exceed the naive
+  rate and be non-vacuous + deterministic. Pure Go, no reconnect.
+- `.gitignore`: ignore the remaining stray repo-root cmd binaries (`/statecov`, `/mutate`, `/cover`,
+  `/guidedfuzz`, `/trajdiff`).
+
 ## [1.91.0] - 2026-06-17
 
 ### Added

@@ -128,7 +128,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-8** ✅v1.84.0 | **Behavioral trajectory diff vs original ROM** (`cmd/trajdiff`) | full **time-extended** state-trajectory diff (refdiff is a static snapshot) | F-2 | M | 2 |
 | **VV-9** ✅v1.87.0 | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
 | **VV-10** ✅v1.88.0 (T-1/T-2/T-3) | **HW-divergence trap detectors** (timer-wrap=G8 ✅, HMOVE-latch ✅, uninit-RAM-read ✅) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
-| **VV-11** | **State-coverage matrix** (zone/VDEL-parity/NUSIZ/bank) + **coverage-aware mutation** | did tests exercise every TIA mode; honest mutation kill-rate (closes the playbook's 5–20% thread) | D-3/D-4 | S–M | 3 |
+| **VV-11** ✅v1.92.0 | **State-coverage matrix** (NUSIZ/size/VDEL/PF-mode/bank; `internal/statecov`+`cmd/statecov`) + **coverage-filtered mutation** (`mutate.EvalRandomCovered`, `cmd/mutate -covered`) | did tests exercise every TIA mode; **honest** mutation kill-rate (closes the playbook's 5–20% thread — smoke: 2%→68%) | D-3/D-4 | S–M | 3 |
 | **VV-12** | **SSIM / pHash tolerant frame compare** | magnitude+locality "how wrong, and where" (exact golden is boolean) | E-3 | S–M | 3 |
 | **VV-13** | **Audio spectral (FFT) + RMS-envelope diff** | frequency-domain timbre check (out-resolves `golden_audio` on V2-14 inverted twins) | E-4 | S–M | 3 |
 | **VV-14** | `cmd/cpucert` owned certificate · **ILP/SMT (Z3)** prover upgrade · external TIA/Sim2600 ROMs | citable cert; infeasible-path tightening + value-range proofs; silicon-TIA tie-breaker | B-C2/C-2/B-C3 | M–L | 3 (defer) |
@@ -262,7 +262,16 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   known-traps.md §A/§D; AtariAge 303277; Valgrind Memcheck (shadow memory).
 
 ## Tier 3 — polish / softer / defer
-- **VV-11** state-coverage matrix + coverage-filtered mutation (honest kill-rate; discharges the playbook's flagged 5–20%). **VV-12** SSIM/pHash tolerant lane (adds magnitude+locality; does **not** replace exact golden). **VV-13** audio FFT/RMS-envelope (new modality; audio rarer on the roadmap). **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.
+- **VV-11 ✅ DONE (v1.92.0):** `internal/statecov`+`cmd/statecov` build a **state-coverage matrix** — a coverage
+  axis orthogonal to PC/branch (VV-3): which TIA *modes* the test actually drove (NUSIZ copies, missile/ball size,
+  VDELP0/P1/BL, PF reflect/score/priority, bank), sampled per scanline over a multi-frame run. An axis stuck at
+  its reset value = a verification blind spot (e.g. smoke moves nothing; multicolor48 drives triple-copy NUSIZ;
+  banked_game shows 2 banks; pf_modes shows score/priority). `mutate.EvalRandomCovered` (`cmd/mutate -covered`)
+  adds **coverage-filtered mutation** = an **honest kill rate**: restricting fault injection to executed offsets
+  removes dead-code dilution that deflates the naive number — on smoke.bin the same suite scores **2% naive vs
+  68% covered**, discharging the playbook's flagged 5–20% thread. Self-tests both directions (matrix must
+  distinguish rich/poor ROMs; covered kill-rate must exceed naive and be non-vacuous + deterministic). Pure Go,
+  no reconnect. **Src:** DeMillo/Offutt (mutation); coverage-guided testing. **VV-12** SSIM/pHash tolerant lane (adds magnitude+locality; does **not** replace exact golden). **VV-13** audio FFT/RMS-envelope (new modality; audio rarer on the roadmap). **VV-14** `cmd/cpucert` citable certificate, the Z3/ILP prover upgrade (infeasible-path + value-range invariants — defer until C-1 proves out or a kernel demands it), and external TIA/Sim2600 silicon tie-breaker ROMs (ROM-licensing sensitive). C-3 ESIL/radare2 symbolic exec was **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it isn't re-litigated.
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
