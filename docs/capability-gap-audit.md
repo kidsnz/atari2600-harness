@@ -327,6 +327,21 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   **assessed and declined** (foreign Python+r2 runtime vs pure-Go; unvetted 6502 timing model) — on record so it
   isn't re-litigated. **Src:** Li&Malik IPET DAC'95; Ballabriga&Cassé WCET'08.
 
+## Authoring aids (proactive, non-VV) — sprint 2026-06-18
+A user-initiated complement to the VV-* verification backlog: where VV-* *observe/measure/judge a run*, these
+*read intent before the run* and *interpret timing causality*. Four planned (AT-1 static timing linter, AT-2
+write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 forward sprite-position solver).
+**Quality bar: zero false positives on the known-good technique corpus** (same discipline as VV-2 green-ification).
+- **AT-1 ✅ DONE (v1.98.0): static TIA-timing linter** (`cmd/timinglint` + `cyclebound.Lint`). Reuses the
+  cyclebound decoder/`Instr`/srcmap and the absint value-range engine. Three high-confidence rules — `hmove-without-hmxx`,
+  `hmxx-without-hmove` (value-aware: only provably non-zero staged motion warns; a `lda #0; sta HMPx` clear or an
+  unknown value stays silent), `hmove-hazard` (HMxx/HMCLR write starts <24cy after HMOVE on a straight-line path;
+  the `sta HMOVE; ds 12; sta HMCLR` idiom at exactly 24cy is safe). **Measured: 0 false positives on all 31
+  technique kernels** (first sweep's 6 hits were two detector gaps — missed indexed `sta HMP0,x` stores, and a
+  benign zero-clear — both fixed; a latent hazard false-negative in the cycle accounting also fixed). Litmus
+  `lint_r1/_r2/_r3` + `lint_clean`; `TestLint*` lock both directions + the corpus guard. Pure Go, CLI only (no
+  MCP/reconnect). **AT-2/3/4 + a single batched MCP exposure remain.**
+
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
 surface (testing-playbook methods, `stellacheck`, litmus V2-1…18, golden/regress/refdiff, G1–G14) — see each

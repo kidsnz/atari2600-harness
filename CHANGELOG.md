@@ -8,6 +8,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.98.0] - 2026-06-18
+
+### Added
+- **`cmd/timinglint` + `cyclebound.Lint` — static TIA-timing linter (authoring aid, T1 of the authoring-tools
+  sprint).** Reads a kernel and warns *before* you run it about high-confidence horizontal-motion timing
+  pitfalls, complementing the runtime checks (`assert_line_budget`, VV-10 HMOVE hazard) by being proactive.
+  Three rules, each validated both directions:
+  - **`hmove-without-hmxx`** — HMOVE is strobed but no HMP0/HMP1/HMM0/HMM1/HMBL is ever written (the fine
+    motion is always 0).
+  - **`hmxx-without-hmove`** — a **provably non-zero** motion is staged but HMOVE is never strobed (the motion
+    is never applied). Value-aware via the prover's abstract interpreter: a defensive `lda #0; sta HMPx` clear
+    (proven 0) or any unknown/computed value never warns — only motion proven non-zero does.
+  - **`hmove-hazard`** — an HMxx/HMCLR write starts <24 CPU cycles after an HMOVE on a straight-line path
+    (motion undefined, Stella PG). The standard `sta HMOVE; ds 12,$EA; sta HMCLR` idiom (HMCLR at exactly 24cy)
+    is correctly treated as safe.
+- **Litmus fixtures + self-tests:** `roms/litmus/lint_r1_hmove_nohmxx.asm` / `lint_r2_hmxx_nohmove.asm` /
+  `lint_r3_hazard.asm` (each fires exactly its rule) and `lint_clean.asm` (the canonical correct idiom, silent).
+  `TestLintTrapsFire` / `TestLintCleanSilent` lock both directions; `TestLintNoFalsePositivesOnTechniques`
+  is the corpus guard.
+
+### Notes
+- **Quality bar met (measured): zero false positives on all 31 known-good technique kernels.** The first sweep
+  surfaced 6 apparent warnings, all run down to two detector gaps and fixed (the rules themselves held):
+  `storeTIA` missed **indexed** HMxx stores (`sta HMP0,x` / `sta HMM0,y` — how shared positioning code stages
+  several objects), and `hmxx-without-hmove` wrongly flagged a benign zero-clear (now value-aware). Also fixed a
+  latent false-negative in the hazard cycle-accounting (the gap is now measured to the *start* of the HMxx write,
+  so a 22-cycle `ds 11` gap is correctly flagged while the 24-cycle idiom is not). Pure Go, CGO-free; CLI only
+  (no MCP tool — no reconnect).
+
 ## [1.97.0] - 2026-06-18
 
 ### Added

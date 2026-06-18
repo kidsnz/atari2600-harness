@@ -29,6 +29,7 @@
 /ingest
 /cpucheck
 /cpucert
+/timinglint
 /oraclevote
 /trajdiff
 /framesim
