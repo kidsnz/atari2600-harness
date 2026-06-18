@@ -28,6 +28,7 @@
 /stellacheck
 /ingest
 /cpucheck
+/cpucert
 /oraclevote
 /trajdiff
 /framesim
