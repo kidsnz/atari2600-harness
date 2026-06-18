@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# pre-push — mirror the fast, high-value part of CI before every push, so a red
+# build never reaches GitHub. A plain local build+test runs under the umbrella
+# go.work (serially) and HIDES the parallel package-test races CI hits, so this
+# runs CI's actual invocation (GOWORK=off, -p 1) plus the quick doc checks.
+#
+# Enable once per clone:  git config core.hooksPath scripts/git-hooks
+# Emergency bypass:        git push --no-verify
+#
+# Heavy CI steps (full scenario sweep, Klaus/Tom-Harte network conformance) are
+# intentionally left to CI itself — this hook stays under ~1 minute.
+set -uo pipefail
+
+echo "pre-push: mirroring CI (go vet / go test -p 1 / doc checks)…"
+fail() {
+  echo ""
+  echo "✗ pre-push BLOCKED: '$1' failed — fix it before pushing (or bypass with: git push --no-verify)"
+  exit 1
+}
+
+export GOWORK=off CGO_ENABLED=0
+go vet ./...                          || fail "go vet"
+go test -p 1 ./...                    || fail "go test -p 1"
+python3 scripts/check_wiring.py       || fail "check_wiring"
+python3 scripts/check_provenance.py   || fail "check_provenance"
+python3 scripts/check_traps.py --selftest || fail "check_traps --selftest"
+python3 scripts/check_traps.py        || fail "check_traps"
+
+echo "✓ pre-push: CI mirror green — pushing."
