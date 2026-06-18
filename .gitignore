@@ -31,6 +31,7 @@
 /oraclevote
 /trajdiff
 /framesim
+/audiospec
 /guidedfuzz
 /cover
 /mutate
