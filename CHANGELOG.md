@@ -8,6 +8,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.90.0] - 2026-06-17
+
+### Added
+- **MAME headless cross-oracle (VV-6).** New `internal/oracle` package: an `Oracle` interface (`DumpRAM`: run a
+  ROM from power-on for N frames → RAM $80-$FF), the embedded `Gopher2600` member, `Diff`, and `Vote` (majority
+  RAM dump + named dissenters). Extracted from `cmd/stellacheck` (which now reuses `oracle.Gopher`). `oracle.Mame`
+  runs MAME's a2600 driver with `-video none -skip_gameinfo` and a lua autoboot script that dumps RAM after N
+  frames — a genuinely independent, **fully hands-free** third emulator (unlike the Stella oracle's human
+  keypress), CGO-free (shells out to the `mame` binary). New `cmd/oraclevote` runs every available oracle
+  (Gopher2600 always, MAME if installed) and reports a majority verdict + dissenters (exit 1 on dissent) =
+  "all software agrees but the hardware-grade member disagrees" made visible — the suite's reason to exist.
+  Self-test (gated on MAME present): MAME reads smoke's ram.0x80==66 and agrees with Gopher2600 on all 128 RAM
+  bytes, voting unanimously; `TestVoteDissent` proves a planted lone dissenter is named. VV-7 (perfect6502
+  silicon-netlist CPU oracle) will plug into the same `cmd/oraclevote`. **Src:** MAME luascript docs.
+
 ## [1.89.0] - 2026-06-17
 
 ### Added

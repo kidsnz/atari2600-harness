@@ -176,6 +176,7 @@ any game; even its tests reference only its own `roms/litmus`).
   `cmd/jingle` (melody notation → playable ROM) / `cmd/rammap` (RAM usage audit → markdown map) /
   `cmd/cover` (VV-3 PC/branch coverage + one-sided branches) / `cmd/guidedfuzz` (VV-3 coverage-guided AFL-style fuzz) /
   `cmd/trajdiff` (VV-8 behavioral trajectory diff vs a reference ROM) /
+  `cmd/oraclevote` (VV-6 N-oracle majority RAM vote: Gopher2600 + MAME headless; `internal/oracle`) /
   `cmd/stellacheck` (Stella oracle: RAM + pixel compare; hands-free via scripts/stella_oracle.sh) / `internal/emu` (driving) / `internal/annotate` (annotation) /
   `internal/scenario` (scenario regression = input timeline + numeric assertions, ROM-agnostic) /
   `internal/calibrate` (position calibration = poke sweep + linear regression) /
@@ -188,7 +189,7 @@ any game; even its tests reference only its own `roms/litmus`).
   (like the encoder; YAGNI).
 
 ## Development environment (macOS / Apple Silicon)
-`brew install dasm cc65 pkg-config go` / Stella: `brew install --cask stella`.
+`brew install dasm cc65 pkg-config go` / Stella: `brew install --cask stella` / MAME (VV-6 cross-oracle, optional): `brew install mame`.
 Clone Gopher2600 into the **harness/** root (untracked, referenced via `go.mod` `replace`).
 **Run commands from each repo's root** (harness's own from `harness/`, ROMs from `roms/`). `go.work` assumed.
 - ROM build: `dasm x.asm -f3 -ox.bin`.

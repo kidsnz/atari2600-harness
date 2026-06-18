@@ -123,8 +123,8 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-3** ✅v1.83.0 | **PC/branch coverage map** (`cmd/cover`) → **coverage-guided fuzzing** (`cmd/guidedfuzz`) | test-adequacy axis + AFL-style feedback fuzz (today's fuzz is blind) | D-1→D-2 | S→M | ★1 |
 | **VV-4** ✅v1.79.0 | **Motion-smoothness / jerk metric** (`cmd/motion` + `read_motion` MCP + `checks.motion`) | per-frame motion-jerk NUMBER = "judder/ブルブル" automated (closes the Breakout hand-trace) | E-1 | S–M | ★1 |
 | **VV-5** ✅v1.82.0 | **Temporal-logic trace assertions** (`temporal` block: eventually-within-K/response/never-for-N; `always`=existing invariant) | properties over a **sequence** of frames (per-frame invariants can't) | F-1 | M | ★1 |
-| **VV-6** | **MAME headless cross-oracle** (`cmd/mamecheck`) | a **3rd independent** full-system oracle, **fully headless** (no keypress unlike Stella) | A1 | M | 2 |
-| **VV-7** | **perfect6502 hardware-grade CPU oracle** (`cmd/cpucheck`) + **N-oracle majority vote** (`cmd/oraclevote`) | silicon-netlist truth (catches bugs ALL hand-written emulators share); fuses oracles into one verdict | A2/A3/B-C3 | M | 2 |
+| **VV-6** ✅v1.90.0 | **MAME headless cross-oracle** (`internal/oracle.Mame` + `cmd/oraclevote`) | a **3rd independent** full-system oracle, **fully headless** (no keypress unlike Stella) | A1 | M | 2 |
+| **VV-7** 🔲 | **perfect6502 hardware-grade CPU oracle** (`cmd/cpucheck`) + **N-oracle majority vote** (`cmd/oraclevote` ✅) | silicon-netlist truth (catches bugs ALL hand-written emulators share); fuses oracles into one verdict | A2/A3/B-C3 | M | 2 |
 | **VV-8** ✅v1.84.0 | **Behavioral trajectory diff vs original ROM** (`cmd/trajdiff`) | full **time-extended** state-trajectory diff (refdiff is a static snapshot) | F-2 | M | 2 |
 | **VV-9** ✅v1.87.0 | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
 | **VV-10** ✅v1.88.0 (T-1/T-2/T-3) | **HW-divergence trap detectors** (timer-wrap=G8 ✅, HMOVE-latch ✅, uninit-RAM-read ✅) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
@@ -195,7 +195,17 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   `roms/litmus/scenarios/temporal.json`. **Src:** Bauer/Leucker/Schallhart TOSEM 2011; STL RV'15.
 
 ## Tier 2 — high value, more dependent or larger
-- **VV-6 / VV-7 (cross-oracle):** MAME a2600 runs `-video none -autoboot_script <lua> -seconds_to_run` = a genuinely independent, **hands-free** 3rd oracle (catches corners Gopher2600+Stella both get wrong); perfect6502 is the **silicon-netlist** CPU tier (CPU-only; shelled-out to keep the main build CGO-free); `oraclevote` fuses Gopher2600+Stella+MAME(+perfect6502) into a majority verdict that surfaces "all software agrees but the hardware-grade member dissents" = the project's reason to exist. FPGA/real-2600 = manual escalation tier only (human cost). Extract shared `internal/oracle/` from today's `cmd/stellacheck`. **Src:** MAME luascript docs; mist64/perfect6502 (from visual6502).
+- **VV-6 ✅ DONE (v1.90.0):** shared `internal/oracle` (Oracle interface = `DumpRAM`: run a ROM from power-on N
+  frames → RAM $80-$FF; `Diff`; `Vote` = majority dump + named dissenters), extracted from `cmd/stellacheck`
+  (now reuses `oracle.Gopher`). `oracle.Mame` runs MAME's a2600 driver `-video none -skip_gameinfo` with a lua
+  autoboot script that dumps RAM after N frames — a genuinely independent, **fully hands-free** 3rd oracle
+  (unlike Stella's keypress). CGO-free (shells out to the `mame` binary). `cmd/oraclevote` fuses every available
+  oracle into a majority verdict that surfaces "all software agrees but the hardware-grade member dissents" =
+  the project's reason to exist. Self-test (gated on MAME present): MAME agrees with Gopher2600 on all 128 RAM
+  bytes of `smoke` and they vote unanimously; `TestVoteDissent` proves a planted lone dissenter is named.
+- **VV-7 🔲 (next):** perfect6502 is the **silicon-netlist** CPU oracle (CPU-only; shelled out to a `cmd/cpucheck`
+  with CGO isolated so the main build stays CGO-free); plugs into the existing `cmd/oraclevote` as a hardware-grade
+  member. FPGA/real-2600 = manual escalation tier only. **Src:** MAME luascript docs; mist64/perfect6502 (from visual6502).
 - **VV-8 ✅ DONE (v1.84.0):** `internal/trajdiff` + `cmd/trajdiff` step original vs candidate ROM in lockstep on
   one input timeline and report the first-divergence frame+field, or MATCH. Default trajectory = the 128-byte
   RAM each frame (`emu.PeekRAM`); custom fields reuse `scenario.ResolveField`. Diffs **behavior over time**, not
