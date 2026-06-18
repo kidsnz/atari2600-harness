@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/kidsnz/atari2600-harness/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/oracle"
 )
 
 const stellaBin = "/Applications/Stella.app/Contents/MacOS/Stella"
@@ -237,23 +238,9 @@ func compare(romPath string, frames int, dumpFile string) error {
 	if err != nil {
 		return err
 	}
-	e, err := emu.New("NTSC")
+	ours, err := oracle.Gopher{}.DumpRAM(romPath, frames) // shared in-tree oracle (internal/oracle)
 	if err != nil {
 		return err
-	}
-	if err := e.LoadROM(romPath); err != nil {
-		return err
-	}
-	if err := e.RunFrames(frames); err != nil {
-		return err
-	}
-	var ours [128]uint8
-	for i := 0; i < 128; i++ {
-		v, err := e.PeekRAM(uint16(0x80 + i))
-		if err != nil {
-			return err
-		}
-		ours[i] = v
 	}
 	diffs := 0
 	for i := 0; i < 128; i++ {
