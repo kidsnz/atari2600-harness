@@ -14,7 +14,23 @@ const (
 	smokeAsm   = "../../roms/litmus/smoke.asm"
 	jsrAsm     = "../../roms/litmus/cb_jsr.asm"
 	divAsm     = "../../roms/litmus/cb_divloop.asm"
+	andAsm     = "../../roms/litmus/cb_andloop.asm"
 )
+
+// TestProveAndMaskBoundsLoop locks 3A: a divide loop fed by an UNKNOWN source is
+// bounded once the source is masked with `and #imm` (range model), where without
+// it the value stays Top => unbounded. Both directions: certifies at 76 with no
+// unbounded region; a tight budget flips it.
+func TestProveAndMaskBoundsLoop(t *testing.T) {
+	rep := mustProve(t, andAsm, 76)
+	if !rep.Certified || len(rep.Unbounded) != 0 {
+		t.Fatalf("cb_andloop must certify at 76 (AND-mask bounds the loop); unbounded=%+v violations=%+v",
+			rep.Unbounded, rep.Violations)
+	}
+	if tight := mustProve(t, andAsm, 12); tight.Certified {
+		t.Fatal("cb_andloop must NOT certify at budget 12 (the masked divide loop's cost exceeds it)")
+	}
+}
 
 // TestProveDivideLoopBounded locks 2B: a divide-by-15 / sbc-counter loop is
 // bounded from A's proven loop-entry range and the region certifies (v1 reported

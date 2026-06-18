@@ -422,24 +422,30 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 		if sub == 0 || nbody != 1 {
 			return 0
 		}
-		// A's LOOP-ENTRY upper bound. absStates[header] is the in-loop join, which the
-		// final wrapping subtraction can pollute to Top, so prefer the closest
-		// immediate `lda #imm` initializer before the loop (exact); otherwise use a
-		// non-Top tracked range. Unknown => 0 (stay unbounded, no false bound).
+		// A's LOOP-ENTRY upper bound. absStates[header] is the in-loop JOIN — polluted
+		// to Top by the final wrapping subtraction on the back-edge — so read A from
+		// the FALL-THROUGH predecessor's post-state instead (the value entering the
+		// loop from above). This is where 3A's AND-mask range and 3B's array-element
+		// range surface. Max over predecessors (sound). Unknown => 0 (stay unbounded).
 		amax := -1
-		bestAddr := -1
 		for addr, in := range nodes {
-			if int(addr) >= int(header) {
-				continue
-			}
-			if in.Def.Operator == instructions.LDA && in.Def.AddressingMode == instructions.Immediate && int(addr) > bestAddr {
-				bestAddr = int(addr)
-				amax = int(in.Operand & 0xFF)
+			if in.next() == header && addr != latch.Addr && int(addr) < int(header) {
+				if st, ok := absStates[addr]; ok {
+					if ea := st.transfer(in).A; !ea.Top && ea.Hi > amax {
+						amax = ea.Hi
+					}
+				}
 			}
 		}
+		// fallback: closest immediate `lda #imm` before the loop (exact).
 		if amax < 0 {
-			if st, ok := absStates[header]; ok && !st.A.Top {
-				amax = st.A.Hi
+			bestAddr := -1
+			for addr, in := range nodes {
+				if int(addr) < int(header) && in.Def.Operator == instructions.LDA &&
+					in.Def.AddressingMode == instructions.Immediate && int(addr) > bestAddr {
+					bestAddr = int(addr)
+					amax = int(in.Operand & 0xFF)
+				}
 			}
 		}
 		if amax < 0 {

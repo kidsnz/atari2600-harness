@@ -60,6 +60,26 @@ func (r ValueRange) eq(o ValueRange) bool {
 	return r.Lo == o.Lo && r.Hi == o.Hi
 }
 
+// andImm over-approximates A AND #m: AND can only CLEAR bits, so the result is
+// <= each operand → [0, min(A.Hi, m)]. Sound (e.g. `and #$7F` → [0,127]).
+func andImm(a ValueRange, m int) ValueRange {
+	hi := m
+	if !a.Top && a.Hi < hi {
+		hi = a.Hi
+	}
+	return vRange(0, hi)
+}
+
+// oraImm over-approximates A ORA #m: ORA can only SET bits, so the result is
+// >= each operand → [max(A.Lo, m), 255]. Sound.
+func oraImm(a ValueRange, m int) ValueRange {
+	lo := m
+	if !a.Top && a.Lo > lo {
+		lo = a.Lo
+	}
+	return vRange(lo, 255)
+}
+
 // incWrap / decWrap model ±1 in the 8-bit domain. A wrap (0xFF->0x00 / 0x00->0xFF)
 // can't be expressed as one interval, so we fall back to Top (sound).
 func incWrap(r ValueRange) ValueRange {
@@ -376,8 +396,22 @@ func (s State) transfer(in Instr) State {
 		n.applyStore(in, s.X)
 	case instructions.STY:
 		n.applyStore(in, s.Y)
-	case instructions.AND, instructions.ORA, instructions.EOR:
-		n.A = vTop()
+	case instructions.AND:
+		if imm {
+			n.A = andImm(s.A, immv) // 3A: `and #$7F` → [0,127]
+		} else {
+			n.A = vTop()
+		}
+		n.setNZ(n.A)
+	case instructions.ORA:
+		if imm {
+			n.A = oraImm(s.A, immv)
+		} else {
+			n.A = vTop()
+		}
+		n.setNZ(n.A)
+	case instructions.EOR:
+		n.A = vTop() // bit flips — not modeled
 		n.setNZ(n.A)
 	case instructions.ASL, instructions.LSR, instructions.ROL, instructions.ROR:
 		n.A = vTop() // may be accumulator-mode; lose A soundly
