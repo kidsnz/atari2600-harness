@@ -8,6 +8,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.101.0] - 2026-06-18
+
+### Added
+- **`cmd/spritepos` + `internal/spritepos` — forward sprite-position solver (authoring aid, AT-4).** Given a
+  target X (0..159) it returns the routine input, the div-15-coarse / HMOVE-fine decomposition, a paste-able
+  `SetXPos` snippet, and — the part that makes it trustworthy — the position the hardware **actually reaches**
+  (HmovedPixel), measured by running the kernel. Built clean-room on the verified
+  `roms/techniques/shared_setxpos.asm` idiom (div-15 coarse via RESPx strobe timing + remainder→HMOVE nibble by
+  the `eor #7; asl×4` trick). Per CLAUDE.md the X(N) offset is kernel-specific, so `Solve` never trusts the
+  arithmetic — it measures the offset against the emulator, inverts it, and re-runs to confirm. `-all` solves
+  every X for an object; `-json` for tooling.
+- **Self-tests:** `TestDecompose` (pure coarse/fine arithmetic), `TestAchieveSweepLog` (records X(A)),
+  `TestSolveHitsTargets` (P0/P1/M0/BL × 7 targets land EXACTLY, emulator-verified), `TestAchieveDiscriminates`
+  (a deliberately-wrong input must miss — the guarantee isn't vacuous).
+
+### Notes
+- **Measured: X(A) == A exactly across the whole range** for this calibrated routine (slope 1, offset 0), and
+  `spritepos -object BL -all` lands **160/160 targets exactly**. Found + fixed a bug in the pure `Decompose`
+  helper (loop-exit used bit-7 instead of the 6502 carry, so X≥128 broke immediately) — caught because the
+  emulator ground truth disagreed with the math; the verified positions were never affected. Pure Go, CLI only.
+
 ## [1.100.0] - 2026-06-18
 
 ### Added

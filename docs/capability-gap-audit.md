@@ -340,7 +340,7 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
   technique kernels** (first sweep's 6 hits were two detector gaps — missed indexed `sta HMP0,x` stores, and a
   benign zero-clear — both fixed; a latent hazard false-negative in the cycle accounting also fixed). Litmus
   `lint_r1/_r2/_r3` + `lint_clean`; `TestLint*` lock both directions + the corpus guard. Pure Go, CLI only (no
-  MCP/reconnect). **AT-4 + a single batched MCP exposure remain.**
+  MCP/reconnect). **A single batched MCP exposure (AT-5) remains.**
 - **AT-2 ✅ DONE (v1.99.0): write→visible-pixel timeline** (`cmd/beamtrace` + `internal/beamtrace`, new thin
   `emu.LastTIAWrite` accessor). Runs the ROM instruction-by-instruction, records every TIA write with the beam
   clock it lands at, and tabulates per scanline which visible pixels each write governs — the causal map
@@ -367,6 +367,17 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
     rare false positives, tune to minimise them on the corpus) remains a live future option should a concrete
     need appear — kept on the books deliberately rather than declared done. The substrate to revisit it
     (`beamrace.Trace` events carrying object X + before/after-beam) is already in place.
+- **AT-4 ✅ DONE (v1.101.0): forward sprite-position solver** (`cmd/spritepos` + `internal/spritepos`). Target
+  X (0..159) → routine input + div-15-coarse / HMOVE-fine decomposition + paste-able `SetXPos` snippet + the
+  position the hardware ACTUALLY reaches (HmovedPixel). Clean-room on the verified `shared_setxpos.asm` idiom.
+  **Soundness via measurement, not formula:** per CLAUDE.md the X(N) offset is kernel-specific, so `Solve`
+  measures the offset on the emulator, inverts it, and re-runs to confirm. Measured X(A)==A exactly (slope 1,
+  offset 0) for the calibrated routine; `spritepos -object BL -all` lands 160/160 targets exactly. `TestSolve*`
+  (exact landing, emulator-verified) + `TestAchieveDiscriminates` (wrong input misses ⇒ non-vacuous) + a fixed
+  `Decompose` carry bug (caught by the emulator disagreeing with the math). Pure Go, CLI only.
+- **AT-5 (remaining): one batched MCP exposure** of the interactive aids (`beamtrace` timeline + `-race`
+  advisory, `spritepos` solver) added to `cmd/harness` in a single commit → rebuild → smoke → one reconnect
+  ([[feedback-smoke-test-harness-before-reconnect]]). The linter (AT-1) stays CLI/CI-only (no MCP needed).
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
