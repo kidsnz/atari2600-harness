@@ -121,6 +121,35 @@ func TestNormalizeSizeMaxUpscales(t *testing.T) {
 	}
 }
 
+// TestContentRowSpans locks the per-element ruler: lit runs are reported in CLOCK
+// coords (x/scale) on content-aligned rows, so a 2× screenshot and a 1× ROM measure
+// on the same 0..159 axis at native precision.
+func TestContentRowSpans(t *testing.T) {
+	// 2× screenshot: a lit box x[100-119] on rows 10-13. content-bbox top = row 10.
+	img := image.NewRGBA(image.Rect(0, 0, 320, 40))
+	for y := 10; y < 14; y++ {
+		for x := 100; x < 120; x++ {
+			img.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+		}
+	}
+	if got := ContentRowSpans(img, 0); !SpansEqual(got, []Span{{50, 59}}) { // x/2
+		t.Fatalf("ContentRowSpans(2×, ar=0) = %v, want [{50 59}]", got)
+	}
+	if s := ContentRowSpans(img, 99); s != nil {
+		t.Errorf("out-of-range ar should be nil, got %v", s)
+	}
+	// 1× ROM: same axis, scale 1.
+	rom := image.NewRGBA(image.Rect(0, 0, 160, 40))
+	for y := 5; y < 7; y++ {
+		for x := 8; x < 12; x++ {
+			rom.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+		}
+	}
+	if got := ContentRowSpans(rom, 0); !SpansEqual(got, []Span{{8, 11}}) {
+		t.Errorf("ContentRowSpans(1×, ar=0) = %v, want [{8 11}]", got)
+	}
+}
+
 // perturb flips the luma of the first k pixels to mid-grey.
 func perturb(src *image.RGBA, k int) *image.RGBA {
 	dst := clone(src)

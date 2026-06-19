@@ -43,6 +43,19 @@ versions follow [Semantic Versioning](https://semver.org/).
   metric (it doesn't blur real ~1px differences away), confirming the remaining residual is genuine fine detail
   (net-edge/phase, fenceposts), not a downscale artifact. `TestNormalizeSizeMaxUpscales` locks it (an image vs
   its 2× upscale max-normalizes to the 2× size and scores ~1.0).
+- **`framesim` per-element ruler (`framesim.ContentRowSpans` + `Span`/`SpansEqual` + `framesim -spans`), and an
+  `-align` height-mismatch warning.** The global SSIM/diff buries 1-row/1-px element errors (a score-bottom row,
+  one net dash, a partial wall edge) — the PONG campaign proved it: the static frame read "done" at the global
+  level while three elements (score bottom, ball squareness, paddle height) were each off by a row, and the fix
+  hunt was slow because there was no standing tool to measure each element's exact extent. `-spans` prints, for
+  every content-aligned row, the lit runs in CLOCK coords (clk = x / scale, so a 1× ROM and a 2× screenshot read
+  on the same 0..159 axis) for A and B side-by-side, marking rows that differ — measured in each frame's OWN
+  content crop at native resolution, so it keeps the screenshot's precision and sidesteps the resize that makes
+  `-align` ±1-row sensitive. It is the exact ruler that complements the tolerant SSIM/diff: on the campaign frame
+  it pinpointed exactly two differing rows (a net dash and the partial wall edge), including a net-dash gap below
+  the diff's row-band threshold. The `-align` path now also warns when the two content heights differ (the
+  resized diff then carries ~Δpx of edge noise → use `-spans`). `TestContentRowSpans` locks the clock-coord
+  mapping at 1× and 2×. Replaces the ad-hoc per-row measurement script hand-built mid-campaign.
 
 ### Fixed
 - **CI: run `go test -p 1 ./...` (serial package tests).** Several packages assemble/read the SAME shared ROM

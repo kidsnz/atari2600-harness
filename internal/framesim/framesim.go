@@ -187,6 +187,53 @@ func NormalizeAlignedUp(a, b *image.RGBA) (*image.RGBA, *image.RGBA, image.Point
 	return NormalizeSizeMax(cropRGBA(a, ContentBBox(a)), cropRGBA(b, ContentBBox(b)))
 }
 
+// Span is an inclusive lit run on one row, in CLOCK coords [Lo,Hi].
+type Span struct{ Lo, Hi int }
+
+// ContentRowSpans returns the lit x-runs on content-aligned row ar (ar=0 is the top
+// of the lit-content bbox), in CLOCK coords (clk = x / scale, scale = frame width /
+// 160 — so a 1× ROM frame and a 2× screenshot both report on the same 0..159 axis).
+// It measures the frame in its OWN content crop at native resolution: this keeps a
+// hi-res screenshot's precision and sidesteps the resize that makes the -align diff
+// ±1-row sensitive — i.e. this is the exact per-element ruler (vs the tolerant diff).
+// "Lit" = luma > 128 (same basis as ContentBBox). Returns nil if ar is out of range.
+func ContentRowSpans(img *image.RGBA, ar int) []Span {
+	bb := ContentBBox(img)
+	y := bb.Min.Y + ar
+	if ar < 0 || y >= bb.Max.Y {
+		return nil
+	}
+	scale := img.Bounds().Dx() / 160
+	if scale < 1 {
+		scale = 1
+	}
+	var spans []Span
+	s, maxX := -1, img.Bounds().Max.X
+	for x := img.Bounds().Min.X; x <= maxX; x++ {
+		on := x < maxX && luma(img, x, y) > 128
+		if on && s < 0 {
+			s = x
+		} else if !on && s >= 0 {
+			spans = append(spans, Span{s / scale, (x - 1) / scale})
+			s = -1
+		}
+	}
+	return spans
+}
+
+// SpansEqual reports whether two rows' clock-spans match exactly.
+func SpansEqual(a, b []Span) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // DiffStats localizes where two frames differ (lit-state mismatch). Mismatch =
 // pixels lit in exactly one frame. AOnly = lit in A but not B (A has extra),
 // BOnly = lit in B but not A (A is MISSING what B shows). RowMiss[y] = mismatches

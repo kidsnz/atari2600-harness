@@ -69,6 +69,7 @@ func main() {
 	diffOut := flag.String("diff", "", "also write a per-pixel diff image here (red=A-only, blue=B-only) and report differing row-bands")
 	align := flag.Bool("align", false, "crop both to lit-content bbox before comparing (align wall-to-wall, not by frame edges) — for ROM vs screenshot with different margins")
 	up := flag.Bool("up", false, "rescale to the common MAX (upscale the low-res side) instead of min — keeps a hi-res screenshot's sharp edges so the diff tracks real structure, not downscale blur")
+	spans := flag.Bool("spans", false, "the per-element ruler: print each content-aligned row's lit clock-spans for A and B (native precision, no resize), marking rows that differ. Use to measure exact element bboxes (net/score/ball/paddle/wall) target-vs-yours.")
 	flag.Parse()
 	if *a == "" || *b == "" {
 		fmt.Fprintln(os.Stderr, "usage: framesim -a x.bin -b y.bin [-frames 8] [-min 0.95]")
@@ -84,6 +85,27 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: load %s: %v\n", *b, err)
 		os.Exit(2)
+	}
+
+	// -spans: the exact per-element ruler. Print each content-aligned row's lit
+	// clock-spans for A and B (measured natively, no resize), marking diffs. Stands
+	// alone (no SSIM) — this is for "where exactly does each element sit, target vs mine".
+	if *spans {
+		printSpans(*a, ia, *b, ib)
+		return
+	}
+
+	// A height mismatch makes the resized -align diff ±1-row sensitive (false full-row
+	// diffs at the top/bottom edge); say so and point at -spans for exact work.
+	if *align {
+		ha, hb := framesim.ContentBBox(ia).Dy(), framesim.ContentBBox(ib).Dy()
+		if ha != hb {
+			d := ha - hb
+			if d < 0 {
+				d = -d
+			}
+			fmt.Fprintf(os.Stderr, "WARN: content heights differ (A=%d B=%d) — the resized -align diff carries ~%dpx of edge noise; use -spans for exact per-element measurement.\n", ha, hb, d)
+		}
 	}
 
 	// Normalize so a 1× ROM render and a 2× screenshot compare instead of erroring.
@@ -148,4 +170,40 @@ func main() {
 		fmt.Fprintf(os.Stderr, "FAIL: SSIM %.4f < min %.4f\n", ss.Mean, *min)
 		os.Exit(1)
 	}
+}
+
+func fmtSpans(s []framesim.Span) string {
+	if len(s) == 0 {
+		return " (none)"
+	}
+	out := ""
+	for _, sp := range s {
+		out += fmt.Sprintf(" clk[%d-%d]", sp.Lo, sp.Hi)
+	}
+	return out
+}
+
+// printSpans tabulates each content-aligned row's lit clock-spans for A and B,
+// marking rows whose spans differ — the exact per-element ruler.
+func printSpans(aName string, a *image.RGBA, bName string, b *image.RGBA) {
+	ha, hb := framesim.ContentBBox(a).Dy(), framesim.ContentBBox(b).Dy()
+	fmt.Printf("spans (content-aligned, clock 0..159 · A=%s rows=%d · B=%s rows=%d):\n", aName, ha, bName, hb)
+	n := ha
+	if hb < n {
+		n = hb
+	}
+	diff := 0
+	for ar := 0; ar < n; ar++ {
+		sa, sb := framesim.ContentRowSpans(a, ar), framesim.ContentRowSpans(b, ar)
+		mark := ""
+		if !framesim.SpansEqual(sa, sb) {
+			mark, diff = "   <-- differ", diff+1
+		}
+		fmt.Printf("  ar %3d: A%-28s | B%s%s\n", ar, fmtSpans(sa), fmtSpans(sb), mark)
+	}
+	fmt.Printf("summary: %d/%d content rows differ", diff, n)
+	if ha != hb {
+		fmt.Printf(" (heights differ A=%d B=%d — extra rows beyond %d not shown)", ha, hb, n)
+	}
+	fmt.Println()
 }
