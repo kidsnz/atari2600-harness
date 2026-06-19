@@ -46,6 +46,34 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
    - a reusable pattern → promote to `docs/techniques/` or `pkg/`.
    Every production makes the next one safer and faster.
 
+## Reproducing a reference image pixel-exact (the image-match loop)
+When the task is "make the ROM look like THIS image" (a Stella snapshot of a real ROM, or a Photoshop mock —
+the project's core use case, workflow A above), run this **measured convergence loop**. It is how the PONG
+static frame reached ~0.1% diff. Judge by the per-element ruler, not the eye.
+
+0. **Clean-reference contract.** Pixel-exact reproduction is capped by the target's cleanliness: use a **Stella
+   F12 PNG (TV effects off, integer scale)** or the **ROM itself** — not an OS screenshot / resized / filtered
+   image (non-integer scale → fuzzy measurement). Get two things from the user up front: **semantics** (which
+   TIA object each element is — "net = the thin centre line, scores = players, ball is square") and **fidelity**
+   ("match exactly" vs "rough mock"). They eliminate guesswork and mutual misreading.
+1. **Measure the target per element** — `framesim -spans` (read column A): every element's exact extent in
+   clock×scanline. This is the ruler.
+2. **Author / render** the kernel.
+3. **Localize** — `framesim -align -diff out.png` (where it's wrong) + `-up` (sharp/strict, no downscale blur).
+4. **Measure yours per element** — `framesim -spans -a rom.bin -b target.png`: row-by-row clock-spans, target
+   vs yours, differing rows marked.
+5. **Fix ONE element, re-measure** (small steps — [[feedback-execution-discipline]]).
+6. At convergence, **the user does a visual pass** (`get_screen_annotated` is the channel) and names any element
+   still off; fix each exactly.
+
+**Two rules for this loop (both learned the hard way on PONG, 2026-06-19):**
+- **Measure per element — don't trust the global SSIM/diff alone.** A 1-row fencepost error hides in the global
+  number but the eye (and `-spans`) catches it (the frame read "done" globally while 3 elements were each off a row).
+- **Never call a localized diff "the floor / irreducible" without proving it.** If `-spans`/`-diff` shows a region
+  off, it is a *solvable target* — exhaust the fix. If a real hardware/structural limit blocks it (object count,
+  PF 4-clock granularity, a row trade-off like `docs/known-traps.md` §A PF-coverage), show that limit numerically
+  before reporting "floor." (= [[feedback-verification-standard]] "prove the negative" + [[feedback-execution-discipline]].)
+
 ## Why this exists
 Past Pong attempts died at step 4/5 (unverified timing). The corpus + checks turn "Claude that knows things"
 into "Claude that gets better at making things." The mechanical parts (pkg/design, check_traps, CI) are
