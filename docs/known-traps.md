@@ -32,6 +32,7 @@ Detection column: **static** = a source-text linter can flag it · **runtime** =
 | HMOVE range | ±8 px / scanline; pulse count = upper nibble of `HMxx EOR $80` | 319456 |
 | coarse÷15 + fine HMOVE | `eor #7` → 4×ASL, ~30 cy; small real-HW latch differences | 304182, 284554, 160645 |
 | ÷15 / X(N) is kernel-specific | the absolute offset includes the prologue cycle count → **measure `read_tia` HmovedPixel, don't hardcode N** | (CLAUDE.md) + 294398 |
+| **positioning ÷15 loop crossing a page → judder** | if the `sbc #15` / `bcs` divide loop straddles a page boundary, the **taken `bcs` costs +1 cycle** → each iteration is 6cy(18px) not 5cy(15px); the coarse step no longer tiles with the HMOVE fine (±~7) → the object **judders ~3px at every 15px while moving** AND the X(N) offset inflates by +1cy/iteration. A *static* object hides it (only shows when it MOVES across cells). **Keep the divide loop on one page** (page-align it). Found: PONG smooth-ball, the loop sat at $F0FE/$F100 — moving it to $F100 (whole loop on one page) made the ball perfectly smooth (read_motion jerk→0). detect: runtime (read_motion jerk_rms) / listing (loop address vs page boundary) | in-house: PONG 2026-06-19 |
 
 ## C. Cartridge / bank / RAM
 
