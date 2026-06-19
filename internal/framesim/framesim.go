@@ -109,6 +109,59 @@ func NormalizeSize(a, b *image.RGBA) (*image.RGBA, *image.RGBA, image.Point) {
 	return Resize(a, w, h), Resize(b, w, h), image.Pt(w, h)
 }
 
+// ContentBBox returns the bounding box of "lit" pixels (luma > 128). Cropping a
+// frame to this box drops the black VBLANK/overscan margins, so two captures with
+// different margins can be aligned by their content (e.g. wall-to-wall) instead of
+// by raw frame edges.
+func ContentBBox(img *image.RGBA) image.Rectangle {
+	b := img.Bounds()
+	// Running min/max as ints — do NOT seed with image.Rect, which sorts its args
+	// and would collapse an inverted seed back to the full bounds.
+	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, b.Min.X, b.Min.Y
+	found := false
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if luma(img, x, y) > 128 {
+				found = true
+				if x < minX {
+					minX = x
+				}
+				if y < minY {
+					minY = y
+				}
+				if x+1 > maxX {
+					maxX = x + 1
+				}
+				if y+1 > maxY {
+					maxY = y + 1
+				}
+			}
+		}
+	}
+	if !found {
+		return b
+	}
+	return image.Rect(minX, minY, maxX, maxY)
+}
+
+func cropRGBA(img *image.RGBA, r image.Rectangle) *image.RGBA {
+	out := image.NewRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
+	for y := 0; y < r.Dy(); y++ {
+		for x := 0; x < r.Dx(); x++ {
+			out.SetRGBA(x, y, img.RGBAAt(r.Min.X+x, r.Min.Y+y))
+		}
+	}
+	return out
+}
+
+// NormalizeAligned crops both frames to their lit-content bbox (aligning them by
+// content — e.g. wall-to-wall — instead of by frame edges) and then rescales to a
+// common size. This is what makes a ROM render comparable to a screenshot captured
+// with different VBLANK/overscan margins (the limitation NormalizeSize left open).
+func NormalizeAligned(a, b *image.RGBA) (*image.RGBA, *image.RGBA, image.Point) {
+	return NormalizeSize(cropRGBA(a, ContentBBox(a)), cropRGBA(b, ContentBBox(b)))
+}
+
 // DiffStats localizes where two frames differ (lit-state mismatch). Mismatch =
 // pixels lit in exactly one frame. AOnly = lit in A but not B (A has extra),
 // BOnly = lit in B but not A (A is MISSING what B shows). RowMiss[y] = mismatches

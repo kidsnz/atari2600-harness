@@ -14,8 +14,19 @@ versions follow [Semantic Versioning](https://semver.org/).
   320×M), so a ROM could not be compared to a target screenshot. Both inputs are now downscaled (nearest-neighbor,
   per-axis min) to a common raster before SSIM/pHash, and the CLI reports the `normalized` size. Found and fixed
   during the PONG dogfooding campaign (it blocked the Phase-1 "framesim matches the target screenshot" metric).
-  `TestNormalizeSizeRescales` locks it (an image vs its own 2× upscale scores ~1.0). Known limitation: normalizes
-  scale, not vertical framing (differing VBLANK/overscan margins still shift content — alignment is future work).
+  `TestNormalizeSizeRescales` locks it (an image vs its own 2× upscale scores ~1.0). Vertical-framing alignment
+  (differing VBLANK/overscan margins) is handled separately by `-align` below.
+- **`framesim` content-bbox alignment (`framesim.ContentBBox` + `NormalizeAligned` + `framesim -align`).**
+  Scale-normalization alone still misaligned a ROM render against a screenshot whose lit content sits at a
+  different vertical offset (the ROM's 214-row frame vs the target's 228-row frame put walls/net/scores on
+  different rows), so the diff was dominated by spurious whole-row mismatches and was untrustworthy. `-align`
+  first crops BOTH inputs to their lit-content bounding box (luma>128 = wall-to-wall, net-to-net) and only then
+  scale-normalizes, so content is compared content-to-content regardless of margins. On the PONG campaign frame
+  this took the diff from 3164→1078 mismatched px and SSIM 0.105→0.192 (the remaining diff is now REAL: score
+  glyphs, net phase, paddles — not framing noise), unblocking the convergence loop. `TestNormalizeAligned` locks
+  it (the same content at different positions in different-size frames aligns to ~1.0). Fix along the way: the
+  bbox seed used `image.Rect(max,min)`, which sorts its args and collapsed the inverted seed back to full
+  bounds (ContentBBox always returned the whole frame) — now seeded with plain ints.
 - **`framesim` difference localizer (`framesim.Diff` + `framesim -diff out.png`).** SSIM gives one global score
   and the single worst 8×8 block; for the "reproduce a target screenshot" loop you need to see EVERY differing
   region. `Diff` classifies each pixel (match / A-only=red / B-only=blue) into a diff image and per-row stats,

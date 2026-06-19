@@ -81,6 +81,31 @@ func TestDiffLocalizes(t *testing.T) {
 	}
 }
 
+// TestNormalizeAligned locks content-bbox alignment: the same content placed at
+// different positions in different-size frames (different margins) scores ~1.0 after
+// NormalizeAligned, where raw NormalizeSize would misalign it.
+func TestNormalizeAligned(t *testing.T) {
+	a := image.NewRGBA(image.Rect(0, 0, 40, 40))
+	for y := 10; y < 30; y++ {
+		for x := 8; x < 32; x++ {
+			a.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+		}
+	}
+	if bb := ContentBBox(a); bb != image.Rect(8, 10, 32, 30) {
+		t.Fatalf("ContentBBox = %v, want (8,10)-(32,30)", bb)
+	}
+	b := image.NewRGBA(image.Rect(0, 0, 60, 50)) // same 24×20 content, different frame/margins
+	for y := 5; y < 25; y++ {
+		for x := 20; x < 44; x++ {
+			b.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+		}
+	}
+	na, nb, _ := NormalizeAligned(a, b)
+	if ss, ok := SSIM(na, nb); !ok || ss.Mean < 0.9 {
+		t.Errorf("same content / different margins should align to ~1.0, got %.3f (ok=%v)", ss.Mean, ok)
+	}
+}
+
 // perturb flips the luma of the first k pixels to mid-grey.
 func perturb(src *image.RGBA, k int) *image.RGBA {
 	dst := clone(src)

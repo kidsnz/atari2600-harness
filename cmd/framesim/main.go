@@ -67,6 +67,7 @@ func main() {
 	spec := flag.String("spec", "NTSC", "TV spec")
 	min := flag.Float64("min", 0, "fail (exit 1) if SSIM mean < this")
 	diffOut := flag.String("diff", "", "also write a per-pixel diff image here (red=A-only, blue=B-only) and report differing row-bands")
+	align := flag.Bool("align", false, "crop both to lit-content bbox before comparing (align wall-to-wall, not by frame edges) — for ROM vs screenshot with different margins")
 	flag.Parse()
 	if *a == "" || *b == "" {
 		fmt.Fprintln(os.Stderr, "usage: framesim -a x.bin -b y.bin [-frames 8] [-min 0.95]")
@@ -84,9 +85,16 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Normalize scale so a 1× ROM render and a 2× screenshot compare instead of
-	// erroring (the common size is the per-axis min — downscale only).
-	na, nb, sz := framesim.NormalizeSize(ia, ib)
+	// Normalize so a 1× ROM render and a 2× screenshot compare instead of erroring.
+	// -align also crops to lit content first (wall-to-wall), absorbing differing
+	// VBLANK/overscan margins; otherwise just scale-normalize (downscale to min).
+	var na, nb *image.RGBA
+	var sz image.Point
+	if *align {
+		na, nb, sz = framesim.NormalizeAligned(ia, ib)
+	} else {
+		na, nb, sz = framesim.NormalizeSize(ia, ib)
+	}
 	ss, ok := framesim.SSIM(na, nb)
 	if !ok {
 		fmt.Fprintf(os.Stderr, "ERROR: cannot compare frames (normalized to %dx%d)\n", sz.X, sz.Y)
