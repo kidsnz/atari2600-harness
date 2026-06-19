@@ -34,6 +34,16 @@ versions follow [Semantic Versioning](https://semver.org/).
   doesn't). Turns "compare → localize what's wrong → fix → repeat" into a measured loop. `TestDiffLocalizes`
   locks it (identical = 0 mismatch; a lit block over black = B-only localized to its rows).
 
+- **`framesim` max-normalization (`framesim.NormalizeSizeMax` / `NormalizeAlignedUp` + `framesim -up`).**
+  `NormalizeSize` downscales both inputs to the per-axis MIN; comparing a 1× ROM render to a 2× screenshot
+  thus downscales the screenshot, blurring its thin features (net dash, glyph edge) so the SSIM/diff is *more
+  forgiving* but fuzzy. `-up` instead rescales to the per-axis MAX — upscaling the ROM (nearest-neighbor, stays
+  sharp) and leaving the screenshot native — for a sharp-vs-sharp comparison at the screenshot's resolution.
+  Found during the PONG campaign while chasing the static-match residual: `-up` is the STRICTER, more honest
+  metric (it doesn't blur real ~1px differences away), confirming the remaining residual is genuine fine detail
+  (net-edge/phase, fenceposts), not a downscale artifact. `TestNormalizeSizeMaxUpscales` locks it (an image vs
+  its 2× upscale max-normalizes to the 2× size and scores ~1.0).
+
 ### Fixed
 - **CI: run `go test -p 1 ./...` (serial package tests).** Several packages assemble/read the SAME shared ROM
   `.bin` fixtures (`roms/litmus`, `roms/techniques`) during their tests; under `go test ./...` (parallel test

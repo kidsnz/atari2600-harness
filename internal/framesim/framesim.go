@@ -162,6 +162,31 @@ func NormalizeAligned(a, b *image.RGBA) (*image.RGBA, *image.RGBA, image.Point) 
 	return NormalizeSize(cropRGBA(a, ContentBBox(a)), cropRGBA(b, ContentBBox(b)))
 }
 
+// NormalizeSizeMax rescales both frames to the per-axis MAX size (UPscaling the
+// smaller) instead of the min. Use when one input is a higher-resolution screenshot:
+// downscaling it (NormalizeSize) blurs its thin features (a net dash, a glyph edge)
+// so a sharp ROM render mismatches it by ~1px everywhere — inflating the diff with
+// fuzz that isn't a real structural difference. Upscaling the ROM (nearest-neighbor,
+// stays blocky/sharp) and leaving the screenshot native compares sharp-vs-sharp, so
+// the diff reflects real differences (position/shape), not resampling artifacts.
+func NormalizeSizeMax(a, b *image.RGBA) (*image.RGBA, *image.RGBA, image.Point) {
+	wa, ha := a.Bounds().Dx(), a.Bounds().Dy()
+	wb, hb := b.Bounds().Dx(), b.Bounds().Dy()
+	if wa == wb && ha == hb {
+		return a, b, image.Pt(wa, ha)
+	}
+	w, h := max(wa, wb), max(ha, hb)
+	return Resize(a, w, h), Resize(b, w, h), image.Pt(w, h)
+}
+
+// NormalizeAlignedUp is NormalizeAligned but upscales to the common MAX (see
+// NormalizeSizeMax): content-aligned (wall-to-wall) AND compared at the higher
+// resolution so the screenshot keeps its sharp edges. Best for "ROM vs hi-res
+// screenshot" — the metric then tracks real structure, not downscale blur.
+func NormalizeAlignedUp(a, b *image.RGBA) (*image.RGBA, *image.RGBA, image.Point) {
+	return NormalizeSizeMax(cropRGBA(a, ContentBBox(a)), cropRGBA(b, ContentBBox(b)))
+}
+
 // DiffStats localizes where two frames differ (lit-state mismatch). Mismatch =
 // pixels lit in exactly one frame. AOnly = lit in A but not B (A has extra),
 // BOnly = lit in B but not A (A is MISSING what B shows). RowMiss[y] = mismatches

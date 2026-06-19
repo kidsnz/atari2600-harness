@@ -106,6 +106,21 @@ func TestNormalizeAligned(t *testing.T) {
 	}
 }
 
+// TestNormalizeSizeMaxUpscales locks the max-normalization: an image vs its own 2×
+// upscale, normalized to the common MAX, lands at the 2× size (not the 1× min) and
+// scores ~1.0 — the hi-res side is preserved (not downscaled/blurred).
+func TestNormalizeSizeMaxUpscales(t *testing.T) {
+	orig := patternImage(32, 24)
+	up := Resize(orig, 64, 48)
+	na, nb, sz := NormalizeSizeMax(orig, up)
+	if sz.X != 64 || sz.Y != 48 {
+		t.Fatalf("common size = %v, want 64x48 (per-axis MAX, upscaled)", sz)
+	}
+	if ss, ok := SSIM(na, nb); !ok || ss.Mean < 0.99 {
+		t.Errorf("an image vs its own 2× upscale should score ~1.0 after max-normalize, got %.4f", ss.Mean)
+	}
+}
+
 // perturb flips the luma of the first k pixels to mid-grey.
 func perturb(src *image.RGBA, k int) *image.RGBA {
 	dst := clone(src)

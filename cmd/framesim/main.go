@@ -68,6 +68,7 @@ func main() {
 	min := flag.Float64("min", 0, "fail (exit 1) if SSIM mean < this")
 	diffOut := flag.String("diff", "", "also write a per-pixel diff image here (red=A-only, blue=B-only) and report differing row-bands")
 	align := flag.Bool("align", false, "crop both to lit-content bbox before comparing (align wall-to-wall, not by frame edges) — for ROM vs screenshot with different margins")
+	up := flag.Bool("up", false, "rescale to the common MAX (upscale the low-res side) instead of min — keeps a hi-res screenshot's sharp edges so the diff tracks real structure, not downscale blur")
 	flag.Parse()
 	if *a == "" || *b == "" {
 		fmt.Fprintln(os.Stderr, "usage: framesim -a x.bin -b y.bin [-frames 8] [-min 0.95]")
@@ -90,9 +91,14 @@ func main() {
 	// VBLANK/overscan margins; otherwise just scale-normalize (downscale to min).
 	var na, nb *image.RGBA
 	var sz image.Point
-	if *align {
+	switch {
+	case *align && *up:
+		na, nb, sz = framesim.NormalizeAlignedUp(ia, ib)
+	case *align:
 		na, nb, sz = framesim.NormalizeAligned(ia, ib)
-	} else {
+	case *up:
+		na, nb, sz = framesim.NormalizeSizeMax(ia, ib)
+	default:
 		na, nb, sz = framesim.NormalizeSize(ia, ib)
 	}
 	ss, ok := framesim.SSIM(na, nb)
