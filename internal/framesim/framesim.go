@@ -11,6 +11,7 @@ package framesim
 
 import (
 	"image"
+	"image/color"
 	"math"
 )
 
@@ -106,6 +107,76 @@ func NormalizeSize(a, b *image.RGBA) (*image.RGBA, *image.RGBA, image.Point) {
 	}
 	w, h := min(wa, wb), min(ha, hb)
 	return Resize(a, w, h), Resize(b, w, h), image.Pt(w, h)
+}
+
+// DiffStats localizes where two frames differ (lit-state mismatch). Mismatch =
+// pixels lit in exactly one frame. AOnly = lit in A but not B (A has extra),
+// BOnly = lit in B but not A (A is MISSING what B shows). RowMiss[y] = mismatches
+// on that row, so a band with many BOnly says "the target draws something here that
+// I don't" (e.g. a missing score/paddle/ball).
+type DiffStats struct {
+	W, H     int
+	Mismatch int
+	AOnly    int
+	BOnly    int
+	BBox     image.Rectangle
+	RowMiss  []int
+}
+
+// Diff compares two SAME-SIZE frames pixel-by-pixel (call NormalizeSize first) and
+// returns a visualization + localization: a diff image (match-dark / both-lit grey /
+// A-only red / B-only blue) and per-row + bbox stats. "Lit" = luma > 128. This is
+// the autonomous compare→localize step: render → Diff vs target → fix every flagged
+// region → repeat, instead of eyeballing.
+func Diff(a, b *image.RGBA) (*image.RGBA, DiffStats, bool) {
+	ra, rb := a.Bounds(), b.Bounds()
+	if ra.Dx() != rb.Dx() || ra.Dy() != rb.Dy() {
+		return nil, DiffStats{}, false
+	}
+	w, h := ra.Dx(), ra.Dy()
+	out := image.NewRGBA(image.Rect(0, 0, w, h))
+	st := DiffStats{W: w, H: h, RowMiss: make([]int, h), BBox: image.Rect(w, h, 0, 0)}
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			la := luma(a, ra.Min.X+x, ra.Min.Y+y) > 128
+			lb := luma(b, rb.Min.X+x, rb.Min.Y+y) > 128
+			var c color.RGBA
+			diff := false
+			switch {
+			case la && lb:
+				c = color.RGBA{60, 60, 60, 255} // both lit
+			case !la && !lb:
+				c = color.RGBA{0, 0, 0, 255} // both dark
+			case la && !lb:
+				c, diff = color.RGBA{255, 0, 0, 255}, true // A-only (mine extra)
+				st.AOnly++
+			default:
+				c, diff = color.RGBA{0, 128, 255, 255}, true // B-only (target shows, mine missing)
+				st.BOnly++
+			}
+			out.SetRGBA(x, y, c)
+			if diff {
+				st.Mismatch++
+				st.RowMiss[y]++
+				if x < st.BBox.Min.X {
+					st.BBox.Min.X = x
+				}
+				if y < st.BBox.Min.Y {
+					st.BBox.Min.Y = y
+				}
+				if x+1 > st.BBox.Max.X {
+					st.BBox.Max.X = x + 1
+				}
+				if y+1 > st.BBox.Max.Y {
+					st.BBox.Max.Y = y + 1
+				}
+			}
+		}
+	}
+	if st.Mismatch == 0 {
+		st.BBox = image.Rectangle{}
+	}
+	return out, st, true
 }
 
 func blockSSIM(a, b *image.RGBA, ax, ay, bx, by int) float64 {

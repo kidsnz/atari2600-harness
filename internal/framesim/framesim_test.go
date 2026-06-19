@@ -58,6 +58,29 @@ func TestNormalizeSizeRescales(t *testing.T) {
 	}
 }
 
+// TestDiffLocalizes locks the diff localizer: identical frames score 0 mismatch;
+// a lit block over black is reported as B-only and localized to its rows.
+func TestDiffLocalizes(t *testing.T) {
+	a := patternImage(32, 24)
+	if _, ds, ok := Diff(a, clone(a)); !ok || ds.Mismatch != 0 {
+		t.Fatalf("identical frames should have 0 mismatch, got %d", ds.Mismatch)
+	}
+	black := image.NewRGBA(image.Rect(0, 0, 32, 24))
+	lit := clone(black)
+	for y := 10; y < 14; y++ {
+		for x := 5; x < 9; x++ {
+			lit.SetRGBA(x, y, color.RGBA{255, 255, 255, 255})
+		}
+	}
+	_, ds, _ := Diff(black, lit) // black=A, lit=B → 16 B-only px in rows 10-13
+	if ds.AOnly != 0 || ds.BOnly != 16 {
+		t.Errorf("expected 0 A-only / 16 B-only, got AOnly=%d BOnly=%d", ds.AOnly, ds.BOnly)
+	}
+	if ds.RowMiss[11] != 4 || ds.RowMiss[0] != 0 {
+		t.Errorf("mismatch should localize to rows 10-13 (4/row), got RowMiss[11]=%d RowMiss[0]=%d", ds.RowMiss[11], ds.RowMiss[0])
+	}
+}
+
 // perturb flips the luma of the first k pixels to mid-grey.
 func perturb(src *image.RGBA, k int) *image.RGBA {
 	dst := clone(src)

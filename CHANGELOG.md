@@ -16,6 +16,12 @@ versions follow [Semantic Versioning](https://semver.org/).
   during the PONG dogfooding campaign (it blocked the Phase-1 "framesim matches the target screenshot" metric).
   `TestNormalizeSizeRescales` locks it (an image vs its own 2× upscale scores ~1.0). Known limitation: normalizes
   scale, not vertical framing (differing VBLANK/overscan margins still shift content — alignment is future work).
+- **`framesim` difference localizer (`framesim.Diff` + `framesim -diff out.png`).** SSIM gives one global score
+  and the single worst 8×8 block; for the "reproduce a target screenshot" loop you need to see EVERY differing
+  region. `Diff` classifies each pixel (match / A-only=red / B-only=blue) into a diff image and per-row stats,
+  and the CLI prints the differing row-bands ("rows 37-59: 510 diff px" = a band the target draws that the ROM
+  doesn't). Turns "compare → localize what's wrong → fix → repeat" into a measured loop. `TestDiffLocalizes`
+  locks it (identical = 0 mismatch; a lit block over black = B-only localized to its rows).
 
 ### Fixed
 - **CI: run `go test -p 1 ./...` (serial package tests).** Several packages assemble/read the SAME shared ROM

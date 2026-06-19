@@ -66,6 +66,7 @@ func main() {
 	frames := flag.Int("frames", 8, "frames to render for .bin inputs")
 	spec := flag.String("spec", "NTSC", "TV spec")
 	min := flag.Float64("min", 0, "fail (exit 1) if SSIM mean < this")
+	diffOut := flag.String("diff", "", "also write a per-pixel diff image here (red=A-only, blue=B-only) and report differing row-bands")
 	flag.Parse()
 	if *a == "" || *b == "" {
 		fmt.Fprintln(os.Stderr, "usage: framesim -a x.bin -b y.bin [-frames 8] [-min 0.95]")
@@ -104,6 +105,30 @@ func main() {
 	}{*a, *b, fmt.Sprintf("%dx%d", sz.X, sz.Y), ss.Mean, ss.Worst, ss.WorstBlock.String(), ham}
 	j, _ := json.MarshalIndent(out, "", "  ")
 	fmt.Println(string(j))
+
+	if *diffOut != "" {
+		dimg, ds, _ := framesim.Diff(na, nb)
+		if f, e := os.Create(*diffOut); e == nil {
+			_ = png.Encode(f, dimg)
+			f.Close()
+		}
+		fmt.Printf("diff: %d mismatched px (A-only/red=%d, B-only/blue=%d) bbox=%v -> %s\n",
+			ds.Mismatch, ds.AOnly, ds.BOnly, ds.BBox, *diffOut)
+		inBand, start := false, 0
+		for y := 0; y <= ds.H; y++ {
+			hot := y < ds.H && ds.RowMiss[y] > 2
+			if hot && !inBand {
+				inBand, start = true, y
+			} else if !hot && inBand {
+				inBand = false
+				sum := 0
+				for r := start; r < y; r++ {
+					sum += ds.RowMiss[r]
+				}
+				fmt.Printf("  rows %3d-%3d (%d): %d diff px\n", start, y-1, y-start, sum)
+			}
+		}
+	}
 
 	if *min > 0 && ss.Mean < *min {
 		fmt.Fprintf(os.Stderr, "FAIL: SSIM %.4f < min %.4f\n", ss.Mean, *min)
