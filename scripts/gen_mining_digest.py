@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """gen_mining_digest.py — MINED.csv から docs/mining-digest.md(+ja) を冪等に再生成。
 
-採掘した AtariAge スレ（`reference/atariage/MINED.csv`＝`aa_manifest.py` が FS から再生成）を、
-harness 内の自己完結した「要点索引」に落とす。各スレを「効く design-principles 節 / pkg/design 関数 /
+採掘した AtariAge スレ（`reference/atariage/MINED.csv`）を、harness 内の自己完結した
+「要点索引」に落とす。各スレを「効く design-principles 節 / pkg/design 関数 /
 技候補」へ対応づける。生のスレ保存は reference/ に来歴として残す（ここには入れない）。
+
+注: 取得・台帳生成のスクロール系ツール（旧 aa_fetch/aa_index/aa_manifest）はリポジトリ外の
+ローカル研究ツール（`reference/atariage/_tools/`）に移設済み。MINED.csv はそこで生成する。
+本スクリプトは生成済み CSV を蒸留するだけで取得は行わない。
 
 使い方:
     cd harness
-    python3 scripts/aa_manifest.py        # 先に MINED.csv を最新化
-    python3 scripts/gen_mining_digest.py  # docs/mining-digest.md(+ja) を再生成（冪等）
+    python3 scripts/gen_mining_digest.py  # 既存の MINED.csv から docs/mining-digest.md(+ja) を再生成（冪等）
 
 対応づけ = (1) 既知 slug の手当て FEED（curated）→ (2) slug キーワード推論 → (3) 既定 Reference。
 新規採掘スレは (2)/(3) で自動分類される。高価値スレは FEED に1行足して精緻化する。

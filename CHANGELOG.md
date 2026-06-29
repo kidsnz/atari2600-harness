@@ -8,6 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+- **AtariAge fetch tooling relocated out of the repo.** `scripts/aa_fetch.py`, `scripts/aa_index.py`, and
+  `scripts/aa_manifest.py` (the forum thread/index crawler — Wayback-first, with an optional cookie-based
+  direct fallback) were moved to local-only research tooling outside the published repo. Rationale: it is
+  ingestion scaffolding, not part of the verification harness (the deliverable), and a ToS-adjacent scraper
+  has no reason to ship in the public engine. The distilled knowledge it produced (`docs/mining-digest.md`
+  and the technique/casebook corpus) stays — that is the value; the scraper is not. `gen_mining_digest.py`
+  remains (it only distills an existing local `MINED.csv`; it never fetched anything).
+
 ### Added
 - **`framesim` scale-normalized comparison (`framesim.Resize` + `NormalizeSize`).** `framesim -a rom.bin -b
   screenshot.png` previously errored on a bounds mismatch (a 1× ROM render, 160×N, vs a 2× Stella screenshot,
