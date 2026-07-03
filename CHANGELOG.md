@@ -8,6 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.103.0] - 2026-07-03
+
+Interactive rollout of the two PONG-campaign capabilities (backlog PONG-C1/C2), live-proven on the real
+PONG ROM: C1 rediscovers a byte-faithful replica of the historical 77cy 3-edge-coincidence bug
+(fail at PFp1, 152cy) and passes the fixed kernel across 139 consistent alignments (offsets-coupled sweep);
+C2 runs the whole lightweight-table budget ritual in one call with the original ROM verified byte-identical
+afterwards. The rollout itself exposed and fixed a latent flaw in the budget guard (Fixed below). Also
+includes the accumulated PONG-dogfooding items below (framesim normalization etc.).
+
 ### Removed
 - **AtariAge fetch tooling relocated out of the repo.** `scripts/aa_fetch.py`, `scripts/aa_index.py`, and
   `scripts/aa_manifest.py` (the forum thread/index crawler — Wayback-first, with an optional cookie-based
@@ -17,7 +26,33 @@ versions follow [Semantic Versioning](https://semver.org/).
   and the technique/casebook corpus) stays — that is the value; the scraper is not. `gen_mining_digest.py`
   remains (it only distills an existing local `MINED.csv`; it never fetched anything).
 
+### Fixed
+- **`RunUntilBudget` (assert_line_budget core) silently ate poked-state frames in its warmup — found by the
+  PONG-C1 rollout (2026-07-03).** The unconditional 2-frame stabilization run consumed the very frame a caller
+  had just poked into a worst-case alignment, so `poke → assert_line_budget` could NEVER observe a
+  single-frame overrun — the historical PONG 77cy coincidence bug was un-reproducible by direct poke for
+  exactly this reason (only persistent-state trajectories tripped it, by luck). The warmup now runs only on a
+  fresh boot (Frame<2); mid-session calls start monitoring immediately. Ground truth: a byte-faithful 77cy
+  replica (NetTbl load → 3×NOP, +2cy) with poked 3-edge alignment now reports over=true/152cy; the fixed
+  kernel reports over=false. Locked by `TestBudgetGuardNoWarmupWhenRunning` (frames consumed must equal
+  max_frames exactly when already running).
+
 ### Added
+- **`assert_line_budget` temporary ROM patch (`patch`/`pokes` params) — PONG-C2 (v1.103.0).** During the PONG
+  campaign every budget run required hand-editing the positioning table to lightweight values, assembling,
+  asserting, restoring, re-assembling (~15×; one forgotten restore = shipping a wrong ROM). The tool now takes
+  `patch: [{symbol|addr, bytes}]` — applied to a COPY of the loaded ROM (symbol resolved via the last
+  `assemble_and_load` listing, new `srcmap.Symbol()`), fresh-booted for the measurement, and the original ROM
+  is ALWAYS reloaded afterwards (deferred restore = the forget-to-restore failure mode is structurally gone).
+  `pokes: [{addr,value}]` seeds RAM after the patched boot for trajectory reproduction.
+- **`assert_edge_coincidence` — worst-path fuzz for edge-compare kernels — PONG-C1 (v1.103.0).** The PONG
+  PlayF kernel hid a 77-cycle line that only fires when ALL edge variables (ball bottom + paddle top + paddle
+  bottom) land on the SAME Y — free-run testing missed it for hundreds of frames (known-traps "N-edge
+  coincidence", found 2026-07-02). The tool pokes every listed zero-page edge variable to one Y, runs
+  `frames_per_y` frames under budget-guard semantics, sweeps Y over a range, and reports every failing
+  alignment (`fail_ys`, first at/cycles). Optional `patch` (auto-restored) combines with a lightweight
+  positioning table. Claim-level proof: rediscovers the historical 77cy bug on the pre-fix PONG binary,
+  passes on the fixed one.
 - **`framesim` scale-normalized comparison (`framesim.Resize` + `NormalizeSize`).** `framesim -a rom.bin -b
   screenshot.png` previously errored on a bounds mismatch (a 1× ROM render, 160×N, vs a 2× Stella screenshot,
   320×M), so a ROM could not be compared to a target screenshot. Both inputs are now downscaled (nearest-neighbor,

@@ -69,6 +69,19 @@ func Parse(lst, sym, asmPath string) *Map {
 	return m
 }
 
+// Symbol はシンボル表のラベル名からアドレスを返す（patch オプションの symbol 指定用）。
+func (m *Map) Symbol(name string) (uint16, bool) {
+	if m == nil {
+		return 0, false
+	}
+	for _, l := range m.labels {
+		if l.name == name {
+			return l.addr, true
+		}
+	}
+	return 0, false
+}
+
 // Line は PC に対応するソース行番号（1 起点）を返す。対応が無ければ ok=false。
 func (m *Map) Line(pc uint16) (int, bool) {
 	if m == nil {

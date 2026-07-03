@@ -36,3 +36,23 @@ func TestParseAndLocate(t *testing.T) {
 		t.Error("nil map should return empty")
 	}
 }
+
+func TestSymbol(t *testing.T) {
+	m := Parse(lstFix, symFix, "/tmp/demo.asm")
+	if a, ok := m.Symbol("VBwait"); !ok || a != 0xF01C {
+		t.Errorf("Symbol(VBwait) = %04X, %v", a, ok)
+	}
+	if a, ok := m.Symbol("Start"); !ok || a != 0xF000 {
+		t.Errorf("Symbol(Start) = %04X, %v", a, ok)
+	}
+	if _, ok := m.Symbol("COLUP0"); ok { // equ（$1000未満）は除外済み
+		t.Error("Symbol(COLUP0) should not resolve")
+	}
+	if _, ok := m.Symbol("Nope"); ok {
+		t.Error("Symbol(Nope) should not resolve")
+	}
+	var nilMap *Map
+	if _, ok := nilMap.Symbol("X"); ok {
+		t.Error("nil map Symbol should be false")
+	}
+}

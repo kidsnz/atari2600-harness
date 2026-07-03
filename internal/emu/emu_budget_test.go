@@ -56,3 +56,28 @@ func TestBudgetGuardNoFalsePositive(t *testing.T) {
 		}
 	}
 }
+
+// TestBudgetGuardNoWarmupWhenRunning は「無条件 warmup が poke で作った状態フレームを
+// 監視前に食い潰す」欠陥（PONG-C1 ロールアウトで実測発見・2026-07-03）の回帰ロック。
+// 既に走行中（Frame>=2）の呼び出しでは RunUntilBudget が余計なフレームを消費しないこと＝
+// 呼び出し直後のフレーム（poke が生きている）から監視が始まることを固定する。
+func TestBudgetGuardNoWarmupWhenRunning(t *testing.T) {
+	e, err := New("NTSC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.LoadROM("../../roms/litmus/litmus_pos.bin"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.RunFrames(5); err != nil {
+		t.Fatal(err)
+	}
+	start := e.Coords().Frame
+	if _, _, _, err := e.RunUntilBudget(3, 76); err != nil {
+		t.Fatal(err)
+	}
+	got := e.Coords().Frame - start
+	if got != 3 { // 修正前は warmup 2 フレームぶん余計に進んで 5 になっていた
+		t.Fatalf("frames consumed = %d, want exactly 3 (no hidden warmup when already running)", got)
+	}
+}

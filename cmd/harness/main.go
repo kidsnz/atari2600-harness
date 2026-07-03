@@ -8,6 +8,7 @@ import (
 	_ "image/jpeg"
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"image/png"
 	"os"
@@ -34,6 +35,9 @@ import (
 
 // curMap は assemble_and_load 経由ロード時の PC→ソース行対応（load_rom ではクリア）。
 var curMap *srcmap.Map
+
+// curROMPath は現在ロード中の ROM ファイル（patch オプションの復元先）。
+var curROMPath string
 
 // locate は PC をソース位置文字列へ（対応なしは空文字）。
 func locate(pc uint16) string { return curMap.Locate(pc) }
@@ -92,6 +96,7 @@ func handleLoadROM(ctx context.Context, req *mcp.CallToolRequest, in LoadROMIn) 
 	}
 	current = e
 	curMap = nil // .bin 直ロードはソース対応なし
+	curROMPath = in.Path
 	return nil, LoadROMOut{
 		Coords:  coordsOf(e),
 		Message: fmt.Sprintf("loaded %s (%s)", in.Path, spec),
@@ -145,6 +150,7 @@ func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in Ass
 		return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: out}, fmt.Errorf("assembled ok but load failed: %w", err)
 	}
 	current = e
+	curROMPath = bin
 	return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: out, Loaded: true, Coords: coordsOf(e)}, nil
 }
 
@@ -642,9 +648,26 @@ func handleBreakIf(ctx context.Context, req *mcp.CallToolRequest, in BreakIfIn) 
 
 // --- assert_line_budget（B-3: per-scanline サイクル予算ガード）---
 
+// PatchSpec は測定専用の一時 ROM パッチ（PONG-C2: XTable 差替儀式の構造的解消）。
+// symbol は直近 assemble_and_load のシンボル表から解決。パッチは ROM のコピーに適用され、
+// 測定後に元 ROM を再ロードして復元する（復元忘れという事故クラスを消す）。
+type PatchSpec struct {
+	Symbol string `json:"symbol,omitempty" jsonschema:"DASM symbol from the last assemble_and_load (e.g. XTable)"`
+	Addr   int    `json:"addr,omitempty" jsonschema:"absolute ROM address (e.g. 61522 = $F052); used when symbol is empty"`
+	Bytes  string `json:"bytes" jsonschema:"hex byte string to write at the location (e.g. 0e0e090e0e)"`
+}
+
+// PokeSpec は（再）起動直後・実行前に適用する RAM poke。
+type PokeSpec struct {
+	Addr  int `json:"addr" jsonschema:"RAM address"`
+	Value int `json:"value" jsonschema:"byte value"`
+}
+
 type BudgetIn struct {
-	MaxFrames int `json:"max_frames,omitempty" jsonschema:"upper bound on frames to run (default 1)"`
-	Budget    int `json:"budget,omitempty" jsonschema:"CPU-cycle budget per WSYNC interval (default 76 = one scanline)"`
+	MaxFrames int         `json:"max_frames,omitempty" jsonschema:"upper bound on frames to run (default 1)"`
+	Budget    int         `json:"budget,omitempty" jsonschema:"CPU-cycle budget per WSYNC interval (default 76 = one scanline)"`
+	Patch     []PatchSpec `json:"patch,omitempty" jsonschema:"temporary ROM byte patches applied to a COPY for this measurement only (fresh boot); the original ROM is reloaded afterwards"`
+	Pokes     []PokeSpec  `json:"pokes,omitempty" jsonschema:"RAM pokes applied after boot, before running (only with patch)"`
 }
 type BudgetOut struct {
 	Over       bool   `json:"over"`        // true=ある論理ラインが予算超過（ロール要因）で停止
@@ -653,6 +676,61 @@ type BudgetOut struct {
 	LineCycles int    `json:"line_cycles"` // そのラインが消費した概算 machine cycle（消費ライン数×76）
 	Coords     Coords `json:"coords"`
 }
+
+// applyTempPatch は現 ROM のコピーへ patch を適用して差し替えロードし、復元関数を返す。
+// 呼び出し側は必ず defer restore() すること（＝復元忘れの構造的防止が存在理由）。
+func applyTempPatch(e emuLike, patches []PatchSpec) (restore func(), err error) {
+	if curROMPath == "" {
+		return nil, fmt.Errorf("patch: no ROM path tracked (load via load_rom/assemble_and_load first)")
+	}
+	rom, err := os.ReadFile(curROMPath)
+	if err != nil {
+		return nil, fmt.Errorf("patch: read rom: %w", err)
+	}
+	base := 0x10000 - len(rom) // 4K→$F000 / 2K→$F800
+	for _, p := range patches {
+		addr := p.Addr
+		if p.Symbol != "" {
+			a, ok := curMap.Symbol(p.Symbol)
+			if !ok {
+				return nil, fmt.Errorf("patch: symbol %q not found (assemble_and_load required for symbols)", p.Symbol)
+			}
+			addr = int(a)
+		}
+		b, err := hex.DecodeString(strings.TrimPrefix(p.Bytes, "$"))
+		if err != nil {
+			return nil, fmt.Errorf("patch: bytes %q: %w", p.Bytes, err)
+		}
+		off := addr - base
+		if off < 0 || off+len(b) > len(rom) {
+			return nil, fmt.Errorf("patch: addr $%04X (+%d bytes) outside ROM ($%04X-$%04X)", addr, len(b), base, base+len(rom)-1)
+		}
+		copy(rom[off:], b)
+	}
+	tmp, err := os.CreateTemp("", "harness-patch-*.bin")
+	if err != nil {
+		return nil, fmt.Errorf("patch: temp: %w", err)
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(rom); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return nil, fmt.Errorf("patch: write temp: %w", err)
+	}
+	tmp.Close()
+	if err := e.LoadROM(tmpPath); err != nil {
+		os.Remove(tmpPath)
+		return nil, fmt.Errorf("patch: load patched rom: %w", err)
+	}
+	orig := curROMPath
+	return func() {
+		_ = e.LoadROM(orig) // 元 ROM を必ず復元（フレッシュブート状態になる）
+		os.Remove(tmpPath)
+	}, nil
+}
+
+// emuLike は applyTempPatch が必要とする最小 interface。
+type emuLike interface{ LoadROM(path string) error }
 
 func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetIn) (*mcp.CallToolResult, BudgetOut, error) {
 	mu.Lock()
@@ -666,6 +744,23 @@ func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetI
 	if maxFrames <= 0 {
 		maxFrames = 1
 	}
+	if len(in.Patch) > 0 { // PONG-C2: 一時パッチ（コピーに適用→測定→自動復元）
+		restore, err := applyTempPatch(e, in.Patch)
+		if err != nil {
+			return nil, BudgetOut{}, err
+		}
+		defer restore()
+		// フレッシュブートの Reset 初期化＋VSYNC 安定化を先に済ませてから pokes を適用する
+		// （順序を誤ると Reset の RAM クリアと RunUntilBudget の warmup が pokes を食い潰す）。
+		if err := e.RunFrames(2); err != nil {
+			return nil, BudgetOut{}, fmt.Errorf("warmup: %w", err)
+		}
+		for _, pk := range in.Pokes {
+			if err := e.Poke(uint16(pk.Addr), uint8(pk.Value)); err != nil {
+				return nil, BudgetOut{}, fmt.Errorf("poke $%04X: %w", pk.Addr, err)
+			}
+		}
+	}
 	over, atScanline, lineCycles, err := e.RunUntilBudget(maxFrames, in.Budget)
 	if err != nil {
 		return nil, BudgetOut{}, fmt.Errorf("run until budget: %w", err)
@@ -674,6 +769,100 @@ func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetI
 	if over {
 		out.At = locate(e.PC())
 	}
+	return nil, out, nil
+}
+
+// --- assert_edge_coincidence（PONG-C1: Nエッジ同一Y整列の worst-path fuzz）---
+// エッジ比較カーネル（cpy <edge> の束）の真の worst path＝「全エッジ変数が同じ Y に揃う」
+// を能動的に作って予算をassertする。free-run では数百フレーム踏まないことがある
+// 1cy 超過（known-traps "N-edge coincidence"）を数秒で網羅検出する。
+
+type EdgeCoinIn struct {
+	Addrs      []int       `json:"addrs" jsonschema:"zero-page RAM addresses of the edge variables to align (poked to Y+offset each case)"`
+	Offsets    []int       `json:"offsets,omitempty" jsonschema:"per-addr offsets (same length as addrs, default all 0): addr[i] is poked to Y+offsets[i] — use to keep coupled variables consistent (e.g. ball_end=Y, ball_top=Y-4, paddle_end=Y+height) so the sweep only visits REACHABLE worst cases"`
+	YMin       int         `json:"y_min,omitempty" jsonschema:"sweep start Y (default 0)"`
+	YMax       int         `json:"y_max,omitempty" jsonschema:"sweep end Y inclusive (default 182)"`
+	YStep      int         `json:"y_step,omitempty" jsonschema:"sweep step (default 1)"`
+	FramesPerY int         `json:"frames_per_y,omitempty" jsonschema:"frames to run per alignment (default 2 = the poked frame renders once)"`
+	Budget     int         `json:"budget,omitempty" jsonschema:"CPU-cycle budget per WSYNC interval (default 76)"`
+	Patch      []PatchSpec `json:"patch,omitempty" jsonschema:"optional temporary ROM patches (e.g. lightweight positioning table) applied for the sweep, auto-restored"`
+}
+type EdgeCoinOut struct {
+	Over       bool   `json:"over"`                  // true=少なくとも1つの整列Yで予算超過
+	FailYs     []int  `json:"fail_ys,omitempty"`     // 超過した整列Y（最大32個まで記録）
+	TestedYs   int    `json:"tested_ys"`             // 試行した整列Yの数
+	FirstAt    string `json:"first_at,omitempty"`    // 最初の超過のソース位置
+	FirstY     int    `json:"first_y,omitempty"`     // 最初の超過Y
+	LineCycles int    `json:"line_cycles,omitempty"` // 最初の超過ラインの消費（消費ライン×76）
+	Coords     Coords `json:"coords"`
+}
+
+func handleEdgeCoincidence(ctx context.Context, req *mcp.CallToolRequest, in EdgeCoinIn) (*mcp.CallToolResult, EdgeCoinOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, EdgeCoinOut{}, err
+	}
+	if len(in.Addrs) == 0 {
+		return nil, EdgeCoinOut{}, fmt.Errorf("addrs is required (the edge variables to align)")
+	}
+	if len(in.Offsets) > 0 && len(in.Offsets) != len(in.Addrs) {
+		return nil, EdgeCoinOut{}, fmt.Errorf("offsets length %d != addrs length %d", len(in.Offsets), len(in.Addrs))
+	}
+	yMax := in.YMax
+	if yMax <= 0 {
+		yMax = 182
+	}
+	yStep := in.YStep
+	if yStep <= 0 {
+		yStep = 1
+	}
+	framesPerY := in.FramesPerY
+	if framesPerY <= 0 {
+		framesPerY = 2
+	}
+	if len(in.Patch) > 0 {
+		restore, err := applyTempPatch(e, in.Patch)
+		if err != nil {
+			return nil, EdgeCoinOut{}, err
+		}
+		defer restore()
+	}
+	// フレッシュブート安定化を掃引前に済ませる（各Yの poke を Reset/warmup に食わせない）
+	if err := e.RunFrames(2); err != nil {
+		return nil, EdgeCoinOut{}, fmt.Errorf("warmup: %w", err)
+	}
+	out := EdgeCoinOut{}
+	for y := in.YMin; y <= yMax; y += yStep {
+		for i, a := range in.Addrs {
+			v := y
+			if len(in.Offsets) > 0 {
+				v += in.Offsets[i]
+			}
+			if err := e.Poke(uint16(a), uint8(v)); err != nil {
+				return nil, EdgeCoinOut{}, fmt.Errorf("poke $%04X: %w", a, err)
+			}
+		}
+		over, _, lineCycles, err := e.RunUntilBudget(framesPerY, in.Budget)
+		if err != nil {
+			return nil, EdgeCoinOut{}, fmt.Errorf("run (Y=%d): %w", y, err)
+		}
+		out.TestedYs++
+		if over {
+			if !out.Over {
+				out.Over = true
+				out.FirstY = y
+				out.FirstAt = locate(e.PC())
+				out.LineCycles = lineCycles
+			}
+			if len(out.FailYs) < 32 {
+				out.FailYs = append(out.FailYs, y)
+			}
+		}
+	}
+	out.Coords = coordsOf(e)
 	return nil, out, nil
 }
 
@@ -1129,7 +1318,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.102.0",
+		Version: "1.103.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -1151,7 +1340,8 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
-	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed). Observes ONE run (∃) — for an all-paths proof use prove_line_budget."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed). Observes ONE run (∃) — for an all-paths proof use prove_line_budget. Optional patch=[{symbol|addr,bytes}] applies temporary ROM byte patches to a COPY for this measurement only (e.g. a lightweight positioning table), fresh-boots it, and ALWAYS reloads the original ROM afterwards — replaces the hand-edit→assemble→assert→restore ritual and its forget-to-restore failure mode. pokes=[{addr,value}] seeds RAM after the patched boot."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "assert_edge_coincidence", Description: "Worst-path fuzz for edge-compare kernels (PONG-class): the true per-line worst case is ALL edge variables (ball top/bottom, paddle tops/bottoms...) landing on the SAME Y (+~5cy per extra hit) — an overrun free-running tests can miss for hundreds of frames. Pokes every listed zero-page address to the same Y, runs frames_per_y frames under assert_line_budget semantics, sweeps Y over [y_min..y_max], and reports every failing alignment. Optional patch (auto-restored) for lightweight positioning tables."}, handleEdgeCoincidence)
 	mcp.AddTool(server, &mcp.Tool{Name: "prove_line_budget", Description: "Statically PROVE a kernel's per-scanline cycle budget over ALL reachable paths (∀) — the static sibling of assert_line_budget, which observes only one run (∃). Assembles asm_path, decodes from the reset/IRQ/NMI vectors, cuts the CFG at every STA WSYNC, and proves each WSYNC-to-WSYNC region's worst-case CPU cycles <= budget (default 76). Returns certified plus any over-budget regions (each with a cycle-by-cycle worst path + source location) and any regions it could not bound (unbounded loop / JSR / indirect JMP), reported honestly rather than passed. Run it BEFORE executing a kernel to catch a branch path that overruns only sometimes — the timing trap that rolls the screen on hardware while a lucky run looks fine. Single-bank flat 2K/4K kernels."}, handleProveLineBudget)
 	mcp.AddTool(server, &mcp.Tool{Name: "trace_clocks", Description: "Execute the next N instructions and return each one's beam anatomy: PC, opcode, CPU cycles (WSYNC stalls visible as large counts), and start/end (scanline, color clock). Sub-instruction OBSERVATION granularity — the practical recovery of step_clock (Gopher2600 cannot suspend mid-instruction; see docs/mcp-tools.md)."}, handleTraceClocks)
 	mcp.AddTool(server, &mcp.Tool{Name: "beamtrace", Description: "Write→visible-pixel timeline (authoring aid): trace `frames` frames and return, per scanline, every TIA write with the beam clock it lands at, the register name/kind, the value, and the visible-pixel span [vis_from,vis_to) it governs (until the next write to the same register). Answers 'where on the line does this sta GRP0 actually paint?'. Omit `scanline` for all scanlines that have writes. ADVANCES the emulator `frames` frames — set up the state first."}, handleBeamtrace)

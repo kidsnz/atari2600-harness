@@ -392,6 +392,27 @@ evaluating EVERY tool (log: `sandbox/practice/pong/TOOL-EVAL.md`). Findings that
   (one player, one PF), missed the full-width walls, and quantized white to $0A. Improvements: repeated-pattern
   (net) summarisation, symmetric/same-kind recognition, thin full-width wall detection, PF↔foreground split,
   B&W quantization. (The richer path is `fieldtest` multi-frame + `dissect` on the real ROM — to be evaluated.)
+- **PONG-C1 — ✅ DONE (v1.103.0, 2026-07-03).** Shipped as `assert_edge_coincidence` (addrs+offsets coupled
+  sweep, optional patch). Live-proven: detects a byte-faithful replica of the historical 77cy bug at PFp1;
+  fixed kernel passes 139 reachable alignments. The rollout also exposed+fixed the RunUntilBudget warmup flaw
+  (see CHANGELOG). Original design note kept below for provenance.
+  Original: edge-coincidence fuzz case (from the 77cy latent bug, 2026-07-02). A per-line edge-compare
+  kernel's true worst path = ALL edge variables on the SAME Y (+~5cy per hit) — free-run budget testing missed
+  it for hundreds of frames (known-traps "N-edge coincidence"). Capability: a scenario/fuzz primitive that
+  reads a declared list of "edge variables" (or auto-mines `cpy zp` targets in the kernel PC range), pokes
+  them all to one Y (sweep Y), and runs `assert_line_budget` per alignment. Substrate exists (guidedfuzz,
+  scenario poke steps, assert_line_budget) — this is a targeted generator, not a new engine. Size: S-M.
+  Rollout per the interactive full-integration rule (implement → MCP/scenario wiring → smoke → live-use proof).
+- **PONG-C2 — ✅ DONE (v1.103.0, 2026-07-03).** Shipped as `patch`/`pokes` params on `assert_line_budget`
+  (+`patch` on `assert_edge_coincidence`); symbol resolution via `srcmap.Symbol`. Live-proven: full 600f
+  lightweight-table run in one call, original ROM byte-identical afterwards (peek $F000=45 + file md5).
+  Original design note kept below for provenance.
+  Original: `assert_line_budget` temporary-patch option (from the XTable-swap ritual). During PONG every
+  budget run required: hand-edit XTable to light values → assemble → assert → restore → re-assemble (done
+  ~15×; one forgotten restore = shipping a wrong ROM). Capability: `assert_line_budget` (and
+  `prove_line_budget`) accept `patch: [{addr|symbol, bytes}]` applied to a COPY of the loaded ROM for the
+  measurement only, auto-reverted after — kills the ritual and the restore-forgetting failure mode.
+  Needs symbol lookup from the DASM listing (or raw addr). Size: S. Same interactive rollout.
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing

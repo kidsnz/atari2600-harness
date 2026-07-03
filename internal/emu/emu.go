@@ -843,8 +843,13 @@ func (e *Emu) RunUntilBudget(maxFrames, budgetCycles int) (over bool, atScanline
 
 	// 起動直後の数フレームはリセット／VSYNC 同期が安定せず WSYNC 間隔が乱れる（実測: frame 0 で
 	// strobe が scanline 22→30 と飛ぶ）。誤検知を避けるため計測前に 2 フレーム空走して安定させる。
-	if err := e.RunFrames(2); err != nil {
-		return false, 0, 0, err
+	// ★フレッシュブート時のみ（Frame<2）。無条件 warmup は「poke で作った整列状態のフレーム」を
+	// 監視前に食い潰す欠陥だった（PONG-C1 ロールアウトで実測発見：77cy 整列超過が poke+assert で
+	// 再現不能だった真因。トラジェクトリ経由の超過は状態が持続するため偶然検出できていた）。
+	if e.VCS.TV.GetCoords().Frame < 2 {
+		if err := e.RunFrames(2); err != nil {
+			return false, 0, 0, err
+		}
 	}
 
 	target := e.VCS.TV.GetCoords().Frame + maxFrames
