@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Docs
+- Knowledge captured from the sandbox PONG feel-pass (pf2-06, 2026-07-03): technique **#29 sub-pixel velocity
+  (DDA error accumulator)** — fractional speed while the position stays a 1-byte integer
+  (`docs/techniques/subpixel-velocity.md`); two `known-traps` rows (`bpl`/`bmi` clamp on a coordinate that
+  legitimately exceeds 127 → use wrap-magnitude not bit7; immediate `ld_` clobbering N/Z between a flag-set
+  and its branch → branch first or go branchless); backlog **PONG-C3** (per-line WORST cycle count, not just
+  pass/fail — the highest-leverage tool gap the feel-pass surfaced). Docs-only; no tool/behavior change.
+
 ## [1.103.0] - 2026-07-03
 
 Interactive rollout of the two PONG-campaign capabilities (backlog PONG-C1/C2), live-proven on the real

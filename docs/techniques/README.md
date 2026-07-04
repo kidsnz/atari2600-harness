@@ -37,6 +37,7 @@ with confidence, from basics to advanced tricks.
 | 23 | Pseudo-3D road — M0/M1 shoulders + BL dashed centre, widening per band | advanced | [road.md](road.md) | `roms/techniques/road.asm` | ✅ widening wedge verified, steerable, CI-locked |
 | 27 | HMOVE two-step — reach screen edges past the ÷15 budget wall (clamp input + 2nd HMOVE drift) | intermediate | [hmove-two-step.md](hmove-two-step.md) | (in-game: sandbox PONG `pf2_02_flyoff-right`) | 🔶 in-game verified (read_row edge pixels + budget); standalone demo/CI TODO |
 | 28 | Asymmetric-PF two-digit score — mid-line PF1/PF2 rewrite = 4 independent digit fields | advanced | [asymmetric-pf-score.md](asymmetric-pf-score.md) | (in-game: sandbox PONG `pf2_score-2digit-playfield`+) | 🔶 in-game verified (all digits read_row); standalone demo/CI TODO |
+| 29 | Sub-pixel velocity (DDA accumulator) — fractional speed while the POSITION stays a 1-byte integer | intermediate | [subpixel-velocity.md](subpixel-velocity.md) | (in-game: sandbox PONG `pf2_06_feel-rally-ai-serve`) | 🔶 in-game verified (per-tier px/frame measured exact); standalone demo/CI TODO |
 
 What to absorb next (prioritized, with sources): **[roadmap.md](roadmap.md)** — e.g. 48-px score / 2-line
 kernel / vertical positioning / sound / animation / playfield tricks / general flicker kernel / bank switching.

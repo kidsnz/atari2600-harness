@@ -414,6 +414,23 @@ evaluating EVERY tool (log: `sandbox/practice/pong/TOOL-EVAL.md`). Findings that
   measurement only, auto-reverted after — kills the ritual and the restore-forgetting failure mode.
   Needs symbol lookup from the DASM listing (or raw addr). Size: S. Same interactive rollout.
 
+- **PONG-C3 — per-line WORST cycle count, not just pass/fail (from the pf2-06 feel-pass, 2026-07-03).**
+  `assert_line_budget` answers "did any line exceed budget, and where's the first one" — a boolean + the
+  offender label + `line_cycles` which, on an overrun, reads `152` (= it spilled to a 2nd WSYNC line), NOT
+  the real cycle count. So when a physics row lands at ~76-78cy you cannot see *how much* to trim; you binary-
+  search budgets (76 over / 75 not) or hand-count cycles — and hand-counting was wrong by ±2cy repeatedly this
+  session (page-cross branch, an `ld_` clobbering a flag), costing ~4 assemble/assert iterations per row. The
+  root friction: **the overscan physics rows aren't at fixed scanlines** (their Y drifts frame to frame), so
+  `beamtrace`/`step_scanline`/`breakif(scanline)` are awkward to aim at "row 5 on its worst frame," and
+  `breakif(until_scanline)` did not halt as expected on the drifting overscan (unconfirmed — possible tool
+  quirk worth a separate look). Capability: report, per **labeled line** (start label → next WSYNC), its
+  **max cycles across N frames** + the frame/Y where it peaked + the arg values that produced it — i.e. the
+  quantitative sibling of the boolean `assert_line_budget`. Ideal: fold into `prove_line_budget` (static ∀
+  over paths already knows each line's exact worst — just surface the number per line instead of a global
+  verdict). That turns "trim by guess-and-assert" into "trim by the exact margin." Size: S–M (the cycle
+  accounting exists in `internal/cyclebound`/`emu`; this is mostly surfacing it per-line). Same interactive
+  rollout. **This is the highest-leverage tool gap the feel-pass surfaced.**
+
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
 surface (testing-playbook methods, `stellacheck`, litmus V2-1…18, golden/regress/refdiff, G1–G14) — see each
