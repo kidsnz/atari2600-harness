@@ -15,6 +15,13 @@ versions follow [Semantic Versioning](https://semver.org/).
   legitimately exceeds 127 → use wrap-magnitude not bit7; immediate `ld_` clobbering N/Z between a flag-set
   and its branch → branch first or go branchless); backlog **PONG-C3** (per-line WORST cycle count, not just
   pass/fail — the highest-leverage tool gap the feel-pass surfaced). Docs-only; no tool/behavior change.
+- More knowledge from the PONG serve-refinement + AI-variants work (2026-07-04/06): a `known-traps` row for
+  **`cmp` clobbering Z between a load and a test-for-zero branch** (sibling of the immediate-`ld` clobber;
+  hit as a real serve-clamp bug where `0→1` silently failed); a **range-dependent-threshold** note on the
+  bit7-clamp trap (a `BallRow + 8·DY` lead reaches ~202 so the wrap threshold must be `#220`, not `#200`);
+  and reinforcing evidence on backlog **PONG-C3** (building 3 swappable AI kernels hit the same
+  guess-and-assert budget loop — design estimate 61cy vs real ~78cy — confirming it recurs on every
+  budget-tight kernel). Docs-only; no tool/behavior change.
 
 ## [1.103.0] - 2026-07-03
 

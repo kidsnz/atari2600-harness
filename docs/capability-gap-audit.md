@@ -430,6 +430,14 @@ evaluating EVERY tool (log: `sandbox/practice/pong/TOOL-EVAL.md`). Findings that
   verdict). That turns "trim by guess-and-assert" into "trim by the exact margin." Size: S–M (the cycle
   accounting exists in `internal/cyclebound`/`emu`; this is mostly surfacing it per-line). Same interactive
   rollout. **This is the highest-leverage tool gap the feel-pass surfaced.**
+  - **More evidence (AI-variants build, 2026-07-06):** building 3 swappable row-4 AI kernels hit the exact
+    same guess-and-assert loop repeatedly — v4's rubber-band overran because a clamp-high + loose-error +
+    up-move path combination landed ~2cy over (the design-time hand estimate said 61cy, real was ~78), and
+    v2's predictive kernel overran when a +8cy accuracy tweak pushed one of ~6 branchy paths over. Each cost
+    a full assemble→assert→re-trim cycle to find, and the fix was structural (move work to a slack row).
+    A per-line worst-cycle readout (with the winning path's arg values) would have shown "row4 worst = 78cy
+    on the loose+clamp-high+up path" immediately. Strengthens the case: this recurs on *every* budget-tight
+    kernel, not just PONG's physics rows.
 
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
