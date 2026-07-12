@@ -13,6 +13,7 @@
 |---|---|---|---|
 | Fishing Derby | 1980 Activision / David Crane（逆アセン Dennis Debro） | 2K / 単画面スポーツ | 大型不定形・斜めの線・多ターゲットのオブジェクト経済・対向スコア・同種衝突・無コスト演出 |
 | Breakout | 1978 Atari / Brad Stewart（逆アセン Dennis Debro） | 2K / 単画面アクション | **build-to-learn 初実装**（[[build-to-learn]]）＝自作で「書けた」技：多領域PFカーネル・RAM駆動の破壊可能PF・BL/P0位置決め・キーパドル・位置ベース衝突・サーブ/残球のゲーム状態 |
+| PONG | 2026 in-house capstone | 4K / 単画面スポーツ | 対戦AIの4パラダイム（倒せる設計込み）・不完全さの調律（誤差/遅延）・排他パスの共有末尾スキップで予算捻出・**AI強さの非推移性（単一基準ベンチ≠総当たり）** |
 
 ## Breakout（Atari 1978）— build-to-learn の worked example（「書けた」技）
 `build-to-learn.md` の手順で、マニュアル＋逆アセン＋実ROM寸法スペックから**自作で8段（rung1-8）を実装し遊べる1人用 Breakout を完成**。各段は実ROMに数値照合。＝「説明できる」が「自分で書ける」に変わった実証。出典＝`reference/disassemblies/_casestudies/breakout/`（impl-map/fixtures/method-diff/layout-compare）＋`roms/breakout/`（自作ROM・steps/に各段スナップショット）。
@@ -58,3 +59,23 @@
 
 ### このケースが定量化した能力ギャップ（→ `capability-gap-audit.md`／`roms/EVALUATION.md`）
 Claude の封印再構築 vs 実装の差分＝**衝突・入力・難易度の“ロジック”は読めるが、TIA を絞り切る描画 craft（1スプライト成形・斜線・多重利用・無コスト演出）で実ベテランに劣る**。詳細台帳＝`reference/disassemblies/_casestudies/fishing-derby/diff-gaps.ja.md`。
+
+---
+
+## PONG（in-house capstone, 2026）— 対戦AIの4パラダイムと「強さ」の測り方
+市販ゲーム逆アセンでなく、**自作 capstone（1枚画像→完成PONG）で実測裏取りした gameplay 事例**（Breakout 同様「書けた」側のエントリ）。4変種は本流から**AIコードのみ**差替（物理/english/サーブ/音/スコアは完全同一＝純粋比較）・全本で実機予算検証済（全物理行≤76cy・900f over:false）。出典＝`sandbox/practice/pong/ai-variants/`（README＝4種設計・`bench/README.md`＝客観ベンチ＋総当たり実測・2026-07）。
+
+- **状況：倒せる対戦相手AI（パドル系）が要る**
+  → 古典PONG-AIの**4大パラダイム**から選ぶ。鍵＝**攻略口は後付けでなく設計入力**（各型に構造的な負け筋を残す）：
+  | 型 | 仕組み | 攻略口（designed beatability） |
+  |---|---|---|
+  | 追従 tracker | 現在Yを遅延追従（8fに1回再サンプル・3px） | 再サンプルの一拍遅れを速球・角度変化で抜く |
+  | 予測迎撃 predictive | 影ボール（実ボールの2倍速で前進＋**壁反射込み**）で着弾Yを確定→先回り待機 | 着弾確定後の角度変化（english/WHAMMY急球）・注入した誤読（1/16で逆読み） |
+  | 先読みリード anticipatory | 線形外挿 target=BallRow+4×BallDY・毎f連続2px（滑らか） | **壁を読まない**＝バウンド球に見当違いの先行 |
+  | ラバーバンド rubberband | スコア差で**誤差幅**を変調（負け=締める/勝ち=甘い）・速度2px固定 | リードすると緩む＋人間の瞬間速度優位（WHAMMY±3 > AI2px） |
+- **状況：AIの「らしさ」＝不完全さを調律したい**
+  → 速度でなく**誤差と遅延**で作る：狙い誤差 AIErr の注入（生成は余裕のある行へ移設）・反応遅延（再サンプル間隔）・速度上限。難易度可変は「**誤差幅の変調**」（速度変調は見た目でバレる・誤差変調はバレにくい＝ゲームAIの定石）。
+- **状況：カーネル予算が足りず精度を上げられない**
+  → **排他パスで不要な共有末尾をスキップして予算を捻出**：v2 は予測フェーズ中パドルが動かない＝共有末尾 PaddleR_End 再計算（10cy）が不要→`jmp OverEnt` で housekeeping 行へ直行。**浮いた10cyで影ボールの傾きを近似（X速3固定）→正確（2×BallDX＝全速度で正確）へ強化**。design-principles「物理行の間借り」の変種＝パス固有に不要な共有処理を見つけて省き、浮いた分を精度に回す。
+- **状況：AIの強さを測りたい（評価・バランス調整）**
+  → **単一基準ベンチは1つのレンズにすぎず、順位を正反対に誤り得る（実測）**。固定基準AI（決定論1px追従）相手の11点先取では v4 11-0／v1 11-1／v3 1-11／v2 1-11＝「v4>v1>v3≈v2」。だが**総当たり（head-to-head・AIを左パドルへ移植し左右反転で side bias 排除）の真実は v3≈v4 ＞ v2 ＞ v1**——v1 は 0勝3敗の最弱（8f再サンプル遅延を実AIに突かれる）・v3/v4 は 37000f 走らせても 0-0 の完全膠着。基準を混ぜると **v1→基準→{v2,v3}→v1 の循環＝強さは非推移（ジャンケン）**。さらに**客観ベンチ≠人間相手の難易度**：v3 は完璧追従の基準には 1-11 で「弱」だが、追従が不完全な人間には「中・なんとか勝てる」＝本流採用。教訓＝**AI の強さは相手依存で一次元でない。真の評価は総当たり＋多様な相手モデル**（→ harness backlog の gameplay-verification フロンティア）。

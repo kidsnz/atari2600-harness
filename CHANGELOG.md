@@ -22,6 +22,16 @@ versions follow [Semantic Versioning](https://semver.org/).
   and reinforcing evidence on backlog **PONG-C3** (building 3 swappable AI kernels hit the same
   guess-and-assert budget loop — design estimate 61cy vs real ~78cy — confirming it recurs on every
   budget-tight kernel). Docs-only; no tool/behavior change.
+- Knowledge captured from the PONG AI-variants + objective-benchmark work (2026-07-06..11): two 6502 idioms
+  in `design-principles.md` — sign-preserving ×2^n via repeated `asl` on two's-complement values (with the
+  widened-range clamp caveat: bit7 stops being usable as a sign, so clamp by value range), and packed-BCD
+  bytes comparing correctly with a plain `cmp` (binary order = decimal order; but binary *differences*
+  overstate decimal ones across a digit boundary — bucket/saturate before using them as magnitudes). Plus a
+  new in-house PONG section in `casebook.md`: the four classic paddle-AI paradigms with designed-in
+  beatability, imperfection tuning via error/delay rather than speed, the exclusive-path shared-tail-skip
+  (`jmp OverEnt`) budget-carving pattern, and the measured **non-transitivity of AI strength** (a
+  single-baseline ranking refuted by a round-robin: the baseline's "strong" tracker is actually the weakest
+  head-to-head). Docs-only; no tool/behavior change.
 
 ## [1.103.0] - 2026-07-03
 
