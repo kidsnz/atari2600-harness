@@ -439,6 +439,35 @@ evaluating EVERY tool (log: `sandbox/practice/pong/TOOL-EVAL.md`). Findings that
     on the loose+clamp-high+up path" immediately. Strengthens the case: this recurs on *every* budget-tight
     kernel, not just PONG's physics rows.
 
+- **PONG-C4 — gameplay-behavior verification: headless match harness (AI strength / physics invariants /
+  fairness) (from the C1 objective bench + round-robin, 2026-07-11).**
+  The harness is strong on timing/rendering (assert/prove_line_budget, beamtrace, framesim, …) but has no
+  primitives for *game behavior*: PONG's AI, serve, physics and fairness were all verified with hand-rolled
+  pokes and ad-hoc free-runs. The C1 campaign (`sandbox/practice/pong/ai-variants/bench/` + `matchup/`)
+  exposed both the need and the method — and its central caveat:
+  - Building it by hand meant **one hand-edited ROM per pairing** (4 bench variants + 7 matchup ROMs, each
+    transplanting an AI into the left-paddle input path). That's the ritual to kill.
+  - A single fixed baseline opponent produced a ranking (v4>v1>v3≈v2) that the round-robin **refuted**
+    (true head-to-head order v3≈v4>v2>v1; strength is non-transitive — a v1→baseline→{v2,v3}→v1 cycle). So
+    the capability must support **N×N tournaments**, not a lone benchmark opponent, and the honest output is
+    the matrix, not a scalar rank.
+  Capability sketch — input: ROM + a declared "actor interface" (which RAM addr / input register the harness
+  drives for one side), a parameterized scripted policy (k-px tracker with delay/error knobs), match rules
+  (first-to-N via BCD score addrs, or fixed frames), optionally a set of ROMs/policies for round-robin.
+  Output: per-pairing final scores, the tournament matrix, per-match traces (points timeline, rally lengths)
+  — typed JSON numbers like every other tool. Second half: **behavioral invariants under long free-run fuzz**
+  (ball-speed bounds, paddle range, score monotonicity/BCD validity, serve fairness left vs right) = the
+  physics/fairness siblings of the same primitive.
+  Dedup: `run_scenario` has input timelines + assertions but no closed-loop policy driving; `guidedfuzz`
+  drives inputs but coverage-guided, not policy-scripted; `trajdiff` compares vs a reference ROM, not vs a
+  policy. Caveat baked in from C1: any scripted opponent is ONE lens (objective strength ≠ human difficulty:
+  v3 measured 1-11 vs a perfect 1px tracker yet plays "medium" for a human) — the opponent model must be an
+  explicit, swappable parameter. Size: M (frame-loop input driving exists in the scenario substrate; the
+  work is the actor-interface declaration + match bookkeeping + matrix reporting). Registration only —
+  implementation is a separate approval.
+  Provenance: `sandbox/practice/pong/ai-variants/bench/README.md` (baseline bench + round-robin tables,
+  37000f v3–v4 stalemate, side-bias check via left/right transplant) + `docs/casebook.md` PONG section.
+
 ## How this stays finite & honest
 Provenance is attached to every item (papers/tools/in-tree symbols). Each is de-duped against the existing
 surface (testing-playbook methods, `stellacheck`, litmus V2-1…18, golden/regress/refdiff, G1–G14) — see each

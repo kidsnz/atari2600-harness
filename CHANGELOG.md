@@ -32,6 +32,12 @@ versions follow [Semantic Versioning](https://semver.org/).
   (`jmp OverEnt`) budget-carving pattern, and the measured **non-transitivity of AI strength** (a
   single-baseline ranking refuted by a round-robin: the baseline's "strong" tracker is actually the weakest
   head-to-head). Docs-only; no tool/behavior change.
+- Backlog **PONG-C4** registered (`capability-gap-audit.md`): gameplay-behavior verification — a headless
+  match harness (declared actor interface + parameterized scripted opponent + match rules → per-pairing
+  scores and an N×N tournament matrix) plus behavioral-invariant fuzz (speed bounds, score monotonicity,
+  serve fairness). Generalizes the hand-built C1 bench/round-robin ROMs; the C1-measured non-transitivity
+  is baked in as a design constraint (tournament matrix, not a scalar rank; opponent model = explicit
+  parameter). Registration only — implementation is a separate approval.
 
 ## [1.103.0] - 2026-07-03
 
