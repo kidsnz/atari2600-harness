@@ -56,6 +56,7 @@ must always hold *only* in a doc — burn them here or into memory.
   **`step_scanline`** (v0.15.0, advance until scanline +1) / **`step_instruction`** (v0.15.0, one instruction at a time) /
   **`assemble_and_load`** (v0.16.0, dasm→load in one shot; on failure returns structured dasm output) /
   **`read_audio`** (v0.17.0, reads TIA audio AUDC/AUDF/AUDV numerically = verify sound with numbers too) /
+  **`read_audio_trace`** (v1.104.0, the read_motion of sound: traces AUDC/AUDF/AUDV per-frame over N frames = a whole sound envelope in one call instead of hand-stepping read_audio) /
   **`read_bank`** (v0.43.0, current cartridge bank at PC + is_ram; **F8/F6/F4 verified** (litmus_bank, _f6, _f4), scenario fields `bank.number`/`bank.is_ram`) /
   **`analyze_image`** (v1.12.0+, screenshot→TIA data; multi-frame `paths[]` = static/dynamic separation + union tracks + flicker; `docs/ingest.md`) /
   **`analyze_screen`** (v1.19.0, ingest on the current emulator frame) / **`run_scenario`** (v1.19.0, regression verdicts live) /

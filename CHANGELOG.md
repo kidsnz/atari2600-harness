@@ -8,6 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`read_audio_trace`** (v1.104.0) — trace the TIA audio registers (AUDC control / AUDF freq / AUDV volume)
+  for both channels over N frames, returning the per-frame `control[]/freq[]/volume[]` time-series. The audio
+  analog of `read_motion`: captures a whole sound envelope (a fire/explosion attack-decay, an engine pitch
+  change) in one call instead of stepping frame-by-frame with `read_audio` by hand. ADVANCES the emulator N
+  frames, so trigger the sound first. Motivated by the sandbox Combat clean-room sound pass, where capturing
+  each of engine/fire/explosion took ~30 manual step+read_audio calls. `cmd/harness` handler +
+  `AudioTraceOut`; smoke-tested (`initialize OK 1.104.0`). **Requires MCP reconnect** to become callable.
+
 ### Docs
 - Knowledge captured from the sandbox PONG feel-pass (pf2-06, 2026-07-03): technique **#29 sub-pixel velocity
   (DDA error accumulator)** — fractional speed while the position stays a 1-byte integer

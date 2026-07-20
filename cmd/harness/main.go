@@ -13,6 +13,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -437,6 +438,51 @@ func handleReadAudio(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) 
 	return nil, ReadAudioOut{AudioState: st, Note0: noteOf(st.Channel0), Note1: noteOf(st.Channel1), Coords: coordsOf(e)}, nil
 }
 
+// --- read_audio_trace（音の時系列＝read_audio の read_motion 版。音の包絡を一括で採る）---
+
+type AudioTraceIn struct {
+	Frames int `json:"frames,omitempty" jsonschema:"frames to trace (default 40); ADVANCES the emulator this many frames"`
+}
+type AudioChannelTrace struct {
+	Control []uint8 `json:"control"` // AUDC per frame（波形/音色）
+	Freq    []uint8 `json:"freq"`    // AUDF per frame（分周＝音程）
+	Volume  []uint8 `json:"volume"`  // AUDV per frame（音量＝包絡）
+}
+type AudioTraceOut struct {
+	Frames   int               `json:"frames"`
+	Channel0 AudioChannelTrace `json:"channel0"`
+	Channel1 AudioChannelTrace `json:"channel1"`
+	Coords   Coords            `json:"coords"`
+}
+
+func handleReadAudioTrace(ctx context.Context, req *mcp.CallToolRequest, in AudioTraceIn) (*mcp.CallToolResult, AudioTraceOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, AudioTraceOut{}, err
+	}
+	frames := in.Frames
+	if frames == 0 {
+		frames = 40
+	}
+	var c0, c1 AudioChannelTrace
+	for f := 0; f < frames; f++ {
+		if _, err := e.StepFrame(); err != nil {
+			return nil, AudioTraceOut{}, err
+		}
+		st := e.ReadAudio()
+		c0.Control = append(c0.Control, st.Channel0.Control)
+		c0.Freq = append(c0.Freq, st.Channel0.Freq)
+		c0.Volume = append(c0.Volume, st.Channel0.Volume)
+		c1.Control = append(c1.Control, st.Channel1.Control)
+		c1.Freq = append(c1.Freq, st.Channel1.Freq)
+		c1.Volume = append(c1.Volume, st.Channel1.Volume)
+	}
+	return nil, AudioTraceOut{Frames: frames, Channel0: c0, Channel1: c1, Coords: coordsOf(e)}, nil
+}
+
 // --- read_collisions（P1: CXxx を構造化）---
 
 type ReadCollisionsOut struct {
@@ -768,6 +814,105 @@ func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetI
 	out := BudgetOut{Over: over, AtScanline: atScanline, LineCycles: lineCycles, Coords: coordsOf(e)}
 	if over {
 		out.At = locate(e.PC())
+	}
+	return nil, out, nil
+}
+
+// --- profile_line_budget（PONG-C3: assert_line_budget の定量版＝行別ワースト実測）---
+
+type ProfileLinesIn struct {
+	MaxFrames int         `json:"max_frames,omitempty" jsonschema:"frames to profile (default 30)"`
+	Watch     []string    `json:"watch,omitempty" jsonschema:"RAM locations to snapshot at the OPENING strobe of each line's worst interval — DASM symbols (assemble_and_load required) or addresses ($A8 / 0x84 / 132). These are the arg values the worst path read."`
+	Top       int         `json:"top,omitempty" jsonschema:"return only the N worst lines (default all)"`
+	Patch     []PatchSpec `json:"patch,omitempty" jsonschema:"temporary ROM byte patches applied to a COPY for this measurement only (fresh boot); the original ROM is reloaded afterwards"`
+	Pokes     []PokeSpec  `json:"pokes,omitempty" jsonschema:"RAM pokes applied after boot, before profiling (only with patch)"`
+}
+type ProfileLine struct {
+	At            string         `json:"at,omitempty"` // 開き STA WSYNC のソース位置（assemble_and_load 経由時）
+	PC            string         `json:"pc"`           // 開き STA WSYNC の PC（hex）
+	WorstCycles   int            `json:"worst_cycles"` // 実測ワースト CPU cy（≤76 なら1ラインに収まっている）
+	WorstLines    int            `json:"worst_lines"`  // ワースト時の消費物理ライン数
+	Count         int            `json:"count"`        // 計測区間数
+	WorstFrame    int            `json:"worst_frame"`
+	WorstScanline int            `json:"worst_scanline"`
+	Watch         map[string]int `json:"watch,omitempty"` // ワースト区間開始時点の watch RAM 値
+}
+type ProfileLinesOut struct {
+	Lines  []ProfileLine `json:"lines"`
+	Coords Coords        `json:"coords"`
+}
+
+// resolveRAMRef は "$A8" / "0x84" / "132" / DASMシンボル を RAM アドレスへ解決する。
+func resolveRAMRef(s string) (uint16, error) {
+	if a, ok := curMap.Symbol(s); ok {
+		return a, nil
+	}
+	t := strings.TrimPrefix(strings.TrimPrefix(s, "$"), "0x")
+	if v, err := strconv.ParseUint(t, 16, 16); err == nil && (strings.HasPrefix(s, "$") || strings.HasPrefix(s, "0x")) {
+		return uint16(v), nil
+	}
+	if v, err := strconv.ParseUint(s, 10, 16); err == nil {
+		return uint16(v), nil
+	}
+	return 0, fmt.Errorf("watch %q: not a known symbol (assemble_and_load required for symbols) nor an address", s)
+}
+
+func handleProfileLines(ctx context.Context, req *mcp.CallToolRequest, in ProfileLinesIn) (*mcp.CallToolResult, ProfileLinesOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, ProfileLinesOut{}, err
+	}
+	maxFrames := in.MaxFrames
+	if maxFrames <= 0 {
+		maxFrames = 30
+	}
+	watchAddrs := make([]uint16, len(in.Watch))
+	for i, w := range in.Watch {
+		a, err := resolveRAMRef(w)
+		if err != nil {
+			return nil, ProfileLinesOut{}, err
+		}
+		watchAddrs[i] = a
+	}
+	if len(in.Patch) > 0 { // C2 と同じ一時パッチ規律（コピーに適用→測定→自動復元）
+		restore, err := applyTempPatch(e, in.Patch)
+		if err != nil {
+			return nil, ProfileLinesOut{}, err
+		}
+		defer restore()
+		if err := e.RunFrames(2); err != nil {
+			return nil, ProfileLinesOut{}, fmt.Errorf("warmup: %w", err)
+		}
+		for _, pk := range in.Pokes {
+			if err := e.Poke(uint16(pk.Addr), uint8(pk.Value)); err != nil {
+				return nil, ProfileLinesOut{}, fmt.Errorf("poke $%04X: %w", pk.Addr, err)
+			}
+		}
+	}
+	rows, err := e.ProfileLineWorst(maxFrames, watchAddrs)
+	if err != nil {
+		return nil, ProfileLinesOut{}, fmt.Errorf("profile lines: %w", err)
+	}
+	if in.Top > 0 && len(rows) > in.Top {
+		rows = rows[:in.Top]
+	}
+	out := ProfileLinesOut{Coords: coordsOf(e), Lines: make([]ProfileLine, len(rows))}
+	for i, r := range rows {
+		pl := ProfileLine{
+			At: locate(r.StrobePC), PC: fmt.Sprintf("$%04X", r.StrobePC),
+			WorstCycles: r.WorstCycles, WorstLines: r.WorstLines, Count: r.Count,
+			WorstFrame: r.WorstFrame, WorstScanline: r.WorstScanline,
+		}
+		if len(r.Watch) == len(in.Watch) && len(in.Watch) > 0 {
+			pl.Watch = map[string]int{}
+			for j, name := range in.Watch {
+				pl.Watch[name] = int(r.Watch[j])
+			}
+		}
+		out.Lines[i] = pl
 	}
 	return nil, out, nil
 }
@@ -1318,7 +1463,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.103.0",
+		Version: "1.104.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -1334,6 +1479,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_tia_registers", Description: "Read the current values of the write-only TIA registers (COLUP0/1, COLUPF, COLUBK, NUSIZ, CTRLPF, PF0/1/2, REFP, VDEL, ENAM/ENABL, GRP, etc.) straight from emulator state. Use this to confirm a 'sta COLUP0' actually took effect instead of inferring from pixel colors."}, handleReadTIARegisters)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_collisions", Description: "Read the 8 TIA collision latches (CXxx, $30-$37; sticky until CXCLR) as named boolean pairs (p0_p1, m0_p0, p0_pf, bl_pf, ...). Structured replacement for raw peeks of the collision registers."}, handleReadCollisions)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_audio", Description: "Read the current TIA audio register values for both channels: control (AUDC, waveform), freq (AUDF, divider), volume (AUDV). Lets you verify sound numerically — read_tia/read_row only cover video."}, handleReadAudio)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_audio_trace", Description: "Trace the TIA audio registers (AUDC control / AUDF freq / AUDV volume) for BOTH channels over N frames, returning the per-frame time-series (control[]/freq[]/volume[] per channel) — the audio analog of read_motion. NOTE: ADVANCES the emulator N frames, so trigger the sound first (fire / hit / start moving), then call. Captures a whole sound envelope (the attack/decay of a fire or explosion, an engine pitch change) in one call instead of stepping frame-by-frame with read_audio by hand."}, handleReadAudioTrace)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_motion", Description: "Track a TIA object (P0/M0/P1/M1/BL) over N frames and report how smoothly it moves: per-frame velocity (1st difference), acceleration (2nd difference), and jerk_rms (RMS of the 2nd difference; 0 = constant velocity, high = judder/stutter). Tracks the exact horizontal HmovedPixel (x) and the rendered vertical top. Turns 'does it judder / ブルブル' into a number — automates the hand frame-by-frame trace. NOTE: ADVANCES the emulator N frames, so set up the state (serve/step) first; track the rendered top over a window where the object moves on a uniform background (x is always exact)."}, handleReadMotion)
 	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject controller input or a console panel switch (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. Joystick actions: left|right|up|down|fire|center|paddle. Console panel switches: reset|select|color|p0pro|p1pro (pressed=true is the active state; reset/select are momentary so press then release across frames to start a game). pressed=true holds, false releases (sticks). action=paddle uses value 0.0..1.0 and plugs the paddle peripheral on first use. center releases all directions."}, handleSetInput)
@@ -1341,6 +1487,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
 	mcp.AddTool(server, &mcp.Tool{Name: "breakif", Description: "Run up to max_frames, halting when the beam reaches (until_scanline, until_clock)."}, handleBreakIf)
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed). Observes ONE run (∃) — for an all-paths proof use prove_line_budget. Optional patch=[{symbol|addr,bytes}] applies temporary ROM byte patches to a COPY for this measurement only (e.g. a lightweight positioning table), fresh-boots it, and ALWAYS reloads the original ROM afterwards — replaces the hand-edit→assemble→assert→restore ritual and its forget-to-restore failure mode. pokes=[{addr,value}] seeds RAM after the patched boot."}, handleBudgetGuard)
+	mcp.AddTool(server, &mcp.Tool{Name: "profile_line_budget", Description: "Quantitative sibling of assert_line_budget (PONG-C3): profile `max_frames` frames and return, PER logical line (keyed by the PC of the STA WSYNC that OPENS it — stable even when overscan physics rows drift across scanlines), the measured WORST CPU cycles between WSYNC strobes (exact, beam-derived; <=76 fits one scanline), the physical lines it consumed, how often it ran, and the frame/scanline where the worst hit. Replaces trim-by-guess-and-assert with 'row4 worst = 78cy → trim 2'. Optional watch=[symbols/addrs] snapshots those RAM values at the opening strobe of each line's worst interval = the arg values the worst path read. Optional patch/pokes as in assert_line_budget (temporary, auto-restored). ADVANCES the emulator."}, handleProfileLines)
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_edge_coincidence", Description: "Worst-path fuzz for edge-compare kernels (PONG-class): the true per-line worst case is ALL edge variables (ball top/bottom, paddle tops/bottoms...) landing on the SAME Y (+~5cy per extra hit) — an overrun free-running tests can miss for hundreds of frames. Pokes every listed zero-page address to the same Y, runs frames_per_y frames under assert_line_budget semantics, sweeps Y over [y_min..y_max], and reports every failing alignment. Optional patch (auto-restored) for lightweight positioning tables."}, handleEdgeCoincidence)
 	mcp.AddTool(server, &mcp.Tool{Name: "prove_line_budget", Description: "Statically PROVE a kernel's per-scanline cycle budget over ALL reachable paths (∀) — the static sibling of assert_line_budget, which observes only one run (∃). Assembles asm_path, decodes from the reset/IRQ/NMI vectors, cuts the CFG at every STA WSYNC, and proves each WSYNC-to-WSYNC region's worst-case CPU cycles <= budget (default 76). Returns certified plus any over-budget regions (each with a cycle-by-cycle worst path + source location) and any regions it could not bound (unbounded loop / JSR / indirect JMP), reported honestly rather than passed. Run it BEFORE executing a kernel to catch a branch path that overruns only sometimes — the timing trap that rolls the screen on hardware while a lucky run looks fine. Single-bank flat 2K/4K kernels."}, handleProveLineBudget)
 	mcp.AddTool(server, &mcp.Tool{Name: "trace_clocks", Description: "Execute the next N instructions and return each one's beam anatomy: PC, opcode, CPU cycles (WSYNC stalls visible as large counts), and start/end (scanline, color clock). Sub-instruction OBSERVATION granularity — the practical recovery of step_clock (Gopher2600 cannot suspend mid-instruction; see docs/mcp-tools.md)."}, handleTraceClocks)
