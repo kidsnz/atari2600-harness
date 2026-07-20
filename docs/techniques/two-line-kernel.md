@@ -37,7 +37,27 @@ positions (`TestVDELOddEven`, pixel-row measurement).
   residue — our gradient flickered at stripe edges until the add became an `ora` (valid since
   the operands can't overlap). Constant-input ops beat flag-dependent ones inside kernels.
 
+### Sprite thickness under 2-line — a symmetric centre feature is 2× too thick unless the row count is ODD
+A 2-line kernel fetches one shape byte per **two** scanlines, so every feature is an even number of
+scanlines. A top/bottom-**symmetric** sprite (e.g. an East/West tank whose gun barrel lies on the axis
+of symmetry) lands its centre feature on the **centre pair** of rows when the sprite has an **even**
+number of 2-line rows → the barrel comes out **4 scanlines**, twice the original's ~2. **Fix:** give the
+sprite an **odd** number of 2-line rows so the centre is a **single** row = 2 scanlines. Measured on the
+original Combat East tank (clean-room `read_row`): body `$FC` (4 sl) / neck `$38` (2 sl) / **barrel `$3F`
+(2 sl)** / neck (2 sl) / body (4 sl) = **7 rows, odd**, barrel = one centre row. Reproduced by re-cutting
+the shape to 7 content rows + 1 blank, still 2-line-paired (no parity shimmer). **Zero cycles, zero RAM.**
+- **Corollary (a verification-standard instance):** don't *assume* "2-line forces a fat feature". The
+  original is itself 2-line and thin — **measure the reference first**; the assumed constraint was a
+  false dilemma ("thin tank *or* enemy missile") that a 5-min ROM measurement dissolved.
+- Need BOTH full-resolution players AND two ENAM-stack-trick missiles and the A/B split still won't fit?
+  → the **graphics-pointer 1-line kernel** (flip the line counter to Y, `LDA (Pxptr),Y` so X can stay
+  pinned to `$1E` → missile reset becomes a 2-cy `TXS` instead of `PLA;PLA`). Researched, not yet built —
+  memory `project-technique-candidates`. — in-house: Combat 2026-07-19/20.
+
 ## Verified here (Gopher2600, locked in CI)
 - P0 (diamond, X=60) and P1 (frame, X=100) bounce independently in pair units over a striped
   gradient; RAM/`hmoved_pixel` asserted at fixed frames; 262 lines every frame; budget clean
   (A ≈ 45 cy / B ≈ 40 cy); golden frame.
+- **Odd-row thin barrel (Combat, in-house):** re-cut East/West shape to 7 content rows → `read_row`
+  measures the rendered barrel as exactly **2 scanlines**, matching the original ROM's East tank
+  (body 4 / neck 2 / barrel 2 / neck 2 / body 4), with both missiles (double-push) still in budget.

@@ -38,3 +38,46 @@ New hardware verification: `litmus_resmp` + `scenarios/resmp.json`.
   fine-adjust direction and breaks linearity). With indexed stores (`sta RESP0,x`) the measured
   calibration here is real X = A−3; with absolute stores it was A−9. **Calibrate per kernel
   with `read_tia`, never copy constants.**
+
+## The ENAM "stack trick" — branchless 1-line missile enable (Combat)
+For a **1-scanline** missile, instead of the row-range compare you can enable ENAM branchlessly in
+~10 cy using the stack as a TIA-write pointer. Page 1 (`$01xx`) mirrors the TIA (A7=0), so
+`[$011D]=ENAM0`, `[$011E]=ENAM1`, `[$011F]=ENABL`. Point SP at the ENAM mirror and `PHP` writes the
+processor status — whose **bit 1 is the Z flag** — straight into ENAM.D1 (the enable bit):
+```
+; once per frame, before the visible region:  LDX #$1D ; TXS   (SP → ENAM0 mirror)
+; per kernel line:   CPX MissY0   ; Z = (this row == missile row)
+                     PHP          ; [$011D]=ENAM0, D1=Z  → lit only on its row
+                     PLA          ; restore SP=$1D
+```
+Needs `SEI` (no IRQ) and **no `JSR` in the kernel/VBLANK/overscan** (SP is borrowed). Trap: **ENAM0=$1D,
+ENAM1=$1E, ENABL=$1F** — mixing them lights the wrong object; verify with `read_motion` height, not the
+annotated position marker (a proxy).
+
+### Two missiles in one branchless burst — the descending double-push
+Both players' missiles (M0 + M1) in one sequence: point SP at the **higher** mirror (`$1E`) and push
+twice, descending, so each `PHP` lands in the next ENAM:
+```
+; once per frame:  LDX #$1E ; TXS
+; per line:   CPX MissY1 ; PHP   ; [$011E]=ENAM1  (SP $1E→$1D)
+             CPX MissY0 ; PHP   ; [$011D]=ENAM0  (SP $1D→$1C)
+             PLA ; PLA          ; restore SP=$1E
+```
+= 20 cy, both missiles, no branches. **Irreducible:** the two `PLA` (8 cy) are the mandatory SP restore.
+If that overruns the line, the fix is more budget (a 2-line kernel), or the graphics-pointer X-pin trick
+that collapses `PLA;PLA` to a 2-cy `TXS` (`two-line-kernel.md`). — in-house: Combat 2026-07-18, ∀-certified.
+
+## Missile bounce / tank block off the playfield — CX?FB move-check-revert
+The mover doesn't know where the maze walls are; use the hardware object-vs-playfield latches
+(`CXP0FB`/`CXP1FB`/`CXM0FB`/`CXM1FB`, D7 = object∧PF, cleared each frame by `CXCLR`). A collision is
+only known **after** the object rendered, so it's a 1-frame-delayed bump:
+- **Tank block:** before moving, `BIT CXPxFB; BMI blocked`. On a hit, restore the last non-colliding
+  position (saved when clear) **and** skip this frame's forward step — revert *alone* re-enters the wall
+  next frame; skip *alone* leaves the tank stuck inside. Turning stays allowed so you can steer off.
+- **Missile reflect (2-frame axis probe):** on `CXM?FB`, revert to the last clear position and reverse
+  **X** (assume a vertical wall); if it still collides next frame it was a horizontal wall → reverse **Y**
+  instead. 16-dir ring: reverse-X = `(8−dir)&15`, reverse-Y = `(−dir)&15`, reverse-both = `(dir+8)&15`.
+- **Debug with `read_collisions`:** it separates `m0_pf` from `m0_p0`/`m0_p1`. A missile spawned *inside*
+  its own tank reads `m0_p0=true, m0_pf=false` — don't mistake that for a wall hit (the bug that stalled
+  the reflect prototype). — in-house: Combat 2026-07-18/19 (block shipped ∀-certified; reflect: vertical
+  bounce verified via `read_motion`, full probe still has a spawn-inside-tank edge case).
