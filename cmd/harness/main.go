@@ -444,9 +444,10 @@ type AudioTraceIn struct {
 	Frames int `json:"frames,omitempty" jsonschema:"frames to trace (default 40); ADVANCES the emulator this many frames"`
 }
 type AudioChannelTrace struct {
-	Control []uint8 `json:"control"` // AUDC per frame（波形/音色）
-	Freq    []uint8 `json:"freq"`    // AUDF per frame（分周＝音程）
-	Volume  []uint8 `json:"volume"`  // AUDV per frame（音量＝包絡）
+	// ★[]int（[]uint8 は Go が JSON で base64 文字列にエンコード＝配列にならず schema 検証に落ちる）
+	Control []int `json:"control"` // AUDC per frame（波形/音色）
+	Freq    []int `json:"freq"`    // AUDF per frame（分周＝音程）
+	Volume  []int `json:"volume"`  // AUDV per frame（音量＝包絡）
 }
 type AudioTraceOut struct {
 	Frames   int               `json:"frames"`
@@ -473,12 +474,12 @@ func handleReadAudioTrace(ctx context.Context, req *mcp.CallToolRequest, in Audi
 			return nil, AudioTraceOut{}, err
 		}
 		st := e.ReadAudio()
-		c0.Control = append(c0.Control, st.Channel0.Control)
-		c0.Freq = append(c0.Freq, st.Channel0.Freq)
-		c0.Volume = append(c0.Volume, st.Channel0.Volume)
-		c1.Control = append(c1.Control, st.Channel1.Control)
-		c1.Freq = append(c1.Freq, st.Channel1.Freq)
-		c1.Volume = append(c1.Volume, st.Channel1.Volume)
+		c0.Control = append(c0.Control, int(st.Channel0.Control))
+		c0.Freq = append(c0.Freq, int(st.Channel0.Freq))
+		c0.Volume = append(c0.Volume, int(st.Channel0.Volume))
+		c1.Control = append(c1.Control, int(st.Channel1.Control))
+		c1.Freq = append(c1.Freq, int(st.Channel1.Freq))
+		c1.Volume = append(c1.Volume, int(st.Channel1.Volume))
 	}
 	return nil, AudioTraceOut{Frames: frames, Channel0: c0, Channel1: c1, Coords: coordsOf(e)}, nil
 }
