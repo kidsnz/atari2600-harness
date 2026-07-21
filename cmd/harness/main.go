@@ -484,6 +484,65 @@ func handleReadAudioTrace(ctx context.Context, req *mcp.CallToolRequest, in Audi
 	return nil, AudioTraceOut{Frames: frames, Channel0: c0, Channel1: c1, Coords: coordsOf(e)}, nil
 }
 
+// --- read_ram_trace（任意 RAM の時系列＝step+peek ループを1発に。AI位置/タイマ/モード等の推移を数値で採る）---
+
+type RamTraceIn struct {
+	Addrs  []int `json:"addrs" jsonschema:"RAM addresses to trace, each $80-$FF (128-255); 1-16 addresses"`
+	Frames int   `json:"frames,omitempty" jsonschema:"frames to trace (default 60); ADVANCES the emulator this many frames"`
+}
+type RamTraceOut struct {
+	// ★[]int（[]uint8 は Go が JSON で base64 文字列にエンコード＝配列にならず schema 検証に落ちる）
+	Frames int     `json:"frames"`
+	Addrs  []int   `json:"addrs"`  // echoed, same order as traces
+	Traces [][]int `json:"traces"` // traces[i][f] = value of Addrs[i] at frame f (0-based from the call)
+	Coords Coords  `json:"coords"`
+}
+
+func handleReadRAMTrace(ctx context.Context, req *mcp.CallToolRequest, in RamTraceIn) (*mcp.CallToolResult, RamTraceOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, RamTraceOut{}, err
+	}
+	if len(in.Addrs) == 0 {
+		return nil, RamTraceOut{}, fmt.Errorf("addrs required (1-16 RAM addresses $80-$FF)")
+	}
+	if len(in.Addrs) > 16 {
+		return nil, RamTraceOut{}, fmt.Errorf("too many addrs (%d); max 16", len(in.Addrs))
+	}
+	for _, a := range in.Addrs {
+		if a < 0x80 || a > 0xFF {
+			return nil, RamTraceOut{}, fmt.Errorf("addr %d out of RAM range $80-$FF (128-255)", a)
+		}
+	}
+	frames := in.Frames
+	if frames == 0 {
+		frames = 60
+	}
+	if frames < 1 || frames > 4000 {
+		return nil, RamTraceOut{}, fmt.Errorf("frames %d out of range (1-4000)", frames)
+	}
+	traces := make([][]int, len(in.Addrs))
+	for i := range traces {
+		traces[i] = make([]int, 0, frames)
+	}
+	for f := 0; f < frames; f++ {
+		if _, err := e.StepFrame(); err != nil {
+			return nil, RamTraceOut{}, err
+		}
+		for i, a := range in.Addrs {
+			b, err := e.PeekRAM(uint16(a))
+			if err != nil {
+				return nil, RamTraceOut{}, fmt.Errorf("peek %02X: %w", a, err)
+			}
+			traces[i] = append(traces[i], int(b))
+		}
+	}
+	return nil, RamTraceOut{Frames: frames, Addrs: in.Addrs, Traces: traces, Coords: coordsOf(e)}, nil
+}
+
 // --- read_collisions（P1: CXxx を構造化）---
 
 type ReadCollisionsOut struct {
@@ -1464,7 +1523,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.104.0",
+		Version: "1.105.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -1481,6 +1540,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_collisions", Description: "Read the 8 TIA collision latches (CXxx, $30-$37; sticky until CXCLR) as named boolean pairs (p0_p1, m0_p0, p0_pf, bl_pf, ...). Structured replacement for raw peeks of the collision registers."}, handleReadCollisions)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_audio", Description: "Read the current TIA audio register values for both channels: control (AUDC, waveform), freq (AUDF, divider), volume (AUDV). Lets you verify sound numerically — read_tia/read_row only cover video."}, handleReadAudio)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_audio_trace", Description: "Trace the TIA audio registers (AUDC control / AUDF freq / AUDV volume) for BOTH channels over N frames, returning the per-frame time-series (control[]/freq[]/volume[] per channel) — the audio analog of read_motion. NOTE: ADVANCES the emulator N frames, so trigger the sound first (fire / hit / start moving), then call. Captures a whole sound envelope (the attack/decay of a fire or explosion, an engine pitch change) in one call instead of stepping frame-by-frame with read_audio by hand."}, handleReadAudioTrace)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_ram_trace", Description: "Trace up to 16 RAM addresses ($80-$FF) over N frames, returning each address's per-frame value time-series (traces[i][f]) — the read_motion of arbitrary game state. NOTE: ADVANCES the emulator N frames (input set via set_input sticks across the trace). Collapses a manual step_frame+peek loop into one call: measure as NUMBERS how a tank's X/Y, an AI mode/timer, a score, or any RAM byte evolves over time (e.g. frames-to-escape a region, a decay curve, a stuck oscillation) instead of hand-stepping."}, handleReadRAMTrace)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_motion", Description: "Track a TIA object (P0/M0/P1/M1/BL) over N frames and report how smoothly it moves: per-frame velocity (1st difference), acceleration (2nd difference), and jerk_rms (RMS of the 2nd difference; 0 = constant velocity, high = judder/stutter). Tracks the exact horizontal HmovedPixel (x) and the rendered vertical top. Turns 'does it judder / ブルブル' into a number — automates the hand frame-by-frame trace. NOTE: ADVANCES the emulator N frames, so set up the state (serve/step) first; track the rendered top over a window where the object moves on a uniform background (x is always exact)."}, handleReadMotion)
 	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject controller input or a console panel switch (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. Joystick actions: left|right|up|down|fire|center|paddle. Console panel switches: reset|select|color|p0pro|p1pro (pressed=true is the active state; reset/select are momentary so press then release across frames to start a game). pressed=true holds, false releases (sticks). action=paddle uses value 0.0..1.0 and plugs the paddle peripheral on first use. center releases all directions."}, handleSetInput)
