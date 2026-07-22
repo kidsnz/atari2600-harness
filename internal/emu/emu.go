@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"math/rand"
+	"sort"
 
 	"github.com/jetsetilly/gopher2600/cartridgeloader"
 	"github.com/jetsetilly/gopher2600/digest"
@@ -884,6 +885,123 @@ func (e *Emu) RunUntilBudget(maxFrames, budgetCycles int) (over bool, atScanline
 		}
 		prevRdy = rdy
 	}
+}
+
+// LineWorst は ProfileLineWorst の1行＝「ある STA WSYNC が開く論理ライン」の実測ワースト。
+// キーは開き strobe の PC（オーバースキャン物理行のように scanline が毎フレーム漂う行でも
+// コード位置で安定に集計できる）。cycles の定義は静的 prover の Region.Worst と同一＝
+// 「開き WSYNC の解放（次ライン先頭）から、閉じ WSYNC ストア完了まで」。≤76 なら1ラインに収まる。
+type LineWorst struct {
+	StrobePC      uint16  `json:"strobe_pc"`                // 開き STA WSYNC の PC
+	At            string  `json:"at,omitempty"`             // ソース位置（cmd/harness が srcmap で充填・emu は触らない）
+	Count         int     `json:"count"`                    // 計測できた区間数
+	WorstCycles   int     `json:"worst_cycles"`             // 実測ワースト CPU サイクル（ビーム座標から厳密算出）
+	WorstLines    int     `json:"worst_lines"`              // ワースト時に消費した物理ライン数（1=予算内の形）
+	WorstFrame    int     `json:"worst_frame"`              // ワーストが出たフレーム
+	WorstScanline int     `json:"worst_scanline"`           // ワースト区間の開始 scanline（開き strobe の次ライン）
+	Watch         []uint8 `json:"watch,omitempty"`          // ワースト区間の開き strobe 時点の RAM watch 値（=その行が読む引数）
+}
+
+// ProfileLineWorst は maxFrames フレーム走らせ、WSYNC 区間ごとの実測ワーストサイクルを
+// 開き strobe の PC 別に集計して返す（PONG-C3: assert_line_budget の定量版）。
+// assert が「超えたか/どこで」しか言えないのに対し、こちらは「各行が最悪何 cy 使い、
+// あと何 cy 削ればよいか」を直接示す。watch には ZP アドレス群を渡すと、各行のワースト
+// 区間開始時点の値（その行が読む引数＝ワーストパスの条件）を併記する。
+//
+// サイクル算出: WSYNC 解放は必ず次スキャンライン先頭（clock -68）なので、
+//   clocks = (閉じstrobe.Scanline − (開きstrobe.Scanline+1))×228 + (閉じstrobe.Clock+68)
+//   cycles = clocks/3（CPU 1cy=3clock・解放はサイクル境界に整列）
+// フレームを跨ぐ区間（オーバースキャン最終行→次フレーム VSYNC）は集計しない。
+func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, error) {
+	// フレッシュブート時のみ安定化（RunUntilBudget と同じ規律＝poke 状態を食い潰さない）。
+	if e.VCS.TV.GetCoords().Frame < 2 {
+		if err := e.RunFrames(2); err != nil {
+			return nil, err
+		}
+	}
+
+	target := e.VCS.TV.GetCoords().Frame + maxFrames
+	prevRdy := e.VCS.CPU.RdyFlg
+	rows := map[uint16]*LineWorst{}
+
+	var (
+		havePrev     bool
+		prevPC       uint16
+		prevFrame    int
+		prevScanline int
+		prevWatch    []uint8
+	)
+	snap := func() []uint8 {
+		if len(watch) == 0 {
+			return nil
+		}
+		vals := make([]uint8, len(watch))
+		for i, a := range watch {
+			v, err := e.PeekRAM(a)
+			if err == nil {
+				vals[i] = v
+			}
+		}
+		return vals
+	}
+
+	for {
+		if e.VCS.CPU.Jammed {
+			break
+		}
+		if e.VCS.TV.IsFrameNum(target) {
+			break
+		}
+		pcBefore := e.VCS.CPU.PC.Address()
+		if _, err := e.stepInstr(); err != nil {
+			return nil, err
+		}
+		rdy := e.VCS.CPU.RdyFlg
+		if prevRdy && !rdy { // WSYNC ストローブ完了
+			c := e.VCS.TV.GetCoords()
+			if havePrev && c.Frame == prevFrame {
+				clocks := (c.Scanline-(prevScanline+1))*228 + (c.Clock + 68)
+				if clocks >= 0 {
+					cycles := (clocks + 2) / 3 // 完了座標の端数（0..2clock）を吸収する切り上げ
+					lines := c.Scanline - prevScanline
+					if lines < 1 {
+						lines = 1
+					}
+					row := rows[prevPC]
+					if row == nil {
+						row = &LineWorst{StrobePC: prevPC}
+						rows[prevPC] = row
+					}
+					row.Count++
+					if cycles > row.WorstCycles {
+						row.WorstCycles = cycles
+						row.WorstLines = lines
+						row.WorstFrame = prevFrame
+						row.WorstScanline = prevScanline + 1
+						row.Watch = prevWatch
+					}
+				}
+			}
+			prevPC = pcBefore
+			prevFrame = c.Frame
+			prevScanline = c.Scanline
+			prevWatch = snap()
+			havePrev = true
+		}
+		prevRdy = rdy
+	}
+
+	out := make([]LineWorst, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, *r)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].WorstCycles != out[j].WorstCycles {
+			return out[i].WorstCycles > out[j].WorstCycles
+		}
+		return out[i].StrobePC < out[j].StrobePC
+	})
+	return out, nil
 }
 
 // WatchRAM は RAM[addr] が変化するまで命令単位で実行する（watch_ram ツールの心臓部）。

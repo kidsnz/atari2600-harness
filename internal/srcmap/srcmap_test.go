@@ -45,8 +45,10 @@ func TestSymbol(t *testing.T) {
 	if a, ok := m.Symbol("Start"); !ok || a != 0xF000 {
 		t.Errorf("Symbol(Start) = %04X, %v", a, ok)
 	}
-	if _, ok := m.Symbol("COLUP0"); ok { // equ（$1000未満）は除外済み
-		t.Error("Symbol(COLUP0) should not resolve")
+	// equ（$1000未満・RAM/TIA）も解決する（profile_line_budget の watch シンボル用・2026-07-12 契約変更）。
+	// ROM 外アドレスへの patch は applyTempPatch の境界チェックが弾く＝安全性はそちらで担保。
+	if a, ok := m.Symbol("COLUP0"); !ok || a != 0x0006 {
+		t.Errorf("Symbol(COLUP0) = %04X, %v — RAM/TIA equates must resolve for watch", a, ok)
 	}
 	if _, ok := m.Symbol("Nope"); ok {
 		t.Error("Symbol(Nope) should not resolve")

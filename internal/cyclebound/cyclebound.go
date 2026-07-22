@@ -227,6 +227,7 @@ type solver struct {
 	unbounded bool   // 2A: a path needs interprocedural support we don't model (nested call / RTS w/o caller)
 	unbReason string // why
 	sm        *srcmap.Map
+	amaxHint  int // ②: `@amax N` = author-declared upper bound of a divide-loop accumulator; used by determineBound when the abstract range is Top
 }
 
 func prepend(s Step, rest []Step) []Step {
@@ -376,7 +377,7 @@ func (s *solver) foldLoops() string {
 		}
 	}
 
-	n := determineBound(s.nodes, header, latch, s.absStates)
+	n := determineBound(s.nodes, header, latch, s.absStates, s.amaxHint)
 	if n <= 0 {
 		return "loop bound unknown (need a counted dex/dey or sbc-divide idiom with a proven range)"
 	}
@@ -395,7 +396,7 @@ func (s *solver) foldLoops() string {
 //   - decrement-to-zero (ldx/ldy #N + dex/dey + bne/bpl), and
 //   - (2B) divide / sbc-counter (sec; A reduced by a constant; bcs/bcc),
 //     bounded from the proven range of A on entry to the loop header.
-func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absStates map[uint16]State) int {
+func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absStates map[uint16]State, amaxHint int) int {
 	// 2B: divide-by-N coarse-positioning idiom — the body subtracts a constant from
 	// A and loops while no borrow (BCS) / while borrow (BCC). Max iterations =
 	// floor(Amax/const)+1 (with carry set); +1 more covers an unknown entry carry.
@@ -447,6 +448,9 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 					amax = int(in.Operand & 0xFF)
 				}
 			}
+		}
+		if amax < 0 && amaxHint > 0 {
+			amax = amaxHint // ②: author-declared `@amax N` (the accumulator's proven upper bound) when the abstract range is Top
 		}
 		if amax < 0 {
 			return 0
@@ -515,7 +519,7 @@ func regionTouchesDisplay(nodes map[uint16]Instr) bool {
 // analyzeRegion proves the worst case of the WSYNC-to-WSYNC region opened by the
 // WSYNC store `start`. states gives the abstract state at each address, used to
 // classify the region's display interval (S1).
-func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.Map, states map[uint16]State) Region {
+func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, sm *srcmap.Map, states map[uint16]State) Region {
 	reg := Region{Start: start.Addr, StartLoc: sm.Locate(start.Addr), Budget: budget, Bounded: true, Kind: "visible"}
 	s := &solver{
 		nodes:     map[uint16]Instr{},
@@ -525,6 +529,7 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.
 		state:     map[lkey]int{},
 		absStates: states, // S3: page-cross penalty resolved from tracked index ranges
 		sm:        sm,
+		amaxHint:  amaxHint,
 	}
 
 	// Collect the region subgraph: from the instruction after `start`, follow the
@@ -581,7 +586,10 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget int, sm *srcmap.
 	// mode is total frame-line drift, which is a separate check (ntsc_frame_lines).
 	if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes) {
 		reg.Kind = "blank"
-		return reg
+		// ①: fall through and STILL compute the worst-case. A blank (VSYNC/VBLANK/
+		// overscan) region > budget does not tear a visible line, but it adds a
+		// scanline (WSYNC halts to the next line) = frame-line drift / screen dip /
+		// roll. Previously this returned Worst=0, hiding it from the ∀ proof.
 	}
 	if len(s.sinks) == 0 {
 		return unbounded("no WSYNC reached from region start")
@@ -617,6 +625,13 @@ type Report struct {
 	Certified  bool     `json:"certified"`            // all visible regions bounded AND <= budget
 	Violations []Region `json:"violations,omitempty"` // regions whose worst case exceeds the budget
 	Unbounded  []Region `json:"unbounded,omitempty"`  // regions that could not be proven (out of scope)
+	Lines      []Region `json:"lines,omitempty"`      // PONG-C3: the COMPLETE per-region table (every visible region incl. passing ones, address order) — "trim by the exact margin", not guess-and-assert
+	// --- blank (VSYNC/VBLANK/overscan) region accounting (VV-2b: previously skipped as worst=0) ---
+	BlankLines     []Region `json:"blank_lines,omitempty"`     // every blank region with its computed worst
+	BlankMaxWorst  int      `json:"blank_max_worst,omitempty"` // largest worst among BOUNDED blank regions
+	BlankOver      []Region `json:"blank_over,omitempty"`      // blank regions whose worst exceeds budget×@lines (roll risk, not a visible tear)
+	BlankUnbounded []Region `json:"blank_unbounded,omitempty"` // blank regions we could not statically bound (e.g. a divide loop over an un-@amax'd RAM accumulator)
+	RollFree       bool     `json:"roll_free"`                 // ∀ roll-freedom: EVERY region (blank+visible) is bounded AND within its budget×@lines span
 }
 
 // Prove assembles asmPath, statically proves every WSYNC-to-WSYNC region's
@@ -658,6 +673,27 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		}
 		return 1
 	}
+	// ②: `@amax N` on the WSYNC line that opens a region declares the upper bound of
+	// that region's divide-loop accumulator, so a ÷N coarse-positioner whose input is
+	// a RAM byte (abstract range Top) can still be bounded. 0 = none.
+	atAmaxRe := regexp.MustCompile(`@amax\s+(\d+)`)
+	regionAmax := func(sa uint16) int {
+		ln, ok := sm.Line(sa)
+		if !ok {
+			return 0
+		}
+		for i := ln - 1; i <= ln && i < len(srcLines); i++ {
+			if i < 0 {
+				continue
+			}
+			if g := atAmaxRe.FindStringSubmatch(srcLines[i]); g != nil {
+				if n, e := strconv.Atoi(g[1]); e == nil && n >= 1 {
+					return n
+				}
+			}
+		}
+		return 0
+	}
 
 	rom, err := os.ReadFile(bin)
 	if err != nil {
@@ -692,12 +728,28 @@ func Prove(asmPath string, budget int) (*Report, error) {
 
 	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget}
 	for _, sa := range starts {
-		reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa), sm, states)
+		reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa), regionAmax(sa), sm, states)
 		rep.Regions++
 		if reg.Kind == "blank" {
-			rep.Blank++ // beam in VSYNC/VBLANK: not a visible-line budget risk
+			// ①: a blank region no longer vanishes as worst=0. It is not a visible-line
+			// tear (so it stays OUT of Lines/MaxWorst/Violations/Certified for backward
+			// compatibility), but a blank region over its budget adds a scanline = roll,
+			// so surface it and feed the ③ roll_free ∀ verdict.
+			rep.Blank++
+			rep.BlankLines = append(rep.BlankLines, reg)
+			if !reg.Bounded {
+				rep.BlankUnbounded = append(rep.BlankUnbounded, reg)
+			} else {
+				if reg.Worst > rep.BlankMaxWorst {
+					rep.BlankMaxWorst = reg.Worst
+				}
+				if reg.Over {
+					rep.BlankOver = append(rep.BlankOver, reg)
+				}
+			}
 			continue
 		}
+		rep.Lines = append(rep.Lines, reg) // PONG-C3: keep EVERY visible region, passing or not
 		if !reg.Bounded {
 			rep.Unbounded = append(rep.Unbounded, reg)
 			continue
@@ -717,5 +769,12 @@ func Prove(asmPath string, budget int) (*Report, error) {
 			Reason: "no STA WSYNC reached from the reset/IRQ/NMI vectors — bank-switched or not a single-bank kernel (out of scope)"})
 	}
 	rep.Certified = rep.Regions > 0 && len(rep.Violations) == 0 && len(rep.Unbounded) == 0
+	// ③ roll_free: the ∀ roll-freedom verdict — EVERY region (blank AND visible) is
+	// bounded and within its budget×@lines span. Stricter than Certified (visible-only):
+	// a blank region over budget or unbounded means the frame's line total is NOT
+	// statically proven here (it is delegated to the runtime ∃ ntsc_frame_lines check).
+	rep.RollFree = rep.Regions > 0 &&
+		len(rep.Violations) == 0 && len(rep.Unbounded) == 0 &&
+		len(rep.BlankOver) == 0 && len(rep.BlankUnbounded) == 0
 	return rep, nil
 }

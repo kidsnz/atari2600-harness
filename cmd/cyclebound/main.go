@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/kidsnz/atari2600-harness/internal/cyclebound"
 )
@@ -43,6 +44,23 @@ func main() {
 	fmt.Println(string(out))
 
 	// Human summary on stderr (stdout stays clean JSON for piping).
+	// PONG-C3: per-line worst table, worst first — "trim by the exact margin".
+	lines := append([]cyclebound.Region(nil), rep.Lines...)
+	sort.Slice(lines, func(i, j int) bool { return lines[i].Worst > lines[j].Worst })
+	for _, r := range lines {
+		mark := "  "
+		switch {
+		case !r.Bounded:
+			mark = "??"
+		case r.Over:
+			mark = "!!"
+		}
+		if r.Bounded {
+			fmt.Fprintf(os.Stderr, "%s %3dcy /%3d  %s\n", mark, r.Worst, r.Budget, r.StartLoc)
+		} else {
+			fmt.Fprintf(os.Stderr, "%s   ?  /%3d  %s: %s\n", mark, r.Budget, r.StartLoc, r.Reason)
+		}
+	}
 	if rep.Certified {
 		fmt.Fprintf(os.Stderr, "CERTIFIED: %d regions within budget (base %d cy/line; worst region %d cy, scaled per @lines)\n", rep.Regions, rep.Budget, rep.MaxWorst)
 		return

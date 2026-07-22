@@ -17,7 +17,42 @@ const (
 	andAsm     = "../../roms/litmus/cb_andloop.asm"
 	arrAsm     = "../../roms/litmus/cb_arrloop.asm"
 	romTabAsm  = "../../roms/litmus/cb_romtable.asm"
+
+	blankAmaxAsm   = "../../roms/litmus/cb_blank_amax.asm"
+	blankNoamaxAsm = "../../roms/litmus/cb_blank_noamax.asm"
 )
+
+// TestProveBlankRegionAmax locks VV-2b: blank (VBLANK/overscan) regions are now
+// ∀-accounted instead of hidden as worst=0, and the `@amax N` annotation bounds a
+// divide-loop-in-blank whose accumulator is a RAM byte of unknown range.
+//   - cb_blank_amax   (annotated): the blank divide loop is bounded => roll_free.
+//   - cb_blank_noamax (identical, no annotation): the same loop is honestly reported
+//     unbounded => NOT roll_free, while `certified` (visible-only) stays true in BOTH
+//     (backward compat — a blank overrun is a roll, not a visible tear).
+func TestProveBlankRegionAmax(t *testing.T) {
+	amax := mustProve(t, blankAmaxAsm, 76)
+	if !amax.RollFree {
+		t.Fatalf("cb_blank_amax must be roll_free (the @amax-bounded blank divide loop fits <=76); unbounded=%+v over=%+v", amax.BlankUnbounded, amax.BlankOver)
+	}
+	if len(amax.BlankUnbounded) != 0 || len(amax.BlankOver) != 0 {
+		t.Fatalf("cb_blank_amax: no blank region should be unbounded/over; got unbounded=%d over=%d", len(amax.BlankUnbounded), len(amax.BlankOver))
+	}
+	if amax.BlankMaxWorst == 0 {
+		t.Fatal("① blank regions must be SURFACED with a real worst, not hidden as 0")
+	}
+
+	noamax := mustProve(t, blankNoamaxAsm, 76)
+	if noamax.RollFree {
+		t.Fatal("cb_blank_noamax must NOT be roll_free (the un-@amax'd blank divide loop is unbounded)")
+	}
+	if len(noamax.BlankUnbounded) != 1 {
+		t.Fatalf("cb_blank_noamax must surface exactly 1 unbounded blank region (the divide loop); got %d", len(noamax.BlankUnbounded))
+	}
+	// backward compat: `certified` is visible-only, so BOTH certify despite the blank difference.
+	if !amax.Certified || !noamax.Certified {
+		t.Fatalf("certified (visible-only) must stay true for both; amax=%v noamax=%v", amax.Certified, noamax.Certified)
+	}
+}
 
 // TestProveRomTableBoundsLoop locks 3D: a divide loop fed by a ROM data-table
 // read at a known index is bounded from the table's actual byte values (read out

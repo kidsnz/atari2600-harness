@@ -9,6 +9,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **PONG-C3 / VV-2b — per-line WORST cycle count + blank-region ∀ accounting** (v1.106.0). `prove_line_budget`
+  used to SKIP every VSYNC/VBLANK/overscan ("blank") region — `analyzeRegion` returned `Worst=0` for them and
+  `Prove` `continue`d — so its `certified`/`max_worst` covered only visible lines, and a blank WSYNC-region
+  that overruns 76cy (which adds a scanline = frame-line drift / "screen dip" / roll) was invisible to the ∀
+  proof, delegated entirely to the runtime ∃ `ntsc_frame_lines`/`max_line_budget`. Surfaced while auditing the
+  sandbox Combat clone: its ÷15 coarse-positioner (worst **73cy**, hand-verified) and its overscan-AI lines
+  (up to **179cy**) were bounded-or-unbounded internally but reported as `Worst=0`. Now:
+  - **① blank regions are computed and reported** — new `Report` fields `blank_lines` / `blank_max_worst` /
+    `blank_over` (worst > budget×@lines = roll risk) / `blank_unbounded`. The existing `certified` / `max_worst`
+    stay **visible-only** (backward-compatible: no existing scenario/litmus verdict changes).
+  - **② `; @amax N` annotation** (sibling of `@lines`) — declares the proven upper bound of a divide-loop
+    accumulator, so a ÷N coarse-positioner whose input is a RAM byte (abstract range Top → previously
+    "loop bound unknown") can be bounded. `determineBound` uses it when the abstract range is Top.
+  - **③ `roll_free`** — the ∀ roll-freedom verdict: EVERY region (blank AND visible) is bounded AND within its
+    budget×@lines span. Stricter than `certified`; a blank overrun or an un-`@amax`'d divide loop makes it
+    false, honestly (vs the old silent `Worst=0`). Litmus: `cb_blank_amax` (annotated → `roll_free`) /
+    `cb_blank_noamax` (identical, unannotated → the blank divide loop is honestly `blank_unbounded`), test
+    `TestProveBlankRegionAmax`. Complements the runtime side `emu.ProfileLineWorst` (∃ measured per-line worst,
+    blank lines included) + the static `Report.Lines` complete per-region table. **Requires MCP reconnect** for
+    the new report fields to surface through the `prove_line_budget` tool.
 - **`read_audio_trace`** (v1.104.0) — trace the TIA audio registers (AUDC control / AUDF freq / AUDV volume)
   for both channels over N frames, returning the per-frame `control[]/freq[]/volume[]` time-series. The audio
   analog of `read_motion`: captures a whole sound envelope (a fire/explosion attack-decay, an engine pitch

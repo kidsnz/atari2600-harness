@@ -18,7 +18,8 @@ import (
 type Map struct {
 	File   string // 表示用ファイル名（ベース名）
 	lines  map[uint16]int
-	labels []label // アドレス昇順
+	labels []label           // アドレス昇順・ROM 域（$1000+）のみ＝Locate 用
+	syms   map[string]uint16 // 全シンボル（RAM equate 含む）＝Symbol 用（watch/patch のシンボル解決）
 }
 
 type label struct {
@@ -50,6 +51,7 @@ func Parse(lst, sym, asmPath string) *Map {
 			m.lines[addr] = srcLine
 		}
 	}
+	m.syms = map[string]uint16{}
 	for _, ln := range strings.Split(sym, "\n") {
 		g := symRe.FindStringSubmatch(ln)
 		if g == nil || g[1] == "---" {
@@ -60,8 +62,11 @@ func Parse(lst, sym, asmPath string) *Map {
 			continue
 		}
 		addr := uint16(addr64)
+		if _, seen := m.syms[g[1]]; !seen {
+			m.syms[g[1]] = addr // RAM equate（<$1000）も保持＝watch/poke のシンボル解決用
+		}
 		if addr < 0x1000 {
-			continue
+			continue // Locate の直近ラベル探索は ROM 域のみ（TIA/RIOT equ がコード位置を汚さない）
 		}
 		m.labels = append(m.labels, label{addr, g[1]})
 	}
@@ -69,17 +74,14 @@ func Parse(lst, sym, asmPath string) *Map {
 	return m
 }
 
-// Symbol はシンボル表のラベル名からアドレスを返す（patch オプションの symbol 指定用）。
+// Symbol はシンボル表のラベル名からアドレスを返す（patch/watch オプションの symbol 指定用）。
+// ROM ラベルに加え RAM equate（BallRow=$83 等）も引ける。
 func (m *Map) Symbol(name string) (uint16, bool) {
 	if m == nil {
 		return 0, false
 	}
-	for _, l := range m.labels {
-		if l.name == name {
-			return l.addr, true
-		}
-	}
-	return 0, false
+	a, ok := m.syms[name]
+	return a, ok
 }
 
 // Line は PC に対応するソース行番号（1 起点）を返す。対応が無ければ ok=false。
