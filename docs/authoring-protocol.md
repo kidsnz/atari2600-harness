@@ -26,6 +26,8 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
    - `docs/cookbook.md` → the recipe for this game-type (technique stack + traps + checks).
    - `docs/casebook.md` → how a real commercial game solved this situation (situation → technique, evidence-backed by disassemblies).
    - `docs/mining-digest.md` / `docs/design-principles.md` → the rules for the feature at hand.
+   - `docs/integration-density-playbook.md` → when the constraint is *fit* (bytes/RAM/cycles interlock):
+     the density principles, the **density scorecard** to score against a reference, and the practice ladder.
    - `docs/techniques/` → the nearest verified technique to clone.
 2. **Plan against checks** — run the design through `pkg/design` feasibility (budget / color bands /
    multiplex / PF windows / positioning). Reject an unworkable layout **on paper**, before asm.

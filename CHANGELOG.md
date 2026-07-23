@@ -9,6 +9,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`docs/integration-density-playbook.md` — the composition/integration skill, distilled** (v1.108.0). The
+  design-time reference for the *fit* problem (2 KB ROM · 128 B RAM · 76 cy/line · 262 lines interlocking).
+  Distilled from a broad cross-domain research pass (demoscene/size-coding · WCET/embedded real-time ·
+  deliberate-practice science · software product-line engineering · systemic game design) and **adversarially
+  filtered against the real 2600 budget**. Contents: 8 rated transferable principles (adopted/adapted), an
+  explicit **kill list** (bytebeat/PCM, heavy runtime synthesis, generic packers, compile-time `#ifdef`
+  variants, "≤76 is enough", GC/heaps — all rejected with the reason), a measurable **Density Scorecard**
+  (functionality-per-byte · WCET-slack/line · RAM-byte duty · feature-count-per-K · kernel byte-density ·
+  table-leverage · dead-weight), and a 6-rung **deliberate-practice ladder** with per-rung scorecard gates.
+  Wired into `docs/authoring-protocol.md` step 1 (Retrieve); provenance in §F. `check_wiring` / `check_provenance`
+  green. No binary/behavior change (docs + one authoring-protocol reference only).
 - **PONG-C3 / VV-2b — per-line WORST cycle count + blank-region ∀ accounting** (v1.106.0). `prove_line_budget`
   used to SKIP every VSYNC/VBLANK/overscan ("blank") region — `analyzeRegion` returned `Worst=0` for them and
   `Prove` `continue`d — so its `certified`/`max_worst` covered only visible lines, and a blank WSYNC-region
