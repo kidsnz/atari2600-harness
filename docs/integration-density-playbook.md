@@ -201,14 +201,22 @@ is purely control-flow" (page-crossing/branch data-dependence, §1); "Combat var
 
 ## G. Open agenda (verify-on-harness + unsolved questions)
 
-**Verify these on OUR harness before trusting them** — they are near-certain textbook facts, but the
-research pass could not independently re-verify them (its verifier agents hit an infra limit, an *error*
-not a refutation). Re-verifying them is itself a good first practice task (§E rung 1–2):
-- The byte idioms of §6 — **BIT-absolute skip-next** (−1 B, register-safe), **BRK-as-1-byte-call** (vs 3-byte
-  `JSR`), **shared envelope/glyph tables** (24 B recovered in *Dominant Amber*) → confirm with
-  `assemble_and_load` + `read_cycles` / byte count.
-- The cycle↔pixel coupling **X = (CYCLES − 20) × 3** (3 px/CPU cycle) underpinning beam-race positioning →
-  confirm with `spritepos` / `read_tia` HmovedPixel.
+**Verify on OUR harness before trusting** — these were near-certain textbook facts the research pass
+could not independently re-verify (its verifier agents hit an infra limit, an *error* not a refutation).
+Re-verifying them is the first practice task (§E rung 1). Status:
+
+- ✓ **VERIFIED (2026-07-24, rung 1).** The cycle↔pixel coupling **3 color-clocks per CPU cycle** (the real
+  fact behind `X = (CYCLES − 20) × 3`). `trace_clocks` on a 2/3/4/5/6-cycle instruction mix: color-clock
+  advance = **exactly 3 × cycles** every time (6/9/12/15/18), no exceptions. Positioning reality
+  cross-checked: `spritepos` x=80 → achieved_x=80 exact (div-15 loop = 5 cy = 15 clocks = the RESP granularity).
+  *Note:* a `sta WSYNC` stall is attributed to the **following** instruction (Gopher2600 observation
+  granularity) — a live reminder that a kernel needs exact-cycle timing, not just `≤ 76` (§1).
+- ✓ **VERIFIED (2026-07-24, rung 1).** **BIT-absolute skip-next.** Raw `$2C` = 3 bytes / **4 cycles**;
+  falling into it absorbs the next 2-byte instruction (`$F00D` → next PC `$F010`, skipping `lda #$22`) and
+  leaves **A/X/Y intact** (A=$11, X=$BB, Y=$CC), moving only N/V/Z. Register-safety confirmed.
+- ☐ **Still to verify** (lower priority, deferred): **BRK-as-1-byte-call** (vs 3-byte `JSR`) and the
+  **shared envelope/glyph table** 24-byte saving (*Dominant Amber*) — reproduce with `assemble_and_load`
+  + byte count when a build actually reaches for them.
 
 **Unsolved questions (the research agenda this playbook opens):**
 1. **Compute↔storage crossover.** At what *generation cost per row/screen* does procedural-from-seed stop

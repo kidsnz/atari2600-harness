@@ -24,6 +24,10 @@ versions follow [Semantic Versioning](https://semver.org/).
   3-vote tested → 20 confirmed / 0 refuted / 5 infra-unverified): added the master-move framing, concrete
   anchors (Pitfall seed 0xC4 / ~50 B; Combat 27 / ~28 B), two scorecard axes (generation-ratio, data-share),
   an anti-gaming caveat, and **§G** (verify-on-harness list + the 3 open research questions).
+  **Rung-1 self-verification done** (§G): the 3-color-clocks-per-CPU-cycle coupling (`trace_clocks`:
+  Δclock = exactly 3 × cycles across a 2/3/4/5/6-cy mix; `spritepos` x=80 exact) and the BIT-absolute
+  skip-next idiom ($2C, 3 B / 4 cy, A/X/Y preserved) both confirmed on-harness — the playbook's §1/§6
+  now rest on measured ground, not citations.
 - **PONG-C3 / VV-2b — per-line WORST cycle count + blank-region ∀ accounting** (v1.106.0). `prove_line_budget`
   used to SKIP every VSYNC/VBLANK/overscan ("blank") region — `analyzeRegion` returned `Worst=0` for them and
   `Prove` `continue`d — so its `certified`/`max_worst` covered only visible lines, and a blank WSYNC-region
