@@ -38,6 +38,21 @@ versions follow [Semantic Versioning](https://semver.org/).
   `AudioTraceOut`; smoke-tested (`initialize OK 1.104.0`). **Requires MCP reconnect** to become callable.
 
 ### Docs
+- **Combat deep-read (round 2) absorbed** — a 5-lens pass (game-design/6502-craft/audio/anti-patterns/clone-novelties)
+  over the original Wagner Combat.asm surfacing learnings the efficiency comparison structurally could not see,
+  concentrated in **audio** and **design-intent**. `design-principles.md` gains a "Combat deep-read: design-intent,
+  audio model & AI-nav primitives" section (difficulty=self-handicap-on-the-winner; curate+reskin content strategy;
+  invisible-stealth self-betrayal; consequence-beat+board-reset; diegetic end-game UI; control-overload;
+  **sound-priority = last-writer-wins on a 1-object-per-channel bus**; vector-slot-data 2K→4K trap; + the clone's
+  emulator-verified **AI-nav primitives** (octant-seek overflow-guard, mod-16 shortest-arc turn, map-free
+  stall/wall-slide/aim-gate/scatter-decoy) flagged PONG-capstone material). Two new **technique reference docs**:
+  `techniques/audio-envelope-idioms.md` (counter-IS-the-audio-register, self-clearing SFX counter, per-player detune,
+  gear-shift pitch curve) and `techniques/kernel-micro-idioms.md` (HMP low-nibble 2nd axis, `$FF`/`$00` AND-mask blank,
+  −4 pointer bias, PF mirror via counter-EOR, compare-via-EOR A=0) — reference-only (reimplement+CI = TODO), wired into
+  `techniques/README.md` (#30/#31). `casebook.md` gains two anti-pattern cases (unclamped-input-index UB; don't-cargo-cult
+  a master's cruft). `capability-gap-audit.md` registers **CMB-4** (CMB-AUDIO temporal-audio assertion), **CMB-5** (MD5
+  gap-fill $FF-PROM model), **CMB-6** (assembler warn on data over $FFFA-$FFFF), **CMB-7** (no-SMC calibration boundary).
+  `check_wiring`+`check_provenance` green. Docs-only.
 - **Combat (1977 Wagner 2K) structure/efficiency learnings absorbed** from the sandbox clean-room comparison
   study (`studies/combat/comparison-structure-vs-original.ja.md`, `diff-gaps.ja.md`), skipping what was already
   in the harness (stack-trick/two-line-kernel/score-kernel/div-15). `casebook.md` gains a **Combat** section
