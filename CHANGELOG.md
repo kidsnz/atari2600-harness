@@ -36,6 +36,37 @@ versions follow [Semantic Versioning](https://semver.org/).
   frames, so trigger the sound first. Motivated by the sandbox Combat clean-room sound pass, where capturing
   each of engine/fire/explosion took ~30 manual step+read_audio calls. `cmd/harness` handler +
   `AudioTraceOut`; smoke-tested (`initialize OK 1.104.0`). **Requires MCP reconnect** to become callable.
+- **State snapshots + RAM-semantics probe** (v1.107.0) — three new MCP tools, `save_state` / `restore_state` /
+  `probe_ram_semantics`, plus a `-snapshot` mode for `cmd/guidedfuzz`. Motivated by a study of
+  [kisonecat/deep-atari](https://github.com/kisonecat/deep-atari) (a GAN that predicts the 2600 screen from RAM);
+  the GAN itself was rejected, but two of its ingredients were worth taking.
+  - **`save_state`/`restore_state`** (`internal/emu/state.go`) wrap Gopher2600's `hardware.VCS.Snapshot()` +
+    `rewind.Plumb()` so the harness can branch-search: try N inputs or N RAM values from the SAME frame instead
+    of replaying from `load_rom`. Slots are named and reusable; a snapshot costs ~3.9 KB (measured, 200 kept).
+    ⚠️ **`television.Plumb()` does not touch the PixelRenderers** — `capture.Reset()` is never called on restore,
+    so the framebuffer keeps the picture drawn on the *diverged* path (measured: hash matches the diverged frame,
+    not the saved one). `State` therefore carries the framebuffer + crop rect + the CPU-cycle counters, and
+    `TestSaveRestoreRoundTrip` fails if that copy is removed. Not covered, by design: video/audio digests,
+    coverage and audio capture are append-only recorders and do not rewind.
+  - **`probe_ram_semantics`** (`internal/emu/ramprobe.go`) answers "what is $XX?" for a ROM with no source:
+    save → poke $XX=V → run `frames` → diff the frame against the un-poked baseline → restore, for every address
+    and probe value; classifies from how the changed-region centroid travels (`x_position`/`y_position`/
+    `appearance`/`none`). Non-destructive. Graded against litmus ground truth both ways (litmus_pos `$80`=DELAY
+    → x_position; motion_glide `$80`=posY → y_position; unused addresses → `none`, no false positives) and
+    audited against the published Combat disassembly (full sweep in 3.1s; `$A4`/`$A5` = TankY0/TankY1,
+    `$DC` = KLskip, `$88`/`$A3` = GameOn/GAMVAR repaint everything, `$BE`-`$CC` even = the HIRES sprite buffer).
+    Default `frames` is **3, not 1**, because Fishing Derby's score bytes reach the screen only after a
+    BCD→digit-graphics conversion and were invisible at `frames=1` (measured 0 → 1 → 2 detected at frames 1/2/3).
+    Known blind spot: a byte the kernel recomputes every frame before use reads as `none`.
+  - **`guidedfuzz -snapshot`** reuses one emulator and restores a post-warmup snapshot per evaluation instead of
+    reloading the ROM. Identical coverage signatures (`TestSnapshotEvaluatorMatchesReload`), and at `warmup=200`
+    **~100x faster** (625.9ms → 6.2ms per evaluation; CLI end-to-end 23.80s → 0.86s at warmup=120, both
+    markers=36). New `Coverage.Reset()` cuts each evaluation since restore does not rewind coverage.
+  - Reference material: `reference/ale-ram-maps/` (umbrella, local-only) — RAM addresses for **104 commercial
+    games** distilled from the Arcade Learning Environment's `RomSettings` sources, with provenance and the
+    `(offset & 0x7F) + 0x80` address convention verified against ALE's `RomUtils.cpp`. Used as an independent
+    answer key for `probe_ram_semantics`, not as a design input.
+  **Requires MCP reconnect** to become callable.
 
 ### Docs
 - **Combat deep-read (round 2) absorbed** — a 5-lens pass (game-design/6502-craft/audio/anti-patterns/clone-novelties)

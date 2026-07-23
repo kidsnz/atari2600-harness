@@ -31,6 +31,11 @@ server.Run(context.Background(), &mcp.StdioTransport{})
 - Hold a single `*emu.Emu` (`internal/emu`) as a package global, protected by a `sync.Mutex`.
 - `load_rom` rebuilds from `emu.New(spec)` and attaches each time (deterministic reset).
 - Return an error if read/step tools are called before a ROM is loaded.
+- **Named snapshot slots** (v1.107.0, `cmd/harness/tools_state.go`): `save_state`/`restore_state` keep a
+  `map[string]*emu.State` beside the emulator so one position can be re-entered any number of times.
+  `load_rom`/`assemble_and_load` clear the map (`resetSlots()`) — a state must never be plumbed into a
+  different machine. `emu.State` deliberately includes the capture framebuffer, because Gopher2600's
+  `television.Plumb()` leaves the PixelRenderers alone and would otherwise show the diverged frame.
 
 ## Shared return component
 

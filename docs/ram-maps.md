@@ -4,6 +4,12 @@ Zero-page equates per ROM (auto-generated; regenerate with the snippet in this f
 Overlaps within one ROM are design (scene overlays); the audit confirms every used address has a
 named equate and no ROM strays outside $80-$FF user RAM.
 
+> **Scope: ROMs we wrote.** This file is generated from our own DASM equates, so it says nothing about a
+> commercial ROM. For those, measure with **`probe_ram_semantics`** (v1.107.0 — poke each byte, diff the
+> frame, classify) and grade the answer against the umbrella-level **`reference/ale-ram-maps/`**, an
+> external table of RAM addresses for 104 commercial games derived from the Arcade Learning Environment.
+> Order matters: measure first, cross-check second — the external table is an answer key, not a design input.
+
 ## roms/exerciser/exerciser.asm
 - $80 `scene`
 - $81 `prevFire`

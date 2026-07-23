@@ -66,7 +66,9 @@ must always hold *only* in a doc — burn them here or into memory.
   **`prove_line_budget`** (v1.80.0, VV-2: STATIC per-scanline budget PROVER over ALL paths = the ∀ sibling of `assert_line_budget`; `cmd/cyclebound`+`internal/cyclebound`) /
   **`beamtrace`** (v1.102.0, AT-2: write→visible-pixel timeline = per scanline, each TIA write's beam clock + the visible span it governs) /
   **`beam_race`** (v1.102.0, AT-3: advisory object-graphics-vs-beam map, factual/no-verdict; paired with scenario `checks.no_beam_race`) /
-  **`spritepos`** (v1.102.0, AT-4: forward sprite-position solver = target X → SetXPos input + decomposition + snippet + emulator-verified achieved X). `step_clock`/`watch(bus)` parked (docs/mcp-tools.md).
+  **`spritepos`** (v1.102.0, AT-4: forward sprite-position solver = target X → SetXPos input + decomposition + snippet + emulator-verified achieved X) /
+  **`save_state`** / **`restore_state`** (v1.107.0, whole-machine snapshot into a named, reusable slot — CPU/RAM/TIA/RIOT/cart/TV **plus the rendered framebuffer and the cycle counters**; branch-search from one position instead of replaying from load_rom. ~3.9 KB per snapshot. Does NOT rewind the append-only recorders: video/audio digests, coverage, audio capture) /
+  **`probe_ram_semantics`** (v1.107.0, "what is $XX?" for a ROM with no source: poke each RAM byte with each probe value, diff the frame against the un-poked baseline, classify from how the changed-region centroid travels = x_position / y_position / appearance / none. Non-destructive. Default frames=3 — at 1 a byte that reaches the screen via a multi-frame conversion, e.g. a BCD score, reads as no-effect. Cross-check its answers against `reference/ale-ram-maps/`). `step_clock`/`watch(bus)` parked (docs/mcp-tools.md).
   
 
 ## Constants you must never get wrong (source: `docs/resources.md`)
@@ -157,6 +159,7 @@ round trip. Also return `png_path` in JSON.
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
 | Image ingestion (screenshot/ROM → TIA data) + input contract v3 | `docs/ingest.md` |
 | RAM maps per ROM (auto-extracted audit) | `docs/ram-maps.md` |
+| RAM maps for **commercial** ROMs (external answer key for `probe_ram_semantics`; 104 games, ALE-derived) | umbrella `reference/ale-ram-maps/` (local-only, not part of this repo) |
 | Decision history and changelog (delivered-work log) | `CHANGELOG.md` |
 
 > **Anti-rot:** every `docs/*.md` must be reachable from this table or the authoring protocol — `scripts/check_wiring.py`
