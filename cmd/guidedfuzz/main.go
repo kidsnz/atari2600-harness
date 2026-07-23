@@ -27,6 +27,7 @@ func main() {
 	player := flag.Int("player", 0, "player port for inputs")
 	actions := flag.String("actions", "left,right,fire", "comma-separated action pool")
 	blind := flag.Bool("blind", false, "run the blind baseline instead (for comparison)")
+	snapshot := flag.Bool("snapshot", false, "reuse one emulator and restore a post-warmup snapshot per evaluation instead of reloading the ROM (identical signatures, ~100x faster at warmup=200; measured in internal/guidedfuzz)")
 	flag.Parse()
 
 	if *rom == "" {
@@ -41,6 +42,14 @@ func main() {
 		Actions:    splitTrim(*actions),
 	}
 	eval := guidedfuzz.EmuEvaluator("NTSC", *rom, *warmup, *player)
+	if *snapshot {
+		snapEval, err := guidedfuzz.EmuSnapshotEvaluator("NTSC", *rom, *warmup, *player)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+			os.Exit(2)
+		}
+		eval = snapEval
+	}
 
 	run := guidedfuzz.RunGuided
 	mode := "guided"

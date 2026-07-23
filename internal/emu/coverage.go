@@ -84,3 +84,13 @@ func (c *Coverage) SeenPCs() []uint16 {
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
+
+// Reset は記録済みカバレッジを捨てる。RestoreState は「加算されるだけの記録器」を巻き戻さない
+// ので、スナップショットから同じ局面を何度も走らせて 1 回分ずつの標識を取りたい場合
+// （guidedfuzz のスナップショット版）は、復元のたびにこれを呼んで区間を切る。
+func (c *Coverage) Reset() {
+	c.pcSeen = map[uint16]bool{}
+	c.brTaken = map[uint16]bool{}
+	c.brNot = map[uint16]bool{}
+	c.branches = map[uint16]bool{}
+}
