@@ -32,13 +32,20 @@ import (
 type ProbeOptions struct {
 	Addrs  []uint16 // 空なら $80..$FF 全部
 	Values []uint8  // 空なら DefaultProbeValues
-	Frames int      // poke 後に進めるフレーム数（既定 1）
+	Frames int      // poke 後に進めるフレーム数（既定 DefaultProbeFrames）
 	MinPix int      // これ未満の変化画素数はノイズとして "none" 扱い（既定 1）
 }
 
 // DefaultProbeValues は既定の探り値。0..255 をほぼ等間隔に刻む（座標バイトなら画面上を
 // 端から端まで動くので重心の傾きが出る）。
 var DefaultProbeValues = []uint8{0x00, 0x30, 0x60, 0x90, 0xC0, 0xF0}
+
+// DefaultProbeFrames は poke 後に進める既定フレーム数。
+// 1 ではなく 3 なのは実測による: Fishing Derby のスコア $BD/$BE は BCD から桁グラフィックへ
+// 変換されてから描かれるため frames=1 では画面に出ず（affected=0）、frames=2 で片方、
+// **frames=3 で両方**検出できた（ALE の RomSettings が my_score/oppt_score と記録している 2 番地に一致）。
+// 「1 フレームで出ない = 効果なし」と誤判定するより、3 倍遅くても取りこぼさない方を既定にする。
+var DefaultProbeFrames = 3
 
 // ProbeSample は 1 (addr,value) の実測 1 点。
 type ProbeSample struct {
@@ -75,7 +82,7 @@ func (e *Emu) ProbeRAMSemantics(opt ProbeOptions) ([]ProbeResult, error) {
 	}
 	frames := opt.Frames
 	if frames <= 0 {
-		frames = 1
+		frames = DefaultProbeFrames
 	}
 	minPix := opt.MinPix
 	if minPix <= 0 {

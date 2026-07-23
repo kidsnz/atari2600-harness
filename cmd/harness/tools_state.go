@@ -94,7 +94,7 @@ func slotNames() []string {
 type ProbeRAMIn struct {
 	Addrs  []int `json:"addrs,omitempty" jsonschema:"RAM addresses to probe ($80-$FF as decimal or via peek-style ints); omit for the whole of $80-$FF"`
 	Values []int `json:"values,omitempty" jsonschema:"values to write at each address; omit for 0,48,96,144,192,240"`
-	Frames int   `json:"frames,omitempty" jsonschema:"frames to run after each poke before comparing (default 1)"`
+	Frames int   `json:"frames,omitempty" jsonschema:"frames to run after each poke before comparing (default 3; 1 is ~3x faster but misses values that only reach the screen through a multi-frame conversion, e.g. BCD score -> digit graphics)"`
 	MinPix int   `json:"min_pixels,omitempty" jsonschema:"treat fewer changed pixels than this as no effect (default 1)"`
 	Top    int   `json:"top,omitempty" jsonschema:"return only the N addresses with the largest effect (default: all that had any effect)"`
 }
@@ -134,9 +134,10 @@ func handleProbeRAM(ctx context.Context, req *mcp.CallToolRequest, in ProbeRAMIn
 		return nil, ProbeRAMOut{}, err
 	}
 
-	out := ProbeRAMOut{Probed: len(res), Frames: opt.Frames, Coords: coordsOf(e)}
-	if out.Frames == 0 {
-		out.Frames = 1
+	// Results は必ず配列で返す（nil スライスは JSON null になり、素直な client が落ちる）。
+	out := ProbeRAMOut{Results: []emu.ProbeResult{}, Probed: len(res), Frames: opt.Frames, Coords: coordsOf(e)}
+	if out.Frames <= 0 {
+		out.Frames = emu.DefaultProbeFrames
 	}
 	for _, r := range res {
 		if r.Class != "none" {
