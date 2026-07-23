@@ -96,6 +96,7 @@ func handleLoadROM(ctx context.Context, req *mcp.CallToolRequest, in LoadROMIn) 
 		return nil, LoadROMOut{}, fmt.Errorf("load rom: %w", err)
 	}
 	current = e
+	resetSlots() // 別 ROM の状態を復元させない
 	curMap = nil // .bin 直ロードはソース対応なし
 	curROMPath = in.Path
 	return nil, LoadROMOut{
@@ -151,6 +152,7 @@ func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in Ass
 		return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: out}, fmt.Errorf("assembled ok but load failed: %w", err)
 	}
 	current = e
+	resetSlots() // 別 ROM の状態を復元させない
 	curROMPath = bin
 	return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: out, Loaded: true, Coords: coordsOf(e)}, nil
 }
@@ -1560,6 +1562,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_screen", Description: "Run the ingest analyzer on the CURRENT emulator frame (no file needed): playfield bands as PF bytes, sprite candidates with GRP bytes + per-row colors, groups, fidelity, plus the TIA-grid overlay. The reverse-direction read of whatever is on screen right now."}, handleAnalyzeScreen)
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_image", Description: "Ingest a game screenshot (grade A = Stella F12 PNG, unmodified, TV effects off; any integer multiple of the 160-clock raster) and return TIA-space analysis: normalized raster + palette quantization to real COLUxx values, playfield bands as PF0/PF1/PF2 bytes (repeat/reflect/asymmetric, score-mode flag), sprite candidates with GRP bytes + per-row colors + NUSIZ copy folding, plus a TIA-grid overlay image. Ambiguous elements carry confidence; one screenshot is one frame of truth (flicker objects appear partially)."}, handleAnalyzeImage)
 	mcp.AddTool(server, &mcp.Tool{Name: "get_screen_annotated", Description: "Return the latest frame as a PNG with an XY grid in real TIA coordinates (x=clock 0..159, y=scanline) and labelled sprite-position markers. The primary visual channel: the user can point at it and instruct by coordinate. Also returns sprite positions numerically."}, handleScreenAnnotated)
+	registerStateTools(server) // save_state / restore_state / probe_ram_semantics (cmd/harness/tools_state.go)
 
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		fmt.Fprintln(os.Stderr, "harness:", err)
