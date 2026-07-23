@@ -24,6 +24,7 @@
 ## スプライト（P0/P1）
 - 8 ドット幅・1 レジスタ（GRP 8bit, MSB=左端）。幅 NUSIZ 1x/2x/4x。〔2k6specs, Davie S21〕
 - **横位置 = 2段階**：粗 ÷15（5cy ループ）→ 微 HMOVE。粒度 3px/CPUサイクル（litmus 一致）。〔Davie S22〕 `→ design.PositionSplit/CoarseIterations`
+  - **粗位置決めライン＝kernel の最タイト区間**：`sta WSYNC`→`sta WSYNC` 区間が ÷15 ループ＋fine tail（`eor`/ASL×4/`sta`）で **X に比例して重くなり**、最大 X で **worst > 76cy → 画面ロール**（小 X の幸運なテストは通過＝∀証明でしか出ない）。`prove_line_budget` の `; @amax N` は**区間を開く `sta WSYNC`** の行に置いて縛る（`sbc` 行では効かない）。収める手＝**可動域を制限**するか **÷15 をルックアップ表化して定数時間に**（表化は密度の常道）。ループを縛っても fine tail が残れば超過する。〔density-ladder rung2 実測 / prove_line_budget roll_free 2026-07-24〕
 - **★RESxx の内部描画遅延（位置照合の第一容疑）**：`RESxx` ストロボはカウンタを即リセットするが、**オブジェクトが実際に描き始めるのは遅れる＝player +5 / missile・ball +4 カラークロック**（RESP0 が cycle46 で終わると X≈75）。Stella ソース(`renderCounterOffset`)で実証。**「目標 X が ~5px ずれる」時はまずこれを疑う**。RESxx の粒度は 3 color-clock。〔採掘 294398, 283075, 305780, 172089, 137739, 329611, 304182〕（codified `X=3N−54/55` を裏で説明する量＝**litmus_pos で実測照合**してから定数化）
 - **多オブジェクトの位置式と書込み窓**：可視中の `RESxx` は禁止（即時リセットで曲がる）＝HBLANK/前ラインで先読み。共有ループは consecutive な `RESP0,x`/`HMP0,x` を `DEX/BPL` で回す（`design.shared_setxpos` 実装済）。右端の溢れ限界は X≈134（「N オブジェクト=N+1 走査線」が真因）。〔採掘 67045, 308513, 340965, 311795（RESxx×HMOVE レース＝Gopher2600 実装済）〕
 - **1サイクル潰しで RESP を狙った位置に**：粗位置決めで NOP が無い時、`sta.wx HMP0,x`（dasm `.w`/`.FORCE` で Absolute,X=5cy を強制／ZP,X は4cy）で1cy 足して RESP0 ストロボを**狙ったサイクル**に合わせる。〔採掘 blog SpiceWare 12538〕
