@@ -22,6 +22,10 @@ turns a working ROM into a **dense** one. This doc is the design-time reference 
 
 Rating = transfer value to a real 2 KB / 128 B / 76 cy build. ★★★★★ = load-bearing.
 
+> **The two that carry the rest.** Of the eight, the completed research elevates **one master move** —
+> *store a generator + a seed/table, not the data* (#3) — and **one discipline** — *prove the worst case
+> statically, don't sample it* (#1). Everything else is how you make those two pay under byte/cycle scarcity.
+
 ### 1. Prove the worst case — don't sample it. ★★★★★
 *(WCET / abstract interpretation → `prove_line_budget`)*
 A test run only characterises the inputs you happened to exercise; it can **never** guarantee
@@ -45,7 +49,8 @@ variables are provably **never live at the same time**, overlay them on the same
 ### 3. Generate from a seed — but only with a CHEAP generator. ★★★★ (conditional)
 *(procedural-from-seed, adversarially bounded)*
 Trade storage for a *tiny* amount of compute. Pitfall! synthesises all 255 screens from a
-polynomial-counter **seed** (an LFSR — a few cycles). Entombed builds its whole maze from a
+polynomial-counter **seed** (an 8-bit LFSR seeded at **0xC4**, ~50 bytes of generator, a few
+cycles *per screen* — not per pixel). Entombed builds its whole maze from a
 **32-byte table + a small algorithm + symmetry** (20-bit half-row → fixed 4-bit wall → 16 →
 bit-duplication → only **8 bits** actually selected). **KILL (§C):** the demoscene "everything
 is a function" reflex (64 kB runtime mesh synthesis, `bytebeat` audio = *f(t)*) assumes runtime
@@ -59,7 +64,7 @@ Ship many curated variants from one artifact. **Not** the compile-time `#ifdef` 
 (that yields *N separate binaries* and each compositional "feature module" costs hook-method
 bytes). The 2600 form is a **third mechanism**: one ROM, config bits (console switches / a RAM
 byte) **index a small parameter table** at runtime → many variants from shared code
-(Combat: 27 variants). Treat each config bit as a *modeled feature with constraints* so only
+(Combat: **27 variants from a ~28-byte table**). Treat each config bit as a *modeled feature with constraints* so only
 valid/curated combinations are reachable. Density metric: *feature-count-per-K* (§D).
 *Source: Kang et al. FODA; Kästner & Apel (annotative vs compositional); Combat 27-variant table.*
 
@@ -132,13 +137,19 @@ Each metric is measurable *with the harness*, and compared to a reference ROM (e
 
 | Metric | Definition | How to measure | Target |
 |---|---|---|---|
-| **Functionality-per-byte** | shipped features (variants · mechanics · screens) ÷ ROM bytes used | count features / `size` | ≥ reference |
-| **WCET slack per line** | `76 − proven_WCET(line)` | `prove_line_budget` (all paths) | small **positive & uniform** (tight ≠ loose ≠ negative) |
-| **RAM-byte duty** | distinct live-purposes per RAM byte over a frame (overlays where non-overlap is proven) | `read_ram_trace` + liveness | > 1 |
-| **Feature-count-per-K** | curated variants derivable ÷ config bytes | count / table size | ≥ reference (Combat: 27 / ~table) |
+| **Functionality-per-byte** | shipped features (variants · mechanics · screens) ÷ ROM bytes used | count features / `size` | ≥ reference (Combat 27 / ~28 B; Pitfall 255 screens / ~50 B gen) |
+| **WCET slack per line** | `76 − proven_WCET(line)`, reported as the **minimum across all line-types** | `prove_line_budget` (all paths) — **proven, never `profile_line_budget` sampled** | small **positive & uniform** (tight ≠ loose ≠ negative) |
+| **RAM-byte duty** | avg distinct live-purposes per RAM byte over a frame (overlays where non-overlap is proven) | `probe_ram_semantics` / `read_ram_trace` + liveness | > 1 |
+| **Feature-count-per-K** | curated variants derivable ÷ config bytes | count / table size | ≥ reference (Combat 27 / ~28 B) |
 | **Kernel byte-density** | visible pixel-rows produced ÷ kernel bytes | `read_row` × kernel size | ≥ reference |
-| **Table-leverage** | emergent outputs ÷ table bytes | e.g. maze cells / 32 B; screens / seed | maximise |
+| **Generation ratio** | bytes of rendered content (screens · mazes · objects) ÷ bytes of stored generator + seed | count outputs × output-size / gen bytes | maximise (Pitfall: 255 screens / ~50 B) |
+| **Data-share ratio** | table bytes consumed by **≥ 2** users ÷ total table bytes | trace table readers | maximise (shared envelope/glyph tables) |
 | **Dead-weight** | bytes/cycles that buy **no** viable option (complexity without depth) | design audit | → 0 |
+
+> **Anti-gaming caveat (open question).** The axes interlock — you can *trade* one for another (spend cycles to
+> save bytes, overlay RAM at the cost of a branch). So the scorecard is a **vector, not a single score**:
+> progress = moving one axis toward target **without regressing** the others. Collapsing them into one index
+> that can't be gamed by a resource trade is unsolved (§G).
 
 The scorecard is a *criterion-referenced* instrument (per the deliberate-practice measurement
 literature), not a vanity number: each row is an objective, reproducible target, and progress =
@@ -178,8 +189,32 @@ Per build:
 - **Software product lines:** Kang et al. FODA; Apel/Batory/Kästner/Saake FOSPL; Kästner & Apel annotative-vs-compositional; Combat 27-variant table.
 - **Systemic game design:** "Complexity vs Depth" (Game Developer); Orthogonal Differentiation (gdp3, Chalmers); effective-complexity writeups.
 
-*Adversarial verification note:* several claims were 3-vote refutation-tested during the research
-pass. Confirmed transfers: cheap seed/table generation, WCET-over-all-paths, register/byte
-multi-use, byte idioms. **Refuted / bounded:** `bytebeat` and heavy runtime synthesis (no 2600
-compute path — §C); "6502 WCET is purely control-flow" (page-crossing/branch data-dependence, §1);
-"Combat variants = annotative `#ifdef`" (it is runtime table indexing — §4).
+*Adversarial verification note.* The full research pass later completed and 3-vote refutation-tested
+25 claims: **20 confirmed, 0 refuted, 5 could not be verified** (verifier infra errored — *not*
+refutations; see §G). Confirmed transfers: seed/table generation, symmetry/bit-duplication,
+parameterized shared substrate, WCET-over-all-paths (safe **and** tight), Ericsson-strict practice.
+**Bounded / killed:** `bytebeat` and heavy runtime synthesis (no 2600 compute path — §C); "6502 WCET
+is purely control-flow" (page-crossing/branch data-dependence, §1); "Combat variants = annotative
+`#ifdef`" (it is runtime table indexing — §4).
+
+---
+
+## G. Open agenda (verify-on-harness + unsolved questions)
+
+**Verify these on OUR harness before trusting them** — they are near-certain textbook facts, but the
+research pass could not independently re-verify them (its verifier agents hit an infra limit, an *error*
+not a refutation). Re-verifying them is itself a good first practice task (§E rung 1–2):
+- The byte idioms of §6 — **BIT-absolute skip-next** (−1 B, register-safe), **BRK-as-1-byte-call** (vs 3-byte
+  `JSR`), **shared envelope/glyph tables** (24 B recovered in *Dominant Amber*) → confirm with
+  `assemble_and_load` + `read_cycles` / byte count.
+- The cycle↔pixel coupling **X = (CYCLES − 20) × 3** (3 px/CPU cycle) underpinning beam-race positioning →
+  confirm with `spritepos` / `read_tia` HmovedPixel.
+
+**Unsolved questions (the research agenda this playbook opens):**
+1. **Compute↔storage crossover.** At what *generation cost per row/screen* does procedural-from-seed stop
+   paying, given 76 cy per visible line **plus** the larger off-screen VBLANK/overscan budget? (Measure it.)
+2. **Single density index without gaming.** How to weight/normalise the scorecard's axes into one comparable
+   number that cannot be gamed by trading one interlocking resource for another (cycles↔bytes↔RAM)? (§D caveat.)
+3. **"Dense" baseline.** What is the *measured* functionality-per-byte of the references (Combat 27 / ~28 B;
+   Pitfall 255 / ~50 B) vs a modern hand-built ROM — i.e. what ratio counts as dense, making the scorecard
+   absolute rather than merely relative?

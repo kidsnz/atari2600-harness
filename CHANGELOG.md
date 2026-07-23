@@ -19,7 +19,11 @@ versions follow [Semantic Versioning](https://semver.org/).
   (functionality-per-byte · WCET-slack/line · RAM-byte duty · feature-count-per-K · kernel byte-density ·
   table-leverage · dead-weight), and a 6-rung **deliberate-practice ladder** with per-rung scorecard gates.
   Wired into `docs/authoring-protocol.md` step 1 (Retrieve); provenance in §F. `check_wiring` / `check_provenance`
-  green. No binary/behavior change (docs + one authoring-protocol reference only).
+  green. No binary/behavior change (docs + one authoring-protocol reference only). First distilled from the
+  interrupted deep-research run's 71 cached results, then **reconciled against the completed run** (25 claims
+  3-vote tested → 20 confirmed / 0 refuted / 5 infra-unverified): added the master-move framing, concrete
+  anchors (Pitfall seed 0xC4 / ~50 B; Combat 27 / ~28 B), two scorecard axes (generation-ratio, data-share),
+  an anti-gaming caveat, and **§G** (verify-on-harness list + the 3 open research questions).
 - **PONG-C3 / VV-2b — per-line WORST cycle count + blank-region ∀ accounting** (v1.106.0). `prove_line_budget`
   used to SKIP every VSYNC/VBLANK/overscan ("blank") region — `analyzeRegion` returned `Worst=0` for them and
   `Prove` `continue`d — so its `certified`/`max_worst` covered only visible lines, and a blank WSYNC-region
