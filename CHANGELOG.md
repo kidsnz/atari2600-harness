@@ -38,6 +38,18 @@ versions follow [Semantic Versioning](https://semver.org/).
   `AudioTraceOut`; smoke-tested (`initialize OK 1.104.0`). **Requires MCP reconnect** to become callable.
 
 ### Docs
+- **Combat (1977 Wagner 2K) structure/efficiency learnings absorbed** from the sandbox clean-room comparison
+  study (`studies/combat/comparison-structure-vs-original.ja.md`, `diff-gaps.ja.md`), skipping what was already
+  in the harness (stack-trick/two-line-kernel/score-kernel/div-15). `casebook.md` gains a **Combat** section
+  (PF-only dual score via `CTRLPF #$02` + recycled PF1; multi-frame `MxPFcount` wall-normal bounce solver;
+  `StirTimer` hit-reaction state machine; `VARMAP` 27-variant bit-packed selector + DDR input-gating) + an
+  index row. `design-principles.md` gains 8 **integration-under-budget** rules (one `,X`-indexed path for all
+  objects vs per-object inlining; time-sliced momentum; rotation-shape RAM precompute; interleaved single HIRES
+  buffer; multi-duty phase-locked byte fan-out; `INTIM`/`TIM64T` VBLANK load-leveling vs fixed-count+pad;
+  one-loop-four-ranges `ClearMem`; self-audit-your-own-cargo-cult). `capability-gap-audit.md` registers three
+  candidates: **CMB-1** structural-efficiency lint (inline→`,X` in blanked time, ~250-400 B recoverable),
+  **CMB-2** `INTIM` fixed-picture-start advisor, **CMB-3** collision-face/wall-normal estimation aid. `check_wiring`
+  + `check_provenance` green. Clean-room recorded (disassembly read post-build; casebook contract). Docs-only.
 - Knowledge captured from the sandbox PONG feel-pass (pf2-06, 2026-07-03): technique **#29 sub-pixel velocity
   (DDA error accumulator)** — fractional speed while the position stays a 1-byte integer
   (`docs/techniques/subpixel-velocity.md`); two `known-traps` rows (`bpl`/`bmi` clamp on a coordinate that
