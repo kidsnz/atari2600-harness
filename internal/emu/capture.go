@@ -74,6 +74,13 @@ func (c *capture) SetPixels(sig []signal.SignalAttributes, last int) error {
 func (c *capture) Reset()              { c.clear() }
 func (c *capture) EndRendering() error { return nil }
 
+// colorRGBA converts a TIA colour-register value (COLUPx/COLUM/COLUBL/COLUPF/COLUBK,
+// 0..255) into the exact RGBA the renderer used for it — the SAME palette as the
+// captured frame, so a value read from ReadTIARegisters matches Snapshot pixels.
+func (c *capture) colorRGBA(code uint8) color.RGBA {
+	return c.frameInfo.Spec.GetColor(signal.ColorSignal(code))
+}
+
 // snapshot は最新フレームの可視域を独立した image.RGBA コピーで返す（以後の駆動で
 // 上書きされない）。visibleTop は縦座標マッピング用（クロップ y=0 の絶対 scanline）。
 func (c *capture) snapshot() (img *image.RGBA, visibleTop int) {

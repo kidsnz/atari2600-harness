@@ -9,6 +9,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`spritey` — numeric vertical (Y) position of a TIA object** (v1.109.0). Reports an object's drawn
+  scanline extent (`y_top`/`y_bot`/`height`, grid-y) + X, found by matching the object's OWN colour at its
+  X column — filling the gap `read_tia` (X only) and `read_motion` (rendered-top, which latches onto the
+  playfield border for a 1-2px missile) leave. `frames=1` reports the current frame; `frames>1` advances and
+  returns the per-frame Y trajectory — **tracing a bullet's ricochet as numbers** (`y_top` rises then falls at
+  each top/bottom bounce). Surfaced demand-driven while observing Outlaw's signature ricochet: `read_motion`
+  reported the bullet's Y as a constant 65 (the border) vs the true ~85. New: `emu.ObjectColorRGBA` (palette
+  map via `capture.colorRGBA`→`Spec.GetColor`) + `emu.ObjectYExtent` (colour-matched column scan) + the
+  `spritey` MCP tool + `TestObjectYExtentTracksBall` (a glide must descend, non-vacuous). Caveat: colour-match
+  widens the extent when a same-colour object overlaps within ~8px (a just-fired missile over its player)
+  until they separate. read_motion untouched (no regression). `go test ./...` green; MCP smoke on Outlaw green.
 - **`docs/integration-density-playbook.md` — the composition/integration skill, distilled** (v1.108.0). The
   design-time reference for the *fit* problem (2 KB ROM · 128 B RAM · 76 cy/line · 262 lines interlocking).
   Distilled from a broad cross-domain research pass (demoscene/size-coding · WCET/embedded real-time ·

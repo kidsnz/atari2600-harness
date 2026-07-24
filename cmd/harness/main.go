@@ -639,6 +639,68 @@ func handleReadMotion(ctx context.Context, req *mcp.CallToolRequest, in ReadMoti
 	return nil, ReadMotionOut{Track: tr, Coords: coordsOf(e)}, nil
 }
 
+// --- spritey（オブジェクトの縦位置 Y を数値で。read_tia=Xのみ・read_motion top=小missile不可 の穴埋め。弾の軌道/リコシェを数値化）---
+
+type SpriteYIn struct {
+	Object string `json:"object,omitempty" jsonschema:"object: P0 M0 P1 M1 BL (default M0)"`
+	Frames int    `json:"frames,omitempty" jsonschema:"samples to return (default 1 = current frame only, no advance). >1 ADVANCES the emulator frames-1 steps and returns the per-frame Y trajectory — trace a bullet's ricochet (y_top rises then falls at a bounce) as numbers"`
+}
+type SpriteYSample struct {
+	Frame   int  `json:"frame"`
+	X       int  `json:"x"`       // HmovedPixel (0..159)
+	YTop    int  `json:"y_top"`   // topmost drawn scanline (grid-y); -1 if absent
+	YBot    int  `json:"y_bot"`   // bottommost drawn scanline; -1 if absent
+	Height  int  `json:"height"`  // y_bot - y_top + 1
+	Present bool `json:"present"` // false = disabled / off-screen
+}
+type SpriteYOut struct {
+	Object  string          `json:"object"`
+	Samples []SpriteYSample `json:"samples"`
+	Coords  Coords          `json:"coords"`
+}
+
+var spriteYIndex = map[string]int{"P0": 0, "M0": 1, "P1": 2, "M1": 3, "BL": 4}
+
+func handleSpriteY(ctx context.Context, req *mcp.CallToolRequest, in SpriteYIn) (*mcp.CallToolResult, SpriteYOut, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	e, err := get()
+	if err != nil {
+		return nil, SpriteYOut{}, err
+	}
+	obj := strings.ToUpper(strings.TrimSpace(in.Object))
+	if obj == "" {
+		obj = "M0"
+	}
+	idx, ok := spriteYIndex[obj]
+	if !ok {
+		return nil, SpriteYOut{}, fmt.Errorf("unknown object %q (want P0 M0 P1 M1 BL)", obj)
+	}
+	frames := in.Frames
+	if frames < 1 {
+		frames = 1
+	}
+	out := SpriteYOut{Object: obj}
+	for f := 0; f < frames; f++ {
+		if f > 0 {
+			if _, err := e.StepFrame(); err != nil {
+				return nil, SpriteYOut{}, err
+			}
+		}
+		yt, yb, h, present := e.ObjectYExtent(idx)
+		s := SpriteYSample{Frame: f, X: e.Markers()[idx].Clock, Present: present}
+		if present {
+			s.YTop, s.YBot, s.Height = yt, yb, h
+		} else {
+			s.YTop, s.YBot, s.Height = -1, -1, 0
+		}
+		out.Samples = append(out.Samples, s)
+	}
+	out.Coords = coordsOf(e)
+	return nil, out, nil
+}
+
 // --- set_input（ジョイスティック注入。poke は入力に効かない）---
 
 type SetInputIn struct {
@@ -1525,7 +1587,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.108.0",
+		Version: "1.109.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
@@ -1544,7 +1606,8 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_audio_trace", Description: "Trace the TIA audio registers (AUDC control / AUDF freq / AUDV volume) for BOTH channels over N frames, returning the per-frame time-series (control[]/freq[]/volume[] per channel) — the audio analog of read_motion. NOTE: ADVANCES the emulator N frames, so trigger the sound first (fire / hit / start moving), then call. Captures a whole sound envelope (the attack/decay of a fire or explosion, an engine pitch change) in one call instead of stepping frame-by-frame with read_audio by hand."}, handleReadAudioTrace)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_ram_trace", Description: "Trace up to 16 RAM addresses ($80-$FF) over N frames, returning each address's per-frame value time-series (traces[i][f]) — the read_motion of arbitrary game state. NOTE: ADVANCES the emulator N frames (input set via set_input sticks across the trace). Collapses a manual step_frame+peek loop into one call: measure as NUMBERS how a tank's X/Y, an AI mode/timer, a score, or any RAM byte evolves over time (e.g. frames-to-escape a region, a decay curve, a stuck oscillation) instead of hand-stepping."}, handleReadRAMTrace)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
-	mcp.AddTool(server, &mcp.Tool{Name: "read_motion", Description: "Track a TIA object (P0/M0/P1/M1/BL) over N frames and report how smoothly it moves: per-frame velocity (1st difference), acceleration (2nd difference), and jerk_rms (RMS of the 2nd difference; 0 = constant velocity, high = judder/stutter). Tracks the exact horizontal HmovedPixel (x) and the rendered vertical top. Turns 'does it judder / ブルブル' into a number — automates the hand frame-by-frame trace. NOTE: ADVANCES the emulator N frames, so set up the state (serve/step) first; track the rendered top over a window where the object moves on a uniform background (x is always exact)."}, handleReadMotion)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_motion", Description: "Track a TIA object (P0/M0/P1/M1/BL) over N frames and report how smoothly it moves: per-frame velocity (1st difference), acceleration (2nd difference), and jerk_rms (RMS of the 2nd difference; 0 = constant velocity, high = judder/stutter). Tracks the exact horizontal HmovedPixel (x) and the rendered vertical top. Turns 'does it judder / ブルブル' into a number — automates the hand frame-by-frame trace. NOTE: ADVANCES the emulator N frames, so set up the state (serve/step) first; track the rendered top over a window where the object moves on a uniform background (x is always exact). For the exact vertical position of a small missile/ball (a bullet) — where the rendered-top scan latches onto a border — use spritey instead."}, handleReadMotion)
+	mcp.AddTool(server, &mcp.Tool{Name: "spritey", Description: "Numeric VERTICAL position of a TIA object (P0/M0/P1/M1/BL): its drawn scanline extent (y_top/y_bot/height in grid-y, same coord as read_row) + X (HmovedPixel), found by matching the object's OWN colour at its X column. Fills the gap read_tia (X only) and read_motion (rendered-top, unreliable for a 1-2px missile against a bordered playfield) leave. frames=1 (default) reports the CURRENT frame without advancing; frames>1 ADVANCES the emulator and returns the per-frame Y trajectory — trace a bullet's ricochet as numbers (y_top rises then falls at each top/bottom bounce). present=false = disabled/off-screen. Caveat: matches by colour, so another same-colour object within ~8px right (e.g. a just-fired missile still overlapping its player) can widen the extent until they separate."}, handleSpriteY)
 	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject controller input or a console panel switch (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. Joystick actions: left|right|up|down|fire|center|paddle. Console panel switches: reset|select|color|p0pro|p1pro (pressed=true is the active state; reset/select are momentary so press then release across frames to start a game). pressed=true holds, false releases (sticks). action=paddle uses value 0.0..1.0 and plugs the paddle peripheral on first use. center releases all directions."}, handleSetInput)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)

@@ -208,6 +208,72 @@ func (e *Emu) Markers() []annotate.Marker {
 	}
 }
 
+// ObjectColorRGBA returns object idx's rendered colour (0=P0 1=M0 2=P1 3=M1 4=BL)
+// — the palette-mapped COLUPx/COLUM/COLUBL used to draw it. Pairs with
+// Markers()[idx].Clock (the object's X) to find the object by its OWN colour,
+// robust where a "first non-background pixel" scan latches onto the playfield
+// frame/border instead of a small missile.
+func (e *Emu) ObjectColorRGBA(idx int) color.RGBA {
+	r := e.ReadTIARegisters()
+	var code uint8
+	switch idx {
+	case 0:
+		code = r.Player0.Color
+	case 1:
+		code = r.Missile0.Color
+	case 2:
+		code = r.Player1.Color
+	case 3:
+		code = r.Missile1.Color
+	case 4:
+		code = r.Ball.Color
+	}
+	return e.cap.colorRGBA(code)
+}
+
+// ObjectYExtent returns object idx's drawn vertical extent this frame — the top
+// and bottom VISIBLE scanline (grid-y, same coord as ReadRow) whose pixel matches
+// the object's own colour at/near its X column. present=false when the object is
+// disabled / off-screen (no matching pixel). This is the numeric Y / vertical
+// readout that read_tia (X only) and read_motion (rendered-top, unreliable for a
+// 1-2px missile against a bordered field) lack — for tracing a bullet's trajectory
+// / ricochet as numbers. Caveat: matches the object's colour, so another object of
+// the SAME colour within ~8px to the right (e.g. a just-fired missile overlapping
+// its player) can widen the extent; once separated it is clean.
+func (e *Emu) ObjectYExtent(idx int) (yTop, yBot, height int, present bool) {
+	if idx < 0 || idx >= 5 {
+		return 0, 0, 0, false
+	}
+	x := e.Markers()[idx].Clock
+	if x < 0 || x > 159 {
+		return 0, 0, 0, false
+	}
+	want := e.ObjectColorRGBA(idx)
+	img, visTop := e.Snapshot()
+	b := img.Bounds()
+	const span = 8 // missile occupies x..x+1; a player up to ~x+15 (left half suffices)
+	yTop, yBot = 1<<30, -1
+	for row := 0; row < b.Dy(); row++ {
+		for dx := 0; dx < span && x+dx < b.Dx(); dx++ {
+			p := img.RGBAAt(x+dx, row)
+			if p.R == want.R && p.G == want.G && p.B == want.B { // RGB only (alpha differs)
+				sl := row + visTop
+				if sl < yTop {
+					yTop = sl
+				}
+				if sl > yBot {
+					yBot = sl
+				}
+				break
+			}
+		}
+	}
+	if yBot < 0 {
+		return 0, 0, 0, false
+	}
+	return yTop, yBot, yBot - yTop + 1, true
+}
+
 // Annotated は最新フレームに TIA 実座標のグリッド・軸ラベル・スプライトマーカーを重ねた
 // 注釈画像を返す（ユーザー↔Claude の通信回線）。scale は整数倍率（×3〜4 推奨）。
 func (e *Emu) Annotated(scale int) *image.RGBA {
