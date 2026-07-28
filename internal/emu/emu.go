@@ -23,6 +23,8 @@ import (
 	"github.com/jetsetilly/gopher2600/hardware/riot/timer"
 	"github.com/jetsetilly/gopher2600/hardware/television"
 	"github.com/jetsetilly/gopher2600/hardware/television/coords"
+	"github.com/jetsetilly/gopher2600/hardware/television/signal"
+	"github.com/jetsetilly/gopher2600/hardware/television/specification"
 	"github.com/jetsetilly/gopher2600/hardware/tia/video"
 	"github.com/jetsetilly/gopher2600/setup"
 
@@ -44,6 +46,12 @@ type Emu struct {
 	paddlePlugged [2]bool       // SetPaddle がポートへ paddle peripheral を差したか（冪等化, V2-4b）
 
 	cov *Coverage // PC/分岐カバレッジ記録（任意・EnableCoverage で有効化, VV-3）。nil=無効でゼロコスト
+
+	// AT-5: per-pixel の描画オブジェクト帰属（PF/P0/P1/M0/M1/BL/BG）。elemCB を毎カラー
+	// クロック呼び、GetLastSignal().Index を索引に Video.LastElement を記録する。
+	// 値は element+1（0=未記録）。elemCB=nil のとき VCS.Step(nil) と等価＝ゼロコスト。
+	elemBuf []uint8         // 索引 = signal.Index（フルフレーム 228×scanline 空間）
+	elemCB  func(bool) error // 事前確保クロージャ（stepInstr で毎回渡す。per-call alloc 回避）
 }
 
 // EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。
@@ -114,7 +122,7 @@ func (e *Emu) AudioHash() string {
 // この規約で cpuCycles は「実行した命令サイクルの総和」になる（WSYNC の空転は含めない）。
 func (e *Emu) stepInstr() (executed bool, err error) {
 	ready := e.VCS.CPU.RdyFlg
-	if err := e.VCS.Step(nil); err != nil {
+	if err := e.VCS.Step(e.elemCB); err != nil { // elemCB=nil のとき従来どおり（ゼロコスト）
 		return false, err
 	}
 	if ready {
@@ -174,7 +182,30 @@ func New(spec string) (*Emu, error) {
 	//    （LoadROM）でのリセット前に行うので、以後の CPU 初期状態は毎 run・全プラットフォームで同一になる。
 	vcs.Env.Normalise()
 	vcs.Env.Random.Rand = rand.New(rand.NewSource(0))
-	return &Emu{TV: tv, VCS: vcs, cap: cap}, nil
+	e := &Emu{TV: tv, VCS: vcs, cap: cap}
+	e.EnableElementCapture() // AT-5: decompose_row 用に per-pixel 帰属を常時記録（実測は不変・オーバヘッド極小）
+	return e, nil
+}
+
+// EnableElementCapture は per-pixel の描画オブジェクト帰属記録を有効化する（冪等）。
+// 以後の stepInstr が毎カラークロック Video.LastElement を elemBuf[signal.Index] に書く。
+// エミュレーション結果（色/サイクル）は一切変えない＝観測専用。
+func (e *Emu) EnableElementCapture() {
+	if e.elemCB != nil {
+		return
+	}
+	e.elemBuf = make([]uint8, specification.AbsoluteMaxClks)
+	e.elemCB = func(isCycle bool) error {
+		sig := e.VCS.TV.GetLastSignal()
+		if sig.Index == signal.NoSignal {
+			return nil
+		}
+		if sig.Index >= 0 && sig.Index < len(e.elemBuf) {
+			// element(0..6) を +1 して格納（0=未記録の番兵）
+			e.elemBuf[sig.Index] = uint8(e.VCS.TIA.Video.LastElement) + 1
+		}
+		return nil
+	}
 }
 
 // Snapshot は最新フレームの可視域（160×可視高さ）を独立コピーで返す。
@@ -696,6 +727,52 @@ func (e *Emu) ReadRow(scanline int) (runs []RowRun, width int, err error) {
 		runs = append(runs, RowRun{Clock: x, Len: 1, Hex: hx})
 	}
 	return runs, w, nil
+}
+
+// ElemRun は DecomposeRow の連長エンコード 1 区間。可視 clock [Clock, Clock+Len) を
+// 同一の TIA オブジェクト Element が描いている。
+type ElemRun struct {
+	Clock   int    `json:"clock"`   // 区間先頭の可視 clock（0..159）
+	Len     int    `json:"len"`     // 連続ピクセル数
+	Element string `json:"element"` // BG/PF/P0/P1/M0/M1/BL（none=未記録）
+}
+
+// elemNames は video.Element(0..6) → 表示名。索引は elemBuf 格納値 −1。
+var elemNames = [...]string{"BG", "BL", "PF", "P0", "P1", "M0", "M1"}
+
+// DecomposeRow は指定可視 scanline（ReadRow と同じ絶対 scanline 座標）を「どの TIA
+// オブジェクトが各ピクセルを描いたか」で連長エンコードして返す。ReadRow（色）・beamtrace
+// （書込）に無い帰属マップ＝商用 ROM のクリーンルーム解析用（AT-5）。可視 clock x は
+// elemBuf 索引 scanline*228 + 68 + x（read_row と同座標）。要 EnableElementCapture。
+func (e *Emu) DecomposeRow(scanline int) (runs []ElemRun, width int, err error) {
+	if e.elemBuf == nil {
+		return nil, specification.ClksVisible, fmt.Errorf("element capture not enabled")
+	}
+	vt := e.cap.frameInfo.VisibleTop
+	vb := e.cap.frameInfo.VisibleBottom
+	if scanline < vt || scanline > vb {
+		return nil, specification.ClksVisible, fmt.Errorf("scanline %d out of visible range %d..%d", scanline, vt, vb)
+	}
+	elemAt := func(x int) string {
+		idx := scanline*specification.ClksScanline + specification.ClksHBlank + x
+		if idx < 0 || idx >= len(e.elemBuf) {
+			return "none"
+		}
+		v := e.elemBuf[idx]
+		if v == 0 || int(v) > len(elemNames) {
+			return "none"
+		}
+		return elemNames[v-1]
+	}
+	for x := 0; x < specification.ClksVisible; x++ {
+		el := elemAt(x)
+		if len(runs) > 0 && runs[len(runs)-1].Element == el {
+			runs[len(runs)-1].Len++
+			continue
+		}
+		runs = append(runs, ElemRun{Clock: x, Len: 1, Element: el})
+	}
+	return runs, specification.ClksVisible, nil
 }
 
 // --- P1: TIA 書込専用レジスタの現在値読み（色推論を実測へ）---

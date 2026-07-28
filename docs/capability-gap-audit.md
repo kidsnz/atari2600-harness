@@ -509,3 +509,47 @@ Four more harness-capability candidates from a 5-lens deep read of the original 
   copy so they were left intact, but the user asked that the English-ization "reliably happen later" — tracked
   here so it is not dropped. `mining-digest.md` is **excluded** (generated from Japanese-source thread data —
   translating would break source fidelity). Size: medium; needs review. Separate approval.
+
+## Reproduction-loop backlog (RL-*) — 2026-07-29
+The clean-room reproduction loop tools (`docs/reproduce-loop.md`): **`vismatch`** (palette-independent
+per-pixel object-attribution visual diff + `-genpf` PF-table generator), **`behavmatch`** (scripted-input
+behavioural diff), **`framegen`** (from-scratch pixel-exact static-frame generator). **Field-evaluated** on
+a second game (Pizza Boy Tokyo) — the running log + all 7 enhancement asks are in
+`sandbox/practice/pizza-boy-tokyo/TOOL-EVAL-reproduce-loop.md`, promoted here as the canonical backlog.
+**Validation stands:** vismatch found a systematic **+8-scanline** vertical shift that eyeballed screenshots
+missed; `-genpf` gave the exact band positions that corrected a hand-model that was **3px (−11 vs −8) wrong**
+→ byte-exact PF; matched-state measurement pinned bike top at abs sl176 vs a comment that mis-stated the
+offset by 13 lines. The tools do what they were built for: **numbers close holes the eye cannot.** Ranked:
+
+- **RL-5 — `behavmatch` warmup/frame-offset flag ★ top priority (critical gap).** `behavmatch` drives both
+  ROMs from frame 0, so a game with a **title screen that auto-advances to gameplay** (most commercial ROMs)
+  is measured on its TITLE screen, not gameplay — apples-to-oranges, every scenario reads MECHANIC DIFF
+  (observed live on Pizza Boy: target P0 Y=29-46 = title vs mine=gameplay). `vismatch` has `-target-frames`;
+  `behavmatch` has **no equivalent**. Fix: `-target-warmup N`/`-mine-warmup N` (run N frames, optionally with
+  RESET, before the scenario's scripted input). Size: S. 〔TOOL-EVAL V4 / idea #5〕
+- **RL-1 — `-genpf` full-width PF output mode ★ top priority.** `-genpf` measures band positions + per-band
+  clk-spans **perfectly**, but emits **Outlaw-specific** `CacLTbl/CacRTbl` (centre-arena repeat-mode CacL/CacR
+  encoding). A full-width playfield (e.g. Pizza Boy's 4 buildings across clk4-143) needs **per-scanline/band
+  `PF0/PF1/PF2` tables** (`PF0tab/PF1tab/PF2tab`, reflect or repeat). The measurement already exists — only the
+  emit needs a `-format pf012|arena` switch. Size: S-M. 〔TOOL-EVAL V2 / idea #1〕
+- **RL-6 — `behavmatch` scenario generalisation.** Scenarios are hardcoded Outlaw mechanics in
+  `internal/behavmatch/scenarios.go` (e.g. `p0-fire-freeze` = the no-Getaway rule). Make scenarios
+  **per-game/loadable** (input timeline + trace targets via JSON/DSL or a per-game registry) so a new game is
+  usable without editing the package. Pizza Boy needs: 4-way move / delivery (+$10 BCD trace) / crash
+  (pstate/freeze). Ties to the behaviour-reproduction system (any non-Outlaw game needs this). Size: M.
+  〔TOOL-EVAL V4 / idea #6〕
+- **RL-2 — `vismatch` global vertical-offset auto-detect + 1-line summary.** When N playfield bands are all
+  shifted by a constant, a human currently reads the band-diff and infers it. Emit `best global vertical
+  shift = −11 (removes X% of PF mismatch)` automatically (framegen already does this content-shift search
+  internally — lift it into vismatch). Size: S. 〔TOOL-EVAL V3 / idea #2〕
+- **RL-3 — matched-state moving-object comparison (`vismatch` × `behavmatch`).** Single-frame vismatch is
+  perfect for static PF but a moving object (bike/taxi) reads as transient diff when the two ROMs are in
+  different game-state. Drive both to the **same scripted state/frame (behavmatch), then vismatch** — measures
+  moving-object position fidelity in one shot. (Done manually via matched-state this session; automate.)
+  Size: M. 〔TOOL-EVAL V5 / idea #3〕
+- **RL-4 — `-target-until-gameplay` auto frame-find.** Auto-detect the first frame where PF/sprites stabilise
+  (title exited) so the target frame count need not be hand-tuned. Complements RL-5. Size: S-M. 〔idea #4〕
+- **RL-7 — `framegen` field evaluation (validator track).** `framegen` self-calibrates VBLANK/vertical-shift/
+  sprite-X — the −8 shift hand-iterated on Pizza Boy should be automatic. Evaluate as the visual-layer
+  ground-truth/validator (note: static-frame replay only — it does **not** generate gameplay logic, which is
+  the behaviour-reproduction system's job). Size: S (evaluation). 〔idea #7〕

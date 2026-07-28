@@ -9,6 +9,58 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`framegen` — from-scratch full-frame reproduction generator** (v1.112.0). Reads a target ROM and emits
+  a NEW, self-contained DASM source that reproduces its static visible frame **pixel-exactly** — including
+  the players. It renders the target, reads which TIA object drew each pixel per visible scanline
+  (`emu.DecomposeRow`), re-encodes the playfield into left/right PF register bytes and the two players into
+  GRP0/GRP1 bytes, reads colours/NUSIZ/positions, and writes a data-driven per-scanline PF(L/R)+GRP0/GRP1
+  replay kernel. Then it **self-calibrates** three things by assembling + rendering its own output in a loop:
+  the two sprite X inputs (`SetXPos` landing offset is kernel-specific), the VBLANK line count (clone's
+  visible top matches the target's), and a residual content vertical shift (±lines, chosen by element-match).
+  Validated: on Outlaw it produced `clone/outlaw_clone.asm` that `vismatch` reports **pixel-exact (band diffs:
+  none)** across all 214 visible scanlines — gunmen (2×-wide, P1 reflected), asymmetric cactus, score, bars,
+  borders — with the target's exact TIA colours. `go run ./cmd/framegen -rom Outlaw.bin -reset -out clone.asm`.
+- **`vismatch` + `behavmatch` — the automated reproduction-diff loop** (v1.111.0). Two CLI tools that
+  close the "reproduce a commercial screen/mechanic pixel- and behaviour-exact" loop so a builder never
+  again sparse-samples, mis-measures a band boundary by 1-2px, and iterates by hand. Both diff a TARGET
+  ROM against your build.
+  - **`cmd/vismatch` (`internal/vismatch`)** — PALETTE-INDEPENDENT visual diff. Renders both frames, reads
+    WHICH TIA object drew each pixel (`emu.DecomposeRow` → BG/PF/P0/P1/M0/M1/BL) on every visible scanline,
+    and reports every element-level difference plus a per-element **band diff** naming the exact scanline
+    range and lit clock-spans where shapes disagree (e.g. `PF 162-165 | target 80-83 | mine 72-83` — a
+    fat-by-4px playfield bar, pinpointed in one pass). `-diff` writes an object-attribution overlay PNG
+    (green=match / red=target-only / blue=mine-only). `-genpf` **auto-generates the correct playfield tables
+    from the target**: measures the cactus/PF bands and emits paste-ready `CACTOP/CACBOT` + `CacLTbl/CacRTbl`
+    `ds` runs (validated: reproduced Outlaw's hand-derived cactus tables exactly). Palette independence is
+    the point — two ROMs use different palettes, so object attribution, not RGB, is the ground truth.
+  - **`cmd/behavmatch` (`internal/behavmatch`)** — behavioural diff. Drives both ROMs through identical
+    scripted input scenarios (`internal/behavmatch/scenarios.go`: 4-way walk speed/clamps, fire→freeze
+    coupling), records every object's per-frame trajectory (`emu.ObjectYExtent`/`Markers`/`PeekRAM`), and
+    reports where a MECHANIC diverges as numbers — separating speed/travel-span (mechanic) from absolute
+    rest position (calibration), plus a "no-Getaway" frozen-while-bullet coupling check. On Outlaw it
+    confirmed horizontal (0.5px/f) and vertical (4px/4f) speeds match and surfaced two real build bugs
+    (left-walk range too small; a fire-while-right bullet-trajectory divergence). **`-target-warmup N` /
+    `-mine-warmup N`** (RL-5, field-driven): run N no-input frames before the scenario to skip a title
+    screen that auto-advances to gameplay — without it a title-advance game (Pizza Boy) is measured on its
+    title, not gameplay. Field evaluation of the whole loop + a 7-item enhancement backlog (RL-*) live in
+    `docs/capability-gap-audit.md`.
+  Both are thin layers over existing `emu` primitives (`New`/`LoadROM`/`RunFrames`/`SetInput`/`SetPanel`/
+  `Snapshot`/`ReadRow`/`DecomposeRow`/`ObjectYExtent`/`Markers`/`PeekRAM`) + `build.Assemble` (accept `.asm`,
+  auto-build). Docs: `docs/reproduce-loop.md`.
+- **`decompose_row` — per-pixel TIA-object attribution of a scanline** (v1.110.0, AT-5). The attribution
+  sibling of `read_row` (colours) and `beamtrace` (register writes): decomposes one visible scanline into
+  run-length runs `{clock,len,element}` where element ∈ `{BG,PF,P0,P1,M0,M1,BL}` — answers "is THIS part of
+  the picture the playfield, a player, a missile, or the ball?". The decisive tool for reverse-engineering how
+  a running commercial ROM composes its screen (which TIA object draws which visual element, per line).
+  Demand-driven while decoding Outlaw's asymmetric cactus: `read_row` showed `clk72-75 + clk80-83` lit but not
+  that BOTH are Playfield (repeat-mode mid-line PF rewrites), and that the sprite/missile budget is spent
+  elsewhere (gunmen at the sides, disjoint from the centre cactus). Implementation: Gopher2600's
+  `reflection`/`video.Element` already computes per-pixel attribution but was unplumbed — `emu.EnableElementCapture`
+  drives a per-color-clock callback (`VCS.Step(elemCB)`) recording `TIA.Video.LastElement` into `elemBuf`
+  indexed by `signal.Index` (full 228×scanline space; visible clock x → `scanline*228+68+x`, same mapping as
+  `ReadRow`); `emu.DecomposeRow` RLE-encodes it. Capture is on by default (observation-only — never changes
+  colours/cycles; overhead is one array write per color clock). New: `emu.ElemRun`, `emu.DecomposeRow`,
+  `emu.EnableElementCapture` + the `decompose_row` MCP tool. Same absolute-scanline coordinate as `read_row`.
 - **`spritey` — numeric vertical (Y) position of a TIA object** (v1.109.0). Reports an object's drawn
   scanline extent (`y_top`/`y_bot`/`height`, grid-y) + X, found by matching the object's OWN colour at its
   X column — filling the gap `read_tia` (X only) and `read_motion` (rendered-top, which latches onto the

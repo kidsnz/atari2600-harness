@@ -60,3 +60,7 @@
 /roms/**/*.sym
 /stellacheck
 /statecov
+/framegen
+/vismatch
+/behavmatch
+/ramtrace
