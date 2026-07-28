@@ -399,6 +399,30 @@ func (e *Emu) PeekRAM(addr uint16) (uint8, error) {
 	return e.VCS.Mem.Peek(addr)
 }
 
+// 2600 の作業 RAM（RIOT・$80–$FF の 128 バイト）。
+const (
+	RAMBase = 0x80 // 最初の RAM 番地
+	RAMSize = 128  // RAM の総バイト数
+)
+
+// CurrentRAM は 128 バイトの RAM 全域（$80–$FF）を副作用なしで一括に読む。
+//
+// PeekRAM を 128 回呼ぶのと値としては同じだが、呼ぶ側が「どの番地を見たいか」を
+// **事前に宣言しなくてよくなる**のが本質。挙動再現（RAM トレース）では、どの番地が
+// 意味を持つかは測る前には分からない＝毎フレーム全部を記録し、後から分類する。
+// 添字は番地−$80（out[0] が $80）。
+func (e *Emu) CurrentRAM() ([RAMSize]uint8, error) {
+	var out [RAMSize]uint8
+	for i := 0; i < RAMSize; i++ {
+		b, err := e.VCS.Mem.Peek(uint16(RAMBase + i))
+		if err != nil {
+			return out, fmt.Errorf("peek RAM $%02X: %w", RAMBase+i, err)
+		}
+		out[i] = b
+	}
+	return out, nil
+}
+
 // TimerState は RIOT タイマの現在状態（VV-10 T-1 timer-wrap 検出の土台）。
 type TimerState struct {
 	INTIM          uint8 // 現在のカウンタ値
