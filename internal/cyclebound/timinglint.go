@@ -109,7 +109,7 @@ func Lint(asmPath string) ([]LintWarning, error) {
 	}
 	// Abstract-interpret so R2 can tell a real staged motion from a defensive
 	// `lda #0; sta HMP0` clear (the latter must not warn).
-	states := computeStates(instrs, entries, p.byteAt)
+	states, _ := computeStates(instrs, entries, p.byteAt)
 
 	loc := func(a uint16) string { return sm.Locate(a) }
 	var w []LintWarning

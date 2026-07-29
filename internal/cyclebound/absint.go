@@ -703,7 +703,13 @@ func zpInitRange(instrs map[uint16]Instr) ValueRange {
 // The lattice is finite (8-bit ranges + tri-bools), so it converges; maxIter is a
 // safety cap (on hit the partial result is still sound — callers treat an absent
 // address as Top / display-unknown, i.e. checked conservatively).
-func computeStates(instrs map[uint16]Instr, entries []uint16, romAt func(uint16) (byte, bool)) map[uint16]State {
+// computeStates runs the forward fixpoint. The second return value reports
+// whether it actually CONVERGED: the iteration cap is a backstop against a
+// non-terminating ascending chain, and a run that hits it has stopped early with
+// states that are UNDER-approximations. Consumers (bounds, page penalties, branch
+// refinement) treat their inputs as sound, so an unconverged result must never be
+// silently handed to them — a proof resting on it would be a proof of nothing.
+func computeStates(instrs map[uint16]Instr, entries []uint16, romAt func(uint16) (byte, bool)) (map[uint16]State, bool) {
 	entryState := map[uint16]State{}
 	var work []uint16
 	inWork := map[uint16]bool{}
@@ -729,7 +735,8 @@ func computeStates(instrs map[uint16]Instr, entries []uint16, romAt func(uint16)
 		push(e, seed)
 	}
 	const maxIter = 300000
-	for it := 0; len(work) > 0 && it < maxIter; it++ {
+	it := 0
+	for ; len(work) > 0 && it < maxIter; it++ {
 		addr := work[0]
 		work = work[1:]
 		inWork[addr] = false
@@ -745,7 +752,7 @@ func computeStates(instrs map[uint16]Instr, entries []uint16, romAt func(uint16)
 			push(e.addr, e.state)
 		}
 	}
-	return entryState
+	return entryState, len(work) == 0 && it < maxIter
 }
 
 // baseCost is the instruction's cycle count WITHOUT the page-cross penalty.

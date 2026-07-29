@@ -632,6 +632,12 @@ type Report struct {
 	BlankOver      []Region `json:"blank_over,omitempty"`      // blank regions whose worst exceeds budget×@lines (roll risk, not a visible tear)
 	BlankUnbounded []Region `json:"blank_unbounded,omitempty"` // blank regions we could not statically bound (e.g. a divide loop over an un-@amax'd RAM accumulator)
 	RollFree       bool     `json:"roll_free"`                 // ∀ roll-freedom: EVERY region (blank+visible) is bounded AND within its budget×@lines span
+
+	// Converged reports that the abstract-interpretation fixpoint reached a fixed
+	// point rather than stopping at its iteration cap. A capped run leaves
+	// UNDER-approximated states, which every downstream consumer treats as sound,
+	// so a report with Converged=false proves nothing and must not be certified.
+	Converged bool `json:"converged"`
 }
 
 // Prove assembles asmPath, statically proves every WSYNC-to-WSYNC region's
@@ -716,7 +722,7 @@ func Prove(asmPath string, budget int) (*Report, error) {
 			entries = append(entries, t)
 		}
 	}
-	states := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
+	states, converged := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
 
 	var starts []uint16
 	for a, in := range instrs {
@@ -726,7 +732,7 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	}
 	sort.Slice(starts, func(i, j int) bool { return starts[i] < starts[j] })
 
-	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget}
+	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget, Converged: converged}
 	for _, sa := range starts {
 		reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa), regionAmax(sa), sm, states)
 		rep.Regions++
@@ -768,12 +774,15 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		rep.Unbounded = append(rep.Unbounded, Region{Budget: budget,
 			Reason: "no STA WSYNC reached from the reset/IRQ/NMI vectors — bank-switched or not a single-bank kernel (out of scope)"})
 	}
-	rep.Certified = rep.Regions > 0 && len(rep.Violations) == 0 && len(rep.Unbounded) == 0
+	// A capped fixpoint leaves under-approximated states, so nothing derived from
+	// them may be certified — the bound would rest on values the analysis never
+	// finished computing.
+	rep.Certified = rep.Converged && rep.Regions > 0 && len(rep.Violations) == 0 && len(rep.Unbounded) == 0
 	// ③ roll_free: the ∀ roll-freedom verdict — EVERY region (blank AND visible) is
 	// bounded and within its budget×@lines span. Stricter than Certified (visible-only):
 	// a blank region over budget or unbounded means the frame's line total is NOT
 	// statically proven here (it is delegated to the runtime ∃ ntsc_frame_lines check).
-	rep.RollFree = rep.Regions > 0 &&
+	rep.RollFree = rep.Converged && rep.Regions > 0 &&
 		len(rep.Violations) == 0 && len(rep.Unbounded) == 0 &&
 		len(rep.BlankOver) == 0 && len(rep.BlankUnbounded) == 0
 	return rep, nil
