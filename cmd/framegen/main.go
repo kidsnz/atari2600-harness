@@ -16,6 +16,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
@@ -23,6 +24,16 @@ import (
 )
 
 // nusizWidth maps NUSIZ size-and-copies bits to pixels-per-GRP-bit (1/2/4).
+//
+// The five COPY modes (1,2,3,4,6) are 1 pixel per bit — the copies are hardware
+// replication of the SAME 8-bit byte, not a wider byte — so returning 1 for them
+// is correct, and it is measured rather than assumed: with NUSIZ held constant,
+// `DecomposeRow` on roms/litmus/litmus_nusiz_all's per-mode probe reports run
+// LENGTHS of 8 for modes 0,1,2,3,4,6, 16 for mode 5 and 32 for mode 7 on a $FF
+// byte. framegen reproduces all eight constant modes pixel-exact on a P0-only
+// probe (864/864, 1728/1728, 1728/1728, 2592/2592, 1728/1728, 1728/1728,
+// 2592/2592, 3456/3456 P0 cells matched for modes 0..7) — so a wrong copy count
+// in a clone is NOT this function.
 func nusizWidth(sc uint8) int {
 	switch sc & 0x07 {
 	case 0x05:
@@ -31,6 +42,111 @@ func nusizWidth(sc uint8) int {
 		return 4
 	}
 	return 1
+}
+
+// nusizCopies maps NUSIZ size-and-copies bits to the number of copies the TIA
+// draws. Measured, not tabulated from a document: litmus_nusiz_all holds $FF in
+// both players and steps NUSIZ 0..7 in 24-line bands, and `DecomposeRow` counts
+// P0 runs per band at these start clocks —
+//
+//	0: 24 | 1: 24,40 | 2: 24,56 | 3: 24,40,56 | 4: 24,88 | 5: 25 | 6: 24,56,88 | 7: 25
+//
+// i.e. 1,2,2,3,2,1,3,1 copies for modes 0..7.
+func nusizCopies(sc uint8) int {
+	switch sc & 0x07 {
+	case 0x01, 0x02, 0x04:
+		return 2
+	case 0x03, 0x06:
+		return 3
+	}
+	return 1
+}
+
+// nusizStartShift is how far right the TIA starts drawing a player when the size
+// bits widen it. Measured on eight otherwise-identical probe ROMs whose only
+// difference is the NUSIZ value: `Markers()[0].Clock` (HmovedPixel) reads 24 for
+// modes 0,1,2,3,4,6 and 25 for modes 5 and 7, and the first drawn pixel agrees
+// with it in all eight. So the shift is +1 for the two size modes and 0 for the
+// rest, and HmovedPixel already carries it — a per-line X read from the machine
+// needs no correction, but comparing two lines' positions does.
+func nusizStartShift(sc uint8) int {
+	if nusizWidth(sc) > 1 {
+		return 1
+	}
+	return 0
+}
+
+// lineState is the per-scanline TIA state a per-scanline replay kernel could
+// carry for the two players: NUSIZ (size+copies) and the reset position.
+//
+// framegen used to read both ONCE, at the end of the rendered frame, and apply
+// that single value to every scanline. On a target that changes NUSIZ down the
+// frame that is not an approximation, it is the wrong picture: litmus_nusiz_all
+// ends its frame in mode $07 (quad width), so every one of its 214 lines was
+// reproduced quad-width and 2666 cells came out wrong.
+type lineState struct {
+	nz0, nz1 uint8
+	x0, x1   int
+}
+
+// measureLines steps ONE whole frame instruction by instruction and records, for
+// every scanline, the NUSIZ and reset position each player ENDS that scanline
+// with. A scanline with no instruction boundary of its own inherits the previous
+// line's state, which is what the hardware does too.
+//
+// End of line, not end of HBLANK, and that is a measurement rather than a
+// preference. The engine applies a NUSIZ write through a delayed event, so the
+// register READBACK lags the store: traced on litmus_nusiz_all scanline 37, the
+// band header's `sta NUSIZ1` completes at clock -41 and `Player1.SizeAndCopies`
+// still reads the previous band's $07 at every instruction boundary through clock
+// -2, only reading $00 at clock +7 — while the picture on that line shows P1 drawn
+// in the NEW mode ($00: one copy, 8 pixels wide, starting at clock 3, not $07's
+// quad width starting at 4). A cutoff at the end of HBLANK therefore reads a value
+// the scanline never used; it cost 2 of litmus_nusiz_all's 214 lines (37 and 181,
+// the two whose band header straddles the boundary) and 18 P1 cells.
+//
+// The cost of the late sample is stated rather than hidden: a target that changes
+// NUSIZ part-way ALONG a scanline has that change attributed to the whole line.
+// This kernel carries one NUSIZ per scanline, so it could not reproduce such a
+// line under any sampling rule; the difference surfaces as unexplained cells in
+// the final report instead of being quietly absorbed.
+func measureLines(e *emu.Emu) (map[int]lineState, error) {
+	regs := e.ReadTIARegisters()
+	mk := e.Markers()
+	cur := lineState{regs.Player0.SizeAndCopies, regs.Player1.SizeAndCopies, mk[0].Clock, mk[2].Clock}
+	out := map[int]lineState{}
+	start := e.Coords().Frame
+	maxSl := 0
+	for {
+		if err := e.StepInstruction(); err != nil {
+			return nil, err
+		}
+		c := e.Coords()
+		if c.Frame != start {
+			break
+		}
+		if c.Scanline > maxSl {
+			maxSl = c.Scanline
+		}
+		regs := e.ReadTIARegisters()
+		mk := e.Markers()
+		cur = lineState{regs.Player0.SizeAndCopies, regs.Player1.SizeAndCopies, mk[0].Clock, mk[2].Clock}
+		out[c.Scanline] = cur
+	}
+	// Fill the gaps forward: a scanline whose HBLANK held no instruction boundary
+	// still ran with whatever the previous line left in the registers.
+	var last lineState
+	seeded := false
+	for s := 0; s <= maxSl; s++ {
+		if v, ok := out[s]; ok {
+			last, seeded = v, true
+			continue
+		}
+		if seeded {
+			out[s] = last
+		}
+	}
+	return out, nil
 }
 
 // pfBytes encodes 20 playfield columns (each 4 clocks) into PF0/PF1/PF2 with the
@@ -59,12 +175,72 @@ type frameData struct {
 	top, h           int
 	p0col, p1col     uint8
 	pfcol, bgcol     uint8
-	nusiz0, nusiz1   uint8
+	nusiz0, nusiz1   uint8 // end-of-frame NUSIZ (what the clone restores after its kernel)
 	p0x, p1x         int
 	pf0L, pf1L, pf2L []uint8
 	pf0R, pf1R, pf2R []uint8
 	grp0, grp1       []uint8
-	tgtElem          [][]string // target's per-visible-line object attribution (for content-shift search)
+	nz0, nz1         []uint8     // per-visible-line NUSIZ, measured (see measureLines)
+	tgtElem          [][]string  // target's per-visible-line object attribution (for content-shift search)
+	obj              [2]objFacts // measured per-object facts, index 0=P0 1=P1
+	kern             []writeBlock
+}
+
+// objFacts is what the machine says one player DOES over the target's frame, as
+// opposed to what a single end-of-frame register read says it is. Every field is
+// counted, never inferred, because the report built on it used to assert a cause
+// ("a per-zone multiplexed target") that it had not measured — and that was wrong
+// for litmus_nusiz_all, whose two players are placed once before the frame loop
+// and never moved.
+type objFacts struct {
+	name      string
+	lines     int           // visible lines on which the target draws this element at all
+	maxRuns   int           // most separate runs of it seen on one line
+	modes     map[uint8]int // per-line NUSIZ value -> number of visible lines with it
+	maxCopies int           // most copies any of those modes asks the TIA for
+	baseX     map[int]int   // reset X with the NUSIZ size shift removed -> line count
+	distinctX int           // len(baseX): >1 is the only thing that means multiplexing
+	onlyX     int           // the single base X, meaningful only when distinctX == 1
+}
+
+func newObjFacts(name string) objFacts {
+	return objFacts{name: name, modes: map[uint8]int{}, baseX: map[int]int{}}
+}
+
+// modeList renders the measured NUSIZ modes with the line count each ran for, so
+// "up to 3 copies" is always accompanied by the evidence for it.
+func (f objFacts) modeList() string {
+	if len(f.modes) == 0 {
+		return "(never drawn)"
+	}
+	keys := make([]int, 0, len(f.modes))
+	for k := range f.modes {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("$%02X(%dx%d copies on %d lines)",
+			k, nusizWidth(uint8(k)), nusizCopies(uint8(k)), f.modes[uint8(k)]))
+	}
+	return strings.Join(parts, " ")
+}
+
+// xList renders the measured reset positions, size shift removed.
+func (f objFacts) xList() string {
+	if len(f.baseX) == 0 {
+		return "[]"
+	}
+	keys := make([]int, 0, len(f.baseX))
+	for k := range f.baseX {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%d(%d lines)", k, f.baseX[k]))
+	}
+	return "[" + strings.Join(parts, " ") + "]"
 }
 
 // shiftUint8 returns a copy of a shifted by s (out[i]=a[i+s], edges clamp to 0).
@@ -90,7 +266,32 @@ func (fd *frameData) shifted(s int) *frameData {
 	c.pf2R = shiftUint8(fd.pf2R, s)
 	c.grp0 = shiftUint8(fd.grp0, s)
 	c.grp1 = shiftUint8(fd.grp1, s)
+	// The NUSIZ tables are per-scanline replay data like the rest: shifting the
+	// picture without them would move a band's graphics off its own copy mode.
+	c.nz0 = shiftKeepEdges(fd.nz0, s)
+	c.nz1 = shiftKeepEdges(fd.nz1, s)
 	return &c
+}
+
+// shiftKeepEdges shifts like shiftUint8 but clamps to the first/last element
+// instead of 0. NUSIZ has no "off" value — shifting a zero into the edge would
+// silently order one copy where the target asks for three.
+func shiftKeepEdges(a []uint8, s int) []uint8 {
+	out := make([]uint8, len(a))
+	if len(a) == 0 {
+		return out
+	}
+	for i := range out {
+		j := i + s
+		if j < 0 {
+			j = 0
+		}
+		if j >= len(a) {
+			j = len(a) - 1
+		}
+		out[i] = a[j]
+	}
+	return out
 }
 
 // extract renders the target and pulls every per-scanline replay byte.
@@ -123,8 +324,9 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 		nusiz0: regs.Player0.SizeAndCopies, nusiz1: regs.Player1.SizeAndCopies,
 		p0x: mk[0].Clock, p1x: mk[2].Clock,
 	}
-	w0 := nusizWidth(fd.nusiz0)
-	w1 := nusizWidth(fd.nusiz1)
+	// Pass 1: object attribution for every visible line. It has to run before the
+	// state pass, which steps a further frame and overwrites the element buffer.
+	runsPerLine := make([][]emu.ElemRun, h)
 	for y := 0; y < h; y++ {
 		sl := top + y
 		elem := make([]string, 160)
@@ -132,6 +334,7 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 			elem[i] = "BG"
 		}
 		if runs, _, err := e.DecomposeRow(sl); err == nil {
+			runsPerLine[y] = runs
 			for _, r := range runs {
 				for x := r.Clock; x < r.Clock+r.Len && x < 160; x++ {
 					elem[x] = r.Element
@@ -151,45 +354,115 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 		fd.pf0R = append(fd.pf0R, r0)
 		fd.pf1R = append(fd.pf1R, r1)
 		fd.pf2R = append(fd.pf2R, r2)
-		fd.grp0 = append(fd.grp0, grpByte(elem, fd.p0x, w0, "P0"))
-		fd.grp1 = append(fd.grp1, grpByte(elem, fd.p1x, w1, "P1"))
 		fd.tgtElem = append(fd.tgtElem, elem)
+	}
+
+	// Pass 2: per-scanline NUSIZ and reset position, measured off the next frame
+	// (framegen reproduces a STATIC frame, so the next one repeats this one).
+	st, err := measureLines(e)
+	if err != nil {
+		return nil, err
+	}
+	fd.obj[0] = newObjFacts("P0")
+	fd.obj[1] = newObjFacts("P1")
+	for y := 0; y < h; y++ {
+		ls, ok := st[top+y]
+		if !ok {
+			ls = lineState{fd.nusiz0, fd.nusiz1, fd.p0x, fd.p1x}
+		}
+		fd.nz0 = append(fd.nz0, ls.nz0)
+		fd.nz1 = append(fd.nz1, ls.nz1)
+		countRuns(&fd.obj[0], runsPerLine[y], "P0", ls.nz0, ls.x0)
+		countRuns(&fd.obj[1], runsPerLine[y], "P1", ls.nz1, ls.x1)
+	}
+	fd.obj[0].distinctX = len(fd.obj[0].baseX)
+	fd.obj[1].distinctX = len(fd.obj[1].baseX)
+
+	// The graphics byte is sampled at the line's OWN pixel width, from the same
+	// end-of-frame reset position as before, corrected only by that line's size
+	// shift. It deliberately does NOT sample at the per-line HmovedPixel: this
+	// kernel strobes RESPx once, and the position it strobes to is calibrated
+	// against the end-of-frame marker, so reading the pattern from anywhere else
+	// draws the right shape in the wrong column. Measured cost of getting that
+	// wrong: sampling at the per-line position turned flicker_multiplex (0 cells
+	// wrong) into 78, sprite_anim (0) into 84 and text24 (162) into P0/P1 absent
+	// entirely — the end-of-frame marker and the visible-line position are not the
+	// same number on a target that parks its sprites during overscan.
+	sh0 := nusizStartShift(fd.nusiz0)
+	sh1 := nusizStartShift(fd.nusiz1)
+	for y := 0; y < h; y++ {
+		x0 := fd.p0x - sh0 + nusizStartShift(fd.nz0[y])
+		x1 := fd.p1x - sh1 + nusizStartShift(fd.nz1[y])
+		fd.grp0 = append(fd.grp0, grpByte(fd.tgtElem[y], x0, nusizWidth(fd.nz0[y]), "P0"))
+		fd.grp1 = append(fd.grp1, grpByte(fd.tgtElem[y], x1, nusizWidth(fd.nz1[y]), "P1"))
 	}
 	return fd, nil
 }
 
+// countRuns folds one visible line into an object's measured facts.
+func countRuns(f *objFacts, runs []emu.ElemRun, name string, nz uint8, x int) {
+	n := 0
+	for _, r := range runs {
+		if r.Element == name {
+			n++
+		}
+	}
+	if n == 0 {
+		return // the object draws nothing here; its position says nothing about the picture
+	}
+	f.lines++
+	if n > f.maxRuns {
+		f.maxRuns = n
+	}
+	f.modes[nz&0x07]++
+	if c := nusizCopies(nz); c > f.maxCopies {
+		f.maxCopies = c
+	}
+	// Remove the size-mode start shift before counting positions, so a target that
+	// only switches between 1x and 2x is not reported as having moved its sprite.
+	b := x - nusizStartShift(nz)
+	f.baseX[b]++
+	f.onlyX = b
+}
+
 // renderGrid assembles src, renders it, and returns the per-visible-line object
-// attribution grid + the Snapshot top (aligned to absolute scanline top+y).
-func renderGrid(src, spec string, frames int) (grid [][]string, top int, err error) {
+// attribution grid + the Snapshot top (aligned to absolute scanline top+y), plus
+// the SAME measured per-object facts that are taken off the target. Measuring the
+// clone the same way the target is measured is what lets the final report compare
+// copy counts and reset positions instead of asserting a cause.
+func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [2]objFacts, err error) {
+	obj[0], obj[1] = newObjFacts("P0"), newObjFacts("P1")
 	dir, err := os.MkdirTemp("", "framegen")
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, obj, err
 	}
 	asm, bin := dir+"/c.asm", dir+"/c.bin"
 	if err := os.WriteFile(asm, []byte(src), 0o644); err != nil {
-		return nil, 0, err
+		return nil, 0, obj, err
 	}
 	if out, aerr := build.Assemble(asm, bin); aerr != nil {
-		return nil, 0, fmt.Errorf("assemble:\n%s", out)
+		return nil, 0, obj, fmt.Errorf("assemble:\n%s", out)
 	}
 	e, err := emu.New(spec)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, obj, err
 	}
 	if err := e.LoadROM(bin); err != nil {
-		return nil, 0, err
+		return nil, 0, obj, err
 	}
 	if err := e.RunFrames(frames); err != nil {
-		return nil, 0, err
+		return nil, 0, obj, err
 	}
 	img, vt := e.Snapshot()
 	h := img.Bounds().Dy()
+	runsPerLine := make([][]emu.ElemRun, h)
 	for y := 0; y < h; y++ {
 		row := make([]string, 160)
 		for i := range row {
 			row[i] = "BG"
 		}
 		if runs, _, err := e.DecomposeRow(vt + y); err == nil {
+			runsPerLine[y] = runs
 			for _, r := range runs {
 				for x := r.Clock; x < r.Clock+r.Len && x < 160; x++ {
 					row[x] = r.Element
@@ -198,7 +471,18 @@ func renderGrid(src, spec string, frames int) (grid [][]string, top int, err err
 		}
 		grid = append(grid, row)
 	}
-	return grid, vt, nil
+	if st, merr := measureLines(e); merr == nil {
+		for y := 0; y < h; y++ {
+			ls, ok := st[vt+y]
+			if !ok {
+				continue
+			}
+			countRuns(&obj[0], runsPerLine[y], "P0", ls.nz0, ls.x0)
+			countRuns(&obj[1], runsPerLine[y], "P1", ls.nz1, ls.x1)
+		}
+		obj[0].distinctX, obj[1].distinctX = len(obj[0].baseX), len(obj[1].baseX)
+	}
+	return grid, vt, obj, nil
 }
 
 // elemCoverage is one TIA element's share of the reproduction: how many visible
@@ -305,6 +589,193 @@ func byteTable(label string, data []uint8) string {
 	return sb.String()
 }
 
+// writeBlock is one per-scanline table→TIA-register store in the replay kernel:
+// `lda TABLE,y` (4 cycles) + `sta REG` (3) = 7 CPU cycles. `deadline` is the
+// visible clock of the FIRST pixel that register governs — land the store after
+// it and that pixel still shows the previous line's value.
+type writeBlock struct {
+	table    string
+	reg      string
+	deadline int
+	data     func(*frameData) []uint8
+}
+
+// Timing model of the loop, all in CPU cycles from the scanline's start. WSYNC
+// releases the CPU at colour clock 0 of the new line, so block i (1-based)
+// finishes at cycle 7i = colour clock 21i, i.e. visible clock 21i-68. One
+// iteration costs `sta WSYNC` (3) + 7 per block + `iny`/`cpy #n`/`bne` (7).
+//
+// The block COUNT is capped at what `cyclebound` can certify, not at what the
+// hardware would tolerate, and the two differ. Every table is `align 256` and the
+// index never exceeds 255, so `lda TABLE,y` never crosses a page and really costs
+// 4 — nine blocks run in 3+7*9+7 = 73 of the 76 cycles, and a nine-block clone was
+// measured at 262 scanlines with its picture improved. But the static prover
+// cannot assume the alignment, bounds `lda abs,y` at 5, and scores the same kernel
+// at 3+8*9+7 = 82 against a 76 budget: `certified:false`, a violation on the
+// visible `Kern` region. Eight blocks score 74 and certify (measured on the Outlaw
+// clone). Emitting only kernels the project's own prover accepts is worth the slot
+// — a generated artifact that trips the repo's line-budget gate is a landmine, and
+// RL-7b exists because exactly that kind of unseen overrun shipped once already.
+const (
+	kernBlockCycles     = 7 // real cost: lda abs,y (4, tables are page-aligned) + sta zp (3)
+	kernProvedBlockCost = 8 // cyclebound's conservative cost: lda abs,y bounded at 5
+	kernFixedCycles     = 3 + 7
+	kernMaxBlocks       = (76 - kernFixedCycles) / kernProvedBlockCost
+)
+
+func blockLands(i int) int { return 21*(i+1) - 68 } // i is 0-based
+
+// planKernel picks the per-scanline writes the replay kernel will carry.
+//
+// The eight-block PF+GRP layout is kept EXACTLY as it was whenever the target's
+// NUSIZ never changes down the frame, so every clone framegen used to get right
+// is still emitted byte for byte. Only a target that moves NUSIZ needs more
+// blocks than fit, and only then is the layout re-planned: playfield writes the
+// target provably does not need are dropped (both halves all zero, or the right
+// half identical to the left, both measured over every line), and what remains is
+// ordered by deadline. If two NUSIZ tables still do not fit, they are dropped and
+// the caller reports it rather than emitting a kernel that runs long and rolls.
+func planKernel(fd *frameData) (blocks []writeBlock, notes []string) {
+	pf := []writeBlock{
+		{"PF0LT", "PF0", 0, func(f *frameData) []uint8 { return f.pf0L }},
+		{"PF1LT", "PF1", 16, func(f *frameData) []uint8 { return f.pf1L }},
+		{"PF2LT", "PF2", 48, func(f *frameData) []uint8 { return f.pf2L }},
+		{"PF0RT", "PF0", 80, func(f *frameData) []uint8 { return f.pf0R }},
+		{"PF1RT", "PF1", 96, func(f *frameData) []uint8 { return f.pf1R }},
+		{"PF2RT", "PF2", 128, func(f *frameData) []uint8 { return f.pf2R }},
+	}
+	g0 := writeBlock{"GRP0T", "GRP0", fd.obj[0].minX(fd.p0x), func(f *frameData) []uint8 { return f.grp0 }}
+	g1 := writeBlock{"GRP1T", "GRP1", fd.obj[1].minX(fd.p1x), func(f *frameData) []uint8 { return f.grp1 }}
+	n0 := writeBlock{"NZ0T", "NUSIZ0", g0.deadline, func(f *frameData) []uint8 { return f.nz0 }}
+	n1 := writeBlock{"NZ1T", "NUSIZ1", g1.deadline, func(f *frameData) []uint8 { return f.nz1 }}
+
+	vary0 := !constBytes(fd.nz0)
+	vary1 := !constBytes(fd.nz1)
+	if !vary0 && !vary1 {
+		// Historical order, unchanged: GRP0, PF left, GRP1, PF right.
+		return []writeBlock{g0, pf[0], pf[1], pf[2], g1, pf[3], pf[4], pf[5]}, nil
+	}
+
+	want := []writeBlock{g0, g1}
+	if vary0 {
+		want = append(want, n0)
+	}
+	if vary1 {
+		want = append(want, n1)
+	}
+	// Playfield pruning, decided per REGISTER and only where the drop is provably
+	// output-equivalent. A register whose two halves are 0 on every line is left at
+	// the 0 the reset clear already wrote; a register whose right-half bytes equal
+	// its left-half bytes on every line needs no mid-line rewrite, because CTRLPF is
+	// 0 (repeat) and the right half then copies the left. Dropping a LEFT write on
+	// its own is never sound — the following line would inherit the right half's
+	// value — so the two are only ever dropped together.
+	dropZero, dropRight := 0, 0
+	for i := 0; i < 3; i++ {
+		l, r := pf[i], pf[i+3]
+		lb, rb := l.data(fd), r.data(fd)
+		switch {
+		case allZero(lb) && allZero(rb):
+			dropZero++
+		case sameBytes(lb, rb):
+			want = append(want, l)
+			dropRight++
+		default:
+			want = append(want, l, r)
+		}
+	}
+	if dropZero > 0 {
+		notes = append(notes, fmt.Sprintf("playfield: %d of the 3 PF registers are 0 on both halves of all %d visible lines, so the kernel does not write them (%d cycles freed)", dropZero, fd.h, dropZero*2*kernBlockCycles))
+	}
+	if dropRight > 0 {
+		notes = append(notes, fmt.Sprintf("playfield: %d of the 3 PF registers have right-half bytes equal to their left half on all %d visible lines, so CTRLPF repeat reproduces them and the mid-line rewrite is dropped (%d cycles freed)", dropRight, fd.h, dropRight*kernBlockCycles))
+	}
+	if len(want) > kernMaxBlocks {
+		// Drop the NUSIZ tables, not a picture write: an over-long kernel does not
+		// render a slightly wrong frame, it desynchronises and rolls.
+		var kept []writeBlock
+		var dropped []string
+		for _, b := range want {
+			if b.reg == "NUSIZ0" || b.reg == "NUSIZ1" {
+				dropped = append(dropped, b.reg)
+				continue
+			}
+			kept = append(kept, b)
+		}
+		notes = append(notes, fmt.Sprintf("NOT REPRODUCED: per-line %s. The kernel would need %d write blocks and only %d fit — 3+%d*n+7 CPU cycles against a 76-cycle scanline, counting each block at %d because a static prover bounds `lda abs,y` at 5 rather than assume the tables' page alignment (the hardware would run 9 blocks at 3+%d*9+7 = %d, but the emitted clone would then fail cyclebound at 82)",
+			strings.Join(dropped, " and "), len(want), kernMaxBlocks, kernProvedBlockCost, kernProvedBlockCost, kernBlockCycles, 3+kernBlockCycles*9+7))
+		want = kept
+	}
+	// Earliest deadline first: every write has to land before the pixels it
+	// governs, and PF0-left (deadline 0) is the tightest of them.
+	sortStableByDeadline(want)
+	return want, notes
+}
+
+// minX is the leftmost reset position the object was measured at on any line it
+// drew on — the tightest deadline its register writes have to meet. Falls back to
+// the end-of-frame marker when the object never drew.
+func (f objFacts) minX(fallback int) int {
+	if len(f.baseX) == 0 {
+		return fallback
+	}
+	m := 1 << 30
+	for x := range f.baseX {
+		if x < m {
+			m = x
+		}
+	}
+	return m
+}
+
+func sortStableByDeadline(b []writeBlock) {
+	for i := 1; i < len(b); i++ {
+		for j := i; j > 0 && b[j].deadline < b[j-1].deadline; j-- {
+			b[j], b[j-1] = b[j-1], b[j]
+		}
+	}
+}
+
+func constBytes(a []uint8) bool {
+	for i := 1; i < len(a); i++ {
+		if a[i] != a[0] {
+			return false
+		}
+	}
+	return true
+}
+
+func allZero(a []uint8) bool {
+	for _, v := range a {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func sameBytes(a, b []uint8) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// kernelHas reports whether the planned kernel replays reg per scanline.
+func kernelHas(blocks []writeBlock, reg string) bool {
+	for _, b := range blocks {
+		if b.reg == reg {
+			return true
+		}
+	}
+	return false
+}
+
 // emit builds the full clone source. p0in/p1in are the SetXPos routine inputs
 // and vblankAdj shifts the VBLANK line count (all self-calibrated by the caller).
 func emit(fd *frameData, p0in, p1in, vblankAdj, osAdj int) string {
@@ -323,6 +794,30 @@ func emit(fd *frameData, p0in, p1in, vblankAdj, osAdj int) string {
 	overscan := 261 - fd.top - nlines - vblankAdj + osAdj
 	if overscan < 1 {
 		overscan = 1
+	}
+	blocks := fd.kern
+	// The kernel body, one 7-cycle block per line, annotated with the beam clock
+	// the store lands at and the first visible clock it has to beat. Those are the
+	// numbers that decide whether the reproduction is even possible, so they belong
+	// in the file rather than only in the terminal that generated it.
+	var kb strings.Builder
+	for i, b := range blocks {
+		lands := blockLands(i)
+		fmt.Fprintf(&kb, "    lda %s,y\n    sta %-6s      ; lands at visible clock %+d, needs <= %d\n",
+			b.table, b.reg, lands, b.deadline)
+	}
+	ctrlpfNote := "repeat mode: independent halves via per-line rewrite"
+	if !kernelHas(blocks, "PF0") {
+		ctrlpfNote = "repeat mode; the kernel rewrites only what the target needs"
+	}
+	// Put the end-of-frame NUSIZ back after the kernel: framegen calibrates the
+	// sprite X by comparing the target's and the clone's HmovedPixel at the frame
+	// boundary, and that marker moves 1 pixel with the size bits (measured: 24 at
+	// 1x, 25 at 2x/4x) — so leaving the last scanline's NUSIZ in place would make
+	// the two markers describe different things.
+	nusizRestore := ""
+	if kernelHas(blocks, "NUSIZ0") || kernelHas(blocks, "NUSIZ1") {
+		nusizRestore = fmt.Sprintf("    lda #$%02X\n    sta NUSIZ0\n    lda #$%02X\n    sta NUSIZ1\n", fd.nusiz0, fd.nusiz1)
 	}
 	var sb strings.Builder
 	fmt.Fprintf(&sb, `; ==========================================================================
@@ -379,7 +874,7 @@ clr:
     lda #$%02X
     sta NUSIZ1
     lda #0
-    sta CTRLPF          ; repeat mode: independent halves via per-line rewrite
+    sta CTRLPF          ; %s
     sta REFP0
     sta REFP1
 
@@ -414,23 +909,7 @@ vb:
     ldy #0
 Kern:
     sta WSYNC
-    lda GRP0T,y
-    sta GRP0
-    lda PF0LT,y
-    sta PF0
-    lda PF1LT,y
-    sta PF1
-    lda PF2LT,y
-    sta PF2
-    lda GRP1T,y
-    sta GRP1
-    lda PF0RT,y
-    sta PF0
-    lda PF1RT,y
-    sta PF1
-    lda PF2RT,y
-    sta PF2
-    iny
+%s    iny
     cpy #%d
     bne Kern
     sta WSYNC           ; end the last visible line BEFORE clearing anything:
@@ -440,7 +919,7 @@ Kern:
     sta PF0
     sta PF1
     sta PF2
-    lda #2
+%s    lda #2
     sta VBLANK
     ldx #%d
 os:
@@ -465,17 +944,20 @@ SetXPos:
     sta.w RESP0,x
     rts
 
-`, fd.p0col, fd.p1col, fd.pfcol, fd.bgcol, fd.nusiz0, fd.nusiz1,
-		p0in, p1in, vblank, nlines, nlines, overscan)
+`, fd.p0col, fd.p1col, fd.pfcol, fd.bgcol, fd.nusiz0, fd.nusiz1, ctrlpfNote,
+		p0in, p1in, vblank, nlines, kb.String(), nlines, nusizRestore, overscan)
 
-	sb.WriteString(byteTable("PF0LT", fd.pf0L))
-	sb.WriteString(byteTable("PF1LT", fd.pf1L))
-	sb.WriteString(byteTable("PF2LT", fd.pf2L))
-	sb.WriteString(byteTable("PF0RT", fd.pf0R))
-	sb.WriteString(byteTable("PF1RT", fd.pf1R))
-	sb.WriteString(byteTable("PF2RT", fd.pf2R))
-	sb.WriteString(byteTable("GRP0T", fd.grp0))
-	sb.WriteString(byteTable("GRP1T", fd.grp1))
+	// Only the tables the kernel actually reads (a dropped playfield write would
+	// otherwise leave 256 bytes of dead data behind), in a fixed order so two runs
+	// stay diffable no matter how the kernel was scheduled.
+	for _, name := range []string{"PF0LT", "PF1LT", "PF2LT", "PF0RT", "PF1RT", "PF2RT", "GRP0T", "GRP1T", "NZ0T", "NZ1T"} {
+		for _, b := range blocks {
+			if b.table == name {
+				sb.WriteString(byteTable(b.table, b.data(fd)))
+				break
+			}
+		}
+	}
 	sb.WriteString("\n    org $FFFC\n    .word Reset\n    .word Reset\n")
 	return sb.String()
 }
@@ -528,6 +1010,22 @@ func main() {
 	}
 	fmt.Printf("extracted: visible %d lines (top %d), P0col=$%02X P1col=$%02X PFcol=$%02X BGcol=$%02X NUSIZ0=$%02X NUSIZ1=$%02X P0x=%d P1x=%d\n",
 		fd.h, fd.top, fd.p0col, fd.p1col, fd.pfcol, fd.bgcol, fd.nusiz0, fd.nusiz1, fd.p0x, fd.p1x)
+	for i := range fd.obj {
+		fmt.Printf("  measured %s: drawn on %d lines, NUSIZ %s, up to %d copies, %d run(s) max per line, %d distinct reset X %s\n",
+			fd.obj[i].name, fd.obj[i].lines, fd.obj[i].modeList(), fd.obj[i].maxCopies,
+			fd.obj[i].maxRuns, fd.obj[i].distinctX, fd.obj[i].xList())
+	}
+	var planNotes []string
+	fd.kern, planNotes = planKernel(fd)
+	names := make([]string, len(fd.kern))
+	for i, b := range fd.kern {
+		names[i] = b.reg
+	}
+	fmt.Printf("  kernel: %d write blocks (%s), %d of 76 CPU cycles per scanline\n",
+		len(fd.kern), strings.Join(names, ","), kernFixedCycles+kernBlockCycles*len(fd.kern))
+	for _, n := range planNotes {
+		fmt.Println("  " + n)
+	}
 
 	// Self-calibrate: the two SetXPos inputs (players land on the target's
 	// columns — the landing offset is kernel-specific) AND the VBLANK line count
@@ -559,7 +1057,7 @@ func main() {
 	bestS, bestM := 0, -1
 	for s := -4; s <= 4; s++ {
 		src := emit(fd.shifted(s), p0in, p1in, vblankAdj, osAdj)
-		grid, _, err := renderGrid(src, *spec, *frames)
+		grid, _, _, err := renderGrid(src, *spec, *frames)
 		if err != nil {
 			continue
 		}
@@ -605,10 +1103,13 @@ func main() {
 	// own rendered frame, because "pixel-exact" on a target that draws no
 	// missiles says nothing about a target that does.
 	var cov []elemCoverage
-	if grid, _, err := renderGrid(src, *spec, *frames); err == nil {
+	var cloneObj [2]objFacts
+	cloneObj[0], cloneObj[1] = newObjFacts("P0"), newObjFacts("P1")
+	if grid, _, co, err := renderGrid(src, *spec, *frames); err == nil {
 		// fd.tgtElem, not the shifted copy: shifted() moves the REPLAY tables, and
 		// the target's own attribution is the reference the shift was chosen against.
 		cov = coverage(fd.tgtElem, grid)
+		cloneObj = co
 	} else {
 		fmt.Fprintln(os.Stderr, "coverage: could not render the clone:", err)
 	}
@@ -618,7 +1119,8 @@ func main() {
 	lines, lerr := cloneFrameLines(src, *spec)
 
 	miss := missingElements(cov)
-	src = annotate(src, cov, miss)
+	why := diagnose(cov, fd.obj, cloneObj, fd.kern)
+	src = annotate(src, cov, miss, planNotes, why)
 
 	if err := os.WriteFile(*out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
@@ -655,9 +1157,12 @@ func main() {
 	}
 	// An element the clone draws SOMEWHERE but in the wrong cells is a different
 	// finding from one it never draws, and it must not fall through to a success
-	// line: a kernel that carries one X per player cannot follow a multiplexed
-	// target that moves its sprites per zone, and that shows up here as a cell
-	// count, not as a missing element.
+	// line. Which of the two structural limits caused it — copies the kernel does
+	// not order, or a position it cannot follow — is decided by the measurements
+	// above, never asserted: the line that used to stand here blamed "a per-zone
+	// multiplexed target" unconditionally, and on litmus_nusiz_all (both players
+	// placed once before the frame loop, 1 distinct reset X measured for each) that
+	// was simply false.
 	if lerr == nil && lines != want {
 		fmt.Printf("RESULT: the picture matches but the frame is %d scanlines, not %d — a clone that "+
 			"reproduces every pixel and the wrong frame length still rolls on hardware.\n", lines, want)
@@ -669,11 +1174,85 @@ func main() {
 	}
 	if short > 0 {
 		fmt.Printf("RESULT: differences remain — %d of %d visible cells are drawn by a different element "+
-			"than the target's. Every element is present, so this is placement, not omission "+
-			"(one X per player cannot follow a per-zone multiplexed target).\n", short, len(fd.tgtElem)*160)
+			"than the target's. %s\n", short, len(fd.tgtElem)*160, why)
 		os.Exit(1)
 	}
 	fmt.Println("RESULT: pixel-exact — every visible cell is drawn by the same element as the target")
+}
+
+// diagnose says why the clone's cells differ, from counted quantities only.
+//
+// Two structural limits of this kernel shape can put a present element in the
+// wrong cells, and they are not interchangeable:
+//
+//   - COPIES — the target asks the TIA for 2 or 3 hardware copies of a player and
+//     the clone draws fewer. Measured as copies-per-line on both sides.
+//   - MULTIPLEXING — the target moves the sprite down the frame and the clone,
+//     which strobes RESPx once, cannot follow. Measured as the number of DISTINCT
+//     reset positions (size-mode shift removed, because a 1x→2x switch moves the
+//     first drawn pixel by 1 without the sprite having moved).
+//   - A LATE WRITE — the kernel's own store for that object lands after the beam
+//     has already passed the object's leftmost pixel, so the line renders the
+//     PREVIOUS line's byte. Measured against the emitted block schedule, not
+//     assumed: the kernel is a fixed sequence of 7-cycle blocks and each one's
+//     landing clock is arithmetic on its position in that sequence.
+//
+// Anything else is named as unexplained rather than attributed to whichever of
+// the three happens to sound plausible.
+func diagnose(cov []elemCoverage, tgt, clone [2]objFacts, blocks []writeBlock) string {
+	differ := map[string]int{}
+	over := map[string]int{}
+	for _, c := range cov {
+		differ[c.Elem] = c.Target - c.Matched
+		over[c.Elem] = c.CloneAny - c.Target
+	}
+	var clauses []string
+	for i, name := range []string{"P0", "P1"} {
+		d := differ[name]
+		if d <= 0 {
+			continue
+		}
+		t, c := tgt[i], clone[i]
+		var why []string
+		if t.maxCopies > c.maxCopies {
+			why = append(why, fmt.Sprintf("the target orders up to %d copies (NUSIZ %s) and the clone draws up to %d",
+				t.maxCopies, t.modeList(), c.maxCopies))
+		}
+		if t.distinctX > 1 {
+			why = append(why, fmt.Sprintf("its reset X takes %d distinct values across the frame %s and this kernel strobes RESP%d once",
+				t.distinctX, t.xList(), i))
+		}
+		for _, l := range lateWrites(blocks, fmt.Sprintf("%d", i)) {
+			why = append(why, l)
+		}
+		if len(why) == 0 {
+			why = append(why, fmt.Sprintf("copies %d target vs %d clone, reset X %d distinct target vs %d clone, "+
+				"and every write for it lands before its leftmost pixel — none of copies, multiplexing or a late "+
+				"write explains these cells, so the cause is not one this tool has measured",
+				t.maxCopies, c.maxCopies, t.distinctX, c.distinctX))
+		}
+		clauses = append(clauses, fmt.Sprintf("%s (%d cells): %s", name, d, strings.Join(why, "; and ")))
+	}
+	if d := differ["PF"]; d > 0 {
+		clauses = append(clauses, fmt.Sprintf("PF (%d cells)", d))
+	}
+	if len(clauses) == 0 {
+		// Every cell the target draws with an object is drawn the same way, so the
+		// remainder is the clone painting over background the target left empty —
+		// the signature of a register the target changed part-way ALONG a scanline,
+		// which a kernel that writes each register once per line in HBLANK cannot
+		// express at any byte value.
+		for _, e := range []string{"P0", "P1", "PF"} {
+			if over[e] > 0 {
+				clauses = append(clauses, fmt.Sprintf("the clone draws %d %s cells the target leaves as background, "+
+					"while matching every %s cell the target does draw", over[e], e, e))
+			}
+		}
+		if len(clauses) == 0 {
+			return "Every element is present and every object cell matches; the difference is in BG cells only."
+		}
+	}
+	return "Measured: " + strings.Join(clauses, ". ") + "."
 }
 
 // cloneFrameLines assembles the generated source and asks the machine how many
@@ -705,6 +1284,45 @@ func cloneFrameLines(src, spec string) (int, error) {
 	return e.StepFrame()
 }
 
+// lateWrites lists the kernel blocks for object suffix ("0" or "1") whose store
+// lands after the first pixel it governs. The kernel is a fixed chain of 7-cycle
+// blocks after WSYNC, so block i finishes at CPU cycle 7i = colour clock 21i =
+// visible clock 21i-68 — no estimate is involved.
+func lateWrites(blocks []writeBlock, suffix string) []string {
+	var out []string
+	for i, b := range blocks {
+		if !strings.HasSuffix(b.reg, suffix) || (!strings.HasPrefix(b.reg, "GRP") && !strings.HasPrefix(b.reg, "NUSIZ")) {
+			continue
+		}
+		if lands := blockLands(i); lands > b.deadline {
+			out = append(out, fmt.Sprintf("the kernel's %s store is block %d of %d and lands at visible clock %+d, "+
+				"past the object's leftmost drawn pixel at %d, so those lines render the previous line's value",
+				b.reg, i+1, len(blocks), lands, b.deadline))
+		}
+	}
+	return out
+}
+
+// wrapComment folds a long report line into an assembler comment block so the
+// generated source stays inside a readable width.
+func wrapComment(s string) string {
+	const width = 74
+	var out strings.Builder
+	col := 0
+	for _, w := range strings.Fields(s) {
+		if col > 0 && col+1+len(w) > width {
+			out.WriteString("\n; ")
+			col = 0
+		} else if col > 0 {
+			out.WriteString(" ")
+			col++
+		}
+		out.WriteString(w)
+		col += len(w)
+	}
+	return out.String()
+}
+
 // enableRegs names the TIA register that would have to be written for each
 // missing element, so the report says what is absent from the source, not just
 // what is absent from the picture.
@@ -724,7 +1342,7 @@ func enableRegs(elems []string) []string {
 // annotate burns the coverage measurement into the generated source's banner.
 // The file outlives the terminal it was generated in; a clone that is missing
 // every bullet must say so where it will still be read months later.
-func annotate(src string, cov []elemCoverage, miss []string) string {
+func annotate(src string, cov []elemCoverage, miss, notes []string, why string) string {
 	var b strings.Builder
 	b.WriteString("; --- reproduction coverage (measured against the target's own frame) ---\n")
 	for _, c := range cov {
@@ -734,6 +1352,15 @@ func annotate(src string, cov []elemCoverage, miss []string) string {
 		fmt.Fprintf(&b, "; NOT REPRODUCED: %s — this kernel emits no %s, so those pixels are\n"+
 			"; absent by construction. This file is a PF/player reproduction, not the whole frame.\n",
 			strings.Join(miss, "/"), strings.Join(enableRegs(miss), "/"))
+	}
+	// The kernel-planning decisions and the measured cause of any residual
+	// difference belong in the file, for the same reason the coverage table does:
+	// the file outlives the terminal that produced it.
+	for _, n := range notes {
+		fmt.Fprintf(&b, "; %s\n", wrapComment(n))
+	}
+	if why != "" {
+		fmt.Fprintf(&b, "; %s\n", wrapComment(why))
 	}
 	b.WriteString("; ---------------------------------------------------------------------\n")
 	const anchor = "; ==========================================================================\n    processor 6502\n"

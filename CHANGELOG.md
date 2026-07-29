@@ -9,6 +9,41 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`framegen` printed a cause it had not measured, and replayed a single frame-final NUSIZ** (RL-7c). On
+  `roms/litmus/litmus_nusiz_all.bin` it reported 2666 of 34240 cells wrong and explained them with a fixed
+  sentence — *"this is placement, not omission (one X per player cannot follow a per-zone multiplexed
+  target)"* — printed unconditionally on every non-exact run. That ROM places both players once before the
+  frame loop and never moves them (measured: **1 distinct reset X each**, over 191 and 190 drawn lines), so
+  the sentence was false there and was never evidence anywhere.
+  - **The obvious suspect was falsified first.** `nusizWidth` returns 1 for the five NUSIZ COPY modes, which
+    looks like a bug and is not: the copies are hardware replication of the same 8-bit byte. Eight probe
+    ROMs, one per mode held CONSTANT for a whole frame, reproduce **pixel-exact in all eight** (P0 cells
+    864/864, 1728/1728, 1728/1728, 2592/2592, 1728/1728, 1728/1728, 2592/2592, 3456/3456 for modes 0..7).
+    The real cause: `extract` read NUSIZ once at the end of the rendered frame, and litmus_nusiz_all ends in
+    mode $07, so all 214 lines came out quad-width.
+  - **Diagnosis.** Per visible line, for each player, the extractor now measures the NUSIZ in force, the reset
+    position and the number of separate runs `DecomposeRow` reports — and takes the same measurement off the
+    **clone**. The RESULT line names a cause only when the number proving it was counted: copies (`the target
+    orders up to 3 copies (NUSIZ $06 on 37 lines) and the clone draws up to 1`), multiplexing (**only** when
+    distinct reset X > 1, listing the positions and their line counts), or a late write (the kernel's own
+    store landing past the object's leftmost pixel, arithmetic on the emitted block schedule). When none is
+    measurable it says so. The NUSIZ size shift is removed before counting positions — HmovedPixel moves ±1
+    on a 1x↔2x change without the sprite moving (measured: 24 for modes 0,1,2,3,4,6 and 25 for 5 and 7).
+  - **Reproduction.** A varying per-line NUSIZ is now replayed from a table. Room is made by dropping
+    playfield writes the target provably does not need, decided per PF register (both halves 0 on every line,
+    or right half equal to left on every line). A left write is never dropped alone.
+  - **Result: 2666 → 2 cells** (P0 3616/3616, P1 3120/3120). The 2 are reported, not absorbed: the target
+    clears GRP1 part-way along scanline 228 leaving a 10-pixel P1 run, and a kernel writing each register
+    once per line in HBLANK can draw only 8 or 12 there at quad width.
+  - **Where it gives up, with numbers.** `rts_dispatch` would need 9 write blocks. Nine run on hardware
+    (3+7·9+7 = 73 of 76; the 9-block clone measured 262 scanlines and 376→8 cells), but `cyclebound` bounds
+    `lda abs,y` at 5 because it cannot assume the tables' `align 256`, scoring it 82 against 76 and refusing
+    to certify. The kernel is capped at the certifiable 8 blocks and the tool reports what it dropped and why.
+  - **No regression.** With NUSIZ constant down the frame — 30 of 31 technique ROMs, Outlaw and Combat — the
+    historical eight-block layout is emitted unchanged (verified by diffing the generated sources; only the
+    new per-block deadline comments differ). Corpus after: **21 pixel-exact / 8 differ / 2 partial, 262
+    scanlines on 31/31**, every cell count identical to before; Outlaw and Combat still pixel-exact with and
+    without `-reset`.
 - **`prove_line_budget` called VBLANK-time code a visible-line tear whenever a subroutine had two call
   sites** (v1.115.0). Found while running a generated clone through the prover: the ordinary two-sprite
   shape — both players placed through one shared `SetXPos` — came back `certified:false` with the routine
