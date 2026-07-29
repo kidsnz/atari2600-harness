@@ -51,7 +51,25 @@ own authoring loop**, not the editor. The G work stands on its own; M references
 ## Tier 3 — polish
 - **G5:** mid-line HMOVE / RESP pipeline = *observed* via `trace_clocks`, not litmus-locked.
 - **G6:** oracle sub-frame phase offset for per-frame-mutating RAM.
-- **G7:** collision trap (`watch_ram` is RAM-only); `step_clock` (parked).
+- **G7 — DONE (v1.116.0) for the collision half.** `watch_ram` traps a RAM change and names the instruction
+  that made it; collisions had no equivalent. New `emu.WatchCollision` reports where each CXxx latch was
+  FIRST set — beam scanline and clock in `read_row` coordinates, plus the PC executing at that colour clock.
+
+  **The beam position is the part that cannot be recovered afterwards**, which is why it is captured inside
+  the existing per-colour-clock hook rather than reconstructed: CXxx latches are sticky and a game clears
+  them with CXCLR every frame, so a frame-boundary sample answers "did it happen" and nothing else — and by
+  the time an instruction retires the beam has moved on.
+
+  It reports every requested pair rather than stopping at the first: "the bullet hit the wall" and "the
+  bullet hit the player" on the same frame are different answers, and a trap that stopped would hide one.
+  A misspelt pair name is an **error listing the valid names**, not an empty result that would read as
+  "nothing collided".
+
+  Measured in three directions: `litmus_collide_all` fires **all 15 pairs**, each with a real PC and an
+  in-range beam clock (frame 3, scanline 36, clock 2); `shared_setxpos`, whose five objects sit at separate
+  fixed columns, reports **0**; an unknown pair name errors. A trap that fires on everything is as useless as
+  one that fires on nothing, so both directions are asserted. `step_clock` remains parked.
+- **G7 (original):** collision trap (`watch_ram` is RAM-only); `step_clock` (parked).
 - **G8 — PARTIAL (v1.116.0): the detector exists, the positive case has no ROM witness.** New
   `emu.WatchTimerDividerHazard` reports every write to TIM1T/TIM8T/TIM64T/T1024T whose own cycles straddle
   the counter's underflow, folding every RIOT mirror through `memorymap.MapAddress` and taking the register

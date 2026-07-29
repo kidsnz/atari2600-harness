@@ -66,6 +66,10 @@ type Emu struct {
 	// フレーム内ウォッチ（StartFrameWatch / FrameWatch）。watching=false でゼロコスト。
 	watching bool
 	cxAccum  video.CollisionEvent // 起きた衝突の OR 蓄積（CXCLR に消されない）
+	// cxFirst は各衝突ビットが**最初に立ったカラークロック**のビーム位置。蓄積だけでは
+	// 「このフレームで起きたか」しか言えず、「どこで起きたか」は命令が退役する頃には
+	// ビームが移動して失われている。nil の間はゼロコスト。
+	cxFirst map[video.CollisionEvent]CollisionSite
 	spLow    uint8                // SP が到達した最小値
 	spHigh   uint8                // SP が到達した最大値（低い値に「固定」なのか「途中で降りた」のかを区別する）
 }
@@ -262,7 +266,25 @@ func (e *Emu) EnableElementCapture() {
 		// フレーム内で起きた衝突の蓄積（下記 FrameWatch）。LastColorClock は
 		// 毎ビデオサイクル reset されるので、ここで拾わないと二度と見えない。
 		if e.watching {
-			e.cxAccum |= e.VCS.TIA.Video.Collisions.LastColorClock
+			now := e.VCS.TIA.Video.Collisions.LastColorClock
+			// Which collisions are NEW on this colour clock, and exactly where the beam
+			// was. Accumulating alone answers "did it happen this frame"; a trap needs
+			// "where", and the beam has moved on by the time an instruction retires.
+			if fresh := now &^ e.cxAccum; fresh != 0 && e.cxFirst != nil {
+				c := e.VCS.TV.GetCoords()
+				for bit := video.CollisionEvent(1); bit != 0; bit <<= 1 {
+					if fresh&bit == 0 {
+						continue
+					}
+					if _, seen := e.cxFirst[bit]; !seen {
+						e.cxFirst[bit] = CollisionSite{
+							Frame: c.Frame, Scanline: c.Scanline, Clock: c.Clock,
+							PC: e.VCS.CPU.PC.Address(),
+						}
+					}
+				}
+			}
+			e.cxAccum |= now
 		}
 		return nil
 	}
@@ -305,6 +327,104 @@ const (
 	cxeM0M1 video.CollisionEvent = 1 << 14
 	// bit 15 は CXCLR イベント＝衝突ではないので蓄積対象外。
 )
+
+// CollisionSite is where a collision FIRST occurred: the beam position at the
+// colour clock the latch was set, plus the PC of the instruction that was running.
+//
+// The beam position is the part that cannot be recovered later. CXxx latches are
+// sticky and a game clears them with CXCLR every frame, so sampling at a frame
+// boundary answers "did it happen" and nothing else — and by the time an
+// instruction retires the beam has moved on. Which is why this is recorded inside
+// the per-colour-clock hook rather than reconstructed afterwards.
+type CollisionSite struct {
+	Frame    int    `json:"frame"`
+	Scanline int    `json:"scanline"`
+	Clock    int    `json:"clock"` // read_row coordinates: HBLANK -68..-1, visible 0..159
+	PC       uint16 `json:"pc"`    // the instruction executing at that colour clock
+}
+
+// CollisionTrap is one collision pair caught by WatchCollision.
+type CollisionTrap struct {
+	Pair string        `json:"pair"` // m0_p0, p0_pf, bl_pf, ...
+	At   CollisionSite `json:"at"`
+}
+
+// collisionBits maps the scenario/report names onto the engine's own event bits,
+// so a caller names a pair the same way every other tool in this repo does.
+var collisionBits = map[string]video.CollisionEvent{
+	"m0_p1": cxeM0P1, "m0_p0": cxeM0P0, "m0_pf": cxeM0PF, "m0_bl": cxeM0BL,
+	"m1_p0": cxeM1P0, "m1_p1": cxeM1P1, "m1_pf": cxeM1PF, "m1_bl": cxeM1BL,
+	"p0_pf": cxeP0PF, "p0_bl": cxeP0BL, "p1_pf": cxeP1PF, "p1_bl": cxeP1BL,
+	"bl_pf": cxeBLPF, "p0_p1": cxeP0P1, "m0_m1": cxeM0M1,
+}
+
+// CollisionPairNames lists every pair WatchCollision accepts, sorted, so a caller
+// that mistypes one gets the list rather than silence.
+func CollisionPairNames() []string {
+	out := make([]string, 0, len(collisionBits))
+	for k := range collisionBits {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// WatchCollision runs up to maxFrames and reports where each named collision
+// FIRST occurred — the CXxx sibling of watch_ram, which is RAM-only (G7).
+//
+// It reports every requested pair that fired rather than stopping at the first,
+// because "the bullet hit the wall" and "the bullet hit the player" on the same
+// frame are different answers and a trap that stopped would hide one of them.
+// A pair that never fires is absent from the result, and the caller is told which
+// were asked for — an empty result must not read as "nothing collided" when the
+// name was simply misspelt.
+func (e *Emu) WatchCollision(pairs []string, maxFrames int) ([]CollisionTrap, error) {
+	want := map[video.CollisionEvent]string{}
+	for _, p := range pairs {
+		bit, ok := collisionBits[p]
+		if !ok {
+			return nil, fmt.Errorf("unknown collision pair %q (have: %v)", p, CollisionPairNames())
+		}
+		want[bit] = p
+	}
+	if len(want) == 0 {
+		// No pairs named means every pair, so a caller exploring a ROM does not have
+		// to know what to look for first.
+		for name, bit := range collisionBits {
+			want[bit] = name
+		}
+	}
+
+	e.cxFirst = map[video.CollisionEvent]CollisionSite{}
+	e.StartFrameWatch()
+	start := e.Coords().Frame
+	for e.Coords().Frame-start < maxFrames {
+		if err := e.StepInstruction(); err != nil {
+			return nil, err
+		}
+	}
+
+	var out []CollisionTrap
+	for bit, name := range want {
+		if site, ok := e.cxFirst[bit]; ok {
+			out = append(out, CollisionTrap{Pair: name, At: site})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i].At, out[j].At
+		if a.Frame != b.Frame {
+			return a.Frame < b.Frame
+		}
+		if a.Scanline != b.Scanline {
+			return a.Scanline < b.Scanline
+		}
+		if a.Clock != b.Clock {
+			return a.Clock < b.Clock
+		}
+		return out[i].Pair < out[j].Pair
+	})
+	return out, nil
+}
 
 // StartFrameWatch は蓄積をリセットして観測を開始する（毎フレームの直前に呼ぶ）。
 func (e *Emu) StartFrameWatch() {
