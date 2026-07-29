@@ -3,6 +3,7 @@
 package build
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,22 +20,56 @@ func BinPathFor(asmPath string) string {
 // `-I<asm のディレクトリ>` を渡すので、cwd に関わらず `include vcs.h` 等が asm 自身の隣から解決する
 // （別ディレクトリから .asm シナリオを走らせても通る）。
 func Assemble(asmPath, binPath string) (output string, err error) {
-	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+binPath, "-I"+filepath.Dir(asmPath)).CombinedOutput()
-	return string(out), err
+	tmp := scratchPath(binPath, "bin")
+	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+tmp, "-I"+filepath.Dir(asmPath)).CombinedOutput()
+	if err != nil {
+		os.Remove(tmp)
+		return string(out), err
+	}
+	if err := os.Rename(tmp, binPath); err != nil {
+		os.Remove(tmp)
+		return string(out), err
+	}
+	return string(out), nil
+}
+
+// scratchPath makes a per-process temporary name next to the real output.
+//
+// The output path is derived from the .asm, so two processes assembling the same
+// source write the same file — and `go test ./...` runs each package as its own
+// process, so any two test packages that assemble the same kernel do exactly
+// that. One would then load a half-written ROM. It showed up as a test that
+// failed only under full-parallel `go test` and passed alone and under -p 1,
+// which reads like flakiness and is really a torn file. Writing to a private
+// name and renaming makes the swap atomic: a reader sees the old complete file
+// or the new one, never a partial one.
+func scratchPath(binPath, ext string) string {
+	return fmt.Sprintf("%s.tmp%d.%s", strings.TrimSuffix(binPath, filepath.Ext(binPath)), os.Getpid(), ext)
 }
 
 // AssembleWithListing は -l/-s 付きでアセンブルし、リスティングとシンボル表の中身も返す
 // （U-M9 ソース行デバッグ用。失敗時は output に診断、lst/sym は空）。
 func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err error) {
-	lstPath := strings.TrimSuffix(binPath, ".bin") + ".lst"
-	symPath := strings.TrimSuffix(binPath, ".bin") + ".sym"
-	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+binPath, "-l"+lstPath, "-s"+symPath, "-I"+filepath.Dir(asmPath)).CombinedOutput()
+	// Same reasoning as Assemble: private names, then an atomic rename for the
+	// artifact other processes read. The listing and symbol files are consumed
+	// here and deleted, so they only need to be private.
+	tmpBin := scratchPath(binPath, "bin")
+	lstPath := scratchPath(binPath, "lst")
+	symPath := scratchPath(binPath, "sym")
+	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+tmpBin, "-l"+lstPath, "-s"+symPath, "-I"+filepath.Dir(asmPath)).CombinedOutput()
 	if err != nil {
+		os.Remove(tmpBin)
+		os.Remove(lstPath)
+		os.Remove(symPath)
 		return string(out), "", "", err
 	}
 	lb, _ := os.ReadFile(lstPath)
 	sb, _ := os.ReadFile(symPath)
 	os.Remove(lstPath)
 	os.Remove(symPath)
+	if err := os.Rename(tmpBin, binPath); err != nil {
+		os.Remove(tmpBin)
+		return string(out), "", "", err
+	}
 	return string(out), string(lb), string(sb), nil
 }

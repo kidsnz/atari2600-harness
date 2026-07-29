@@ -246,8 +246,10 @@ in the CHANGELOG's "Decisions" section. **When tagging, also bump `Version:` in 
 
 **Before pushing, mirror CI — don't trust a plain local build+test.** A local `go test` runs under the
 umbrella `go.work` and effectively serially, which HIDES what CI hits. Run CI's actual invocation:
-`GOWORK=off CGO_ENABLED=0 go vet ./... && go test -p 1 ./...` (CI uses `-p 1`: parallel package tests race on
-the shared ROM `.bin` fixtures), then the scenario + `check_*` steps. **Lesson (2026-06-18):** a docs-only push
+`GOWORK=off CGO_ENABLED=0 go vet ./... && go test -p 1 ./...` (CI uses `-p 1`. The race that made that
+necessary is FIXED — `build.Assemble` writes to a per-process name and renames, so two test packages
+assembling the same kernel can no longer read a half-written ROM — but `-p 1` is kept as the CI invocation
+because it is what CI actually runs, and mirroring CI is the point), then the scenario + `check_*` steps. **Lesson (2026-06-18):** a docs-only push
 went CI-red on a flaky parallel-test file race that local build+test never showed — CI is the gate, so verify
 against it, not a proxy, before every push. A tracked **pre-push hook** automates this: `scripts/git-hooks/pre-push`
 runs the mirror (vet + `test -p 1` + the fast `check_*`) and blocks a red push — enable once per clone with
