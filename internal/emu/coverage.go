@@ -43,6 +43,18 @@ func (c *Coverage) Seen(addr uint16) bool { return c.pcSeen[addr] }
 // BranchCount は分岐命令として観測したアドレス数。
 func (c *Coverage) BranchCount() int { return len(c.branches) }
 
+// BranchAddrs は分岐命令として観測したアドレスを昇順で返す。静的に復号した分岐集合と
+// 突き合わせるための観測側＝これに含まれて静的側に無いものは「デコーダが到達していない
+// コード」であり、分母が小さすぎる合図になる。
+func (c *Coverage) BranchAddrs() []uint16 {
+	out := make([]uint16, 0, len(c.branches))
+	for a := range c.branches {
+		out = append(out, a)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
 // EdgeCount は踏んだ分岐エッジの総数（最大 = BranchCount*2＝両方向踏破）。
 func (c *Coverage) EdgeCount() int { return len(c.brTaken) + len(c.brNot) }
 

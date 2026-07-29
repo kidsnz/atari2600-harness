@@ -542,8 +542,19 @@ recording before the items:
 - **SD-0d Non-convergence is silent.** `absint.computeStates` returns after `maxIter` without signalling it;
   unconverged cells are under-approximations consumed as sound. Fix: return a converged flag and refuse to
   certify without it.
-- **SD-0e `cover` divides by branches OBSERVED**, so a branch never reached is invisible and the percentage
-  flatters itself. Fix once SD-0c gives a static denominator.
+- **SD-0e `cover` divided by branches OBSERVED — DONE.** A branch never reached left the arithmetic
+  entirely, so the percentage ROSE as the test got worse. Measured on this repo's own kernels before the fix:
+  `divtable` reported **100% edge coverage with 12 of its 17 branches never executed**; `maze`, `hscroll` and
+  `multicolor48` also read 100% with a third of theirs unreached; `game_states` read 60% where the honest
+  figure is 30%.
+  `cyclebound.StaticBranches` decodes the cartridge from its vectors and gives the branches the PROGRAM has.
+  `cover` now divides by that, keeps the old number alongside as `edge_coverage_observed` so the difference
+  is visible rather than silently corrected, and names the **unreached branches** — the actionable half.
+  When an executed branch was never decoded (bank switch, computed dispatch) the denominator is too small
+  and the figure is an over-estimate: `decoder_incomplete` plus a note say so out loud instead of leaving it
+  to be inferred from a percentage above 100 (`banked_game` reads 150%, which is the diagnosis, not a bug in
+  the arithmetic). Measured: 31 ROMs, 2 with executed-but-undecoded branches (`banked_game`,
+  `rts_dispatch`); static <= observed coverage holds on all 29 fully decoded ROMs.
 
 ### SD-1 — Static def-use / reaching definitions (selected 2026-07-29)
 The forall answer to "which instruction wrote which RAM/TIA address, in what order within a frame,

@@ -19,17 +19,48 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kidsnz/atari2600-harness/internal/cyclebound"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
 
 type report struct {
-	Rom            string   `json:"rom"`
-	Frames         int      `json:"frames"`
-	PCExecuted     int      `json:"pc_executed"`      // distinct instruction addresses reached
-	Branches       int      `json:"branches"`         // distinct branch instructions observed
-	EdgesExercised int      `json:"edges_exercised"`  // taken+fall-through edges hit (max = branches*2)
-	EdgeCoverage   float64  `json:"edge_coverage"`    // edges_exercised / (branches*2)
-	OneSided       []string `json:"one_sided_branches"` // branch PCs (hex) with only one edge taken
+	Rom        string `json:"rom"`
+	Frames     int    `json:"frames"`
+	PCExecuted int    `json:"pc_executed"` // distinct instruction addresses reached
+
+	// BranchesStatic is every branch the control-flow graph reaches from the
+	// reset/NMI/IRQ vectors — the branches the PROGRAM has. BranchesObserved is
+	// the ones this run executed.
+	//
+	// The distinction is the whole point of this report. Dividing by what was
+	// observed makes a branch that was never reached vanish from the arithmetic,
+	// so the percentage RISES as the test gets worse. Measured on this repo's own
+	// kernels: divtable reported 100% edge coverage with 12 of its 17 branches
+	// never executed; maze, hscroll and multicolor48 also read 100% with a third
+	// of their branches unreached.
+	BranchesStatic   int `json:"branches_static"`
+	BranchesObserved int `json:"branches_observed"`
+	EdgesExercised   int `json:"edges_exercised"`
+
+	// EdgeCoverage divides by the static denominator. EdgeCoverageObserved is the
+	// old, flattering number, kept alongside so the difference is visible rather
+	// than silently corrected.
+	EdgeCoverage         float64 `json:"edge_coverage"`
+	EdgeCoverageObserved float64 `json:"edge_coverage_observed"`
+
+	// UnreachedBranches are branches the program has and this run never executed —
+	// the actionable half of the report.
+	UnreachedBranches []string `json:"unreached_branches"`
+	OneSided          []string `json:"one_sided_branches"` // executed, but only one edge taken
+
+	// ExecutedButUndecoded are branches the machine ran that the decoder never
+	// reached: flow from the vectors cannot follow a bank switch or a computed
+	// dispatch. While this is non-empty the static denominator is too small and
+	// the coverage figure is an over-estimate, which DecoderIncomplete says out
+	// loud rather than leaving to be inferred from a percentage above 100.
+	ExecutedButUndecoded []string `json:"executed_but_undecoded,omitempty"`
+	DecoderIncomplete    bool     `json:"decoder_incomplete"`
+	Note                 string   `json:"note,omitempty"`
 }
 
 func main() {
@@ -80,18 +111,58 @@ func main() {
 	for i, a := range one {
 		oneHex[i] = fmt.Sprintf("0x%04X", a)
 	}
-	edgeCov := 0.0
+
+	staticBr, banked, sErr := cyclebound.StaticBranches(*rom)
+	staticSet := map[uint16]bool{}
+	for _, a := range staticBr {
+		staticSet[a] = true
+	}
+	var unreached []string
+	for _, a := range staticBr {
+		if !cov.Seen(a) {
+			unreached = append(unreached, fmt.Sprintf("0x%04X", a))
+		}
+	}
+	var undecoded []string
+	for _, a := range cov.BranchAddrs() {
+		if !staticSet[a] {
+			undecoded = append(undecoded, fmt.Sprintf("0x%04X", a))
+		}
+	}
+
+	obsCov := 0.0
 	if cov.BranchCount() > 0 {
-		edgeCov = float64(cov.EdgeCount()) / float64(cov.BranchCount()*2)
+		obsCov = float64(cov.EdgeCount()) / float64(cov.BranchCount()*2)
+	}
+	statCov := 0.0
+	if len(staticBr) > 0 {
+		statCov = float64(cov.EdgeCount()) / float64(len(staticBr)*2)
 	}
 	rep := report{
-		Rom:            *rom,
-		Frames:         *frames,
-		PCExecuted:     cov.PCCount(),
-		Branches:       cov.BranchCount(),
-		EdgesExercised: cov.EdgeCount(),
-		EdgeCoverage:   edgeCov,
-		OneSided:       oneHex,
+		Rom:                  *rom,
+		Frames:               *frames,
+		PCExecuted:           cov.PCCount(),
+		BranchesStatic:       len(staticBr),
+		BranchesObserved:     cov.BranchCount(),
+		EdgesExercised:       cov.EdgeCount(),
+		EdgeCoverage:         statCov,
+		EdgeCoverageObserved: obsCov,
+		UnreachedBranches:    unreached,
+		OneSided:             oneHex,
+		ExecutedButUndecoded: undecoded,
+		DecoderIncomplete:    banked || len(undecoded) > 0 || sErr != nil,
+	}
+	switch {
+	case sErr != nil:
+		rep.Note = "the cartridge could not be decoded (" + sErr.Error() + "); edge_coverage has no denominator"
+	case banked:
+		rep.Note = "bank-switched image: a flat decode does not describe it, so branches_static is incomplete and edge_coverage is an over-estimate"
+	case len(undecoded) > 0:
+		rep.Note = "some executed branches were never decoded (flow from the vectors cannot follow a bank switch or a computed dispatch), so branches_static is too small and edge_coverage is an over-estimate"
+	}
+	if *warmup > 0 {
+		rep.Note = strings.TrimSpace(rep.Note + " | recording starts after " + fmt.Sprint(*warmup) +
+			" warm-up frame(s), so branches only reached during boot count as unreached")
 	}
 	b, _ := json.MarshalIndent(rep, "", "  ")
 	fmt.Println(string(b))

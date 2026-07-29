@@ -680,3 +680,31 @@ func loadProgram(asmPath string) (*program, map[uint16]Instr, []uint16, *srcmap.
 }
 
 func baseName(p string) string { return filepath.Base(p) }
+
+// StaticBranches decodes a raw cartridge image from its vectors and returns every
+// branch instruction the control-flow graph reaches, ascending, plus whether the
+// image is bank-switched (in which case a flat decode does not describe it and
+// the set is not a denominator anyone should divide by).
+//
+// It exists so a coverage report can be divided by the branches a program HAS
+// rather than by the ones a run happened to execute. Dividing by what was
+// observed makes an unreached branch vanish from the arithmetic entirely, so the
+// percentage rises as the test gets worse.
+func StaticBranches(romPath string) (branches []uint16, banked bool, err error) {
+	rom, err := os.ReadFile(romPath)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(rom) < 6 || len(rom) > 0x10000 {
+		return nil, false, fmt.Errorf("unexpected ROM size %d bytes", len(rom))
+	}
+	p := newProgram(rom)
+	instrs, _ := p.decodeFromVectors()
+	for a, in := range instrs {
+		if in.Def.IsBranch() {
+			branches = append(branches, a)
+		}
+	}
+	sort.Slice(branches, func(i, j int) bool { return branches[i] < branches[j] })
+	return branches, p.banked, nil
+}
