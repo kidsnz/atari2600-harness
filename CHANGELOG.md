@@ -9,6 +9,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`ramtrace` + the RAM-equivalence gate — the measurement half of behavioural reproduction** (v1.113.0).
+  `vismatch` asks whether a build LOOKS like the target and `behavmatch`'s trajectory diff asks whether it
+  MOVES like it; this answers the prior question — what the machine's 128 bytes of state are doing — so a
+  commercial game's logic can be re-authored one rule at a time and each rule gated numerically.
+  - **`emu.CurrentRAM`** reads all 128 bytes ($80-$FF) in one call. The point is not speed: it removes the
+    need to DECLARE which addresses are interesting, which is precisely what is being measured.
+  - **`emu.StartFrameWatch`/`FrameWatch`/`FrameWatchSPRange`** accumulate, inside the frame, every collision
+    that OCCURRED (via the per-videocycle event, independent of `CXCLR`) and the range the stack pointer
+    travelled. Observation-only, proven not to change a RAM byte or a cycle count.
+  - **`cmd/ramtrace`** — `record` (full per-frame series + held input + collisions + SP range, as
+    provenance-stamped JSON), `activity` (per-byte descriptive statistics, fitting nothing), `arity` (the
+    smallest feature set that determines each byte's next value, with the LOCATIONS of any contradicting
+    transitions and `-skip` to separate power-on initialisation from gameplay).
+  - **`behavmatch -ram-gate`** reports the first frame and address where a build's RAM stops matching the
+    target's — a debugging address instead of a downstream symptom. It compares a mask, never all 128
+    bytes, because two correct implementations legitimately differ in scratch and leftovers; every verdict
+    prints what was excluded and why, and a pass over nothing is labelled VACUOUS.
+  - **Scenario library rewritten** as ROM-agnostic scripts covering both players, tap-vs-hold fire,
+    diagonals, aimed fire, simultaneous fire, a 900-frame duel and the console switches. Scripts can no
+    longer name a game variable, so they can no longer name a wrong one.
+  - **`internal/version`** is now the single source of the harness version (it had drifted between the
+    CHANGELOG and the MCP serverInfo twice; a tool that stamps a wrong version into a provenance block makes
+    its artifacts untraceable).
+  Docs: `docs/reproduce-loop.md`.
+
 - **`framegen` — from-scratch full-frame reproduction generator** (v1.112.0). Reads a target ROM and emits
   a NEW, self-contained DASM source that reproduces its static visible frame **pixel-exactly** — including
   the players. It renders the target, reads which TIA object drew each pixel per visible scanline
@@ -149,6 +174,25 @@ versions follow [Semantic Versioning](https://semver.org/).
     `(offset & 0x7F) + 0x80` address convention verified against ALE's `RomUtils.cpp`. Used as an independent
     answer key for `probe_ram_semantics`, not as a design input.
   **Requires MCP reconnect** to become callable.
+
+### Fixed
+- **Collision and stack sampling happened at frame boundaries, where both are already gone** (v1.113.0).
+  Games clear `CXxx` every frame and SP is back at `$FF`, so boundary sampling could neither prove a game
+  uses collisions nor tell which RAM the stack had trampled. Measured against a real cartridge, the SP
+  low-water mark came out `$FF` on every single frame — excluding exactly zero bytes and silently turning
+  the RAM gate's stack mask into a no-op. Watching inside the frame then invalidated the rule as well: the
+  target's SP sweeps `$FF` down to `$1C` every frame (a `TXS` aiming at TIA register space), under which
+  "exclude everything at or above the lowest SP" excludes all 128 bytes and the gate passes unconditionally
+  while reporting green. A pointer descending past an address is not a write to it; stack exclusion needs
+  write attribution and is not attempted until that exists.
+
+### Decisions
+- **The arity probe reports memorisation as memorisation.** A free-running frame counter takes a fresh
+  value every frame, so keying on it "explains" every other byte perfectly — the first version of the probe
+  reported that all of RAM had arity 1. Frame-counter-like bytes are now identified and tried last, and any
+  resolution in which every key was seen exactly once is flagged `MEMORISING`: consistent with the data,
+  and evidence of nothing about states the scenarios never visited. A model that only reproduces its own
+  recording is the failure this whole system exists to avoid, so the tool has to be able to say so.
 
 ### Docs
 - **Combat deep-read (round 2) absorbed** — a 5-lens pass (game-design/6502-craft/audio/anti-patterns/clone-novelties)

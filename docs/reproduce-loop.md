@@ -1,4 +1,4 @@
-# The reproduction loop — `vismatch` + `behavmatch`
+# The reproduction loop — `vismatch` + `behavmatch` + `ramtrace`
 
 Two tools that make clean-room reproduction of a commercial ROM a **build → measure → diff → fix**
 closed loop, so you never again sparse-sample a screen, misjudge a playfield-band boundary by 1–2px,
@@ -74,10 +74,68 @@ residual content vertical shift (±lines, chosen by element-match). Validated: p
 clone (gunmen at 2× width with P1 reflected, asymmetric cactus, score, bars, borders) with the target's
 exact TIA colours. The output is stand-alone (register equates inline, no includes).
 
+## `ramtrace` — what is this ROM's state, and how does each byte change?
+
+The prior question to both of the above. `vismatch` asks whether it looks the same and `behavmatch`'s
+trajectory diff asks whether it moves the same; `ramtrace` asks what the machine's 128 bytes of state are
+doing, so a game's logic can be re-authored one rule at a time instead of guessed at wholesale.
+
+```
+ramtrace record   -rom target.bin -scenario duel-long -out trace.json   # full per-frame series
+ramtrace activity -rom target.bin -scenario all                          # what each byte did
+ramtrace arity    -rom target.bin -scenario all -skip 20                 # what each byte depends on
+```
+
+Every frame it records all 128 RAM bytes, the **held input** (reconstructed from the script's press/release
+edges), the **collisions that occurred** and the **stack-pointer range**. Artifacts carry a provenance block
+(ROM md5, engine, harness version, scenario), so a measurement can always be re-derived.
+
+It is **ROM-blind by construction** — the input is a `.bin` and an input script, never a symbol map or a
+disassembly. That ordering is the seal: an observation made before reading anyone's source is evidence; the
+same observation made afterwards only confirms what you already believed. It is also not theoretical. The
+scenario library used to declare a target's RAM addresses; measuring the real cartridge showed those
+addresses were guesses from our own reconstruction and wrong. Scripts now cannot name an address, so they
+cannot name a wrong one.
+
+- **`activity`** describes and concludes nothing: distinct values, change cadence, the set of per-frame
+  deltas, which inputs the byte moved under. Fitting a model on top is a separate, later step, and keeping
+  the two apart is what stops a fitted story from being mistaken for an observation.
+- **`arity`** answers whether a byte's next value is decided by a small number of things — itself, the
+  input, and one or two companions. This is the premise that makes per-byte reconstruction a small
+  regression rather than an intractable search, so it is measured rather than assumed. It is a determinism
+  check, not a fit: if two transitions agree on the features but disagree on the result, the feature set is
+  too small. Unresolved is reported as unresolved, with the residual count, the **locations** of the
+  contradicting transitions (`scenario:frame`), and the search bound named.
+
+Two traps it is built to survive, both found by measuring rather than by review:
+
+- **A free-running frame counter explains everything.** A byte that takes a fresh value every frame
+  identifies the frame, so keying on it reproduces the whole recording — the first version of the probe
+  duly reported that all of RAM had arity 1. Such bytes are now identified, tried last, and any resolution
+  that leans on one is flagged, as is any resolution where every key was seen exactly once (`MEMORISING`:
+  consistent with the data, evidence of nothing about unvisited states).
+- **Power-on initialisation is not a per-byte rule.** It is a bulk RAM clear, and folding it into the same
+  model makes bytes look mysterious for reasons unrelated to gameplay. `-skip` separates the two; the
+  conflict locations are what made this visible in one read.
+
+### Sampling inside the frame, not at its edge
+
+Collisions and the stack pointer are recorded **during** the frame, not at the boundary, because at the
+boundary both are already gone: games clear `CXxx` every frame, and SP is back at `$FF`. Boundary sampling
+of SP on a real target reported a low-water mark of `$FF` on every frame — a number that excluded exactly
+zero bytes and quietly turned the RAM gate's stack mask into a no-op.
+
+Watching inside the frame then killed the mask rule itself, which matters more. The target's SP sweeps
+`$FF` down to `$1C` on every frame — a `TXS` aiming the pointer at TIA register space, not a 227-byte
+stack. Under the rule "exclude every address at or above the lowest SP", all 128 bytes drop out and the
+gate passes unconditionally while reporting a clean green. **A pointer descending past an address is not a
+write to it.** Stack exclusion needs write attribution, which does not exist yet, so nothing is excluded on
+stack grounds and the SP range is reported as evidence instead.
+
 ## Scope (honest)
 
-These automate **measuring and generating the DATA** (PF tables, positions, band boundaries) and
-**verifying** visual+behavioural match. They do not synthesise an arbitrary kernel from scratch: new
+These automate **measuring and generating the DATA** (PF tables, positions, band boundaries, per-byte
+state behaviour) and **verifying** visual+behavioural match. They do not synthesise an arbitrary kernel from scratch: new
 sprite artwork still comes from the Photoshop round-trip, and a genuinely new kernel scaffold (a new
 per-scanline object arrangement) is still hand-authored — the tools then measure it against the target and
 tell you exactly what is off. The recurring 1px / speed / freeze iteration pain is fully removed.
@@ -85,4 +143,7 @@ tell you exactly what is off. The recurring 1px / speed / freeze iteration pain 
 ## Building blocks reused (`internal/emu`)
 
 `New`/`LoadROM`/`RunFrames`/`StepFrame`/`SetInput`/`SetPanel`/`Snapshot`/`ReadRow`/`DecomposeRow`
-/`ObjectYExtent`/`Markers`/`PeekRAM`; `internal/build.Assemble` (auto-build `.asm`). No emulator changes.
+/`ObjectYExtent`/`Markers`/`PeekRAM`/`CurrentRAM`/`StartFrameWatch`+`FrameWatch`; `internal/build.Assemble`
+(auto-build `.asm`). The only emulator addition is observation-only: whole-RAM read, and in-frame
+accumulation of collision events and the SP range through the existing per-color-clock callback — proven
+not to change a single RAM byte or cycle count.
