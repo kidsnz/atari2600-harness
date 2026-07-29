@@ -40,6 +40,8 @@ func main() {
 	mWarmup := flag.Int("mine-warmup", 0, "frames to run YOUR build (no input) before the scenario")
 	tol := flag.Float64("tol", 0.6, "px tolerance for 'same' on speed/range")
 	dump := flag.Bool("dump", false, "also print each traced object's raw X series")
+	ramGate := flag.Bool("ram-gate", false, "also gate on RAM state: report the first frame+address where the build's RAM stops matching the target's")
+	ramMask := flag.String("ram-mask", "live", "which bytes the RAM gate compares: 'live' (bytes the target exercised, minus the stack's reach) or 'full' (all 128)")
 	flag.Parse()
 	if *target == "" || *mine == "" {
 		fmt.Fprintln(os.Stderr, "usage: behavmatch -target ref.bin -mine build.asm [-scenario all]")
@@ -96,6 +98,20 @@ func main() {
 			couplingOK := func(b, f int) bool { return b > 0 && float64(f) >= 0.7*float64(b) }
 			if couplingOK(tb, tf) != couplingOK(mb, mf) {
 				fmt.Println("  **DIFF** freeze coupling (frozen-while-bullet) differs")
+				d.Match = false
+			}
+		}
+		if *ramGate {
+			// The mask comes from the TARGET's own recording — which bytes it
+			// exercised, and how far its stack reached — so it is measured rather
+			// than declared. GateRAM prints what it excluded either way.
+			mask := behavmatch.LiveMask(tt)
+			if *ramMask == "full" {
+				mask = behavmatch.FullMask()
+			}
+			g := behavmatch.GateRAM(tt, mt, mask)
+			fmt.Print(g.String())
+			if !g.Pass() {
 				d.Match = false
 			}
 		}
