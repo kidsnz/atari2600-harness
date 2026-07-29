@@ -438,7 +438,14 @@ func (s *solver) longest(addr, ret uint16) result {
 // see the same subgraph — two collectors would eventually disagree, and the
 // disagreement would be invisible.
 func (s *solver) collectRegion(instrs map[uint16]Instr, start Instr) string {
-	work := []uint16{start.next()}
+	return s.collectFrom(instrs, start.next())
+}
+
+// collectFrom walks the subgraph from one address, adding to whatever is already
+// collected. Shared so a caller's continuation can be brought into the same
+// region without a second, subtly different walker.
+func (s *solver) collectFrom(instrs map[uint16]Instr, from uint16) string {
+	work := []uint16{from}
 	for len(work) > 0 {
 		addr := work[len(work)-1]
 		work = work[:len(work)-1]
@@ -483,6 +490,113 @@ func (s *solver) collectRegion(instrs map[uint16]Instr, start Instr) string {
 		}
 	}
 	return ""
+}
+
+// callContexts returns, for a region that begins INSIDE a subroutine, the return
+// addresses that could be active when it runs.
+//
+// A WSYNC inside a callee opens a region whose continuation lives in the CALLER,
+// so with no call context the walk hits an RTS, finds no WSYNC ahead of it, and
+// the region is reported unbounded. Measured on the corpus: five regions fail as
+// "no WSYNC reached" and three as "RTS with no caller in context", and
+// shared_setxpos.asm fails twice because its whole positioning routine is built
+// that way.
+//
+// Each JSR contributes its return address as a candidate whenever the region
+// start is reachable from that JSR's target without first returning.
+func callContexts(instrs map[uint16]Instr, regionStart uint16) []uint16 {
+	var out []uint16
+	seenRet := map[uint16]bool{}
+	for _, in := range instrs {
+		if in.Def.Operator != instructions.JSR {
+			continue
+		}
+		ret := in.next()
+		if seenRet[ret] || !reachableWithinCallee(instrs, in.Operand, regionStart) {
+			continue
+		}
+		seenRet[ret] = true
+		out = append(out, ret)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+// reachableWithinCallee reports whether target is reachable from entry without
+// passing through a return — i.e. whether it is part of that subroutine's body.
+func reachableWithinCallee(instrs map[uint16]Instr, entry, target uint16) bool {
+	seen := map[uint16]bool{entry: true}
+	work := []uint16{entry}
+	for len(work) > 0 {
+		a := work[len(work)-1]
+		work = work[:len(work)-1]
+		if a == target {
+			return true
+		}
+		in, ok := instrs[a]
+		if !ok {
+			continue
+		}
+		switch in.Def.Operator {
+		case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
+			continue
+		}
+		for _, nx := range decodeSuccessors(in) {
+			if !seen[nx] {
+				seen[nx] = true
+				work = append(work, nx)
+			}
+		}
+	}
+	return false
+}
+
+// analyzeRegionInContexts re-analyses a region once per candidate return address
+// and returns the WORST result, or nil when any context fails to resolve. Every
+// context must succeed: a region provable from one call site and not from another
+// is not provable, and reporting the provable one would be choosing the
+// flattering answer.
+func analyzeRegionInContexts(instrs map[uint16]Instr, start Instr, budget, amaxHint int,
+	sm *srcmap.Map, states map[uint16]State, ctxs []uint16) *Region {
+	var worst *Region
+	for _, ret := range ctxs {
+		s := &solver{
+			nodes: map[uint16]Instr{}, sinks: map[uint16]bool{}, folds: map[uint16]loopInfo{},
+			memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states, sm: sm, amaxHint: amaxHint,
+		}
+		if msg := s.collectRegion(instrs, start); msg != "" {
+			return nil
+		}
+		// Bring the caller's continuation in; without it the walk stops at the RTS
+		// and never reaches the WSYNC that ends the region.
+		if msg := s.collectFrom(instrs, ret); msg != "" {
+			return nil
+		}
+		if len(s.sinks) == 0 {
+			return nil
+		}
+		if msg := s.foldLoops(); msg != "" {
+			return nil
+		}
+		r := s.longest(start.next(), ret)
+		if s.cyclic || s.unbounded {
+			return nil
+		}
+		if worst == nil || r.cyc > worst.Worst {
+			reg := Region{
+				Start: start.Addr, StartLoc: sm.Locate(start.Addr), Budget: budget,
+				Bounded: true, Kind: "visible", Worst: r.cyc, Over: r.cyc > budget,
+			}
+			if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes) {
+				reg.Kind = "blank"
+			}
+			if reg.Over {
+				reg.Path = r.path
+			}
+			worst = &reg
+		}
+	}
+	return worst
 }
 
 // solveObligation answers "how many times may this loop run before the region
@@ -766,7 +880,13 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 		// scanline (WSYNC halts to the next line) = frame-line drift / screen dip /
 		// roll. Previously this returned Worst=0, hiding it from the ∀ proof.
 	}
+	ctxs := callContexts(instrs, start.Addr)
 	if len(s.sinks) == 0 {
+		if len(ctxs) > 0 {
+			if r := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, ctxs); r != nil {
+				return *r
+			}
+		}
 		return unbounded("no WSYNC reached from region start")
 	}
 	if msg := s.foldLoops(); msg != "" {
@@ -784,6 +904,11 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 		return unbounded("unbounded loop in region (no counted-loop bound found)")
 	}
 	if s.unbounded {
+		if len(ctxs) > 0 {
+			if rc := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, ctxs); rc != nil {
+				return *rc
+			}
+		}
 		return unbounded(s.unbReason)
 	}
 	reg.Worst = r.cyc

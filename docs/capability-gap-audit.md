@@ -614,7 +614,23 @@ The corpus check is now clean with no exceptions: 215 measured regions across 30
 The "fails if a listed gap stops violating" guard caught its own obsolescence within the hour, which is
 exactly what it was for.
 
-### SD-5 — Call-context resolution for a region opened inside a subroutine (attempted, REVERTED)
+### SD-5 — Call-context resolution for a region opened inside a subroutine — DONE
+(The note below is kept because the sequence matters more than the outcome.)
+A WSYNC inside a callee opens a region whose continuation lives in the caller, so with no call context the
+walk hits an RTS, finds no WSYNC, and the region is unbounded. `callContexts` enumerates each JSR's return
+address whose callee body contains the region start, re-analyses the region per context, and takes the WORST
+— every context must resolve, since a region provable from one call site and not another is not provable.
+
+Measured: unbounded regions **29 -> 24**; certified unchanged at 14/31; observed <= proven on **223** measured
+regions across 30 ROMs with no exceptions.
+
+**This was reverted once, wrongly.** The first attempt was judged unsound because `text12`/`text24` region
+`KrowA+36` was reported bounded at 110 while the profiler measured 143. The profiler was the thing that was
+broken (SD-4): with WSYNC detection fixed, the same region measures **104** against the proven 110. A correct
+improvement was nearly discarded on the evidence of a faulty instrument — the same instrument that had also
+made the prover look unsound. Check the instrument before believing what it says about the thing under test.
+
+### (superseded) SD-5 — original revert note
 A WSYNC inside a callee opens a region whose continuation lives in the caller, so with no call context the
 walk hits an RTS, finds no WSYNC, and the region is unbounded. Measured: 5 regions fail as "no WSYNC reached"
 and 3 as "RTS with no caller in context", across bullets/game_states/road/shared_setxpos/text12/text24.
