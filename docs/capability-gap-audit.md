@@ -554,7 +554,24 @@ CFG already recovered by `cyclebound.decodeInto`, the WSYNC-to-WSYNC region part
 May/must semantics per address. Soundness is checkable, and must be checked: the static may-write set must
 CONTAIN every write observed by a real trace.
 
-### SD-1b — Loop-aware must-write (blocks the uninitialised-read finding)
+### SD-1b — Loop-aware must-write — DONE
+`findSweeps` recognises the counted sweep loop (`ldx #N / sta base,x / dex / bne`) and treats the loop's
+FALL-THROUGH edge — never the back edge, which would claim at the header that the whole range is already
+written — as a must-write of the swept range. The fencepost is the substance: `dex/bne` leaves once the
+index reaches zero, so index 0 is never stored and the range is base+1..base+N; `dex/bpl` leaves only when
+the index goes negative and does include zero.
+
+Measured across the technique corpus plus litmus: uninitialised-read reports went **3783 -> 0 false**, while
+the planted case still fires. The pair `roms/litmus/litmus_uninit_read.asm` (clears $01..$3F, then reads $8A)
+and `litmus_uninit_clean.asm` (identical but for the sweep bound) proves both directions — one report on the
+bait, none on the twin. Cross-checked against the emulator: every uninitialised read `emu.WatchUninitRead`
+observes must appear in the static set (32 ROMs run).
+
+Also added while doing it: a bank-switched image (larger than the 4K the console addresses at once) is now
+DECLINED rather than analysed. `banked_game.asm` was decoding 66 instructions from entry points $FFE0/$FFFF
+and producing a confident finding about an address it had never decoded. `DefUseReport.FlatBankOnly` says so.
+
+### (superseded) SD-1b — original note
 `DefUse` computes reads that no path from reset has definitely written first, and does not report them,
 because both scopes tried produce noise rather than findings — measured, not guessed:
 per-WSYNC-region, 515 flagged addresses on one technique kernel (a kernel reads what its setup wrote);

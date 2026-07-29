@@ -212,27 +212,26 @@ type DefUseReport struct {
 	// claim degenerating into "all of memory".
 	Writes map[string]Access `json:"writes,omitempty"`
 
-	// UninitReads is NOT POPULATED yet, and the reason is worth stating rather
-	// than hiding behind an empty field.
+	// UninitReads are reads of RAM that no path from the reset vector has
+	// definitely written first — power-on rubbish on hardware, while an emulator
+	// hands out a deterministic value and the bug never surfaces in testing.
 	//
-	// The question is the right one — a read of RAM that no path from reset has
-	// definitely written first is power-on rubbish on hardware, while an emulator
-	// hands out a deterministic value and the bug never shows up in testing. Two
-	// attempts, both measured, both unusable:
-	//
-	//   - Scoped per WSYNC region: 515 flagged addresses on one technique kernel.
-	//     A kernel reads state its setup wrote, so a per-region must-set flags
-	//     essentially every read.
-	//   - Scoped from reset over the whole CFG: 3783 on dyn_multisprite, 506 on
-	//     maze. must-write counts only exactly-targeted stores, and the RAM clear
-	//     every 2600 ROM opens with is an INDEXED store, so the analysis never
-	//     learns that RAM was initialised at all.
-	//
-	// Flagging everything is the same as flagging nothing, so this ships empty
-	// until must-write can reason about the clear-loop idiom (SD-1b). The dynamic
-	// counterpart, emu.WatchUninitRead, already answers the question for the runs
-	// it executes.
+	// Two earlier scopes were measured and discarded rather than shipped, because
+	// each flagged so much that a report meant nothing: per WSYNC region, 515
+	// addresses on one technique kernel (a kernel reads what its setup wrote);
+	// whole-program but counting only exactly-targeted stores, 3783 on
+	// dyn_multisprite and 506 on maze (the RAM clear every 2600 ROM opens with is
+	// an INDEXED store, so the analysis never learned RAM was initialised).
+	// Recognising the sweep idiom took the corpus to zero false reports while the
+	// planted case in litmus_uninit_read.asm still fires.
 	UninitReads []UninitRead `json:"uninit_reads,omitempty"`
+
+	// FlatBankOnly is set when the image is larger than the 4K the console can
+	// address at once. Every analysis here keys on a flat address, so on a
+	// bank-switched image it would be describing a program that does not exist —
+	// findings are withheld and this says why, rather than a plausible-looking
+	// answer being returned.
+	FlatBankOnly string `json:"flat_bank_only,omitempty"`
 
 	Regions []RegionDefUse `json:"regions,omitempty"`
 }
@@ -297,6 +296,122 @@ func regionInstrs(instrs map[uint16]Instr, start uint16) []uint16 {
 	return out
 }
 
+// A counted loop that walks a store's index across a proven range writes its
+// whole swept range by the time it exits. Recognising that is what makes a
+// must-write analysis usable on a 2600 ROM at all: every one of them opens with
+// `ldx #$FF / sta $00,x / dex / bne`, and because an indexed store has no single
+// exact target, an analysis that only counts exact stores never learns that RAM
+// was initialised — so it reports essentially every later read as reading
+// uninitialised memory. Measured before this existed: 3783 such reports on one
+// technique kernel, 506 on another. Flagging everything is the same as flagging
+// nothing.
+//
+// The fencepost is the substance of the idiom, not a detail. With `dex / bne`
+// the body runs at index N down to 1 and the branch falls through once the index
+// reaches zero, so index 0 is NEVER stored — the swept range is base+1 .. base+N.
+// `dex / bpl` exits when the index goes negative, so that one DOES include zero.
+// Getting this backwards would claim a byte is initialised that the machine
+// never touched, which is the one direction a must-analysis may not be wrong in.
+type sweepInfo struct {
+	exit  uint16   // the loop's fall-through successor
+	addrs []uint16 // everything the loop has definitely written once it gets there
+}
+
+// findSweeps locates counted sweep loops keyed by their latch (back-branch)
+// address. Anything it cannot fully account for is simply not reported, so a
+// missed sweep costs precision and never correctness.
+func findSweeps(instrs map[uint16]Instr, states map[uint16]State) map[uint16]sweepInfo {
+	out := map[uint16]sweepInfo{}
+	for la, latch := range instrs {
+		if !latch.Def.IsBranch() {
+			continue
+		}
+		op := latch.Def.Operator
+		if op != instructions.BNE && op != instructions.BPL {
+			continue
+		}
+		header := latch.branchTarget()
+		if header > la {
+			continue // forward branch, not a loop latch
+		}
+		// Walk the body as a straight chain, noting which index register is
+		// decremented and which indexed stores ride on it.
+		decX, decY := false, false
+		var stores []Instr
+		a := header
+		ok := true
+		for guard := 0; guard < 64; guard++ {
+			in, found := instrs[a]
+			if !found {
+				ok = false
+				break
+			}
+			if in.Addr == la {
+				break
+			}
+			if in.Def.IsBranch() || in.isWSYNC() {
+				ok = false
+				break
+			}
+			switch in.Def.Operator {
+			case instructions.DEX:
+				decX = true
+			case instructions.DEY:
+				decY = true
+			case instructions.STA, instructions.STX, instructions.STY:
+				switch in.Def.AddressingMode {
+				case instructions.AbsoluteX, instructions.AbsoluteY:
+					stores = append(stores, in)
+				}
+			}
+			a = in.next()
+			if a > la {
+				ok = false
+				break
+			}
+		}
+		if !ok || len(stores) == 0 || (!decX && !decY) || (decX && decY) {
+			continue
+		}
+		n := determineBound(instrs, header, latch, states, 0)
+		if n <= 0 || n > 255 {
+			continue
+		}
+		lo := 1
+		if op == instructions.BPL {
+			lo = 0 // dex/bpl leaves only once the index goes negative, so 0 is stored
+		}
+		seen := map[uint16]bool{}
+		var addrs []uint16
+		for _, st := range stores {
+			// The store must be indexed by the register the loop decrements, or the
+			// sweep says nothing about where it went.
+			wantX := st.Def.AddressingMode == instructions.AbsoluteX
+			if wantX != decX {
+				continue
+			}
+			base := int(st.Operand)
+			zp := base < 0x100
+			for i := lo; i <= n; i++ {
+				t := base + i
+				if zp {
+					t = (base + i) & 0xFF
+				}
+				if !seen[uint16(t)] {
+					seen[uint16(t)] = true
+					addrs = append(addrs, uint16(t))
+				}
+			}
+		}
+		if len(addrs) == 0 {
+			continue
+		}
+		sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
+		out[la] = sweepInfo{exit: latch.next(), addrs: addrs}
+	}
+	return out
+}
+
 // mustWrittenAt runs a small forward fixpoint over the region computing, at each
 // instruction, the set of addresses written on EVERY path reaching it. Meet is
 // intersection, which is what makes it a must-analysis: an address survives only
@@ -304,7 +419,7 @@ func regionInstrs(instrs map[uint16]Instr, start uint16) []uint16 {
 //
 // A read of an address absent from that set is a read the region does not
 // guarantee to have initialised.
-func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []uint16, start uint16, stopAtWSYNC bool) map[uint16]map[uint16]bool {
+func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []uint16, start uint16, stopAtWSYNC bool, sweeps map[uint16]sweepInfo) map[uint16]map[uint16]bool {
 	inRegion := map[uint16]bool{}
 	for _, a := range region {
 		inRegion[a] = true
@@ -336,10 +451,24 @@ func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []ui
 				if !inRegion[s] {
 					continue
 				}
+				edge := after
+				// A completed sweep is known only on the way OUT. Adding it to the
+				// back edge as well would claim, at the loop header, that the whole
+				// range is already written — false on the first iteration, and false
+				// in the direction a must-analysis may not be wrong in.
+				if sw, isSweep := sweeps[a]; isSweep && s == sw.exit {
+					edge = map[uint16]bool{}
+					for k := range after {
+						edge[k] = true
+					}
+					for _, t := range sw.addrs {
+						edge[t] = true
+					}
+				}
 				old, seen := before[s]
 				if !seen {
 					cp := map[uint16]bool{}
-					for k := range after {
+					for k := range edge {
 						cp[k] = true
 					}
 					before[s] = cp
@@ -348,7 +477,7 @@ func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []ui
 				}
 				// meet = intersection
 				for k := range old {
-					if !after[k] {
+					if !edge[k] {
 						delete(old, k)
 						changed = true
 					}
@@ -390,13 +519,18 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 
 	// Whole-program must-write from the reset vector. Computed but not reported —
 	// see UninitReads for the measured reason.
-	if false && len(entries) > 0 {
+	if p.banked {
+		rep.FlatBankOnly = fmt.Sprintf("image is %d bytes; the console addresses 4K at a time, so this "+
+			"cartridge switches banks and a flat-address analysis does not describe it", len(p.rom))
+	}
+	sweeps := findSweeps(instrs, states)
+	if len(entries) > 0 && !p.banked {
 		all := make([]uint16, 0, len(instrs))
 		for a := range instrs {
 			all = append(all, a)
 		}
 		sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
-		must := mustWrittenAt(instrs, states, all, entries[0], false)
+		must := mustWrittenAt(instrs, states, all, entries[0], false, sweeps)
 		for _, a := range all {
 			acc, ok := accessOf(instrs[a], states[a])
 			if !ok || acc.Unbounded || (acc.Kind != AccessRead && acc.Kind != AccessModify) {
@@ -432,7 +566,7 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 
 	for _, sa := range starts {
 		region := regionInstrs(instrs, sa)
-		must := mustWrittenAt(instrs, states, region, sa, true)
+		must := mustWrittenAt(instrs, states, region, sa, true, sweeps)
 		rd := RegionDefUse{Start: hexAddr(sa), Kind: "region"}
 		if sm != nil {
 			rd.StartLoc = sm.Locate(sa)

@@ -103,11 +103,20 @@ func (in Instr) nodeCost() int {
 type program struct {
 	rom  []byte
 	base uint16 // first ROM address = 0x10000 - len(rom) (0xF000 for 4K, 0xF800 for 2K)
+
+	// banked marks an image larger than the 4K the console can address at once,
+	// i.e. one that switches banks at run time. Everything in this package keys
+	// on a flat address, so on such an image the vectors, the decode and every
+	// analysis built on them describe a program that does not exist. Callers must
+	// decline rather than report — measured on banked_game.asm, the flat model
+	// decoded 66 instructions from entry points $FFE0/$FFFF and produced a
+	// confident finding about an address it had never decoded.
+	banked bool
 }
 
 // newProgram wraps a flat cartridge image.
 func newProgram(rom []byte) *program {
-	return &program{rom: rom, base: uint16(0x10000 - len(rom))}
+	return &program{rom: rom, base: uint16(0x10000 - len(rom)), banked: len(rom) > 4096}
 }
 
 // canon folds a CPU address to the cartridge offset it addresses, or reports
