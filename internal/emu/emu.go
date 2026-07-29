@@ -51,6 +51,11 @@ type Emu struct {
 	// クロック呼び、GetLastSignal().Index を索引に Video.LastElement を記録する。
 	// 値は element+1（0=未記録）。elemCB=nil のとき VCS.Step(nil) と等価＝ゼロコスト。
 	elemBuf []uint8          // 索引 = signal.Index（フルフレーム 228×scanline 空間）
+	// hmRipple / hmFlags は elemBuf と同じ索引で HMOVE 機構の状態を毎カラークロック記録する。
+	// 現在値の読み出しだけでは足りない：リップルはカラークロック単位で動くので、命令単位で
+	// 標本化すると値が飛び、実測で 16 値中 3 値しか見えず終了も一度も捕まらなかった。
+	hmRipple []uint8
+	hmFlags  []uint8
 	// elemCtBuf は elemBuf と同じ索引で「その要素の何番目のコピーが描いたか」。
 	// player/missile なら NUSIZ 複製のコピー番号、playfield なら PF0/1/2 のどれか。
 	// 0 は未記録の番兵で、格納値は実際の値 +1。
@@ -215,6 +220,8 @@ func (e *Emu) EnableElementCapture() {
 	}
 	e.elemBuf = make([]uint8, specification.AbsoluteMaxClks)
 	e.elemCtBuf = make([]uint8, specification.AbsoluteMaxClks)
+	e.hmRipple = make([]uint8, specification.AbsoluteMaxClks)
+	e.hmFlags = make([]uint8, specification.AbsoluteMaxClks)
 	e.elemCB = func(isCycle bool) error {
 		sig := e.VCS.TV.GetLastSignal()
 		if sig.Index == signal.NoSignal {
@@ -232,6 +239,24 @@ func (e *Emu) EnableElementCapture() {
 			// clone of an all-NUSIZ-modes ROM miss 2666 cells and then blame
 			// multiplexing for it.
 			e.elemCtBuf[sig.Index] = uint8(e.VCS.TIA.Video.LastElementCt) + 1
+			// HMOVE machinery, same clock, same index. Two bytes per colour clock —
+			// the engine's own reflection package records 288 for the same moment.
+			hm := &e.VCS.TIA.Hmove
+			e.hmRipple[sig.Index] = hm.Ripple
+			var f uint8 = hmRecorded
+			if hm.Latch {
+				f |= hmLatch
+			}
+			if hm.IsActive() {
+				f |= hmRippleActive
+			}
+			if hm.RippleJustEnded {
+				f |= hmJustEnded
+			}
+			if hm.Future.IsActive() {
+				f |= hmDelayActive
+			}
+			e.hmFlags[sig.Index] = f
 		}
 		// フレーム内で起きた衝突の蓄積（下記 FrameWatch）。LastColorClock は
 		// 毎ビデオサイクル reset されるので、ここで拾わないと二度と見えない。
@@ -422,6 +447,132 @@ func (e *Emu) LoadROM(path string) error {
 // Coords は現在のビーム位置（Frame/Scanline/Clock）を返す。横位置判定の出典。
 func (e *Emu) Coords() coords.TelevisionCoords {
 	return e.VCS.TV.GetCoords()
+}
+
+// HmoveState is the TIA's horizontal-motion machinery caught mid-operation.
+//
+// HMOVE is not instantaneous: the strobe sets a latch after a delay, a ripple
+// counter then runs 15→0 handing extra ticks to the sprites, and only when it
+// expires has an object finished moving. Every "the sprite landed somewhere I did
+// not predict" bug lives in that window, and until now the only observable was
+// the final position — the machinery producing it was invisible, so a wrong
+// answer could only be guessed at, not watched.
+// Flags packed into hmFlags, one byte per colour clock. hmRecorded is the
+// sentinel that separates "nothing happening here" from "never sampled here" —
+// without it an unvisited clock and an idle one are the same zero, and a query
+// would report calm where it has no data at all.
+const (
+	hmRecorded uint8 = 1 << iota
+	hmLatch
+	hmRippleActive
+	hmJustEnded
+	hmDelayActive
+)
+
+type HmoveState struct {
+	Latch  bool  `json:"latch"`  // HMOVE has been triggered on this scanline (cleared at line start)
+	Ripple uint8 `json:"ripple"` // counts 15 down to 0, then rests at 255 (= -1)
+	// RippleActive is the TIA's OWN definition of "the counter is running", not a
+	// test invented here. The obvious `Ripple != 255` is wrong at both ends: it
+	// calls the idle-but-not-yet-wrapped value 0 active, and it calls the cycle the
+	// counter expires on inactive.
+	RippleActive    bool `json:"ripple_active"`
+	RippleJustEnded bool `json:"ripple_just_ended"` // it expired on this very colour clock
+	// DelayActive covers the gap between the HMOVE strobe and the ripple starting.
+	// An object is committed to move during it while nothing has moved yet, which
+	// is the part of the sequence that is invisible from the position alone.
+	DelayActive    bool `json:"delay_active"`
+	DelayRemaining int  `json:"delay_remaining"`
+	Phi2           bool `json:"phi2"` // TIA phase clock is in rising Phi2 (when the ripple ticks)
+}
+
+// Hmove returns the current horizontal-motion state.
+//
+// HMOVE is not instantaneous: the strobe schedules a latch, a ripple counter then
+// runs 15→0 handing extra ticks to the sprites, and only when it expires has an
+// object finished moving. Every "the sprite landed somewhere I did not predict"
+// bug lives in that window, and the only thing observable until now was the final
+// position — the machinery producing it was invisible, so a wrong landing could
+// be guessed at but not watched.
+//
+// Observation only: reading this cannot change what the machine does.
+func (e *Emu) Hmove() HmoveState {
+	h := &e.VCS.TIA.Hmove
+	return HmoveState{
+		Latch:           h.Latch,
+		Ripple:          h.Ripple,
+		RippleActive:    h.IsActive(),
+		RippleJustEnded: h.RippleJustEnded,
+		DelayActive:     h.Future.IsActive(),
+		DelayRemaining:  h.Future.Remaining(),
+		Phi2:            h.Clk,
+	}
+}
+
+// HmoveSpan is where HMOVE acted on one scanline, in read_row beam coordinates
+// (HBLANK −68..−1, visible 0..159).
+type HmoveSpan struct {
+	Scanline int  `json:"scanline"`
+	Latched  bool `json:"latched"`  // HMOVE was triggered on this line at all
+	Recorded bool `json:"recorded"` // the line was actually sampled (else every field below is meaningless)
+	// StrobeClock is the first clock at which the strobe's delay was pending, i.e.
+	// the earliest visible consequence of the HMOVE write. −999 when there is none.
+	StrobeClock int `json:"strobe_clock"`
+	// RippleStart/RippleEnd bracket the clocks over which the counter ran. Objects
+	// are still moving inside this span, so a position read within it is a
+	// half-finished answer — which is exactly how a "wrong" landing gets recorded.
+	RippleStart int `json:"ripple_start"`
+	RippleEnd   int `json:"ripple_end"`
+	RippleTicks int `json:"ripple_ticks"` // colour clocks the counter was active
+	// Values is every distinct ripple value seen, in the order first seen. The
+	// counter runs 15→0, so anything else is a finding.
+	Values []uint8 `json:"values"`
+}
+
+// HmoveOnScanline reports where HMOVE acted on the given absolute scanline.
+//
+// It reads the per-colour-clock recording rather than the live registers because
+// the ripple counter advances every colour clock — three times per CPU cycle — so
+// sampling it by instruction aliases it badly: measured on litmus_hmove, stepping
+// by instruction saw 3 of the 16 counter values and never once caught the cycle
+// it expired on. A caller debugging a mis-positioned sprite that way is being
+// shown a value that was never the whole story.
+func (e *Emu) HmoveOnScanline(scanline int) (HmoveSpan, error) {
+	if e.hmFlags == nil {
+		return HmoveSpan{}, fmt.Errorf("element capture not enabled")
+	}
+	base := scanline * specification.ClksScanline
+	if base < 0 || base+specification.ClksScanline > len(e.hmFlags) {
+		return HmoveSpan{}, fmt.Errorf("scanline %d out of recorded range", scanline)
+	}
+	sp := HmoveSpan{Scanline: scanline, StrobeClock: -999, RippleStart: -999, RippleEnd: -999}
+	seen := map[uint8]bool{}
+	for i := 0; i < specification.ClksScanline; i++ {
+		f := e.hmFlags[base+i]
+		if f&hmRecorded == 0 {
+			continue
+		}
+		sp.Recorded = true
+		clk := i - specification.ClksHBlank // read_row coordinates
+		if f&hmLatch != 0 {
+			sp.Latched = true
+		}
+		if f&hmDelayActive != 0 && sp.StrobeClock == -999 {
+			sp.StrobeClock = clk
+		}
+		if f&hmRippleActive != 0 {
+			if sp.RippleStart == -999 {
+				sp.RippleStart = clk
+			}
+			sp.RippleEnd = clk
+			sp.RippleTicks++
+			if v := e.hmRipple[base+i]; !seen[v] {
+				seen[v] = true
+				sp.Values = append(sp.Values, v)
+			}
+		}
+	}
+	return sp, nil
 }
 
 // DisplayOff reports whether the beam is currently blanked — VSYNC or VBLANK
