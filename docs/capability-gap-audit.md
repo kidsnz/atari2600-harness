@@ -859,6 +859,43 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   first candidate scanned (−4), i.e. "no offset explains anything" came out as "shift the picture up four
   lines"; ties now resolve to 0. Adding ENAMx/ENABL replay and per-zone sprite X are the follow-ups —
   filed below as RL-8.
+- **RL-7b — the two defects the RL-7 evaluation exposed downstream. DONE (v1.115.0).** Running the generated
+  clone through `cyclebound` and `beamtrace` — rather than only looking at its picture — found two faults that
+  a pixel comparison structurally cannot see.
+
+  **(a) The cleanup ran inside the last visible scanline.** `cyclebound` put the `Kern` region at **97 cycles
+  against a 76-cycle budget**; hand-counting the loop body gives 66, and the missing 31 are the loop-exit
+  cleanup, which falls through *before* the next WSYNC. `beamtrace` on the clone shows it directly:
+
+  ```
+  scanline 240:                       <- the clone's LAST visible line
+      clk +133  GRP0 $00  pixels[133..160)   @$F08E
+      clk +142  GRP1 $00  pixels[142..160)   @$F090
+  ```
+
+  So a sprite pixel right of clock 133 survives on all 213 earlier lines and vanishes on the last one.
+  Proving it took **two attempts at the litmus**, and the failed one is the useful part: a full-width
+  *playfield* shows nothing, because PF2 — the only PF register covering the right edge (clocks 128-159) — is
+  cleared after the line has already ended. Only GRP0/GRP1 are cleared early enough to bite, so the planted
+  quantity had to be a *player* near the right edge (`roms/litmus/litmus_lastline.asm`). Fixed with a `sta
+  WSYNC` before the cleanup; after it, line 240 carries no cleanup write and the clears land in the next
+  line's HBLANK at clocks −53..−17. `Kern`'s worst drops **97 → 66**, and the region violation disappears.
+
+  **(b) Every clone ever generated was out of NTSC spec.** Measured across the 31-ROM corpus, the *pre-fix*
+  generator emitted **267 scanlines on 30 ROMs and 268 on one — 262 on none of them**. Five to six lines
+  over: a real television rolls. Nothing caught it because `vismatch` and the coverage table both compare the
+  visible picture, and the picture was pixel-exact. The cause is that overscan was computed from a formula
+  that ignored `vblankAdj` (self-calibration adds VBLANK lines to slide the picture down; nothing took them
+  back off the end) — and, more fundamentally, that **no formula can be right here**: `SetXPos` is a div-15
+  subtract loop, so placing a player far right costs more than placing one on the left and can run past its
+  own scanline. Combat (P1 at clock 145, input 139) spends one prologue line more than Outlaw does. Fixed by
+  *measuring* — the frame length now self-calibrates against `StepFrame()` exactly as X and VBLANK already
+  did, and `framegen` reports the count every run and exits 1 when it is wrong. **After: 262 on 31/31**, with
+  the pixel results unchanged (21 exact / 8 misplaced / 2 missing) — the fix corrected the frame without
+  disturbing the picture. Regression-locked by `roms/litmus/scenarios/lastline.json` (`ntsc_frame_lines`).
+
+  The lesson is the RL-7 lesson one level up: the tool that checks the picture cannot see the frame around
+  it, and a clone can be pixel-perfect and unplayable at the same time.
 - **RL-8 — `framegen` missile/ball replay + per-zone sprite X.** The two limits RL-7 measured. Missiles and
   the ball need one enable bit and one X per scanline (cheap: the attribution is already extracted, only the
   emitter lacks it); per-zone sprite X needs the extracted single `p0x`/`p1x` to become a per-scanline series

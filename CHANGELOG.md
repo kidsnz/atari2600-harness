@@ -30,6 +30,27 @@ versions follow [Semantic Versioning](https://semver.org/).
     explains anything" came out as "shift the picture up 4 lines" (`motion_glide` scored 34232 at all nine
     offsets and chose −4). Ties now resolve to 0.
   - Follow-up filed as **RL-8**: missile/ball replay and per-zone sprite X.
+- **`framegen`: the last visible scanline no longer loses its sprites, and generated frames are 262 lines**
+  (v1.115.0, audit RL-7b). Both faults were found by running the generated clone through `cyclebound` and
+  `beamtrace` instead of only looking at its picture — a pixel comparison structurally cannot see either.
+  - `cyclebound` put the `Kern` region at **97 cycles against a 76-cycle budget**; the loop body is 66 and the
+    missing 31 are the loop-exit cleanup falling through *before* the next WSYNC. `beamtrace` on the clone
+    shows it landing at `clk +133 GRP0` and `clk +142 GRP1` on the last visible line, so a sprite pixel right
+    of clock 133 survives 213 lines and vanishes on the 214th. Fixed with a `sta WSYNC` before the cleanup;
+    the clears now land in the next line's HBLANK (clocks −53..−17) and `Kern`'s worst drops **97 → 66**.
+  - Proving it needed two litmus attempts, and the failed one is worth recording: a full-width *playfield*
+    exposes nothing, because PF2 — the only PF register covering clocks 128-159 — is cleared after the line
+    has ended. Only GRP0/GRP1 are early enough to bite. New `roms/litmus/litmus_lastline.asm` parks a player
+    near the right edge of every visible line instead, sized to fill the 214-line snapshot window so the last
+    extracted line is a drawn one.
+  - Frame length: the pre-fix generator emitted **267 scanlines on 30 of 31 corpus ROMs and 268 on the other —
+    262 on none**, five to six lines out of NTSC spec, which rolls on a real television. Invisible to every
+    existing check because the *picture* was pixel-exact. Overscan ignored `vblankAdj`, and more
+    fundamentally no formula can be right: `SetXPos` is a div-15 subtract loop, so a player far to the right
+    costs more prologue than one on the left (Combat, P1 at clock 145, spends one line more than Outlaw).
+    Frame length now **self-calibrates against `StepFrame()`** like X and VBLANK already did, is reported every
+    run, and exits 1 when wrong. **After: 262 on 31/31**, pixel results unchanged (21 exact / 8 misplaced /
+    2 missing). Locked by `roms/litmus/scenarios/lastline.json`.
 
 ### Added
 - **Static program analysis — def-use, proven beam windows, conditional bounds, and the tools to check them**

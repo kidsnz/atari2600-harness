@@ -201,8 +201,6 @@ func renderGrid(src, spec string, frames int) (grid [][]string, top int, err err
 	return grid, vt, nil
 }
 
-// matchCount counts element cells that agree between target grid and clone grid,
-// both aligned to the same absolute scanline (tgtTop==cloneTop assumed).
 // elemCoverage is one TIA element's share of the reproduction: how many visible
 // cells the target draws with it, how many of those the clone draws the same
 // way, and whether the clone draws that element ANYWHERE in its frame.
@@ -259,6 +257,8 @@ func missingElements(cov []elemCoverage) []string {
 	return miss
 }
 
+// matchCount counts element cells that agree between target grid and clone grid,
+// both aligned to the same absolute scanline (tgtTop==cloneTop assumed).
 func matchCount(tgt, clone [][]string) int {
 	n := 0
 	h := len(tgt)
@@ -307,13 +307,20 @@ func byteTable(label string, data []uint8) string {
 
 // emit builds the full clone source. p0in/p1in are the SetXPos routine inputs
 // and vblankAdj shifts the VBLANK line count (all self-calibrated by the caller).
-func emit(fd *frameData, p0in, p1in, vblankAdj int) string {
+func emit(fd *frameData, p0in, p1in, vblankAdj, osAdj int) string {
 	nlines := fd.h
 	vblank := fd.top - 3 - 3 + vblankAdj // 3 lines used for positioning (P0,P1,HMOVE) below
 	if vblank < 1 {
 		vblank = 1
 	}
-	overscan := 262 - fd.top - nlines
+	// Count what this function actually emits rather than what the frame nominally
+	// contains: 3 VSYNC + 3 positioning + vblank + nlines + 1 cleanup + overscan,
+	// with vblank = top-6+vblankAdj. Solving for 262 total leaves
+	//   overscan = 261 - top - nlines - vblankAdj.
+	// The vblankAdj term is the one that was missing: self-calibration adds lines
+	// to VBLANK to slide the picture down and nothing took them back off the end,
+	// so generated frames ran 264 scanlines — measured, and out of NTSC spec.
+	overscan := 261 - fd.top - nlines - vblankAdj + osAdj
 	if overscan < 1 {
 		overscan = 1
 	}
@@ -426,9 +433,10 @@ Kern:
     iny
     cpy #%d
     bne Kern
-    lda #0
-    sta GRP0
-    sta GRP1
+    sta WSYNC           ; end the last visible line BEFORE clearing anything:
+    lda #0              ; without it the cleanup runs inside that line and clears
+    sta GRP0            ; GRP0 at beam clock +133 and GRP1 at +142 (measured),
+    sta GRP1            ; erasing any sprite pixel right of there on that one line
     sta PF0
     sta PF1
     sta PF2
@@ -524,9 +532,11 @@ func main() {
 	// Self-calibrate: the two SetXPos inputs (players land on the target's
 	// columns — the landing offset is kernel-specific) AND the VBLANK line count
 	// (the clone's visible top matches the target's, so content aligns vertically).
-	p0in, p1in, vblankAdj := 40, 40, 0
+	// osAdj corrects the overscan count once the frame length can be measured; it
+	// stays 0 through the X/VBLANK calibration, which does not depend on it.
+	p0in, p1in, vblankAdj, osAdj := 40, 40, 0, 0
 	for iter := 0; iter < 16; iter++ {
-		src := emit(fd, p0in, p1in, vblankAdj)
+		src := emit(fd, p0in, p1in, vblankAdj, osAdj)
 		gp0, gp1, top, err := renderClone(src, *spec, *frames)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "calibrate:", err)
@@ -548,7 +558,7 @@ func main() {
 	// target (kills the residual constant offset the top-match can't see).
 	bestS, bestM := 0, -1
 	for s := -4; s <= 4; s++ {
-		src := emit(fd.shifted(s), p0in, p1in, vblankAdj)
+		src := emit(fd.shifted(s), p0in, p1in, vblankAdj, osAdj)
 		grid, _, err := renderGrid(src, *spec, *frames)
 		if err != nil {
 			continue
@@ -564,7 +574,32 @@ func main() {
 	}
 	fmt.Printf("  chosen content shift: %+d\n", bestS)
 
-	src := emit(fd.shifted(bestS), p0in, p1in, vblankAdj)
+	src := emit(fd.shifted(bestS), p0in, p1in, vblankAdj, osAdj)
+
+	// Self-calibrate the frame LENGTH, for the same reason X and VBLANK are
+	// calibrated rather than computed: the prologue's cost is not a constant.
+	// `SetXPos` is a div-15 subtract loop, so a player far to the right takes
+	// longer to place than one on the left and can run past its own scanline —
+	// Combat (P1 at clock 145, input 139) spends one line more than Outlaw does.
+	// Deriving the overscan count from a formula therefore cannot be right for
+	// every target; measuring the emitted frame and correcting the difference is.
+	want := 262
+	if strings.EqualFold(*spec, "PAL") || strings.EqualFold(*spec, "SECAM") {
+		want = 312
+	}
+	for iter := 0; iter < 8; iter++ {
+		got, err := cloneFrameLines(src, *spec)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "frame-length calibration:", err)
+			break
+		}
+		fmt.Printf("  frame length iter %d: %d lines (want %d) osAdj=%d\n", iter, got, want, osAdj)
+		if got == want {
+			break
+		}
+		osAdj += want - got
+		src = emit(fd.shifted(bestS), p0in, p1in, vblankAdj, osAdj)
+	}
 
 	// What did it actually reproduce? Measured per element against the clone's
 	// own rendered frame, because "pixel-exact" on a target that draws no
@@ -577,6 +612,11 @@ func main() {
 	} else {
 		fmt.Fprintln(os.Stderr, "coverage: could not render the clone:", err)
 	}
+	// Frame length is not something the picture comparison can see: a clone can be
+	// pixel-exact and still emit 264 scanlines, which rolls on a real television.
+	// It went unnoticed for exactly that reason, so it is measured here every run.
+	lines, lerr := cloneFrameLines(src, *spec)
+
 	miss := missingElements(cov)
 	src = annotate(src, cov, miss)
 
@@ -585,6 +625,15 @@ func main() {
 		os.Exit(2)
 	}
 	fmt.Printf("wrote %s (%d bytes source)\n", *out, len(src))
+
+	switch {
+	case lerr != nil:
+		fmt.Println("frame length: could not measure —", lerr)
+	case lines != want:
+		fmt.Printf("frame length: %d scanlines, want %d  <-- OUT OF SPEC (would roll on hardware)\n", lines, want)
+	default:
+		fmt.Printf("frame length: %d scanlines (correct for %s)\n", lines, strings.ToUpper(*spec))
+	}
 
 	fmt.Println("reproduction by element (target cells / matched / drawn anywhere in the clone):")
 	for _, c := range cov {
@@ -609,6 +658,11 @@ func main() {
 	// line: a kernel that carries one X per player cannot follow a multiplexed
 	// target that moves its sprites per zone, and that shows up here as a cell
 	// count, not as a missing element.
+	if lerr == nil && lines != want {
+		fmt.Printf("RESULT: the picture matches but the frame is %d scanlines, not %d — a clone that "+
+			"reproduces every pixel and the wrong frame length still rolls on hardware.\n", lines, want)
+		os.Exit(1)
+	}
 	short := 0
 	for _, c := range cov {
 		short += c.Target - c.Matched
@@ -620,6 +674,35 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("RESULT: pixel-exact — every visible cell is drawn by the same element as the target")
+}
+
+// cloneFrameLines assembles the generated source and asks the machine how many
+// scanlines one of its frames actually takes.
+func cloneFrameLines(src, spec string) (int, error) {
+	dir, err := os.MkdirTemp("", "framegen-lines")
+	if err != nil {
+		return 0, err
+	}
+	defer os.RemoveAll(dir)
+	asm, bin := dir+"/c.asm", dir+"/c.bin"
+	if err := os.WriteFile(asm, []byte(src), 0o644); err != nil {
+		return 0, err
+	}
+	if out, aerr := build.Assemble(asm, bin); aerr != nil {
+		return 0, fmt.Errorf("assemble:\n%s", out)
+	}
+	e, err := emu.New(spec)
+	if err != nil {
+		return 0, err
+	}
+	if err := e.LoadROM(bin); err != nil {
+		return 0, err
+	}
+	// Settle first: the frames right after reset are not representative.
+	if err := e.RunFrames(8); err != nil {
+		return 0, err
+	}
+	return e.StepFrame()
 }
 
 // enableRegs names the TIA register that would have to be written for each
