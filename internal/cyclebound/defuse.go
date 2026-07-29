@@ -522,19 +522,8 @@ func loadProgram(asmPath string) (*program, map[uint16]Instr, []uint16, *srcmap.
 	if len(rom) < 6 || len(rom) > 0x10000 {
 		return nil, nil, nil, nil, fmt.Errorf("unexpected ROM size %d bytes (expect a flat 2K/4K image)", len(rom))
 	}
-	p := &program{rom: rom, base: uint16(0x10000 - len(rom))}
-
-	instrs := map[uint16]Instr{}
-	var entries []uint16
-	for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
-		lo, _ := p.byteAt(va)
-		hi, _ := p.byteAt(va + 1)
-		t := uint16(lo) | uint16(hi)<<8
-		if t >= p.base {
-			p.decodeInto(instrs, t)
-			entries = append(entries, t)
-		}
-	}
+	p := newProgram(rom)
+	instrs, entries := p.decodeFromVectors()
 	return p, instrs, entries, sm, nil
 }
 

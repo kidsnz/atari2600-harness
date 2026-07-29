@@ -530,10 +530,15 @@ recording before the items:
   `lr.InstructionData` (the raw operand) rather than the effective address, so `sta RESP0,x` is reported as
   a write to the base register. `beamtrace` inherits this, and it breaks precisely on the multiplexed-object
   kernels the tool exists for. Fix: route through `effectiveAddr`; add a litmus with an indexed TIA store.
-- **SD-0c Address canonicalisation.** `cyclebound` keys the decode on the raw address with
-  `base = 0x10000 - len(rom)`, while coverage records the PC actually executed. On a mirrored or 2K ROM the
-  two live in different address spaces, so any static-minus-dynamic subtraction fabricates its answer. Fix:
-  one shared `canon(addr) -> (bank, offset)` used by decode, coverage, srcmap and beamtrace.
+- **SD-0c Address canonicalisation.** DONE for the decoder. `program.canon` folds a CPU address to a
+  cartridge offset, deciding cartridge space through Gopher2600's memory map first and masking only then
+  (masking first would fold RAM/TIA/RIOT into ROM and decode whatever was there). Measured before/after on
+  real cartridges: **Outlaw 2K went 0 entries / 0 instructions -> 1 / 931, Combat 2K 0 / 0 -> 2 / 838**;
+  every 2K cartridge previously decoded to nothing at all, and reported that as an analysis. 4K unchanged
+  (Frogger 152 instructions either way); the .asm path is byte-identical, 14/31 certified with a zero diff.
+  REMAINING: the same canonical key is not yet used by `emu.Coverage` (which records the raw PC), so a
+  static-minus-dynamic subtraction still compares different address spaces. That matters when the
+  "statically reachable but never executed" report is built — see SD-0e.
 - **SD-0d Non-convergence is silent.** `absint.computeStates` returns after `maxIter` without signalling it;
   unconverged cells are under-approximations consumed as sound. Fix: return a converged flag and refuse to
   certify without it.

@@ -37,6 +37,7 @@ import (
 	"strings"
 
 	"github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
+	"github.com/jetsetilly/gopher2600/hardware/memory/memorymap"
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/srcmap"
 )
@@ -104,12 +105,59 @@ type program struct {
 	base uint16 // first ROM address = 0x10000 - len(rom) (0xF000 for 4K, 0xF800 for 2K)
 }
 
+// newProgram wraps a flat cartridge image.
+func newProgram(rom []byte) *program {
+	return &program{rom: rom, base: uint16(0x10000 - len(rom))}
+}
+
+// canon folds a CPU address to the cartridge offset it addresses, or reports
+// that the address is not in cartridge space at all.
+//
+// The 6507 drives 13 address lines, so the cartridge answers at $1000-$1FFF and
+// at every mirror of it up to $F000-$FFFF; a 2K image answers TWICE inside that
+// window. Keying anything on the raw address therefore splits one byte of ROM
+// across several keys, and comparing a statically-decoded address set against
+// the PCs a real execution reported then subtracts sets that do not overlap —
+// producing a number with no meaning rather than an answer.
+//
+// Cartridge space is decided by Gopher2600's own memory map rather than by a
+// bit test here, and only THEN is the offset taken. Masking first would fold
+// RAM, TIA and RIOT addresses into the ROM and decode whatever bytes happened to
+// be there.
+func (p *program) canon(addr uint16) (uint16, bool) {
+	_, area := memorymap.MapAddress(addr, true)
+	if area != memorymap.Cartridge || len(p.rom) == 0 {
+		return 0, false
+	}
+	return uint16(int(addr) & (len(p.rom) - 1)), true
+}
+
 func (p *program) byteAt(addr uint16) (byte, bool) {
-	off := int(addr) - int(p.base)
-	if off < 0 || off >= len(p.rom) {
+	off, ok := p.canon(addr)
+	if !ok || int(off) >= len(p.rom) {
 		return 0, false
 	}
 	return p.rom[off], true
+}
+
+// decodeFromVectors decodes the program reachable from the reset, NMI and
+// IRQ/BRK vectors. Duplicate targets dedupe.
+func (p *program) decodeFromVectors() (map[uint16]Instr, []uint16) {
+	instrs := map[uint16]Instr{}
+	var entries []uint16
+	seen := map[uint16]bool{}
+	for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
+		lo, _ := p.byteAt(va)
+		hi, _ := p.byteAt(va + 1)
+		t := uint16(lo) | uint16(hi)<<8
+		if _, ok := p.canon(t); !ok || seen[t] {
+			continue
+		}
+		seen[t] = true
+		p.decodeInto(instrs, t)
+		entries = append(entries, t)
+	}
+	return instrs, entries
 }
 
 func (p *program) decodeAt(addr uint16) (Instr, bool) {
@@ -730,20 +778,8 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	if len(rom) < 6 || len(rom) > 0x10000 {
 		return nil, fmt.Errorf("unexpected ROM size %d bytes (expect a flat 2K/4K image)", len(rom))
 	}
-	p := &program{rom: rom, base: uint16(0x10000 - len(rom))}
-
-	// Decode from the reset, NMI and IRQ/BRK vectors (duplicates dedupe).
-	instrs := map[uint16]Instr{}
-	var entries []uint16
-	for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
-		lo, _ := p.byteAt(va)
-		hi, _ := p.byteAt(va + 1)
-		t := uint16(lo) | uint16(hi)<<8
-		if t >= p.base {
-			p.decodeInto(instrs, t)
-			entries = append(entries, t)
-		}
-	}
+	p := newProgram(rom)
+	instrs, entries := p.decodeFromVectors()
 	states, converged := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
 
 	var starts []uint16
