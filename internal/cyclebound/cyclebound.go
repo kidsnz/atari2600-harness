@@ -195,9 +195,16 @@ type Region struct {
 }
 
 type loopInfo struct {
-	cost int
-	exit uint16
-	n    int
+	cost int // worst case: n iterations
+	// minCost is the cost of the FEWEST iterations the loop can run. The
+	// worst-case prover never needed it, but an interval does: using the
+	// worst-case cost as the lower bound too claims the loop always runs its
+	// maximum, which for a divide-by-15 positioning loop is only true for one
+	// target X. Measured consequence of getting this wrong: 20 observed TIA
+	// writes landed EARLIER than their "proven" earliest position.
+	minCost int
+	exit    uint16
+	n       int
 }
 
 type result struct {
@@ -322,6 +329,59 @@ func (s *solver) longest(addr, ret uint16) result {
 	return best
 }
 
+// collectRegion walks the region subgraph from the instruction after start and
+// fills s.nodes / s.sinks. It returns "" on success or the reason the region
+// cannot be reasoned about. Shared with the beam-interval pass so both analyses
+// see the same subgraph — two collectors would eventually disagree, and the
+// disagreement would be invisible.
+func (s *solver) collectRegion(instrs map[uint16]Instr, start Instr) string {
+	work := []uint16{start.next()}
+	for len(work) > 0 {
+		addr := work[len(work)-1]
+		work = work[:len(work)-1]
+		if _, ok := s.nodes[addr]; ok {
+			continue
+		}
+		in, ok := instrs[addr]
+		if !ok {
+			return fmt.Sprintf("reaches undecoded address $%04X", addr)
+		}
+		s.nodes[addr] = in
+		if in.isWSYNC() {
+			s.sinks[addr] = true
+			continue
+		}
+		switch in.Def.Operator {
+		case instructions.JSR:
+			// 2A: follow the callee AND the return point; the callee's own WSYNC is a
+			// sink as usual, and longest() threads the return address. (Collection
+			// terminates via the seen-set; longest() guards against nesting.)
+			work = append(work, in.Operand, in.next())
+			continue
+		case instructions.RTS, instructions.RTI:
+			// 2A: a leaf for collection — the return target is the call context,
+			// resolved in longest() via the threaded return address.
+			continue
+		case instructions.BRK:
+			return "BRK in region"
+		case instructions.JAM:
+			return "JAM (illegal/halt) in region"
+		case instructions.JMP:
+			if in.Def.AddressingMode == instructions.Indirect {
+				return "indirect JMP in region (target not statically known)"
+			}
+			work = append(work, in.Operand)
+			continue
+		}
+		if in.Def.IsBranch() {
+			work = append(work, in.next(), in.branchTarget())
+		} else {
+			work = append(work, in.next())
+		}
+	}
+	return ""
+}
+
 func (s *solver) foldHit(addr uint16) bool { _, ok := s.folds[addr]; return ok }
 
 func (s *solver) loc(addr uint16) string { return s.sm.Locate(addr) }
@@ -387,7 +447,10 @@ func (s *solver) foldLoops() string {
 	}
 	// n iterations: n bodies, (n-1) taken branches back, 1 final not-taken exit.
 	loopCost := n*bodyNoBranch + (n-1)*(latch.Def.Cycles+pen) + latch.Def.Cycles
-	s.folds[header] = loopInfo{cost: loopCost, exit: latch.next(), n: n}
+	// Fewest iterations: the back edge is a bne/bpl AFTER the body, so the body
+	// runs at least once and the branch then falls through.
+	minLoopCost := bodyNoBranch + latch.Def.Cycles
+	s.folds[header] = loopInfo{cost: loopCost, minCost: minLoopCost, exit: latch.next(), n: n}
 	return ""
 }
 
@@ -536,49 +599,8 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 	// CFG; WSYNC stores are sinks (terminators, not expanded); flow we can't
 	// reason about makes the whole region unbounded.
 	unbounded := func(reason string) Region { reg.Bounded = false; reg.Reason = reason; return reg }
-	work := []uint16{start.next()}
-	for len(work) > 0 {
-		addr := work[len(work)-1]
-		work = work[:len(work)-1]
-		if _, ok := s.nodes[addr]; ok {
-			continue
-		}
-		in, ok := instrs[addr]
-		if !ok {
-			return unbounded(fmt.Sprintf("reaches undecoded address $%04X", addr))
-		}
-		s.nodes[addr] = in
-		if in.isWSYNC() {
-			s.sinks[addr] = true
-			continue
-		}
-		switch in.Def.Operator {
-		case instructions.JSR:
-			// 2A: follow the callee AND the return point; the callee's own WSYNC is a
-			// sink as usual, and longest() threads the return address. (Collection
-			// terminates via the seen-set; longest() guards against nesting.)
-			work = append(work, in.Operand, in.next())
-			continue
-		case instructions.RTS, instructions.RTI:
-			// 2A: a leaf for collection — the return target is the call context,
-			// resolved in longest() via the threaded return address.
-			continue
-		case instructions.BRK:
-			return unbounded("BRK in region")
-		case instructions.JAM:
-			return unbounded("JAM (illegal/halt) in region")
-		case instructions.JMP:
-			if in.Def.AddressingMode == instructions.Indirect {
-				return unbounded("indirect JMP in region (target not statically known)")
-			}
-			work = append(work, in.Operand)
-			continue
-		}
-		if in.Def.IsBranch() {
-			work = append(work, in.next(), in.branchTarget())
-		} else {
-			work = append(work, in.next())
-		}
+	if msg := s.collectRegion(instrs, start); msg != "" {
+		return unbounded(msg)
 	}
 	// S1: if the beam is provably in VSYNC/VBLANK at region entry AND the region
 	// never stores to $00/$01 (so it can't turn the display on inside itself), it
