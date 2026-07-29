@@ -212,7 +212,36 @@ type DefUseReport struct {
 	// claim degenerating into "all of memory".
 	Writes map[string]Access `json:"writes,omitempty"`
 
+	// UninitReads is NOT POPULATED yet, and the reason is worth stating rather
+	// than hiding behind an empty field.
+	//
+	// The question is the right one — a read of RAM that no path from reset has
+	// definitely written first is power-on rubbish on hardware, while an emulator
+	// hands out a deterministic value and the bug never shows up in testing. Two
+	// attempts, both measured, both unusable:
+	//
+	//   - Scoped per WSYNC region: 515 flagged addresses on one technique kernel.
+	//     A kernel reads state its setup wrote, so a per-region must-set flags
+	//     essentially every read.
+	//   - Scoped from reset over the whole CFG: 3783 on dyn_multisprite, 506 on
+	//     maze. must-write counts only exactly-targeted stores, and the RAM clear
+	//     every 2600 ROM opens with is an INDEXED store, so the analysis never
+	//     learns that RAM was initialised at all.
+	//
+	// Flagging everything is the same as flagging nothing, so this ships empty
+	// until must-write can reason about the clear-loop idiom (SD-1b). The dynamic
+	// counterpart, emu.WatchUninitRead, already answers the question for the runs
+	// it executes.
+	UninitReads []UninitRead `json:"uninit_reads,omitempty"`
+
 	Regions []RegionDefUse `json:"regions,omitempty"`
+}
+
+// UninitRead is one read that no path from reset guarantees was written first.
+type UninitRead struct {
+	PC   string `json:"pc"`
+	Loc  string `json:"loc,omitempty"`
+	Addr string `json:"addr"`
 }
 
 // mayWriteAddrs returns the may-write set as raw addresses (for the containment
@@ -275,7 +304,7 @@ func regionInstrs(instrs map[uint16]Instr, start uint16) []uint16 {
 //
 // A read of an address absent from that set is a read the region does not
 // guarantee to have initialised.
-func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []uint16, start uint16) map[uint16]map[uint16]bool {
+func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []uint16, start uint16, stopAtWSYNC bool) map[uint16]map[uint16]bool {
 	inRegion := map[uint16]bool{}
 	for _, a := range region {
 		inRegion[a] = true
@@ -284,7 +313,7 @@ func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []ui
 	// "reached, nothing guaranteed".
 	before := map[uint16]map[uint16]bool{start: {}}
 
-	for changed, guard := true, 0; changed && guard < 10000; guard++ {
+	for changed, guard := true, 0; changed && guard < 100000; guard++ {
 		changed = false
 		for _, a := range region {
 			cur, ok := before[a]
@@ -300,7 +329,7 @@ func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []ui
 				(acc.Kind == AccessWrite || acc.Kind == AccessModify) {
 				after[acc.Addrs[0]] = true
 			}
-			if in.isWSYNC() && a != start {
+			if stopAtWSYNC && in.isWSYNC() && a != start {
 				continue
 			}
 			for _, s := range decodeSuccessors(in) {
@@ -359,6 +388,40 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 	rep.MayWrite = hexAddrs(sortedAddrs(mayW))
 	rep.UnboundedWriters = hexAddrs(sortedAddrs(unbounded))
 
+	// Whole-program must-write from the reset vector. Computed but not reported —
+	// see UninitReads for the measured reason.
+	if false && len(entries) > 0 {
+		all := make([]uint16, 0, len(instrs))
+		for a := range instrs {
+			all = append(all, a)
+		}
+		sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
+		must := mustWrittenAt(instrs, states, all, entries[0], false)
+		for _, a := range all {
+			acc, ok := accessOf(instrs[a], states[a])
+			if !ok || acc.Unbounded || (acc.Kind != AccessRead && acc.Kind != AccessModify) {
+				continue
+			}
+			m, reached := must[a]
+			if !reached {
+				continue // this instruction is not reachable from reset
+			}
+			for _, t := range acc.Addrs {
+				if t < 0x80 || t > 0xFF {
+					continue // only RAM has power-on rubbish; TIA/RIOT reads are another matter
+				}
+				if m[t] {
+					continue
+				}
+				u := UninitRead{PC: hexAddr(a), Addr: hexAddr(t)}
+				if sm != nil {
+					u.Loc = sm.Locate(a)
+				}
+				rep.UninitReads = append(rep.UninitReads, u)
+			}
+		}
+	}
+
 	var starts []uint16
 	for a, in := range instrs {
 		if in.isWSYNC() {
@@ -369,7 +432,7 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 
 	for _, sa := range starts {
 		region := regionInstrs(instrs, sa)
-		must := mustWrittenAt(instrs, states, region, sa)
+		must := mustWrittenAt(instrs, states, region, sa, true)
 		rd := RegionDefUse{Start: hexAddr(sa), Kind: "region"}
 		if sm != nil {
 			rd.StartLoc = sm.Locate(sa)

@@ -549,6 +549,26 @@ CFG already recovered by `cyclebound.decodeInto`, the WSYNC-to-WSYNC region part
 May/must semantics per address. Soundness is checkable, and must be checked: the static may-write set must
 CONTAIN every write observed by a real trace.
 
+### SD-1b — Loop-aware must-write (blocks the uninitialised-read finding)
+`DefUse` computes reads that no path from reset has definitely written first, and does not report them,
+because both scopes tried produce noise rather than findings — measured, not guessed:
+per-WSYNC-region, 515 flagged addresses on one technique kernel (a kernel reads what its setup wrote);
+whole-program from reset, 3783 on `dyn_multisprite`, 506 on `maze`, 128 on `rts_dispatch`.
+The cause is single: must-write counts only exactly-targeted stores, and the RAM clear every 2600 ROM opens
+with (`ldx #$FF / sta $00,x / dex / bne`) is an INDEXED store, so the analysis never learns RAM was
+initialised. Fix: recognise the sweep idiom and treat the loop EXIT as a must-write of the swept range —
+noting the fencepost, since `bne` leaves before storing at index 0, so the swept range is $01-$FF and not
+$00-$FF. `zpInitRange` (absint.go) already detects this idiom for the value domain and is the place to start.
+Until then the dynamic counterpart `emu.WatchUninitRead` answers the question for the runs it executes.
+
+### SD-1c — CFG reach gaps found by the def-use soundness sweep
+The containment check (static may-set vs what the machine actually wrote) reported 9053/9053 across the
+31-kernel corpus, and as a by-product named where the CFG never arrives: 306 writes in `banked_game` and
+`rts_dispatch` come from instructions the decoder never decoded. Flow from the reset/NMI/IRQ vectors cannot
+follow a bank switch or an RTS-computed dispatch. Not a wrong prediction — a hole in reachability, counted
+and reported separately so neither hides the other. Fixing it is the stack-modelling and bank-hotspot work
+described in SD-3.
+
 ### SD-2 — Beam position as a tracked interval
 Carry colour-clocks-since-WSYNC in the abstract domain so every TIA write gets a proven clock interval on
 every path. Nothing in the community or the RE ecosystem has this; the state of the art is hand-counting a
