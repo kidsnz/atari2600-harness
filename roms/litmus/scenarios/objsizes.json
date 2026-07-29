@@ -1,0 +1,12 @@
+{
+  "rom": "roms/litmus/litmus_objsizes.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tiareg.missile0.color", "op": "==", "value": 14},
+    {"at_frame": 2, "field": "tiareg.missile1.color", "op": "==", "value": 70},
+    {"at_frame": 2, "field": "tiareg.missile0.size", "op": "==", "value": 3},
+    {"at_frame": 2, "field": "tiareg.missile1.size", "op": "==", "value": 3},
+    {"at_frame": 2, "field": "tiareg.ball.size", "op": "==", "value": 3}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+}

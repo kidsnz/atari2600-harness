@@ -1090,12 +1090,39 @@ func resolveTIAReg(e *emu.Emu, parts []string) (int64, error) {
 		case "reflected":
 			return b2i(pf.Reflected), nil
 		}
+	// Missiles were reachable as POSITIONS (tia.missile0) but their registers were
+	// not, so a scenario could say where a missile is and not what width it is —
+	// and width is exactly what the size litmus exists to pin down. A ROM that
+	// exercises a mode no assertion can name is coverage on paper only.
+	case "missile0", "missile1":
+		m := r.Missile0
+		if parts[1] == "missile1" {
+			m = r.Missile1
+		}
+		switch parts[2] {
+		case "color":
+			return int64(m.Color), nil
+		case "nusiz":
+			return int64(m.Nusiz), nil
+		case "size":
+			return int64(m.Size), nil
+		case "copies":
+			return int64(m.Copies), nil
+		case "enabled":
+			return b2i(m.Enabled), nil
+		case "reset_to_player":
+			return b2i(m.ResetToPlayer), nil
+		}
 	case "ball":
 		switch parts[2] {
 		case "color":
 			return int64(r.Ball.Color), nil
 		case "enabled":
 			return b2i(r.Ball.Enabled), nil
+		case "size":
+			return int64(r.Ball.Size), nil
+		case "vertical_delay":
+			return b2i(r.Ball.VerticalDelay), nil
 		}
 	}
 	return 0, fmt.Errorf("unknown tiareg field %q.%q", parts[1], parts[2])

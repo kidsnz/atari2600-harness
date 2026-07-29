@@ -946,3 +946,41 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   emitter lacks it); per-zone sprite X needs the extracted single `p0x`/`p1x` to become a per-scanline series
   plus RESPx/HMOVE placement in the replay kernel, which is the harder half. Gate: `shared_setxpos`,
   `road` and Fishing Derby reach pixel-exact; `zone_multiplex`'s 380 off-cells go to 0. Size: M.
+
+### Corpus selection is measured, not chosen by taste (2026-07-29)
+
+The question "would more test ROMs make the tests more useful?" has a measurable answer, and `statecov`
+gives it: aggregate the TIA state axes every corpus ROM exercises and read off what nothing has ever run.
+
+Across the 31-ROM technique corpus:
+
+| axis | covered | never exercised |
+|---|---|---|
+| `nusiz1_copies` | **2/8** | 1, 2, 4, 5, 6, 7 — P1 was almost never given copies or a size |
+| `nusiz0_copies` | 4/8 | 1, 2, 4, 7 |
+| `missile0_size` / `missile1_size` | 2/4 | the 2px and 4px widths |
+| `ball_size` | 2/4 | the 4px and 8px widths |
+| `vdelbl` | **1/2** | never set at all |
+| `pf_reflect` / `pf_score` / `pf_priority` / `vdelp0` / `vdelp1` | 2/2 | — |
+
+Playfield modes and player vertical delay were already saturated; missiles, the ball and P1's copy modes
+were not. Two litmus ROMs close all of it — `litmus_objsizes.asm` (every missile and ball width, plus VDELBL
+made observable by toggling ENABL on alternating lines) and `litmus_nusiz_all.asm` (all eight NUSIZ modes on
+both players) — taking every bounded axis to full coverage.
+
+**The coverage number is not the point; what the new ROMs broke is.** Run through `framegen`,
+`litmus_nusiz_all` produced **2666 mismatched cells, the worst in the corpus** (previous worst:
+`zone_multiplex`, 380) — and, worse, the tool explained it wrongly: *"one X per player cannot follow a
+per-zone multiplexed target"*, on a ROM whose players never move. The real cause is that `nusizWidth`
+understands only modes 5 and 7 (double/quad width) and treats the five COPY modes as a single 1× player.
+A confidently wrong reason is worse than no reason; fixed separately.
+
+The exercise also found the assertion language could not state what the new ROM exists to prove: `tiareg`
+exposed no `missile0`/`missile1` object at all and no `size` field, so a scenario could say where a missile
+was but not how wide. Coverage that cannot be asserted is coverage on paper. Added
+`tiareg.missile0/1.{color,nusiz,size,copies,enabled,reset_to_player}` and `tiareg.ball.{size,vertical_delay}`.
+
+**Rule going forward:** admit a ROM to the corpus when `statecov` shows it lights an axis nothing else does,
+not because it is famous or complex. The corollary holds for commercial ROMs, whose value is different in
+kind — they contain shapes we would not think to write (Fishing Derby is what exposed the missile gap in
+RL-7) — but the same measurement decides which ones earn their place in CI.

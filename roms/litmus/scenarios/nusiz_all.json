@@ -1,0 +1,11 @@
+{
+  "rom": "roms/litmus/litmus_nusiz_all.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tiareg.player0.color", "op": "==", "value": 14},
+    {"at_frame": 2, "field": "tiareg.player1.color", "op": "==", "value": 70},
+    {"at_frame": 2, "field": "tiareg.player0.nusiz", "op": "==", "value": 7},
+    {"at_frame": 2, "field": "tiareg.player1.nusiz", "op": "==", "value": 7}
+  ],
+  "checks": {"ntsc_frame_lines": 262, "golden_frame": true}
+}
