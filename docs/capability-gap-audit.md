@@ -745,7 +745,20 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   usable without editing the package. Pizza Boy needs: 4-way move / delivery (+$10 BCD trace) / crash
   (pstate/freeze). Ties to the behaviour-reproduction system (any non-Outlaw game needs this). Size: M.
   〔TOOL-EVAL V4 / idea #6〕
-- **RL-2 — `vismatch` global vertical-offset auto-detect + 1-line summary.** When N playfield bands are all
+- **RL-2 — `vismatch` global vertical-offset auto-detect — DONE.** `vismatch.FindVerticalShift` searches
+  +/-max-shift for the offset that explains the most element mismatch and the CLI prints one line:
+  *"mine sits 8 scanline(s) LOWER than the target (removes 100% of the mismatch: 2560 -> 0 cells)"*.
+  It reports the count at zero alongside the best, so a shift that explains little cannot be presented as
+  an explanation — two pictures can differ in ways no alignment fixes.
+  Graded against a shift known by construction rather than one inferred from its own output: the new pair
+  `roms/litmus/litmus_shift_base.asm` and `litmus_shift_down8.asm` are the same work with eight visible
+  lines moved into VBLANK, so the picture sits exactly eight lines lower and the frame still totals 262.
+  The detector must return +8 and -8 depending on the argument order, must explain all of the mismatch
+  there, must NOT claim an alignment between two unrelated pictures, and must report zero for a ROM against
+  itself.
+  Reproduced first: on that pair the old output gave two 8-line band rows and never named the offset,
+  which is exactly the reading-back-by-hand that produced a 3px error in the field.
+- **(original) RL-2 — `vismatch` global vertical-offset auto-detect + 1-line summary.** When N playfield bands are all
   shifted by a constant, a human currently reads the band-diff and infers it. Emit `best global vertical
   shift = −11 (removes X% of PF mismatch)` automatically (framegen already does this content-shift search
   internally — lift it into vismatch). Size: S. 〔TOOL-EVAL V3 / idea #2〕

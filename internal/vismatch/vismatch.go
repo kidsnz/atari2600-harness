@@ -110,6 +110,78 @@ type BandDiff struct {
 	MineSpan               string
 }
 
+// VerticalShift is the single number a human currently derives by hand from a
+// band diff: how far the whole picture has moved.
+//
+// When every band is off by the same amount, the band-by-band report is N ways
+// of saying one thing, and reading it back into that one thing is exactly where
+// a 3-pixel error crept in during field use (a band model was built at -11 when
+// the truth was -8). The search is cheap and the answer is a number, so there is
+// no reason for a person to be doing it.
+type VerticalShift struct {
+	// Shift is added to a TARGET scanline to find the matching row in MINE, so a
+	// positive value means mine sits LOWER on the screen.
+	Shift int `json:"shift"`
+
+	MismatchAtZero int     `json:"mismatch_at_zero"` // differing cells with no shift
+	MismatchAtBest int     `json:"mismatch_at_best"` // differing cells at Shift
+	Removed        float64 `json:"removed"`          // fraction of the mismatch the shift explains
+}
+
+// FindVerticalShift searches shifts in [-maxShift,+maxShift] for the one that
+// explains the most element mismatch. It reports the count at zero alongside the
+// best, because a shift that removes little is not a finding — two pictures can
+// be wrong in ways that no alignment fixes, and a bare "best shift" would present
+// that as an explanation.
+func FindVerticalShift(target, mine *Grid, maxShift int) VerticalShift {
+	count := func(s int) int {
+		n := 0
+		for y := 0; y < target.H; y++ {
+			my := y + (target.Top - mine.Top) + s
+			if my < 0 || my >= mine.H {
+				continue
+			}
+			for x := 0; x < target.W && x < mine.W; x++ {
+				if target.Elem[y][x] != mine.Elem[my][x] {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	zero := count(0)
+	best, bestN := 0, zero
+	for s := -maxShift; s <= maxShift; s++ {
+		if s == 0 {
+			continue
+		}
+		if n := count(s); n < bestN {
+			best, bestN = s, n
+		}
+	}
+	removed := 0.0
+	if zero > 0 {
+		removed = float64(zero-bestN) / float64(zero)
+	}
+	return VerticalShift{Shift: best, MismatchAtZero: zero, MismatchAtBest: bestN, Removed: removed}
+}
+
+// Describe renders the shift as the one line it exists to replace.
+func (v VerticalShift) Describe() string {
+	if v.Shift == 0 {
+		return fmt.Sprintf("no global vertical shift explains the difference (%d mismatched cells stand)",
+			v.MismatchAtZero)
+	}
+	dir := "LOWER"
+	n := v.Shift
+	if n < 0 {
+		dir, n = "HIGHER", -n
+	}
+	return fmt.Sprintf("best global vertical shift: mine sits %d scanline(s) %s than the target "+
+		"(removes %.0f%% of the mismatch: %d -> %d cells)",
+		n, dir, 100*v.Removed, v.MismatchAtZero, v.MismatchAtBest)
+}
+
 // allElems is the fixed object set (BG excluded from band diffs — it's the
 // negative space, already captured by the other elements' presence).
 var allElems = []string{"PF", "P0", "P1", "M0", "M1", "BL"}

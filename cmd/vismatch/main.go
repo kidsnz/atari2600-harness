@@ -53,6 +53,7 @@ func main() {
 	region := flag.String("region", "122-185", "genpf: target scanline range of the PF element, LO-HI")
 	arenaTop := flag.Int("arena-top", 74, "genpf: absolute scanline of arena line 0 (scanline→arena-line offset)")
 	tableLen := flag.Int("table-len", 112, "genpf: CacLTbl/CacRTbl length in arena lines")
+	maxShift := flag.Int("max-shift", 24, "how far up/down to search for a global vertical offset between the two frames")
 	pfFormat := flag.String("format", "arena", "genpf output: 'arena' = Outlaw-style centre CacLTbl/CacRTbl; 'pf012' = full-width PF0tab/PF1tab/PF2tab for a playfield that spans the line")
 	flag.Parse()
 	if *target == "" {
@@ -160,6 +161,13 @@ func main() {
 			fmt.Printf("  %-3s %4d-%-6d %-4d | %-22s | %-22s\n",
 				b.Element, b.ScanlineLo, b.ScanlineHi, b.Height, b.TargetSpan, b.MineSpan)
 		}
+	}
+
+	// One line for the thing a band diff makes a person derive by hand: when every
+	// band is off by the same amount, N band rows are N ways of saying one number.
+	if !rep.Match {
+		vs := vismatch.FindVerticalShift(tg, mg, *maxShift)
+		fmt.Println(vs.Describe())
 	}
 
 	if *diffOut != "" {
