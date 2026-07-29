@@ -182,9 +182,33 @@ type frameData struct {
 	grp0, grp1       []uint8
 	nz0, nz1         []uint8     // per-visible-line NUSIZ, measured (see measureLines)
 	tgtElem          [][]string  // target's per-visible-line object attribution (for content-shift search)
-	obj              [2]objFacts // measured per-object facts, index 0=P0 1=P1
-	kern             []writeBlock
+	// obj holds the measured facts for all five movable objects, indexed by
+	// objIndex: P0, P1, M0, M1, BL. The missiles and the ball were absent from
+	// this array for as long as the kernel could not draw them, which is exactly
+	// backwards — a tool has to measure what it cannot yet reproduce, or it cannot
+	// say what it is missing.
+	obj [5]objFacts
+	// en0/en1/enb are per-visible-line ENAM0/ENAM1/ENABL bytes ($02 on, $00 off).
+	en0, en1, enb []uint8
+	// msz0/msz1/bsz are the measured missile and ball widths (NUSIZ bits 4-5 and
+	// CTRLPF bits 4-5), taken from the run lengths the machine actually drew.
+	msz0, msz1, bsz uint8
+	kern []writeBlock
 }
+
+// objIndex names the five movable objects in the order fd.obj holds them, and in
+// the order SetXPos's X register selects them: RESP0=$10, RESP1=$11, RESM0=$12,
+// RESM1=$13, RESBL=$14 are consecutive, and so are HMP0..HMBL at $20..$24, which
+// is why one routine can place any of them.
+const (
+	objP0 = iota
+	objP1
+	objM0
+	objM1
+	objBL
+)
+
+var objNames = [5]string{"P0", "P1", "M0", "M1", "BL"}
 
 // objFacts is what the machine says one player DOES over the target's frame, as
 // opposed to what a single end-of-frame register read says it is. Every field is
@@ -201,14 +225,37 @@ type objFacts struct {
 	baseX     map[int]int   // reset X with the NUSIZ size shift removed -> line count
 	distinctX int           // len(baseX): >1 is the only thing that means multiplexing
 	onlyX     int           // the single base X, meaningful only when distinctX == 1
+	// widths counts the run lengths the object was drawn at. For a missile or the
+	// ball that IS its size register (1/2/4/8 colour clocks); more than one entry
+	// means the width changes down the frame, which one register write per frame
+	// cannot reproduce.
+	widths map[int]int
 }
 
 func newObjFacts(name string) objFacts {
-	return objFacts{name: name, modes: map[uint8]int{}, baseX: map[int]int{}}
+	return objFacts{name: name, modes: map[uint8]int{}, baseX: map[int]int{}, widths: map[int]int{}}
 }
 
 // modeList renders the measured NUSIZ modes with the line count each ran for, so
 // "up to 3 copies" is always accompanied by the evidence for it.
+// widthList renders the measured run widths with the line count for each, so
+// "8 clocks wide" always arrives with the evidence.
+func (f objFacts) widthList() string {
+	if len(f.widths) == 0 {
+		return "(none)"
+	}
+	var ks []int
+	for k := range f.widths {
+		ks = append(ks, k)
+	}
+	sort.Ints(ks)
+	parts := make([]string, 0, len(ks))
+	for _, k := range ks {
+		parts = append(parts, fmt.Sprintf("%d(%d lines)", k, f.widths[k]))
+	}
+	return "[" + strings.Join(parts, " ") + "]"
+}
+
 func (f objFacts) modeList() string {
 	if len(f.modes) == 0 {
 		return "(never drawn)"
@@ -266,6 +313,13 @@ func (fd *frameData) shifted(s int) *frameData {
 	c.pf2R = shiftUint8(fd.pf2R, s)
 	c.grp0 = shiftUint8(fd.grp0, s)
 	c.grp1 = shiftUint8(fd.grp1, s)
+	// The enable tables are picture data too. Leaving them behind shifts the
+	// playfield and players while the missiles and ball stay put: measured on
+	// motion_glide, the ball came out drawn on the wrong 4 scanlines, 8 cells wrong
+	// where it had simply been absent before.
+	c.en0 = shiftUint8(fd.en0, s)
+	c.en1 = shiftUint8(fd.en1, s)
+	c.enb = shiftUint8(fd.enb, s)
 	// The NUSIZ tables are per-scanline replay data like the rest: shifting the
 	// picture without them would move a band's graphics off its own copy mode.
 	c.nz0 = shiftKeepEdges(fd.nz0, s)
@@ -363,8 +417,9 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 	if err != nil {
 		return nil, err
 	}
-	fd.obj[0] = newObjFacts("P0")
-	fd.obj[1] = newObjFacts("P1")
+	for i := range fd.obj {
+		fd.obj[i] = newObjFacts(objNames[i])
+	}
 	for y := 0; y < h; y++ {
 		ls, ok := st[top+y]
 		if !ok {
@@ -372,11 +427,30 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 		}
 		fd.nz0 = append(fd.nz0, ls.nz0)
 		fd.nz1 = append(fd.nz1, ls.nz1)
-		countRuns(&fd.obj[0], runsPerLine[y], "P0", ls.nz0, ls.x0)
-		countRuns(&fd.obj[1], runsPerLine[y], "P1", ls.nz1, ls.x1)
+		countRuns(&fd.obj[objP0], runsPerLine[y], "P0", ls.nz0, ls.x0)
+		countRuns(&fd.obj[objP1], runsPerLine[y], "P1", ls.nz1, ls.x1)
+		// Missiles and the ball are measured from the pixels they DREW rather than
+		// from a register read: a missile has no graphics byte, so its run in the
+		// attribution is its position and its width directly, and reading it that way
+		// needs no second measurement pass to disagree with the first. NUSIZ is
+		// passed as 0 because the size shift countRuns removes applies to a player's
+		// graphics start, not to a missile — a missile's run starts where it starts.
+		for i, name := range []string{"M0", "M1", "BL"} {
+			if x, w, ok := firstRun(runsPerLine[y], name); ok {
+				countRuns(&fd.obj[objM0+i], runsPerLine[y], name, 0, x)
+				fd.obj[objM0+i].widths[w]++
+			}
+		}
+		fd.en0 = append(fd.en0, enableByte(runsPerLine[y], "M0"))
+		fd.en1 = append(fd.en1, enableByte(runsPerLine[y], "M1"))
+		fd.enb = append(fd.enb, enableByte(runsPerLine[y], "BL"))
 	}
-	fd.obj[0].distinctX = len(fd.obj[0].baseX)
-	fd.obj[1].distinctX = len(fd.obj[1].baseX)
+	for i := range fd.obj {
+		fd.obj[i].distinctX = len(fd.obj[i].baseX)
+	}
+	fd.msz0 = sizeBits(fd.obj[objM0])
+	fd.msz1 = sizeBits(fd.obj[objM1])
+	fd.bsz = sizeBits(fd.obj[objBL])
 
 	// The graphics byte is sampled at the line's OWN pixel width, from the same
 	// end-of-frame reset position as before, corrected only by that line's size
@@ -400,6 +474,55 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 }
 
 // countRuns folds one visible line into an object's measured facts.
+// firstRun returns the clock and length of the leftmost run of the named element
+// on a line, or ok=false when it drew nothing there.
+func firstRun(runs []emu.ElemRun, name string) (clock, length int, ok bool) {
+	best := 1 << 30
+	for _, r := range runs {
+		if r.Element == name && r.Clock < best {
+			best, length, ok = r.Clock, r.Len, true
+		}
+	}
+	return best, length, ok
+}
+
+// enableByte is the ENAMx/ENABL value that reproduces this line: bit 1 set when
+// the object drew, clear when it did not.
+func enableByte(runs []emu.ElemRun, name string) uint8 {
+	for _, r := range runs {
+		if r.Element == name {
+			return 0x02
+		}
+	}
+	return 0
+}
+
+// sizeBits turns the measured run width into the register bits that produce it —
+// NUSIZ bits 4-5 for a missile, CTRLPF bits 4-5 for the ball, both encoding
+// 1/2/4/8 colour clocks as 0/1/2/3 shifted left by four.
+//
+// The width is taken from what the machine DREW, not from a register read, so a
+// target whose missile changes width down the frame shows up here as more than
+// one entry rather than as whichever value happened to survive to the last line —
+// the same end-of-frame trap that made every NUSIZ mode replay as quad width.
+func sizeBits(f objFacts) uint8 {
+	w := 0
+	for k := range f.widths {
+		if k > w {
+			w = k
+		}
+	}
+	switch {
+	case w >= 8:
+		return 0x30
+	case w >= 4:
+		return 0x20
+	case w >= 2:
+		return 0x10
+	}
+	return 0
+}
+
 func countRuns(f *objFacts, runs []emu.ElemRun, name string, nz uint8, x int) {
 	n := 0
 	for _, r := range runs {
@@ -430,8 +553,14 @@ func countRuns(f *objFacts, runs []emu.ElemRun, name string, nz uint8, x int) {
 // the SAME measured per-object facts that are taken off the target. Measuring the
 // clone the same way the target is measured is what lets the final report compare
 // copy counts and reset positions instead of asserting a cause.
-func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [2]objFacts, err error) {
-	obj[0], obj[1] = newObjFacts("P0"), newObjFacts("P1")
+// mk carries the clone's end-of-frame P0/P1 markers alongside the per-object
+// facts: the players' calibration target is the marker the target was measured
+// with, and a missile's is the reset X its pixels were drawn at. Comparing a
+// player against a base X instead would be comparing two different numbers.
+func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [5]objFacts, err error) {
+	for i := range obj {
+		obj[i] = newObjFacts(objNames[i])
+	}
 	dir, err := os.MkdirTemp("", "framegen")
 	if err != nil {
 		return nil, 0, obj, err
@@ -480,7 +609,17 @@ func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [2]
 			countRuns(&obj[0], runsPerLine[y], "P0", ls.nz0, ls.x0)
 			countRuns(&obj[1], runsPerLine[y], "P1", ls.nz1, ls.x1)
 		}
-		obj[0].distinctX, obj[1].distinctX = len(obj[0].baseX), len(obj[1].baseX)
+	}
+	for y := 0; y < h; y++ {
+		for i, name := range []string{"M0", "M1", "BL"} {
+			if x, w, ok := firstRun(runsPerLine[y], name); ok {
+				countRuns(&obj[objM0+i], runsPerLine[y], name, 0, x)
+				obj[objM0+i].widths[w]++
+			}
+		}
+	}
+	for i := range obj {
+		obj[i].distinctX = len(obj[i].baseX)
 	}
 	return grid, vt, obj, nil
 }
@@ -625,6 +764,71 @@ const (
 
 func blockLands(i int) int { return 21*(i+1) - 68 } // i is 0-based
 
+// placeable reports whether this kernel can put the object where the target has
+// it: it must be drawn at all, and it must sit at ONE reset X for the whole
+// frame, because the kernel strobes each RESxx once. An object that moves per
+// zone is measured, reported and not drawn — never approximated to its first
+// position, which would put pixels somewhere the target never had them.
+func (fd *frameData) placeable(i int) bool {
+	o := fd.obj[i]
+	if i == objP0 || i == objP1 {
+		return true // the players are always placed; their X is the calibrated marker
+	}
+	return o.lines > 0 && o.distinctX == 1
+}
+
+// wantX is the position the calibration drives this object to. Players use the
+// end-of-frame marker the whole kernel is calibrated against; missiles and the
+// ball use the single reset X measured from the pixels they drew.
+func (fd *frameData) wantX(i int) int {
+	switch i {
+	case objP0:
+		return fd.p0x
+	case objP1:
+		return fd.p1x
+	}
+	return fd.obj[i].onlyX
+}
+
+// alwaysOn reports that the object drew on EVERY visible line, so its enable can
+// be written once before the kernel instead of costing a per-line write block.
+// Measured on shared_setxpos: M0, M1 and the ball are all on for all 214 lines,
+// so reproducing them there costs zero kernel cycles.
+func (fd *frameData) alwaysOn(i int) bool { return fd.obj[i].lines == fd.h }
+
+// positionCode emits the SetXPos calls for every placeable object.
+func positionCode(fd *frameData, in [5]int) string {
+	var b strings.Builder
+	for i := range fd.obj {
+		if !fd.placeable(i) {
+			continue
+		}
+		fmt.Fprintf(&b, "    ldx #%d              ; %s\n    lda #%d\n    jsr SetXPos\n", i, objNames[i], in[i])
+	}
+	return b.String()
+}
+
+// staticEnables writes, once before the frame loop, the enable bit of every
+// missile or ball that the target draws on EVERY visible line.
+//
+// An object that never turns off does not need a per-line table, and on a kernel
+// with eight write slots that distinction is the difference between reproducing
+// it and reporting it as absent: shared_setxpos draws M0, M1 and the ball on all
+// 214 lines, so all three cost zero kernel cycles here.
+func staticEnables(fd *frameData) string {
+	var b strings.Builder
+	for _, m := range []struct {
+		idx int
+		reg string
+	}{{objM0, "ENAM0"}, {objM1, "ENAM1"}, {objBL, "ENABL"}} {
+		if fd.placeable(m.idx) && fd.alwaysOn(m.idx) {
+			fmt.Fprintf(&b, "    lda #2              ; %s on for all %d visible lines\n    sta %s\n",
+				objNames[m.idx], fd.h, m.reg)
+		}
+	}
+	return b.String()
+}
+
 // planKernel picks the per-scanline writes the replay kernel will carry.
 //
 // The eight-block PF+GRP layout is kept EXACTLY as it was whenever the target's
@@ -644,6 +848,27 @@ func planKernel(fd *frameData) (blocks []writeBlock, notes []string) {
 		{"PF1RT", "PF1", 96, func(f *frameData) []uint8 { return f.pf1R }},
 		{"PF2RT", "PF2", 128, func(f *frameData) []uint8 { return f.pf2R }},
 	}
+	// A missile or the ball that is on for EVERY visible line needs no per-line
+	// write at all — its enable is set once before the kernel — so it costs zero
+	// cycles. Only one that comes and goes needs a table. Measured: shared_setxpos
+	// has all three on for all 214 lines (free); Fishing Derby's M1 and ball are on
+	// for 42 and 58 of 214 (one block each).
+	var extra []writeBlock
+	for _, m := range []struct {
+		idx        int
+		table, reg string
+		data       func(*frameData) []uint8
+	}{
+		{objM0, "EN0T", "ENAM0", func(f *frameData) []uint8 { return f.en0 }},
+		{objM1, "EN1T", "ENAM1", func(f *frameData) []uint8 { return f.en1 }},
+		{objBL, "ENBT", "ENABL", func(f *frameData) []uint8 { return f.enb }},
+	} {
+		if !fd.placeable(m.idx) || fd.alwaysOn(m.idx) {
+			continue
+		}
+		extra = append(extra, writeBlock{m.table, m.reg, fd.obj[m.idx].onlyX, m.data})
+	}
+
 	g0 := writeBlock{"GRP0T", "GRP0", fd.obj[0].minX(fd.p0x), func(f *frameData) []uint8 { return f.grp0 }}
 	g1 := writeBlock{"GRP1T", "GRP1", fd.obj[1].minX(fd.p1x), func(f *frameData) []uint8 { return f.grp1 }}
 	n0 := writeBlock{"NZ0T", "NUSIZ0", g0.deadline, func(f *frameData) []uint8 { return f.nz0 }}
@@ -651,12 +876,13 @@ func planKernel(fd *frameData) (blocks []writeBlock, notes []string) {
 
 	vary0 := !constBytes(fd.nz0)
 	vary1 := !constBytes(fd.nz1)
-	if !vary0 && !vary1 {
+	if !vary0 && !vary1 && len(extra) == 0 {
 		// Historical order, unchanged: GRP0, PF left, GRP1, PF right.
 		return []writeBlock{g0, pf[0], pf[1], pf[2], g1, pf[3], pf[4], pf[5]}, nil
 	}
 
 	want := []writeBlock{g0, g1}
+	want = append(want, extra...)
 	if vary0 {
 		want = append(want, n0)
 	}
@@ -691,19 +917,32 @@ func planKernel(fd *frameData) (blocks []writeBlock, notes []string) {
 		notes = append(notes, fmt.Sprintf("playfield: %d of the 3 PF registers have right-half bytes equal to their left half on all %d visible lines, so CTRLPF repeat reproduces them and the mid-line rewrite is dropped (%d cycles freed)", dropRight, fd.h, dropRight*kernBlockCycles))
 	}
 	if len(want) > kernMaxBlocks {
-		// Drop the NUSIZ tables, not a picture write: an over-long kernel does not
-		// render a slightly wrong frame, it desynchronises and rolls.
-		var kept []writeBlock
+		// Drop in priority order and RE-CHECK after each removal, never a picture
+		// write: an over-long kernel does not render a slightly wrong frame, it
+		// desynchronises and rolls. Dropping one class and assuming that was enough
+		// is how Fishing Derby came out with a 10-block, 80-cycle kernel against a
+		// 76-cycle line and a 50-scanline frame — the tool printed its own "only 8
+		// fit" note while emitting 10.
+		//
+		// NUSIZ goes before the enables: losing a size mis-draws an object that is
+		// still there, losing an enable removes it from the picture entirely.
+		needed := len(want)
 		var dropped []string
-		for _, b := range want {
-			if b.reg == "NUSIZ0" || b.reg == "NUSIZ1" {
-				dropped = append(dropped, b.reg)
-				continue
+		for _, reg := range []string{"NUSIZ0", "NUSIZ1", "ENABL", "ENAM1", "ENAM0"} {
+			if len(want) <= kernMaxBlocks {
+				break
 			}
-			kept = append(kept, b)
+			for i, b := range want {
+				if b.reg == reg {
+					want = append(want[:i:i], want[i+1:]...)
+					dropped = append(dropped, reg)
+					break
+				}
+			}
 		}
+		kept := want
 		notes = append(notes, fmt.Sprintf("NOT REPRODUCED: per-line %s. The kernel would need %d write blocks and only %d fit — 3+%d*n+7 CPU cycles against a 76-cycle scanline, counting each block at %d because a static prover bounds `lda abs,y` at 5 rather than assume the tables' page alignment (the hardware would run 9 blocks at 3+%d*9+7 = %d, but the emitted clone would then fail cyclebound at 82)",
-			strings.Join(dropped, " and "), len(want), kernMaxBlocks, kernProvedBlockCost, kernProvedBlockCost, kernBlockCycles, 3+kernBlockCycles*9+7))
+			strings.Join(dropped, " and "), needed, kernMaxBlocks, kernProvedBlockCost, kernProvedBlockCost, kernBlockCycles, 3+kernBlockCycles*9+7))
 		want = kept
 	}
 	// Earliest deadline first: every write has to land before the pixels it
@@ -778,9 +1017,20 @@ func kernelHas(blocks []writeBlock, reg string) bool {
 
 // emit builds the full clone source. p0in/p1in are the SetXPos routine inputs
 // and vblankAdj shifts the VBLANK line count (all self-calibrated by the caller).
-func emit(fd *frameData, p0in, p1in, vblankAdj, osAdj int) string {
+func emit(fd *frameData, in [5]int, vblankAdj, osAdj int) string {
 	nlines := fd.h
-	vblank := fd.top - 3 - 3 + vblankAdj // 3 lines used for positioning (P0,P1,HMOVE) below
+	// Positioning costs one scanline per placed object (SetXPos opens with a WSYNC)
+	// plus one for the HMOVE line. That used to be the constant 3 — two players and
+	// HMOVE — and stayed 3 when missiles and the ball became placeable, which
+	// overshot the overscan count into `ldx #257` on Fishing Derby: an immediate
+	// operand that does not assemble, so the clone could not even be built.
+	posLines := 1
+	for i := range fd.obj {
+		if fd.placeable(i) {
+			posLines++
+		}
+	}
+	vblank := fd.top - 3 - posLines + vblankAdj
 	if vblank < 1 {
 		vblank = 1
 	}
@@ -792,8 +1042,14 @@ func emit(fd *frameData, p0in, p1in, vblankAdj, osAdj int) string {
 	// to VBLANK to slide the picture down and nothing took them back off the end,
 	// so generated frames ran 264 scanlines — measured, and out of NTSC spec.
 	overscan := 261 - fd.top - nlines - vblankAdj + osAdj
+	// Clamped to what an immediate operand can hold. The frame-length
+	// self-calibration corrects the count by measurement anyway, but it cannot run
+	// at all if the first emitted source refuses to assemble.
 	if overscan < 1 {
 		overscan = 1
+	}
+	if overscan > 255 {
+		overscan = 255
 	}
 	blocks := fd.kern
 	// The kernel body, one 7-cycle block per line, annotated with the beam clock
@@ -846,6 +1102,9 @@ RESP0  = $10
 RESP1  = $11
 GRP0   = $1B
 GRP1   = $1C
+ENAM0  = $1D
+ENAM1  = $1E
+ENABL  = $1F
 HMP0   = $20
 HMP1   = $21
 HMOVE  = $2A
@@ -873,10 +1132,12 @@ clr:
     sta NUSIZ0
     lda #$%02X
     sta NUSIZ1
-    lda #0
+    lda #$%02X
     sta CTRLPF          ; %s
+    lda #0
     sta REFP0
     sta REFP1
+%s
 
 Main:
     lda #2
@@ -888,14 +1149,8 @@ Main:
     sta VSYNC
     lda #2
     sta VBLANK
-    ; --- position the two players (SetXPos: div-15 coarse + HMOVE fine) ---
-    ldx #0
-    lda #%d
-    jsr SetXPos
-    ldx #1
-    lda #%d
-    jsr SetXPos
-    sta WSYNC
+    ; --- position the objects (SetXPos: div-15 coarse + HMOVE fine) ---
+%s    sta WSYNC
     sta HMOVE
     ; --- pad VBLANK to the target's first visible scanline ---
     ldx #%d
@@ -944,13 +1199,14 @@ SetXPos:
     sta.w RESP0,x
     rts
 
-`, fd.p0col, fd.p1col, fd.pfcol, fd.bgcol, fd.nusiz0, fd.nusiz1, ctrlpfNote,
-		p0in, p1in, vblank, nlines, kb.String(), nlines, nusizRestore, overscan)
+`, fd.p0col, fd.p1col, fd.pfcol, fd.bgcol,
+		fd.nusiz0|fd.msz0, fd.nusiz1|fd.msz1, fd.bsz, ctrlpfNote, staticEnables(fd),
+		positionCode(fd, in), vblank, nlines, kb.String(), nlines, nusizRestore, overscan)
 
 	// Only the tables the kernel actually reads (a dropped playfield write would
 	// otherwise leave 256 bytes of dead data behind), in a fixed order so two runs
 	// stay diffable no matter how the kernel was scheduled.
-	for _, name := range []string{"PF0LT", "PF1LT", "PF2LT", "PF0RT", "PF1RT", "PF2RT", "GRP0T", "GRP1T", "NZ0T", "NZ1T"} {
+	for _, name := range []string{"PF0LT", "PF1LT", "PF2LT", "PF0RT", "PF1RT", "PF2RT", "GRP0T", "GRP1T", "NZ0T", "NZ1T", "EN0T", "EN1T", "ENBT"} {
 		for _, b := range blocks {
 			if b.table == name {
 				sb.WriteString(byteTable(b.table, b.data(fd)))
@@ -964,6 +1220,42 @@ SetXPos:
 
 // renderClone assembles src, renders it, and returns the clone's P0/P1 landing X
 // and its Snapshot visible top (for vertical calibration).
+// renderClonePositions renders the generated source and reports where each of the
+// five objects actually landed, plus the visible top. The positions come from the
+// same measurement as the target's, so the calibration compares like with like.
+// clampInput keeps a SetXPos argument inside the immediate operand's range. The
+// routine's div-15 loop wraps the position anyway, so a value above 255 is not a
+// larger move, it is a source file that does not assemble.
+func clampInput(v int) int {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+	return v
+}
+
+func renderClonePositions(src, spec string, frames int) (x [5]int, top int, err error) {
+	p0, p1, t, err := renderClone(src, spec, frames)
+	if err != nil {
+		return x, 0, err
+	}
+	x[objP0], x[objP1] = p0, p1
+	_, _, obj, err := renderGrid(src, spec, frames)
+	if err != nil {
+		return x, t, err
+	}
+	for i := objM0; i <= objBL; i++ {
+		if obj[i].lines == 0 {
+			x[i] = -1 // never drawn: distinct from "drawn at clock 0"
+			continue
+		}
+		x[i] = obj[i].onlyX
+	}
+	return x, t, nil
+}
+
 func renderClone(src, spec string, frames int) (p0x, p1x, top int, err error) {
 	dir, err := os.MkdirTemp("", "framegen")
 	if err != nil {
@@ -1011,9 +1303,19 @@ func main() {
 	fmt.Printf("extracted: visible %d lines (top %d), P0col=$%02X P1col=$%02X PFcol=$%02X BGcol=$%02X NUSIZ0=$%02X NUSIZ1=$%02X P0x=%d P1x=%d\n",
 		fd.h, fd.top, fd.p0col, fd.p1col, fd.pfcol, fd.bgcol, fd.nusiz0, fd.nusiz1, fd.p0x, fd.p1x)
 	for i := range fd.obj {
+		o := fd.obj[i]
+		if o.lines == 0 {
+			continue // the target never draws it; saying nothing beats printing zeros
+		}
+		if i >= objM0 {
+			// A missile and the ball have no graphics byte: their run IS their width,
+			// so copies and NUSIZ modes would be noise here.
+			fmt.Printf("  measured %s: drawn on %d of %d lines, %d distinct reset X %s, width(s) %s\n",
+				o.name, o.lines, fd.h, o.distinctX, o.xList(), o.widthList())
+			continue
+		}
 		fmt.Printf("  measured %s: drawn on %d lines, NUSIZ %s, up to %d copies, %d run(s) max per line, %d distinct reset X %s\n",
-			fd.obj[i].name, fd.obj[i].lines, fd.obj[i].modeList(), fd.obj[i].maxCopies,
-			fd.obj[i].maxRuns, fd.obj[i].distinctX, fd.obj[i].xList())
+			o.name, o.lines, o.modeList(), o.maxCopies, o.maxRuns, o.distinctX, o.xList())
 	}
 	var planNotes []string
 	fd.kern, planNotes = planKernel(fd)
@@ -1032,22 +1334,61 @@ func main() {
 	// (the clone's visible top matches the target's, so content aligns vertically).
 	// osAdj corrects the overscan count once the frame length can be measured; it
 	// stays 0 through the X/VBLANK calibration, which does not depend on it.
-	p0in, p1in, vblankAdj, osAdj := 40, 40, 0, 0
-	for iter := 0; iter < 16; iter++ {
-		src := emit(fd, p0in, p1in, vblankAdj, osAdj)
-		gp0, gp1, top, err := renderClone(src, *spec, *frames)
+	// One position input per placeable object. The two players were calibrated this
+	// way already; missiles and the ball go through the same routine because
+	// RESP0..RESBL ($10-$14) and HMP0..HMBL ($20-$24) are consecutive, so SetXPos's
+	// X register selects any of the five.
+	in := [5]int{40, 40, 40, 40, 40}
+	var stuck [5]bool
+	var misses [5]int
+	vblankAdj, osAdj := 0, 0
+	for iter := 0; iter < 24; iter++ {
+		src := emit(fd, in, vblankAdj, osAdj)
+		got, top, err := renderClonePositions(src, *spec, *frames)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "calibrate:", err)
 			os.Exit(2)
 		}
-		d0, d1, dtop := fd.p0x-gp0, fd.p1x-gp1, fd.top-top
-		fmt.Printf("  calib iter %d: P0 %d(want %d,d%+d) P1 %d(want %d,d%+d) top %d(want %d,d%+d) in0=%d in1=%d vbAdj=%d\n",
-			iter, gp0, fd.p0x, d0, gp1, fd.p1x, d1, top, fd.top, dtop, p0in, p1in, vblankAdj)
-		if d0 == 0 && d1 == 0 && dtop == 0 {
+		dtop := fd.top - top
+		done := dtop == 0
+		var parts []string
+		for i := range fd.obj {
+			if !fd.placeable(i) || stuck[i] {
+				continue
+			}
+			want := fd.wantX(i)
+			if got[i] < 0 {
+				// Not drawn THIS round is not the same as cannot be drawn. Every object
+				// starts at the same input, so they pile up on each other, and TIA
+				// priority hides the lower ones: measured on shared_setxpos, M1 was
+				// invisible until M0 moved off it, and freezing on the first miss left
+				// M1 stranded at its starting position with all 1712 of its cells wrong.
+				// So hold the input still, keep iterating, and give up only after
+				// several rounds — the others move away and it reappears.
+				//
+				// Chasing the full delta instead walks the input out of range in two
+				// rounds (measured 40 -> 149 -> 258, and `lda #258` does not assemble).
+				misses[i]++
+				if misses[i] >= 4 {
+					stuck[i] = true
+				}
+				done = false
+				parts = append(parts, fmt.Sprintf("%s NOT-DRAWN(want %d, miss %d)", objNames[i], want, misses[i]))
+				continue
+			}
+			misses[i] = 0
+			d := want - got[i]
+			if d != 0 {
+				done = false
+			}
+			in[i] = clampInput(in[i] + d) // +1 input ≈ +1px right near the target
+			parts = append(parts, fmt.Sprintf("%s %d(want %d,d%+d)", objNames[i], got[i], want, d))
+		}
+		fmt.Printf("  calib iter %d: %s top %d(want %d,d%+d) in=%v vbAdj=%d\n",
+			iter, strings.Join(parts, " "), top, fd.top, dtop, in, vblankAdj)
+		if done {
 			break
 		}
-		p0in += d0 // +1 input ≈ +1px right near the target
-		p1in += d1
 		vblankAdj += dtop // more VBLANK lines → visible top moves later (down)
 	}
 
@@ -1056,7 +1397,7 @@ func main() {
 	// target (kills the residual constant offset the top-match can't see).
 	bestS, bestM := 0, -1
 	for s := -4; s <= 4; s++ {
-		src := emit(fd.shifted(s), p0in, p1in, vblankAdj, osAdj)
+		src := emit(fd.shifted(s), in, vblankAdj, osAdj)
 		grid, _, _, err := renderGrid(src, *spec, *frames)
 		if err != nil {
 			continue
@@ -1072,7 +1413,7 @@ func main() {
 	}
 	fmt.Printf("  chosen content shift: %+d\n", bestS)
 
-	src := emit(fd.shifted(bestS), p0in, p1in, vblankAdj, osAdj)
+	src := emit(fd.shifted(bestS), in, vblankAdj, osAdj)
 
 	// Self-calibrate the frame LENGTH, for the same reason X and VBLANK are
 	// calibrated rather than computed: the prologue's cost is not a constant.
@@ -1096,14 +1437,14 @@ func main() {
 			break
 		}
 		osAdj += want - got
-		src = emit(fd.shifted(bestS), p0in, p1in, vblankAdj, osAdj)
+		src = emit(fd.shifted(bestS), in, vblankAdj, osAdj)
 	}
 
 	// What did it actually reproduce? Measured per element against the clone's
 	// own rendered frame, because "pixel-exact" on a target that draws no
 	// missiles says nothing about a target that does.
 	var cov []elemCoverage
-	var cloneObj [2]objFacts
+	var cloneObj [5]objFacts
 	cloneObj[0], cloneObj[1] = newObjFacts("P0"), newObjFacts("P1")
 	if grid, _, co, err := renderGrid(src, *spec, *frames); err == nil {
 		// fd.tgtElem, not the shifted copy: shifted() moves the REPLAY tables, and
@@ -1199,7 +1540,7 @@ func main() {
 //
 // Anything else is named as unexplained rather than attributed to whichever of
 // the three happens to sound plausible.
-func diagnose(cov []elemCoverage, tgt, clone [2]objFacts, blocks []writeBlock) string {
+func diagnose(cov []elemCoverage, tgt, clone [5]objFacts, blocks []writeBlock) string {
 	differ := map[string]int{}
 	over := map[string]int{}
 	for _, c := range cov {

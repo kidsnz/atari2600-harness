@@ -1074,7 +1074,51 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   **Corpus gap recorded, not papered over:** in all four bank ROMs the banks never execute the same address,
   so `#(bank,pc) == #pc` and **none of them can catch a flat-keyed instrument**. The test says so in its own
   output rather than passing quietly. A litmus where two banks run code at one address is the missing piece.
-- **RL-8 — `framegen` missile/ball replay + per-zone sprite X.** The two limits RL-7 measured. Missiles and
+- **RL-8a — `framegen` draws missiles and the ball. DONE (v1.116.0).** RL-7 measured that the generated
+  kernel emitted no `ENAM0`/`ENAM1`/`ENABL` at all, so those pixels were absent by construction. They are
+  now measured, positioned and drawn wherever the kernel shape allows, and reported when it does not.
+
+  **Measured first, designed second.** What the corpus actually does with missiles:
+
+  | ROM | M0 | M1 | BL |
+  |---|---|---|---|
+  | `shared_setxpos` | 214/214 lines, **1 reset X**, 8 clocks | same, X 109 | 214/214, X 139, 2 clocks |
+  | Fishing Derby | — | 42/214 lines, **1 X** | 58/214, **1 X** |
+  | `road` | 195/214, **21 distinct X** | 194/214, 16 X | 7/214, 3 X |
+
+  Three cases fall out, and the cheapest is the common one: an object on for EVERY line needs no per-line
+  table at all — its enable is written once before the kernel, costing **zero** of the eight write slots.
+  One that comes and goes costs one slot. One whose reset X moves cannot be placed by a kernel that strobes
+  RESxx once, and is reported rather than approximated to its first position.
+
+  `shared_setxpos`: **M0 1712/1712, M1 1712/1712, BL 428/428** — 3852 structurally-absent cells to none.
+  Position calibration generalised from two objects to five (RESP0..RESBL and HMP0..HMBL are consecutive,
+  so one SetXPos places any of them); all five converge in 4 iterations. Corpus: **one ROM changed**, 30
+  byte-identical, 31/31 still 262 scanlines, generated clones still certify (74/76).
+
+  **Four defects found on the way, each by a measurement rather than by reading:**
+  - *Priority hid an object from its own calibration.* All five inputs start equal, so the objects pile up
+    and TIA priority buries the lower ones — M1 was invisible until M0 moved off it. Freezing on the first
+    non-appearance stranded M1 with all 1712 of its cells wrong; it now holds position and retries, and gives
+    up only after four rounds.
+  - *Chasing a missing object walks the input out of range.* 40 → 149 → 258, and `lda #258` does not
+    assemble. Inputs are clamped and non-appearance no longer accumulates.
+  - *The vertical-shift search moved the picture but not the enables.* `shifted()` shifted PF and GRP and
+    left `en0/en1/enb` behind, so `motion_glide`'s ball came out on the wrong scanlines.
+  - *The block cap dropped one class and did not re-check.* Fishing Derby emitted a **10-block, 80-cycle
+    kernel against a 76-cycle line** while printing its own "only 8 fit" note, and the frame collapsed to 50
+    scanlines. Dropping is now iterative and ordered — NUSIZ before enables, because a lost size mis-draws an
+    object that is still there while a lost enable removes it — and never touches a picture write.
+
+  Still not reproduced, with numbers: `road` (reset X moves 21/16/3 ways) and Fishing Derby's M1/BL (its
+  playfield is reflect-asymmetric, so all six PF writes are needed and no slot is left). Per-zone sprite X
+  remains open as **RL-8b**.
+- **RL-8b — `framegen` per-zone sprite X.** The remaining RL-7 limit. `framegen` carries one reset X per
+  object and strobes RESxx once, so a target that repositions per zone cannot be followed — measured:
+  `zone_multiplex` loses 190 cells on each player, `road`'s missiles take 21 and 16 distinct X. Needs the
+  extracted single X to become a per-scanline series plus RESxx/HMOVE placement inside the kernel, against a
+  line budget that already has 8 of 8 slots used. Gate: `zone_multiplex`'s 380 off-cells go to 0 and `road`
+  reaches pixel-exact, with the clone still certifying. Missiles and
   the ball need one enable bit and one X per scanline (cheap: the attribution is already extracted, only the
   emitter lacks it); per-zone sprite X needs the extracted single `p0x`/`p1x` to become a per-scanline series
   plus RESPx/HMOVE placement in the replay kernel, which is the harder half. Gate: `shared_setxpos`,
