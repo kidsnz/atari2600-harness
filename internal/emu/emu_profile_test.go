@@ -14,7 +14,7 @@ func TestProfileLineWorstFindsHeavyLine(t *testing.T) {
 	if err := e.LoadROM("../../roms/litmus/litmus_overrun.bin"); err != nil {
 		t.Fatal(err)
 	}
-	rows, err := e.ProfileLineWorst(3, nil)
+	rows, _, err := e.ProfileLineWorst(3, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestProfileLineWorstNoHiddenWarmup(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := e.Coords().Frame
-	if _, err := e.ProfileLineWorst(3, nil); err != nil {
+	if _, _, err := e.ProfileLineWorst(3, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := e.Coords().Frame - start; got != 3 {
@@ -74,7 +74,7 @@ func TestProfileLineWorstWatch(t *testing.T) {
 	if err := e.LoadROM("../../roms/litmus/litmus_overrun.bin"); err != nil {
 		t.Fatal(err)
 	}
-	rows, err := e.ProfileLineWorst(3, []uint16{0x80, 0x81})
+	rows, _, err := e.ProfileLineWorst(3, []uint16{0x80, 0x81})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1425,7 +1425,16 @@ func (e *Emu) RunUntilBudget(maxFrames, budgetCycles int) (over bool, atScanline
 // コード位置で安定に集計できる）。cycles の定義は静的 prover の Region.Worst と同一＝
 // 「開き WSYNC の解放（次ライン先頭）から、閉じ WSYNC ストア完了まで」。≤76 なら1ラインに収まる。
 type LineWorst struct {
-	StrobePC      uint16  `json:"strobe_pc"`       // 開き STA WSYNC の PC
+	StrobePC uint16 `json:"strobe_pc"` // 開き STA WSYNC の PC
+	// Bank は開き strobe を実行したバンク。BankValid で「バンク0」と「バンク切替
+	// カートではない」を区別する。
+	//
+	// PC だけでキー付けすると、2つのバンクが同じアドレスで WSYNC を撃った場合に
+	// 1行へ融合し、静的証明との突合が「半分を試験しながら合格」になる。今のコーパスは
+	// たまたまバンク間で同一アドレスを実行しないので露見しないが、それは ROM の配置
+	// が偶然そうであるだけで、計測器の正しさではない。
+	Bank      int  `json:"bank,omitempty"`
+	BankValid bool `json:"bank_valid,omitempty"`
 	At            string  `json:"at,omitempty"`    // ソース位置（cmd/harness が srcmap で充填・emu は触らない）
 	Count         int     `json:"count"`           // 計測できた区間数
 	WorstCycles   int     `json:"worst_cycles"`    // 実測ワースト CPU サイクル（ビーム座標から厳密算出）
@@ -1446,21 +1455,32 @@ type LineWorst struct {
 //	clocks = (閉じstrobe.Scanline − (開きstrobe.Scanline+1))×228 + (閉じstrobe.Clock+68)
 //	cycles = clocks/3（CPU 1cy=3clock・解放はサイクル境界に整列）
 //
-// フレームを跨ぐ区間（オーバースキャン最終行→次フレーム VSYNC）は集計しない。
-func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, error) {
+// フレームを跨ぐ区間（オーバースキャン最終行→次フレーム VSYNC）は座標式が成り立たない
+// ので集計しない。**その件数を第2返り値で返す**：黙って捨てると、実測値の無い区間が
+// 表の中で「測った」ように見える。バンク切替のトランポリンはオーバースキャン末に置かれ
+// がちで、まさにこの穴に落ちる。
+func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) (out []LineWorst, crossFrame int, err error) {
 	// フレッシュブート時のみ安定化（RunUntilBudget と同じ規律＝poke 状態を食い潰さない）。
 	if e.VCS.TV.GetCoords().Frame < 2 {
 		if err := e.RunFrames(2); err != nil {
-			return nil, err
+			return nil, crossFrame, err
 		}
 	}
 
 	target := e.VCS.TV.GetCoords().Frame + maxFrames
-	rows := map[uint16]*LineWorst{}
+	type lineKey struct {
+		bank int
+		pc   uint16
+	}
+	rows := map[lineKey]*LineWorst{}
+	// バンク切替カートかどうかは一度だけ聞く。単一バンクなら Bank を報告しない
+	// （平坦 ROM の出力を変えないため）。
+	banked := e.VCS.Mem.Cart.NumBanks() > 1
 
 	var (
 		havePrev     bool
 		prevPC       uint16
+		prevBank     int
 		prevFrame    int
 		prevScanline int
 		prevWatch    []uint8
@@ -1489,7 +1509,7 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 		pcBefore := e.VCS.CPU.PC.Address()
 		executed, err := e.stepInstr()
 		if err != nil {
-			return nil, err
+			return nil, crossFrame, err
 		}
 		// WSYNC の検出は「RdyFlg が true→false になった瞬間」ではなく、WSYNC への
 		// **ストアそのもの**で行う。停止時間が 1 命令ステップ未満で終わる WSYNC は
@@ -1510,6 +1530,13 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 		}
 		if wsyncNow { // WSYNC ストローブ完了
 			c := e.VCS.TV.GetCoords()
+			if havePrev && c.Frame != prevFrame {
+				// フレーム境界を跨ぐ区間は座標式が成り立たないので集計しない。
+				// ただし「黙って捨てる」のをやめて数える：バンク切替のトランポリンは
+				// オーバースキャン末で走ることが多く、まさにここに落ちる。捨てた数を
+				// 出さないと、その区間には実測値が無いのに表が埋まって見える。
+				crossFrame++
+			}
 			if havePrev && c.Frame == prevFrame {
 				clocks := (c.Scanline-(prevScanline+1))*228 + (c.Clock + 68)
 				if clocks >= 0 {
@@ -1518,10 +1545,14 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 					if lines < 1 {
 						lines = 1
 					}
-					row := rows[prevPC]
+					k := lineKey{pc: prevPC}
+					if banked {
+						k.bank = prevBank
+					}
+					row := rows[k]
 					if row == nil {
-						row = &LineWorst{StrobePC: prevPC}
-						rows[prevPC] = row
+						row = &LineWorst{StrobePC: prevPC, Bank: k.bank, BankValid: banked}
+						rows[k] = row
 					}
 					row.Count++
 					if cycles > row.WorstCycles {
@@ -1534,6 +1565,7 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 				}
 			}
 			prevPC = pcBefore
+			prevBank, _ = e.Bank()
 			prevFrame = c.Frame
 			prevScanline = c.Scanline
 			prevWatch = snap()
@@ -1541,7 +1573,7 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 		}
 	}
 
-	out := make([]LineWorst, 0, len(rows))
+	out = make([]LineWorst, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, *r)
 	}
@@ -1551,7 +1583,7 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 		}
 		return out[i].StrobePC < out[j].StrobePC
 	})
-	return out, nil
+	return out, crossFrame, nil
 }
 
 // WatchRAM は RAM[addr] が変化するまで命令単位で実行する（watch_ram ツールの心臓部）。

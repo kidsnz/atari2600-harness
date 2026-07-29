@@ -66,7 +66,7 @@ func TestProvenWorstIsNeverExceededOnCorpus(t *testing.T) {
 		if err := e.LoadROM(bin); err != nil {
 			continue
 		}
-		rows, err := e.ProfileLineWorst(6, nil)
+		rows, _, err := e.ProfileLineWorst(6, nil)
 		if err != nil {
 			continue
 		}

@@ -53,7 +53,7 @@ func TestProfileMatchesProof(t *testing.T) {
 	if err := e.LoadROM(build.BinPathFor(asm)); err != nil {
 		t.Fatal(err)
 	}
-	rows, err := e.ProfileLineWorst(4, nil)
+	rows, _, err := e.ProfileLineWorst(4, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

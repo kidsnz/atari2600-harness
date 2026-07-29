@@ -994,10 +994,16 @@ type ProfileLine struct {
 	WorstFrame    int            `json:"worst_frame"`
 	WorstScanline int            `json:"worst_scanline"`
 	Watch         map[string]int `json:"watch,omitempty"` // ワースト区間開始時点の watch RAM 値
+	// Bank は開き strobe を実行したバンク（バンク切替カートのみ）。ポインタなので
+	// 平坦 ROM では欄自体が出ず、"バンク0" と "バンクの概念なし" が混ざらない。
+	Bank *int `json:"bank,omitempty"`
 }
 type ProfileLinesOut struct {
 	Lines  []ProfileLine `json:"lines"`
 	Coords Coords        `json:"coords"`
+	// CrossFrameDropped は座標式が成り立たないため集計しなかった区間数。0 でも出す：
+	// 欄が無いことを「そんな区間は無かった」と読まれるのを防ぐ。
+	CrossFrameDropped int `json:"cross_frame_dropped"`
 }
 
 // resolveRAMRef は "$A8" / "0x84" / "132" / DASMシンボル を RAM アドレスへ解決する。
@@ -1050,19 +1056,28 @@ func handleProfileLines(ctx context.Context, req *mcp.CallToolRequest, in Profil
 			}
 		}
 	}
-	rows, err := e.ProfileLineWorst(maxFrames, watchAddrs)
+	rows, crossFrame, err := e.ProfileLineWorst(maxFrames, watchAddrs)
 	if err != nil {
 		return nil, ProfileLinesOut{}, fmt.Errorf("profile lines: %w", err)
 	}
 	if in.Top > 0 && len(rows) > in.Top {
 		rows = rows[:in.Top]
 	}
-	out := ProfileLinesOut{Coords: coordsOf(e), Lines: make([]ProfileLine, len(rows))}
+	out := ProfileLinesOut{Coords: coordsOf(e), Lines: make([]ProfileLine, len(rows)),
+		// Intervals that straddle a frame boundary have no valid cycle count from the
+		// beam coordinates, so they are not aggregated. Reporting how many were
+		// dropped is the difference between a table that is complete and one that
+		// merely looks it — and a bank-switch trampoline is usually placed at the end
+		// of overscan, i.e. exactly in the dropped set.
+		CrossFrameDropped: crossFrame}
 	for i, r := range rows {
 		pl := ProfileLine{
 			At: locate(r.StrobePC), PC: fmt.Sprintf("$%04X", r.StrobePC),
 			WorstCycles: r.WorstCycles, WorstLines: r.WorstLines, Count: r.Count,
 			WorstFrame: r.WorstFrame, WorstScanline: r.WorstScanline,
+		}
+		if r.BankValid {
+			pl.Bank = &r.Bank
 		}
 		if len(r.Watch) == len(in.Watch) && len(in.Watch) > 0 {
 			pl.Watch = map[string]int{}

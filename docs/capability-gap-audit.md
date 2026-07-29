@@ -1143,6 +1143,32 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   reachable only across a switch — **measured: 5 such executed pairs, litmus_bank 4 + banked_game 1** — and
   (c) requires every seed whose SOURCE the machine executed to have a landing address the machine also
   executed, so a seed cannot be an invented edge.
+- **SD-8d — the ∃ oracle could not be trusted for what comes next. DONE (v1.116.0), graft G1.** The judged
+  plan for full cross-bank flow analysis names this as the step that must come BEFORE any prover work: the
+  runtime profiler is what the static proof is graded against, so it has to be trustworthy first.
+
+  Two things it was silent about:
+
+  1. **It keyed its rows on the strobe PC alone** (`rows := map[uint16]*LineWorst{}`). Two banks storing WSYNC
+     at one address merge into a single row, and the containment check against the static proof then passes
+     while testing half of what it claims. Measured, no ROM in the corpus executes the same address in two
+     banks — so the old keying was correct *by ROM layout, not by the instrument being right*. Rows are now
+     keyed `(bank, PC)` and carry the bank; flat images carry no bank field at all, so "bank 0" and "not a
+     banked cartridge" cannot be confused. Measured: 6/7/6 rows tagged on the three bank ROMs, **0 on flat
+     images**, so their output is unchanged.
+  2. **It dropped frame-crossing intervals silently.** An interval straddling a frame boundary has no valid
+     cycle count from the beam coordinates, which is the right call — but dropping it without saying so makes
+     a table that is merely incomplete look complete. The count is now returned and surfaced as
+     `cross_frame_dropped`, printed even when zero so an absent field cannot read as "there were none".
+     Measured: **5 over 6 frames on every ROM tried — one per boundary**, flat and banked alike.
+
+  **A claim in the plan did not survive checking.** It stated that "banked_game's cross-bank interval is
+  exactly a frame-crossing one", i.e. that the trampoline fell into the dropped set. Measured against the
+  static report: **every one of the 6/7/6 static regions on litmus_bank, banked_game and litmus_bank_f4 has a
+  matching dynamic row — 0 static regions without a measurement.** The dropped intervals are the frame
+  boundaries and nothing else. The instrument was worth fixing regardless, but not for the stated reason.
+
+  Negative control: forcing the bank flag off makes the test fail with 2 disagreements, so it can fail.
 - **SD-8c — a superchip cartridge was analysed as if its RAM were ROM. DONE (v1.116.0).** Found by the
   adversarial verification of SD-8b, which asked what `analysisUnits` does NOT check.
 
