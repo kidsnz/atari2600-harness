@@ -44,5 +44,24 @@ assert not r["result"].get("isError"), r
 r=call(14,"spritepos",{"x":96,"object":"P0"})
 sc=r["result"]["structuredContent"]
 assert sc["solution"]["exact"] and sc["solution"]["achieved_x"]==96, sc
-print("smoke OK (load/step/analyze_screen/watch_ram/trace_clocks/run_scenario/srcmap/beamtrace/beam_race/spritepos)")
+# SD-1/SD-2: static def-use and the proven beam window. Both are forall answers,
+# so they are checked against a ROM whose behaviour is known: the stack-trick
+# litmus writes COLUBK with a PHA at one exact beam position, and nothing but a
+# tool that resolves the push can see that write at all.
+r=call(15,"defuse",{"asm_path":"roms/litmus/litmus_stack_trick.asm"})
+sc=r["result"]["structuredContent"]["report"]
+assert sc["converged"], sc
+assert any(w.get("exact") and w.get("addrs")==[265] for w in sc["writes"].values()), \
+    "defuse did not resolve the PHA to $0109 (page-1 mirror of COLUBK)"
+r=call(16,"beam_intervals",{"asm_path":"roms/litmus/litmus_stack_trick.asm"})
+sc=r["result"]["structuredContent"]["report"]
+found=[w for reg in sc["regions"] if reg.get("bounded") for w in (reg.get("writes") or []) if w["reg"]=="COLUBK"]
+assert found and found[0]["exact"] and found[0]["min_clock"]==-11, found
+# The uninitialised-read pair: fires on the bait, silent on the twin.
+r=call(17,"defuse",{"asm_path":"roms/litmus/litmus_uninit_read.asm"})
+assert len(r["result"]["structuredContent"]["report"].get("uninit_reads") or [])==1, r
+r=call(18,"defuse",{"asm_path":"roms/litmus/litmus_uninit_clean.asm"})
+assert not (r["result"]["structuredContent"]["report"].get("uninit_reads") or []), r
+
+print("smoke OK (load/step/analyze_screen/watch_ram/trace_clocks/run_scenario/srcmap/beamtrace/beam_race/spritepos/defuse/beam_intervals)")
 p.terminate()

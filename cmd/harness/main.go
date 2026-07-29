@@ -1191,6 +1191,46 @@ func handleProveLineBudget(ctx context.Context, req *mcp.CallToolRequest, in Pro
 	return nil, ProveLineBudgetOut{Report: rep}, nil
 }
 
+// --- static def-use / beam-interval proofs (SD-1, SD-2) ---
+
+type DefUseIn struct {
+	AsmPath string `json:"asm_path" jsonschema:"path to the .asm to assemble and analyse"`
+}
+type DefUseOut struct {
+	Report *cyclebound.DefUseReport `json:"report"`
+}
+
+// handleDefUse answers, over ALL paths, which instruction writes which address.
+func handleDefUse(ctx context.Context, req *mcp.CallToolRequest, in DefUseIn) (*mcp.CallToolResult, DefUseOut, error) {
+	if in.AsmPath == "" {
+		return nil, DefUseOut{}, fmt.Errorf("asm_path is required")
+	}
+	rep, err := cyclebound.DefUse(in.AsmPath, 0)
+	if err != nil {
+		return nil, DefUseOut{}, err
+	}
+	return nil, DefUseOut{Report: rep}, nil
+}
+
+type BeamIntervalsIn struct {
+	AsmPath string `json:"asm_path" jsonschema:"path to the .asm to assemble and analyse"`
+}
+type BeamIntervalsOut struct {
+	Report *cyclebound.BeamReport `json:"report"`
+}
+
+// handleBeamIntervals proves, per TIA write, the beam window it can land in.
+func handleBeamIntervals(ctx context.Context, req *mcp.CallToolRequest, in BeamIntervalsIn) (*mcp.CallToolResult, BeamIntervalsOut, error) {
+	if in.AsmPath == "" {
+		return nil, BeamIntervalsOut{}, fmt.Errorf("asm_path is required")
+	}
+	rep, err := cyclebound.BeamIntervals(in.AsmPath)
+	if err != nil {
+		return nil, BeamIntervalsOut{}, err
+	}
+	return nil, BeamIntervalsOut{Report: rep}, nil
+}
+
 // --- authoring aids: beamtrace timeline / beam_race advisory / spritepos solver ---
 
 type BeamtraceIn struct {
@@ -1646,6 +1686,8 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_line_budget", Description: "Run up to max_frames and halt the moment a logical line (the interval between WSYNC strobes) overruns its CPU-cycle budget and eats extra scanlines — the failure mode that silently rolls the screen. budget defaults to 76 (one scanline); raise it for multi-line kernels. Returns over=true with at_scanline (the overrunning line's start) and line_cycles (machine cycles it consumed). Observes ONE run (∃) — for an all-paths proof use prove_line_budget. Optional patch=[{symbol|addr,bytes}] applies temporary ROM byte patches to a COPY for this measurement only (e.g. a lightweight positioning table), fresh-boots it, and ALWAYS reloads the original ROM afterwards — replaces the hand-edit→assemble→assert→restore ritual and its forget-to-restore failure mode. pokes=[{addr,value}] seeds RAM after the patched boot."}, handleBudgetGuard)
 	mcp.AddTool(server, &mcp.Tool{Name: "profile_line_budget", Description: "Quantitative sibling of assert_line_budget (PONG-C3): profile `max_frames` frames and return, PER logical line (keyed by the PC of the STA WSYNC that OPENS it — stable even when overscan physics rows drift across scanlines), the measured WORST CPU cycles between WSYNC strobes (exact, beam-derived; <=76 fits one scanline), the physical lines it consumed, how often it ran, and the frame/scanline where the worst hit. Replaces trim-by-guess-and-assert with 'row4 worst = 78cy → trim 2'. Optional watch=[symbols/addrs] snapshots those RAM values at the opening strobe of each line's worst interval = the arg values the worst path read. Optional patch/pokes as in assert_line_budget (temporary, auto-restored). ADVANCES the emulator."}, handleProfileLines)
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_edge_coincidence", Description: "Worst-path fuzz for edge-compare kernels (PONG-class): the true per-line worst case is ALL edge variables (ball top/bottom, paddle tops/bottoms...) landing on the SAME Y (+~5cy per extra hit) — an overrun free-running tests can miss for hundreds of frames. Pokes every listed zero-page address to the same Y, runs frames_per_y frames under assert_line_budget semantics, sweeps Y over [y_min..y_max], and reports every failing alignment. Optional patch (auto-restored) for lightweight positioning tables."}, handleEdgeCoincidence)
+	mcp.AddTool(server, &mcp.Tool{Name: "defuse", Description: "Statically answer, over ALL paths, WHICH INSTRUCTION WRITES WHICH ADDRESS — the forall sibling of watch_ram/read_ram_trace, which report only what the runs you did happened to do. Assembles asm_path, walks the CFG, and per WSYNC-to-WSYNC region lists each address's writer PCs and reader PCs (with source locations), plus the whole-program may-write set. Targets are resolved through the EFFECTIVE address, so an indexed store is attributed to the register it actually reaches and a PHA lands wherever SP points (the stack trick writes a TIA register that way, and nothing else here can see it). Also reports UNINITIALISED READS: reads of RAM that no path from reset has definitely written first, which on hardware is power-on rubbish while an emulator hands out a defined value and the bug never surfaces in testing. Use it when a byte is being written from more than one place, when a value looks stale, or before trusting a cell that setup was supposed to fill. Declines a bank-switched image rather than describing a program that does not exist."}, handleDefUse)
+	mcp.AddTool(server, &mcp.Tool{Name: "beam_intervals", Description: "PROVE where every TIA write lands on the scanline, on EVERY path — the forall sibling of beamtrace, which answers for one execution. Assembles asm_path and carries elapsed cycles as an interval through each WSYNC-to-WSYNC region, so each write comes back with the earliest and latest beam clock it can reach (same coordinates as read_row: HBLANK -68..-1, visible 0..159), plus exact=true when its position does not depend on the path at all. A WIDE window is a finding, not a gap: it means the write's position varies with the branch taken, which is a bug in a kernel meant to be cycle-exact; crosses_line marks the worse case where even the SCANLINE depends on the path. Reach for it whenever a colour or graphics register is written after a branch, when one column of one line looks wrong, or to confirm a positioning write is genuinely cycle-exact before building on it. Nothing else in the 2600 ecosystem computes this — the state of the art is hand-counting a single path."}, handleBeamIntervals)
 	mcp.AddTool(server, &mcp.Tool{Name: "prove_line_budget", Description: "Statically PROVE a kernel's per-scanline cycle budget over ALL reachable paths (∀) — the static sibling of assert_line_budget, which observes only one run (∃). Assembles asm_path, decodes from the reset/IRQ/NMI vectors, cuts the CFG at every STA WSYNC, and proves each WSYNC-to-WSYNC region's worst-case CPU cycles <= budget (default 76). Returns certified plus any over-budget regions (each with a cycle-by-cycle worst path + source location) and any regions it could not bound (unbounded loop / JSR / indirect JMP), reported honestly rather than passed. Run it BEFORE executing a kernel to catch a branch path that overruns only sometimes — the timing trap that rolls the screen on hardware while a lucky run looks fine. Single-bank flat 2K/4K kernels."}, handleProveLineBudget)
 	mcp.AddTool(server, &mcp.Tool{Name: "trace_clocks", Description: "Execute the next N instructions and return each one's beam anatomy: PC, opcode, CPU cycles (WSYNC stalls visible as large counts), and start/end (scanline, color clock). Sub-instruction OBSERVATION granularity — the practical recovery of step_clock (Gopher2600 cannot suspend mid-instruction; see docs/mcp-tools.md)."}, handleTraceClocks)
 	mcp.AddTool(server, &mcp.Tool{Name: "beamtrace", Description: "Write→visible-pixel timeline (authoring aid): trace `frames` frames and return, per scanline, every TIA write with the beam clock it lands at, the register name/kind, the value, and the visible-pixel span [vis_from,vis_to) it governs (until the next write to the same register). Answers 'where on the line does this sta GRP0 actually paint?'. Omit `scanline` for all scanlines that have writes. ADVANCES the emulator `frames` frames — set up the state first."}, handleBeamtrace)

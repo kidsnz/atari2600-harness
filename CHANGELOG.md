@@ -9,6 +9,66 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Static program analysis — def-use, proven beam windows, conditional bounds, and the tools to check them**
+  (v1.114.0). A night of work whose theme turned out to be that several existing tools were answering
+  confidently and wrongly, and that only the machine could say so.
+  - **`defuse` (MCP + `internal/cyclebound`)** — which instruction writes which address, over ALL paths, per
+    WSYNC-to-WSYNC region, with may/must separated. Targets resolve through the EFFECTIVE address, so an
+    indexed store is attributed to the register it reaches and a push lands wherever SP points. Also reports
+    reads of RAM no path from reset has definitely written. Soundness is graded against the emulator:
+    9055/9055 observed (pc,addr) pairs inside their predicted sets across the corpus.
+  - **`beam_intervals` (MCP + `internal/cyclebound`)** — the forall version of `beamtrace`: every TIA write
+    with the earliest and latest beam clock it can land at. 7117/7117 observed writes inside their proven
+    window; 327 bounded writes, 106 exactly positioned, mean window 8.7 colour clocks. Nothing in the 2600
+    ecosystem computes this; the state of the art is hand-counting one path.
+  - **Conditional cycle bounds** — of 29 unbounded regions, 15 fail only because a loop's trip count is
+    unknown, so the largest count that fits the budget is computable: *"within 76 cycles provided the loop at
+    $F126 runs at most 11 times"*. Checked for tightness by re-deriving both edges. Never certifies.
+  - **Stack-pointer tracking** — `TXS/TSX/PHA/PHP/PLA/PLP/JSR/RTS`, so the 2600 stack trick (SP aimed at a
+    TIA register, PHA as the store) is visible to both the static and dynamic sides for the first time. They
+    now agree to the clock.
+  - **Call-context resolution** — a region opened by a WSYNC inside a subroutine is analysed once per call
+    site and the worst taken; unbounded regions 29 -> 24.
+  - **Sweep-loop recognition** — the `ldx #$FF / sta $00,x / dex / bne` idiom is a must-write of its swept
+    range at the loop EXIT (minding the fencepost: `bne` leaves before storing at index 0). Uninitialised-read
+    false positives 3783 -> 0 while the planted case still fires.
+  - **Raw `.bin` support** — `program.canon` folds an address to a cartridge offset through the memory map,
+    so a 2K cartridge decodes at every mirror the console sees it at.
+
+### Fixed
+- **`ProfileLineWorst` missed 44% of WSYNC strobes** (v1.114.0). It detected a strobe by the CPU stalling,
+  and a WSYNC whose stall is shorter than one instruction step never shows that transition — so the interval
+  it should have closed ran on to the next visible strobe. Measured: `$F0D0` in bitmap48 executes 192 times
+  in 8 frames and 108 intervals were counted; the longest bogus interval spanned 13 lines and 987 cycles,
+  which made the cycle prover look unsound. Detecting the WSYNC store fixes it (restricted to steps that
+  retired an instruction, since `LastResult` is unchanged during a stall). Now 184 = 192 minus the 8 dropped
+  at frame boundaries, worst 87 cycles over 2 lines, inside the proven 93.
+- **`LastTIAWrite` attributed indexed stores to the base register** (v1.114.0). `sta COLUP0,x` was reported
+  as COLUP0 whatever x held. On our own `shared_setxpos` kernel, five objects collapsed into player 0 over
+  two frames; they now separate correctly. New litmus `litmus_indexed_tia.asm` turns the background green
+  through an indexed store, so the screen arbitrates.
+- **The abstract interpreter was not sound** (v1.114.0). An indexed or indirect store left previously-tracked
+  cells standing, so a later load read a stale value into loop bounding and branch refinement — a "proven"
+  worst case could sit BELOW the machine's. Stores now kill their may-set. No verdict changed on the 31
+  technique kernels, so past certificates stand.
+- **A capped fixpoint was silent** (v1.114.0). `computeStates` stopped at its iteration cap without saying
+  so; nothing derived from an unconverged run may certify.
+- **`cover` divided by branches OBSERVED** (v1.114.0), so an unreached branch left the arithmetic and the
+  percentage rose as the test got worse. `divtable` reported 100% edge coverage with 12 of its 17 branches
+  never executed. It now divides by the branches the program has, names the unreached ones, and says when
+  the decoder itself is incomplete.
+
+### Decisions
+- **Check the instrument before believing what it says about the thing under test.** Twice in one night a
+  faulty `ProfileLineWorst` nearly cost something real: it made the cycle prover look unsound (recorded as
+  the top open defect, then retracted), and it caused a CORRECT improvement to be reverted as unsound
+  (text12/text24 measured 143 against a proven 110; with the profiler fixed the same region measures 104).
+  Both errors have the same shape. Recorded in `docs/capability-gap-audit.md`.
+- **A detector is only worth its reports if it can stay silent.** Uninitialised-read detection was written,
+  measured at 3783 false positives on one kernel, and deliberately NOT shipped until sweep-loop recognition
+  brought it to zero — with a pair of litmus ROMs differing in one operand to prove both directions. The
+  same rule sent an SMC detector back to the backlog: zero stores land on decoded code across 31 kernels and
+  two commercial cartridges, so there is nothing to demonstrate it on.
 - **`ramtrace` + the RAM-equivalence gate — the measurement half of behavioural reproduction** (v1.113.0).
   `vismatch` asks whether a build LOOKS like the target and `behavmatch`'s trajectory diff asks whether it
   MOVES like it; this answers the prior question — what the machine's 128 bytes of state are doing — so a
