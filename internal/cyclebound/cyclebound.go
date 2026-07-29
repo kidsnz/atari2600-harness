@@ -522,6 +522,142 @@ func callContexts(instrs map[uint16]Instr, regionStart uint16) []uint16 {
 	return out
 }
 
+// displayPreserver returns a predicate answering "can a JSR to this address
+// change VSYNC/VBLANK?" — used to keep the display bits alive across a call
+// instead of dropping them with the rest of the callee's unmodeled effect.
+//
+// It is deliberately one-sided. Anything it cannot resolve — an indexed or
+// indirect store, a store whose address folds into TIA $00/$01 through any
+// mirror, a push (page 1 mirrors the console's own addresses, so SP can aim a
+// PHA at VBLANK), or a nested call it has already visited — answers "not
+// preserved", which restores the old behaviour for that call. Being wrong in
+// this direction only loses precision; being wrong the other way would let a
+// region that really does turn the display on be classified as blank and skipped.
+// states may be nil on the first pass, when no index ranges are known yet; the
+// caller then runs a second pass with the states the first produced, which is
+// what makes `sta RESP0,X` — the ordinary way a shared positioning routine picks
+// its object — resolvable at all. The second pass only ever ADDS a justified
+// fact, and the justification itself comes from a sound first-pass range, so the
+// fixpoint stays sound.
+func displayPreserver(instrs map[uint16]Instr, states map[uint16]State) func(uint16) bool {
+	memo := map[uint16]bool{}
+	var walk func(entry uint16, depth int, onStack map[uint16]bool) bool
+	walk = func(entry uint16, depth int, onStack map[uint16]bool) bool {
+		if v, ok := memo[entry]; ok {
+			return v
+		}
+		if depth > 8 || onStack[entry] { // recursion / deep nesting: give up, safely
+			return false
+		}
+		onStack[entry] = true
+		defer delete(onStack, entry)
+
+		seen := map[uint16]bool{entry: true}
+		work := []uint16{entry}
+		for len(work) > 0 {
+			a := work[len(work)-1]
+			work = work[:len(work)-1]
+			in, ok := instrs[a]
+			if !ok {
+				continue
+			}
+			switch in.Def.Operator {
+			case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
+				continue
+			case instructions.PHA, instructions.PHP:
+				if !pushMissesDisplay(in, states) {
+					memo[entry] = false
+					return false
+				}
+			case instructions.JSR:
+				if !walk(in.Operand, depth+1, onStack) {
+					memo[entry] = false
+					return false
+				}
+			case instructions.STA, instructions.STX, instructions.STY:
+				if !storeMissesDisplay(in, states) {
+					memo[entry] = false
+					return false
+				}
+			}
+			for _, nx := range decodeSuccessors(in) {
+				if !seen[nx] {
+					seen[nx] = true
+					work = append(work, nx)
+				}
+			}
+		}
+		memo[entry] = true
+		return true
+	}
+	return func(entry uint16) bool { return walk(entry, 0, map[uint16]bool{}) }
+}
+
+// storeMissesDisplay reports that this store provably cannot reach VSYNC ($00) or
+// VBLANK ($01). Only a non-indexed store to a statically known address qualifies,
+// and the address is folded through the engine's own memory map first so a write
+// via any TIA mirror is caught rather than compared as a raw number.
+func storeMissesDisplay(in Instr, states map[uint16]State) bool {
+	if in.Def.AddressingMode != instructions.Absolute {
+		return indexedStoreMissesDisplay(in, states)
+	}
+	ma, area := memorymap.MapAddress(in.Operand, false)
+	if area != memorymap.TIA {
+		return true
+	}
+	// MapAddress folds any TIA mirror onto the canonical register address, so the
+	// comparison is against $00/$01 there rather than against the raw operand.
+	return ma != 0x00 && ma != 0x01
+}
+
+// pushMissesDisplay reports that a PHA/PHP cannot land on VSYNC/VBLANK.
+//
+// A push is a store to $0100|SP, and page 1 mirrors the addresses the console
+// decodes, so a program that aims SP at the TIA turns a push into a register
+// write — the Stack Trick this project uses deliberately. Treating EVERY push as
+// display-touching would be sound but would drag every RTS-dispatch and every
+// ordinary subroutine call into the visible class. SP is tracked, so the question
+// is answerable: only an SP range that can reach $0100/$0101 counts.
+func pushMissesDisplay(in Instr, states map[uint16]State) bool {
+	st, ok := states[in.Addr]
+	if !ok || !st.valid || st.SP.Top || st.SP.Hi-st.SP.Lo > 255 {
+		return false
+	}
+	for sp := st.SP.Lo; sp <= st.SP.Hi; sp++ {
+		ma, area := memorymap.MapAddress(uint16(0x0100|(sp&0xFF)), false)
+		if area == memorymap.TIA && (ma == 0x00 || ma == 0x01) {
+			return false
+		}
+	}
+	return true
+}
+
+// indexedStoreMissesDisplay resolves `sta base,X` (or ,Y) through the index range
+// the previous pass proved, and reports that no address it can reach is VSYNC or
+// VBLANK. An unknown or unusably wide range answers false.
+func indexedStoreMissesDisplay(in Instr, states map[uint16]State) bool {
+	switch in.Def.AddressingMode {
+	case instructions.AbsoluteX, instructions.AbsoluteY:
+	default:
+		return false // indirect: no base to reason from
+	}
+	st, ok := states[in.Addr]
+	if !ok || !st.valid {
+		return false
+	}
+	idx := st.storeIndex(in)
+	if idx.Top || idx.Hi-idx.Lo > 255 {
+		return false
+	}
+	for i := idx.Lo; i <= idx.Hi; i++ {
+		ma, area := memorymap.MapAddress(in.Operand+uint16(i), false)
+		if area == memorymap.TIA && (ma == 0x00 || ma == 0x01) {
+			return false
+		}
+	}
+	return true
+}
+
 // reachableWithinCallee reports whether target is reachable from entry without
 // passing through a return — i.e. whether it is part of that subroutine's body.
 func reachableWithinCallee(instrs map[uint16]Instr, entry, target uint16) bool {
@@ -587,7 +723,7 @@ func analyzeRegionInContexts(instrs map[uint16]Instr, start Instr, budget, amaxH
 				Start: start.Addr, StartLoc: sm.Locate(start.Addr), Budget: budget,
 				Bounded: true, Kind: "visible", Worst: r.cyc, Over: r.cyc > budget,
 			}
-			if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes) {
+			if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
 				reg.Kind = "blank"
 			}
 			if reg.Over {
@@ -834,11 +970,23 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 
 // regionTouchesDisplay reports whether any node stores to VSYNC($00)/VBLANK($01),
 // i.e. could change the display state within the region.
-func regionTouchesDisplay(nodes map[uint16]Instr) bool {
+// regionTouchesDisplay reports whether anything in the region can turn the
+// display on inside itself, which disqualifies it from being skipped as blank.
+//
+// It shares `storeMissesDisplay` with the JSR rule rather than testing the raw
+// operand, because the raw test saw only non-indexed writes: `sta VSYNC,x` is
+// AbsoluteX, so it returned no address at all and the region was skipped as blank
+// while containing a write to VBLANK. A push counts too — page 1 mirrors the
+// console's own addresses, so SP can aim a PHA at the display.
+func regionTouchesDisplay(nodes map[uint16]Instr, states map[uint16]State) bool {
 	for _, in := range nodes {
 		switch in.Def.Operator {
+		case instructions.PHA, instructions.PHP:
+			if !pushMissesDisplay(in, states) {
+				return true
+			}
 		case instructions.STA, instructions.STX, instructions.STY:
-			if a, ok := storeAddr(in); ok && (a == 0x00 || a == 0x01) {
+			if !storeMissesDisplay(in, states) {
 				return true
 			}
 		}
@@ -873,7 +1021,7 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 	// never stores to $00/$01 (so it can't turn the display on inside itself), it
 	// is not a visible-scanline timing risk — skip it soundly. Its only failure
 	// mode is total frame-line drift, which is a separate check (ntsc_frame_lines).
-	if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes) {
+	if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
 		reg.Kind = "blank"
 		// ①: fall through and STILL compute the worst-case. A blank (VSYNC/VBLANK/
 		// overscan) region > budget does not tear a visible line, but it adds a
@@ -881,6 +1029,30 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 		// roll. Previously this returned Worst=0, hiding it from the ∀ proof.
 	}
 	ctxs := callContexts(instrs, start.Addr)
+	// A region inside a subroutine called from more than one place must be walked
+	// once PER CALL SITE, not as one merged graph. The flat walk follows the RTS
+	// to every return address, so it happily costs a path that enters from call
+	// site A and leaves through call site B — an execution that cannot happen. On
+	// a two-sprite kernel that positions both players through one shared routine
+	// (the ordinary way to write it) that fused path both inflated the worst case
+	// and dragged in a `sta VBLANK` belonging to the other context, which flipped
+	// the region's classification from blank to visible and reported a violation
+	// on a routine that runs entirely inside VBLANK. Measured on a generated
+	// two-call clone: 89 cycles and `certified:false`, against 74 and
+	// `certified:true` for the identical kernel with one call site.
+	//
+	// Taking the worst across contexts stays sound — each context is a real
+	// execution — while dropping the impossible ones. This used to run only as a
+	// fallback when the flat walk found no WSYNC at all, which is exactly the case
+	// where it does NOT help: with several call sites the flat walk reaches a sink
+	// easily, and answers confidently from a path that does not exist.
+	if len(ctxs) > 1 {
+		if r := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, ctxs); r != nil {
+			return *r
+		}
+		// Unresolvable in some context: fall through to the flat walk, which is
+		// still an over-approximation and therefore still sound.
+	}
 	if len(s.sinks) == 0 {
 		if len(ctxs) > 0 {
 			if r := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, ctxs); r != nil {

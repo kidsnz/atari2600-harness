@@ -164,7 +164,11 @@ type State struct {
 	// range over the proven index range — the data is constant and in the binary.
 	// Not part of state equality (it is a constant capability, not a value).
 	romAt func(uint16) (byte, bool)
-	valid bool
+	// preservesDisplay reports whether the subroutine at the given entry address
+	// provably cannot write VSYNC/VBLANK, so those bits survive a JSR to it. Like
+	// romAt it is a constant capability, not a value, and not part of equality.
+	preservesDisplay func(uint16) bool
+	valid            bool
 }
 
 func botState() State { return State{} } // bottom: valid=false (unreachable)
@@ -208,6 +212,9 @@ func (s State) joinState(o State) State {
 	r.ZPVal = s.ZPVal.join(o.ZPVal)
 	if r.romAt = s.romAt; r.romAt == nil { // constant capability — carry it through
 		r.romAt = o.romAt
+	}
+	if r.preservesDisplay = s.preservesDisplay; r.preservesDisplay == nil {
+		r.preservesDisplay = o.preservesDisplay
 	}
 	r.Mem = map[uint16]ValueRange{}
 	for k, v := range s.Mem {
@@ -666,7 +673,26 @@ func absSuccessors(in Instr, st State) []absEdge {
 		}
 		return []absEdge{{in.Operand, st}}
 	case instructions.JSR:
-		return []absEdge{{in.Operand, st}, {in.next(), topState()}}
+		// The callee's effect is not modeled, so the return point starts from Top —
+		// except for the display bits, which are kept when the callee provably
+		// cannot write VSYNC/VBLANK.
+		//
+		// Dropping them unconditionally is not merely imprecise, it is
+		// self-defeating on the ordinary two-sprite kernel: `jsr SetXPos` twice
+		// leaves VBLANK unknown at the SECOND call site, that unknown flows into the
+		// shared subroutine, joins with the known-on state from the first call, and
+		// the routine's own entry state comes out unknown. The region inside it is
+		// then classified `visible` although it runs entirely inside VBLANK, and a
+		// blank-region overrun (frame-line drift, caught by `ntsc_frame_lines`) is
+		// reported as a visible-line tear, which is a different and much louder
+		// claim. Measured on a generated clone: one call site certified, the same
+		// kernel with two did not.
+		ret := topState()
+		if st.preservesDisplay != nil && st.preservesDisplay(in.Operand) {
+			ret.VSync, ret.VBlank = st.VSync, st.VBlank
+		}
+		ret.preservesDisplay = st.preservesDisplay
+		return []absEdge{{in.Operand, st}, {in.next(), ret}}
 	case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
 		return nil
 	}
@@ -745,6 +771,18 @@ func zpInitRange(instrs map[uint16]Instr) ValueRange {
 // refinement) treat their inputs as sound, so an unconverged result must never be
 // silently handed to them — a proof resting on it would be a proof of nothing.
 func computeStates(instrs map[uint16]Instr, entries []uint16, romAt func(uint16) (byte, bool)) (map[uint16]State, bool) {
+	st, ok := computeStatesWith(instrs, entries, romAt, nil)
+	// Second pass: now that index ranges are known, a shared subroutine that picks
+	// its object with `sta RESP0,X` can be shown not to touch the display, so the
+	// display bits survive the call instead of being dropped at every return point.
+	st2, ok2 := computeStatesWith(instrs, entries, romAt, st)
+	if !ok2 {
+		return st, ok
+	}
+	return st2, ok2
+}
+
+func computeStatesWith(instrs map[uint16]Instr, entries []uint16, romAt func(uint16) (byte, bool), prev map[uint16]State) (map[uint16]State, bool) {
 	entryState := map[uint16]State{}
 	var work []uint16
 	inWork := map[uint16]bool{}
@@ -763,10 +801,12 @@ func computeStates(instrs map[uint16]Instr, entries []uint16, romAt func(uint16)
 		}
 	}
 	zpInit := zpInitRange(instrs) // 3B: seed ZP value range (0 if cleared, else Top)
+	preserves := displayPreserver(instrs, prev)
 	for _, e := range entries {
 		seed := topState()
 		seed.ZPVal = zpInit
 		seed.romAt = romAt // 3D: ROM-table reads
+		seed.preservesDisplay = preserves
 		push(e, seed)
 	}
 	const maxIter = 300000

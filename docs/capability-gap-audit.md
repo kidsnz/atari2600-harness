@@ -896,6 +896,51 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
 
   The lesson is the RL-7 lesson one level up: the tool that checks the picture cannot see the frame around
   it, and a clone can be pixel-perfect and unplayable at the same time.
+- **SD-6 — `prove_line_budget` false-positived every two-call shared subroutine. DONE (v1.115.0).** Found by
+  running a generated clone through the prover rather than only looking at its picture. The ordinary
+  two-sprite shape — both players placed through one shared `SetXPos` — reported `certified:false` with the
+  routine classified `visible`, while the **identical kernel with one call site certified**:
+
+  | kernel | regions | blank | max_worst | certified | verdict |
+  |---|---|---|---|---|---|
+  | generated clone, 2 calls to `SetXPos` | 9 | 2 | 89 | **false** | `SetXPos` reported `visible` |
+  | same kernel, 1 call | 9 | 3 | 74 | true | — |
+
+  Nothing but the number of call sites differs. That shape is in this project's own Outlaw and Pizza Boy
+  builds, so the prover was crying wolf on the exact kernels it exists to certify.
+
+  **Cause.** `absSuccessors` reset a JSR's return point to full Top, discarding facts the callee cannot
+  change. VBLANK went unknown at the *second* call site; that unknown flowed into the shared subroutine,
+  joined with the known-on state from the first, and the routine's own entry state came out unknown — so
+  `displayOff()` was false and the region could not be classified blank.
+
+  **Fix.** Keep VSYNC/VBLANK across a call when the callee provably cannot write them. One-sided by
+  construction: an unresolvable store, a push whose SP range can reach $0100/$0101 (page 1 mirrors the
+  console's addresses — the Stack Trick is a real display write), or a nested call already on the stack all
+  answer "not preserved". Indexed stores are resolved through the proven index range, which does not exist
+  on the first pass, so `computeStates` runs twice — the second pass adds only a fact justified by a sound
+  first-pass range.
+
+  **A second, pre-existing hole fell out of the litmus.** `regionTouchesDisplay` tested the raw operand, so
+  it saw only non-indexed writes: `sta VSYNC,x` is AbsoluteX and returned no address at all, letting a region
+  that writes VBLANK be skipped as blank. Both checks now share one resolution path.
+
+  **Corpus effect (31 technique ROMs).** Three false positives removed — `game_states` now certifies
+  (`EnterPlay` runs between VBLANK-on and VBLANK-off and is called from two sites), `bullets` ×2 (`PosObj`
+  called twice inside VBLANK) and `sfx_demo` (the overscan loop) reclassify to blank. One region moved the
+  *conservative* way — `rts_dispatch` at 55 ≤ 76, no violation — because indexed stores are no longer
+  invisible to the display check. The clone's real 89-cycle interval is **not lost**: it moves to
+  `blank_over`, i.e. frame-line drift rather than a torn line, which `ntsc_frame_lines` owns and which
+  `framegen` now self-calibrates (RL-7b).
+
+  **Graded against the machine, not itself.** `blankclass_test.go` runs every corpus ROM and asks the
+  television (`GetLastSignal().VBlank`, via new `emu.DisplayOff()`) whether the beam is really blanked each
+  time execution reaches a blank-classified region's opening WSYNC: **129,936 executions across 31 ROMs, 0
+  disagreements**, the 1 never-reached region reported as not covered. **Negative control**: forcing
+  `displayOff()` to true makes the test fail with 28 disagreements — a test that cannot fail proves nothing.
+  Twin litmus `roms/litmus/litmus_jsr_display.asm` holds three routines of identical shape differing in one
+  store (`sta COLUP0,x` / `sta VSYNC,x` / `sta VBLANK`), all called from the same place with the same index
+  values, so a rule that answers the same way for all three is wrong whichever answer it gives.
 - **RL-8 — `framegen` missile/ball replay + per-zone sprite X.** The two limits RL-7 measured. Missiles and
   the ball need one enable bit and one X per scanline (cheap: the attribution is already extracted, only the
   emitter lacks it); per-zone sprite X needs the extracted single `p0x`/`p1x` to become a per-scanline series

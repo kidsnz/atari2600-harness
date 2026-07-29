@@ -8,6 +8,39 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`prove_line_budget` called VBLANK-time code a visible-line tear whenever a subroutine had two call
+  sites** (v1.115.0). Found while running a generated clone through the prover: the ordinary two-sprite
+  shape — both players placed through one shared `SetXPos` — came back `certified:false` with the routine
+  classified `visible`, while the *identical kernel with one call site* certified. That is the shape every
+  two-sprite kernel has, including this project's own Outlaw and Pizza Boy builds.
+  - Cause: `absSuccessors` reset a JSR's return point to full Top, discarding facts the callee cannot
+    change. VBLANK went unknown at the *second* call site, that unknown flowed into the shared subroutine,
+    joined with the known-on state from the first, and the routine's own entry state came out unknown.
+  - Fix: keep VSYNC/VBLANK across a call when the callee provably cannot write them. The rule is one-sided —
+    an unresolvable store, a push whose SP range can reach $0100/$0101 (page 1 mirrors the console's own
+    addresses, so the Stack Trick is a real display write), or a nested call it has already visited all
+    answer "not preserved". Indexed stores are resolved through the index range, which needs ranges that do
+    not exist on the first pass, so `computeStates` now runs twice; the second pass only adds a fact
+    justified by a sound first-pass range.
+  - **A second, pre-existing hole fell out of the litmus**: `regionTouchesDisplay` tested the raw operand, so
+    it saw only non-indexed writes — `sta VSYNC,x` is AbsoluteX and returned no address at all, letting a
+    region that writes VBLANK be skipped as blank. Both checks now share one resolution path.
+  - Corpus effect (31 technique ROMs): three false positives removed (`game_states` now certifies;
+    `bullets` ×2 and `sfx_demo` reclassified to blank — each verified by reading the call context, e.g.
+    `bullets` calls `PosObj` twice between VBLANK-on and VBLANK-off), and one region moved the *conservative*
+    way (`rts_dispatch`, 55 ≤ 76, no violation) because indexed stores are no longer invisible to the check.
+    The real 89-cycle interval in the generated clone is not lost — it moves to `blank_over`, i.e. frame-line
+    drift rather than a torn line, which the `ntsc_frame_lines` check owns.
+  - Graded against the machine, not against itself: new `blankclass_test.go` runs every corpus ROM and asks
+    the television (`GetLastSignal().VBlank`, via new `emu.DisplayOff()`) whether the beam is really blanked
+    each time execution reaches a blank-classified region's opening WSYNC — **129,936 executions across 31
+    ROMs, 0 disagreements**, with the 1 never-reached region reported as not covered. Negative control:
+    forcing `displayOff()` to true makes it fail with 28 disagreements, so the test can fail.
+  - New twin litmus `roms/litmus/litmus_jsr_display.asm`: three routines of identical shape differing in one
+    store (`sta COLUP0,x` / `sta VSYNC,x` / `sta VBLANK`), all called from the same place with the same index
+    values, so a rule that answers the same way for all three is wrong whichever answer it gives.
+
 ### Changed
 - **`framegen` now reports what it did NOT reproduce** (v1.115.0, audit RL-7). The field evaluation of
   `framegen` found the generator sound but the *report* misleading: its only output was a single

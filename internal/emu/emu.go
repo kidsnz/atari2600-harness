@@ -410,6 +410,18 @@ func (e *Emu) Coords() coords.TelevisionCoords {
 	return e.VCS.TV.GetCoords()
 }
 
+// DisplayOff reports whether the beam is currently blanked — VSYNC or VBLANK
+// asserted — as the television itself sees it, taken from the last signal the TIA
+// sent rather than from any register value we kept a copy of.
+//
+// This is the runtime oracle for the static prover's blank/visible region
+// classification: the prover claims a WSYNC-to-WSYNC region runs while the
+// display is off, and that claim is only worth anything if the machine agrees.
+func (e *Emu) DisplayOff() bool {
+	sig := e.VCS.TV.GetLastSignal()
+	return sig.VBlank
+}
+
 // RunFrames は n フレーム実行する（条件停止なし）。stepInstr 経由で CPU サイクルを正しく累積する
 // （RunForFrameCount を使わないのは、stall ステップを除外した正確なサイクル計上を統一するため）。
 func (e *Emu) RunFrames(n int) error {
