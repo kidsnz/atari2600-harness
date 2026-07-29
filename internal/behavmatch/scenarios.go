@@ -1,5 +1,14 @@
 package behavmatch
 
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+)
+
 // Library holds named, reusable input scenarios.
 //
 // Every scenario is a deterministic, ROM-AGNOSTIC input script: the same script
@@ -210,3 +219,147 @@ func playerTag(player int) string {
 
 // ScenarioNames returns the library names in a stable order.
 func ScenarioNames() []string { return append([]string(nil), order...) }
+
+// --- loading scenarios from disk (RL-6) ---
+//
+// The library above is a good default and a bad ceiling: reaching a new game
+// meant editing this package, which puts a Go build between a person and the
+// question they wanted to ask. A scenario is an input script and a list of
+// objects to watch — data, not code — so it belongs in a file the game can carry
+// next to its own source.
+
+// scenarioFile is the on-disk shape. `at` is keyed by frame number as a string,
+// which is what JSON gives for an integer-keyed map.
+type scenarioFile struct {
+	Scenarios []scenarioJSON `json:"scenarios"`
+}
+
+type scenarioJSON struct {
+	Name    string                   `json:"name"`
+	Frames  int                      `json:"frames"`
+	Reset   bool                     `json:"reset"`
+	Objects []int                    `json:"objects"`
+	At      map[string][]inputChange `json:"at"`
+}
+
+type inputChange struct {
+	Panel  string `json:"panel,omitempty"`
+	Action string `json:"action,omitempty"`
+	Player int    `json:"player,omitempty"`
+	Press  bool   `json:"press"`
+}
+
+func (s scenarioJSON) toScenario() (Scenario, error) {
+	if s.Name == "" {
+		return Scenario{}, fmt.Errorf("scenario has no name")
+	}
+	if s.Frames < 1 {
+		return Scenario{}, fmt.Errorf("scenario %q: frames must be >= 1", s.Name)
+	}
+	out := Scenario{Name: s.Name, Frames: s.Frames, Reset: s.Reset, Objects: s.Objects}
+	if len(s.At) > 0 {
+		out.At = map[int][]InputChange{}
+	}
+	for k, list := range s.At {
+		var f int
+		if _, err := fmt.Sscanf(k, "%d", &f); err != nil {
+			return Scenario{}, fmt.Errorf("scenario %q: frame key %q is not a number", s.Name, k)
+		}
+		if f < 0 || f >= s.Frames {
+			return Scenario{}, fmt.Errorf("scenario %q: frame %d is outside 0..%d, so its input would "+
+				"never be applied", s.Name, f, s.Frames-1)
+		}
+		for _, ic := range list {
+			if (ic.Panel == "") == (ic.Action == "") {
+				return Scenario{}, fmt.Errorf("scenario %q frame %d: set exactly one of panel/action", s.Name, f)
+			}
+			out.At[f] = append(out.At[f], InputChange{
+				Panel: ic.Panel, Action: ic.Action, Player: ic.Player, Press: ic.Press,
+			})
+		}
+	}
+	return out, nil
+}
+
+func fromScenario(s Scenario) scenarioJSON {
+	out := scenarioJSON{Name: s.Name, Frames: s.Frames, Reset: s.Reset, Objects: s.Objects}
+	if len(s.At) > 0 {
+		out.At = map[string][]inputChange{}
+	}
+	for f, list := range s.At {
+		key := fmt.Sprint(f)
+		for _, ic := range list {
+			out.At[key] = append(out.At[key], inputChange{
+				Panel: ic.Panel, Action: ic.Action, Player: ic.Player, Press: ic.Press,
+			})
+		}
+	}
+	return out
+}
+
+// LoadScenarios reads scenarios from a .json file or from every .json in a
+// directory, and returns them with a stable presentation order. A malformed
+// entry is an error rather than a skip: a scenario silently missing from a suite
+// is a gap in coverage that nothing would report.
+func LoadScenarios(path string) (map[string]Scenario, []string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	var files []string
+	if info.IsDir() {
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, e := range entries {
+			if !e.IsDir() && strings.EqualFold(filepath.Ext(e.Name()), ".json") {
+				files = append(files, filepath.Join(path, e.Name()))
+			}
+		}
+		sort.Strings(files)
+		if len(files) == 0 {
+			return nil, nil, fmt.Errorf("%s contains no .json scenario files", path)
+		}
+	} else {
+		files = []string{path}
+	}
+
+	lib := map[string]Scenario{}
+	var order []string
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			return nil, nil, err
+		}
+		var sf scenarioFile
+		if err := json.Unmarshal(b, &sf); err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", f, err)
+		}
+		for _, sj := range sf.Scenarios {
+			sc, err := sj.toScenario()
+			if err != nil {
+				return nil, nil, fmt.Errorf("%s: %w", f, err)
+			}
+			if _, dup := lib[sc.Name]; dup {
+				return nil, nil, fmt.Errorf("%s: duplicate scenario name %q", f, sc.Name)
+			}
+			lib[sc.Name] = sc
+			order = append(order, sc.Name)
+		}
+	}
+	if len(lib) == 0 {
+		return nil, nil, fmt.Errorf("%s defines no scenarios", path)
+	}
+	return lib, order, nil
+}
+
+// ExportBuiltins writes the built-in library as JSON — the starting point for a
+// new game, so nobody has to derive the file format from the parser.
+func ExportBuiltins() ([]byte, error) {
+	var sf scenarioFile
+	for _, n := range ScenarioNames() {
+		sf.Scenarios = append(sf.Scenarios, fromScenario(Library[n]))
+	}
+	return json.MarshalIndent(sf, "", "  ")
+}

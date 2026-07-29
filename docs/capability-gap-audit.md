@@ -739,7 +739,21 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   encoding). A full-width playfield (e.g. Pizza Boy's 4 buildings across clk4-143) needs **per-scanline/band
   `PF0/PF1/PF2` tables** (`PF0tab/PF1tab/PF2tab`, reflect or repeat). The measurement already exists — only the
   emit needs a `-format pf012|arena` switch. Size: S-M. 〔TOOL-EVAL V2 / idea #1〕
-- **RL-6 — `behavmatch` scenario generalisation.** Scenarios are hardcoded Outlaw mechanics in
+- **RL-6 — `behavmatch` scenario generalisation — DONE.** Two halves, both measured.
+  (a) The scripts were Outlaw mechanics; they are now ROM-AGNOSTIC and name no game variable — both players,
+  every direction, tap-vs-hold fire, diagonals, aimed fire, simultaneous fire, a 900-frame duel, the console
+  switches. On the real cartridge that took live bytes from 16 to 51 and revealed the RAM layout as
+  consecutive per-player pairs.
+  (b) They are now LOADABLE: `-scenarios file.json|dir/` and `-export-scenarios` to dump the built-ins as a
+  starting point, so reaching a new game no longer puts a Go build between a person and the question. A
+  scenario is an input script plus objects to watch — data, not code.
+  The check is not that the JSON parses but that a scenario driven from disk moves the machine IDENTICALLY:
+  round-tripped built-ins produce byte-identical traces across all 128 RAM addresses and identical held-input
+  levels per frame. Malformed entries are errors, never skips (missing name/frames, a frame past the end,
+  both or neither of panel/action, duplicate names, an empty file) — a scenario silently absent from a suite
+  is a hole in coverage nothing would report, the same reason the coverage denominator and the RAM-gate mask
+  print what they left out.
+- **(original) RL-6 — `behavmatch` scenario generalisation.** Scenarios are hardcoded Outlaw mechanics in
   `internal/behavmatch/scenarios.go` (e.g. `p0-fire-freeze` = the no-Getaway rule). Make scenarios
   **per-game/loadable** (input timeline + trace targets via JSON/DSL or a per-game registry) so a new game is
   usable without editing the package. Pizza Boy needs: 4-way move / delivery (+$10 BCD trace) / crash

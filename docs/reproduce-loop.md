@@ -74,6 +74,19 @@ residual content vertical shift (±lines, chosen by element-match). Validated: p
 clone (gunmen at 2× width with P1 reflected, asymmetric cactus, score, bars, borders) with the target's
 exact TIA colours. The output is stand-alone (register equates inline, no includes).
 
+### Scenarios live in files, not in the package
+
+`behavmatch -export-scenarios > mygame.json` dumps the built-in library; `-scenarios mygame.json` (or a
+directory of them) drives from it. A scenario is an input script plus the objects to watch — data, not code —
+so a game carries its own next to its source and reaching a new one does not need a Go build. A malformed
+entry is an error rather than a skip: a scenario quietly missing from a suite is a hole in coverage that
+nothing else would report.
+
+`vismatch -target-until-gameplay` finds the frame at which the target's picture settles after its opening
+screen, so `-target-frames` / `-target-warmup` need not be hand-tuned; and when two frames differ by a
+constant vertical offset, `vismatch` now names it in one line instead of leaving it to be derived from N band
+rows — which is where a 3px error came from in the field.
+
 ## `ramtrace` — what is this ROM's state, and how does each byte change?
 
 The prior question to both of the above. `vismatch` asks whether it looks the same and `behavmatch`'s

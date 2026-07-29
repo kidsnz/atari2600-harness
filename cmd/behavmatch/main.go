@@ -41,8 +41,20 @@ func main() {
 	tol := flag.Float64("tol", 0.6, "px tolerance for 'same' on speed/range")
 	dump := flag.Bool("dump", false, "also print each traced object's raw X series")
 	ramGate := flag.Bool("ram-gate", false, "also gate on RAM state: report the first frame+address where the build's RAM stops matching the target's")
+	scenFile := flag.String("scenarios", "", "load scenarios from a .json file or a directory of them, instead of the built-in library — a scenario is an input script and a list of objects to watch, so a game can carry its own next to its source")
+	exportScen := flag.Bool("export-scenarios", false, "print the built-in library as JSON and exit — the starting point for a new game, so the file format need not be derived from the parser")
 	ramMask := flag.String("ram-mask", "live", "which bytes the RAM gate compares: 'live' (bytes the target exercised, minus the stack's reach) or 'full' (all 128)")
 	flag.Parse()
+	if *exportScen {
+		b, err := behavmatch.ExportBuiltins()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		fmt.Println(string(b))
+		os.Exit(0)
+	}
+
 	if *target == "" || *mine == "" {
 		fmt.Fprintln(os.Stderr, "usage: behavmatch -target ref.bin -mine build.asm [-scenario all]")
 		fmt.Fprintln(os.Stderr, "scenarios:", strings.Join(behavmatch.ScenarioNames(), ", "))
@@ -59,9 +71,18 @@ func main() {
 		os.Exit(2)
 	}
 
+	library := behavmatch.Library
 	names := behavmatch.ScenarioNames()
+	if *scenFile != "" {
+		lib, order, err := behavmatch.LoadScenarios(*scenFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "scenarios:", err)
+			os.Exit(2)
+		}
+		library, names = lib, order
+	}
 	if *scenario != "all" {
-		if _, ok := behavmatch.Library[*scenario]; !ok {
+		if _, ok := library[*scenario]; !ok {
 			fmt.Fprintln(os.Stderr, "unknown scenario:", *scenario)
 			os.Exit(2)
 		}
@@ -70,7 +91,7 @@ func main() {
 
 	allMatch := true
 	for _, name := range names {
-		scn := behavmatch.Library[name]
+		scn := library[name]
 		tt, err := behavmatch.Record(tBin, *spec, scn, *tWarmup)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, name, "target:", err)
