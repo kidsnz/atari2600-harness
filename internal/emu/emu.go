@@ -1347,7 +1347,18 @@ func (e *Emu) LastTIAWrite() (TIAWrite, bool) {
 	if lr.Defn == nil || lr.Defn.Effect != instructions.Write {
 		return TIAWrite{}, false
 	}
-	canon, area := memorymap.MapAddress(lr.InstructionData, false)
+	// The register written is the EFFECTIVE address, not the base operand.
+	// `sta COLUP0,x` with x=3 reaches COLUBK, and a multiplexed kernel driving
+	// several objects from one indexed loop is exactly the case a write→beam
+	// timeline exists to explain — so using the operand here names the wrong
+	// register in the only situation that matters. effectiveAddr resolves every
+	// addressing mode; a store does not modify X/Y, so reading them after the
+	// instruction gives the values it actually used.
+	eff, ok := e.effectiveAddr()
+	if !ok {
+		return TIAWrite{}, false
+	}
+	canon, area := memorymap.MapAddress(eff, false)
 	if area != memorymap.TIA {
 		return TIAWrite{}, false
 	}
