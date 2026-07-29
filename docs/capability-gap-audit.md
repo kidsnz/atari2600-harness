@@ -1329,16 +1329,106 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   Still not reproduced, with numbers: `road` (reset X moves 21/16/3 ways) and Fishing Derby's M1/BL (its
   playfield is reflect-asymmetric, so all six PF writes are needed and no slot is left). Per-zone sprite X
   remains open as **RL-8b**.
-- **RL-8b — `framegen` per-zone sprite X.** The remaining RL-7 limit. `framegen` carries one reset X per
-  object and strobes RESxx once, so a target that repositions per zone cannot be followed — measured:
-  `zone_multiplex` loses 190 cells on each player, `road`'s missiles take 21 and 16 distinct X. Needs the
-  extracted single X to become a per-scanline series plus RESxx/HMOVE placement inside the kernel, against a
-  line budget that already has 8 of 8 slots used. Gate: `zone_multiplex`'s 380 off-cells go to 0 and `road`
-  reaches pixel-exact, with the clone still certifying. Missiles and
-  the ball need one enable bit and one X per scanline (cheap: the attribution is already extracted, only the
-  emitter lacks it); per-zone sprite X needs the extracted single `p0x`/`p1x` to become a per-scanline series
-  plus RESPx/HMOVE placement in the replay kernel, which is the harder half. Gate: `shared_setxpos`,
-  `road` and Fishing Derby reach pixel-exact; `zone_multiplex`'s 380 off-cells go to 0. Size: M.
+- **RL-8b — `framegen` per-zone sprite X. DONE.** The last RL-7 limit. `framegen` carried one reset X per
+  object and strobed RESxx once, so a target that repositions down the frame could not be followed:
+  `zone_multiplex` lost 190 cells on each player. It now emits a ZONE-STRUCTURED kernel — a replay loop per
+  zone, separated by positioning blocks that run in the target's own blank lines — and where that does not
+  fit it says so with the lines it counted.
+
+  **The measurement that decides the scope, taken first.** A repositioning kernel does not need per-line
+  RESxx; it needs the position to be constant over a BAND of lines and enough blank lines between bands to
+  pay for the move. So the extractor now records the per-line reset X as a series rather than a histogram
+  (`objFacts.distinctX` counts how many positions a target used and cannot say whether they are reachable)
+  and folds it into bands with the gap before each one. Cost of one boundary: one scanline per object placed
+  (each block opens with `sta WSYNC`) + one HMOVE line + one replayed blank line to leave GRP/PF at 0, since
+  the replay loop is not running on the block's lines and the only picture reproducible there is none.
+
+  | ROM | object | bands | band structure (measured) | gap needed | fits |
+  |---|---|---|---|---|---|
+  | `zone_multiplex` | P0 | 6 | L11-17@x49 gap11, L27-33@x79 gap9, L43-49@x117 gap9, L59-65@x19 gap9, L75-81@x9 gap9, L91-97@x97 gap9 | 4 | **yes** |
+  | `zone_multiplex` | P1 | 6 | L11-17@x71 gap11, L27-33@x41 gap9, L43-49@x4 gap9, L59-65@x34 gap9, L75-81@x66 gap9, L91-97@x94 gap9 | 4 | **yes** |
+  | `dyn_multisprite` | P0 | 3 | L72-85@x48 gap72, L140-141@x48 gap54, L142-153@x78 **gap0** | 4 | no |
+  | `road` | M0 | 27 | L7-8@x38 gap7, L9-10@x82 **gap0**, L11-12@x90 gap0, L13-32@x98 gap0, … | 7 | no |
+  | `road` | M1 | 23 | L7-8@x126 gap7, L9@x122 **gap0**, L13-33@x91 gap3, … | 6 | no |
+  | `road` | BL | 4 | L7-8@x86 gap7, L9-10@x83 **gap0**, L11-12@x80 gap0, L13@x86 gap0 | 5 | no |
+  | `rts_dispatch` | P0 | — | **1 reset X** (36, on all 37 drawn lines) | — | not a zone case |
+  | `bitmap48` | P0/P1 | — | **1 reset X** each (87 / 95, 19 lines) | — | not a zone case |
+  | `score6` | P0/P1 | — | **1 reset X** each (87 / 95, 8 lines) | — | not a zone case |
+  | `text12` | P0/P1 | — | **1 reset X** each (87 / 95, 20 lines) | — | not a zone case |
+  | `text24` | P0/P1 | — | **1 reset X** each (39 / 47, 10 lines) | — | not a zone case |
+  | `hscroll` | — | — | **no player drawn at all**; its 64 cells are PF | — | not a zone case |
+  | `shared_setxpos` | all 5 | — | **1 reset X** each (20/55/84/109/139) | — | not a zone case |
+  | Outlaw | P0/P1 | — | **1 reset X** each (6 / 135, 48 lines) | — | not a zone case |
+  | Combat | P0/P1 | — | **1 reset X** each (11 / 143, 14 lines) | — | not a zone case |
+
+  So **five of the eight "placement differs" ROMs were never a per-zone problem at all** — one X per player,
+  measured — and the RL-7 verdict's "the 8 placement-differs ROMs share one cause" was wrong about them. That
+  is the RL-7c lesson holding a second time: the honest scope of this feature is `zone_multiplex`, and
+  `dyn_multisprite` and `road` are refused with the counted reason rather than approximated.
+
+  **Result: `zone_multiplex` 380 → 0 cells, pixel-exact** (BG 33808/33808, P0 228/228, P1 204/204), 262
+  scanlines. Corpus after, over 31 technique ROMs + Outlaw and Combat with and without `-reset`:
+  **22 pixel-exact / 8 differ / 1 partial, 262 scanlines on 35/35 runs**, and the generated source is
+  **byte-identical for all 34 non-zone runs** (`dyn_multisprite` and `road` gain only the new
+  `NOT REPRODUCED: per-zone X` note in the banner; the code below the comments diffs clean).
+
+  **Three defects found by measuring the clone, each of which a plausible-sounding design would have kept:**
+  - *The prologue's `SetXPos` cannot be reused inside the kernel.* Its div-15 loop costs `5k+22` cycles to
+    the block's closing `sta WSYNC` write, so `k=11` — needed for reset X 4, because `k<=10` only reaches
+    6..155 — pushes that write past cycle 75 and the block eats TWO scanlines. Measured symptom: a 263-line
+    frame and a picture the shift search wanted to move 2 lines, i.e. **72 cells wrong that were not a
+    positioning error**. Replaced with a branch-free fixed-cost block: `n x nop` + `sta.w RESxx` +
+    `lda #nib` + `sta HMxx`, strobing at `2n+3` and closing at `2n+11`, one scanline for every reachable
+    position and no page-crossing branch cycle to account for.
+  - *The reset marker is not the drawn window.* The same 8-pixel sprite line reports reset X 49 with span
+    49..56 in one band, 117 with span 116..123 in another and 4 with span 4..11 in a third — the marker is
+    off by −1, 0 or +1 with the fine HMOVE nibble that placed the object. Calibrating the clone's marker onto
+    the target's marker therefore leaves the picture a pixel out (**12 cells**, all of them one edge pixel of
+    a band's widest lines) and sampling the graphics byte at the marker reads the wrong 8 clocks. Both sides
+    are now anchored on **the leftmost clock the object was actually drawn at**, minimised over the band
+    because the sprite is 2,4,6,8,8,6,4 pixels wide down each band and only the widest lines show its edge.
+  - *The historical block order is wrong for a moved sprite.* `GRP1` sits fifth and lands at visible clock
+    +37, fine for a player parked on the right and **64 cells wrong** for `zone_multiplex`'s band at reset X
+    4. A zone plan now takes the deadline-sorted layout (which also drops the 6 playfield writes this target
+    provably does not need — all three PF registers 0 on both halves of all 214 lines, 42 cycles freed).
+
+  Not reproduced, with the number: `dyn_multisprite` (P0 goes 48 → 78 at visible line 142 while it is still
+  being drawn — **0 of the 4 blank lines** the move needs), `road`'s M0/M1/BL (**0 of 7 / 0 of 6 / 0 of 5**
+  blank lines at their first change, line 9), and the five one-X ROMs above, whose causes are copies and the
+  block budget (RL-7c) and are unchanged. Every generated clone still passes `cyclebound -asm` with
+  `certified:true`.
+
+### A frame counter that WRAPS was not recognised as a clock — and it had been carrying 12 "resolved" bytes (2026-07-29)
+
+`ramtrace arity` finds the smallest feature set (self + input + companions) that determines each RAM byte's
+next value. `frameIndexLike` exists because a free-running counter uniquely identifies the frame, so keying on
+it "explains" every other byte perfectly and the probe reports arity 1 for all of RAM — memorisation wearing a
+model's clothes. That trap was found and fixed in a previous session.
+
+**It was only half fixed.** The test required the value to be distinct on EVERY transition, and a counter that
+WRAPS does not satisfy it. Measured on Outlaw, `$DA` takes **256 distinct values, changes on all 4266
+transitions, and its only deltas are +1 and −255** — a textbook frame counter that cycles. It failed the clock
+test purely because the recording outlives its period, and **27 of the 35 bytes reported as resolved were
+explained by keying on it**.
+
+| Outlaw, 24 scenarios, warmup 20 | before | after |
+|---|---|---|
+| live bytes | 44 | 44 |
+| **resolved** | **35** | **23** |
+| **unresolved** | **9** | **21** |
+| named as clock-like | — | **`$DA`** |
+
+**This corrects a project-level conclusion.** The previous session recorded that the behaviour-reproduction
+plan's central premise — "each byte is determined by itself + input + at most 2 companions" — was *supported by
+measurement*, on figures of that shape (it recorded live 43 / resolved 38 / unresolved 5). With the clock
+excluded, **nearly half the live bytes are unresolved**. The premise is far weaker than recorded, and the M-B
+phase should be planned against 23/44 rather than 38/43.
+
+The detector now also treats "visits ≥250 of its 256 possible values while changing every frame" as a clock,
+and the report **names** the clock-like bytes instead of computing the list and never printing it — the
+`FrameIndexLike` field existed and no caller displayed it. Asserted in three directions: a wrapping counter is
+a clock, a byte cycling over four values is NOT (an ordinary state variable must stay usable as a companion),
+and a constant is not.
 
 ### A RAM gate that compares one byte read as a pass (2026-07-29)
 

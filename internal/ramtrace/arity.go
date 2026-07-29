@@ -162,9 +162,21 @@ func frameIndexLike(ts []transition, code int) bool {
 		if counts[tid] < 4 {
 			continue // too short for uniqueness to mean anything
 		}
-		if len(vals) != counts[tid] {
-			return false
+		// Uniqueness across the whole recording is the strict case, but a counter that
+		// WRAPS is just as dangerous and does not satisfy it. Measured on Outlaw: $DA
+		// takes 256 distinct values, changes on all 4266 transitions, and its only
+		// deltas are +1 and -255 — a free-running frame counter that cycles. It failed
+		// this test purely because the recording is longer than its period, and 27 of
+		// the 35 "resolved" bytes were then explained by keying on it. A byte that
+		// visits (almost) every value it can and changes every frame is a clock,
+		// whether or not the trace outlives one revolution.
+		if len(vals) == counts[tid] {
+			continue // strictly unique: a counter by the original definition
 		}
+		if len(vals) >= 250 {
+			continue // wraps, but visits nearly the whole byte range: still a clock
+		}
+		return false
 	}
 	return len(perTrace) > 0
 }
