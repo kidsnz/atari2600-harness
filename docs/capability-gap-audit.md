@@ -809,7 +809,58 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   start — rather than guessing.
 - **(original) RL-4 — `-target-until-gameplay` auto frame-find.** Auto-detect the first frame where PF/sprites stabilise
   (title exited) so the target frame count need not be hand-tuned. Complements RL-5. Size: S-M. 〔idea #4〕
-- **RL-7 — `framegen` field evaluation (validator track).** `framegen` self-calibrates VBLANK/vertical-shift/
-  sprite-X — the −8 shift hand-iterated on Pizza Boy should be automatic. Evaluate as the visual-layer
-  ground-truth/validator (note: static-frame replay only — it does **not** generate gameplay logic, which is
-  the behaviour-reproduction system's job). Size: S (evaluation). 〔idea #7〕
+- **RL-7 — `framegen` field evaluation (validator track). DONE (v1.115.0).** Evaluated on 31 technique ROMs +
+  3 commercial cartridges. The self-calibration works: VBLANK, vertical shift and sprite X all converge
+  without hand-iteration. What the evaluation found is that **the tool did not say what it failed to
+  reproduce**, and its kernel cannot reproduce everything.
+
+  **The defect, reproduced first.** `framegen`'s only progress line was `element match N / 34240`. On
+  *Fishing Derby* that read **33172 / 34240 = 96.9%**, followed by `wrote fd.asm` — no warning of any kind.
+  Measured per element, the same frame is:
+
+  | elem | target cells | matched | drawn anywhere in the clone |
+  |---|---|---|---|
+  | BG | 26226 | 26172 | 27186 |
+  | PF | 6912 | 6888 | 6888 |
+  | P0 | 665 | **75** | 98 |
+  | P1 | 337 | **37** | 68 |
+  | M1 | 42 | **0** | **0** |
+  | BL | 58 | **0** | **0** |
+
+  96.9% overall while **the fisherman is 11% correct (75/665)** and the hook and line are absent outright.
+  Background is 77% of the visible area, so it carries the headline number and buries everything the
+  reproduction is actually for. `grep -c 'ENAM0\|ENAM1\|ENABL'` on every generated clone returns **0**: the
+  emitted kernel writes PF/GRP0/GRP1 and nothing else, so missiles and the ball are missing *by
+  construction*, not by a tuning error.
+
+  **The fix** — `framegen` now measures its own output per element against the target's attribution and
+  reports what it did not draw, in three places: the terminal report, a `; NOT REPRODUCED:` block burned into
+  the generated `.asm` banner (the file outlives the terminal), and the **exit code** (1 = incomplete, matching
+  `vismatch`/`behavmatch`). Structural absence (`clone 0`) is reported separately from misplacement
+  (`clone > 0` but in the wrong cells) because they have different causes and different fixes.
+
+  **Field results after the fix** (`-frames 28`, 31 technique ROMs):
+
+  | verdict | count | ROMs |
+  |---|---|---|
+  | pixel-exact | 21 | banked_game, bullets, divtable, flicker_multiplex, game_states, maze, multicolor48, music_driver, paddle_demo, pf_modes, procgen_demo, rpgmap, sfx_demo, sound_driver, sprite_anim, tia_pcm, two_line_kernel, two_line_vdel, venetian, vertical_pos, vertical_pos_dcp |
+  | placement differs | 8 | zone_multiplex 380, rts_dispatch 376, text12 298, bitmap48 212, dyn_multisprite 176, hscroll 64, score6 48, text24 162 (cells) |
+  | element absent | 2 | shared_setxpos (M0 1712, M1 1712, BL 428), road (M0/M1/BL) |
+
+  Commercial: **Outlaw pixel-exact, Combat pixel-exact** (with and without `-reset`); **Fishing Derby partial**
+  (M1/BL absent). The 8 "placement differs" ROMs share one cause, now stated in the report rather than left
+  to be discovered: `framegen` carries **one X per player for the whole frame**, so a kernel that repositions
+  a sprite per zone cannot be followed — `zone_multiplex` loses 190 cells on each player.
+
+  **Verdict: `framegen` is a sound visual-layer validator for BG/PF/P0/P1 on single-position kernels**, which
+  covers 21/31 of the corpus and 2/3 of the cartridges tried. It is *not* a whole-frame reproducer: it draws
+  no missiles or ball, and it cannot follow a multiplexed sprite. That limit is now machine-enforced (exit 1)
+  instead of resting on the reader noticing. A tie in the vertical-shift search also used to resolve to the
+  first candidate scanned (−4), i.e. "no offset explains anything" came out as "shift the picture up four
+  lines"; ties now resolve to 0. Adding ENAMx/ENABL replay and per-zone sprite X are the follow-ups —
+  filed below as RL-8.
+- **RL-8 — `framegen` missile/ball replay + per-zone sprite X.** The two limits RL-7 measured. Missiles and
+  the ball need one enable bit and one X per scanline (cheap: the attribution is already extracted, only the
+  emitter lacks it); per-zone sprite X needs the extracted single `p0x`/`p1x` to become a per-scanline series
+  plus RESPx/HMOVE placement in the replay kernel, which is the harder half. Gate: `shared_setxpos`,
+  `road` and Fishing Derby reach pixel-exact; `zone_multiplex`'s 380 off-cells go to 0. Size: M.

@@ -203,6 +203,62 @@ func renderGrid(src, spec string, frames int) (grid [][]string, top int, err err
 
 // matchCount counts element cells that agree between target grid and clone grid,
 // both aligned to the same absolute scanline (tgtTop==cloneTop assumed).
+// elemCoverage is one TIA element's share of the reproduction: how many visible
+// cells the target draws with it, how many of those the clone draws the same
+// way, and whether the clone draws that element ANYWHERE in its frame.
+type elemCoverage struct {
+	Elem     string
+	Target   int // cells the target draws with this element
+	Matched  int // of those, cells the clone agrees on
+	CloneAny int // cells the clone draws with this element, anywhere
+}
+
+// coverage measures the reproduction per element rather than as one number.
+//
+// A single match percentage hides the failure that matters: this generator's
+// kernel emits PF + GRP0/GRP1 and nothing else, so on a target that draws no
+// missiles it is pixel-exact, and on a target that draws bullets it silently
+// omits every one of them while still scoring high. `CloneAny == 0` with
+// `Target > 0` is that case stated as a number — the element is not slightly
+// wrong, it is structurally absent.
+func coverage(tgt, clone [][]string) []elemCoverage {
+	target, matched, cloneAny := map[string]int{}, map[string]int{}, map[string]int{}
+	h := len(tgt)
+	if len(clone) < h {
+		h = len(clone)
+	}
+	for y := 0; y < h; y++ {
+		for x := 0; x < 160 && x < len(tgt[y]) && x < len(clone[y]); x++ {
+			target[tgt[y][x]]++
+			cloneAny[clone[y][x]]++
+			if tgt[y][x] == clone[y][x] {
+				matched[tgt[y][x]]++
+			}
+		}
+	}
+	// Fixed order so two runs are diffable, and so an element the target never
+	// draws is absent rather than reported as a vacuous 0/0 pass.
+	var out []elemCoverage
+	for _, e := range []string{"BG", "PF", "P0", "P1", "M0", "M1", "BL"} {
+		if target[e] == 0 && cloneAny[e] == 0 {
+			continue
+		}
+		out = append(out, elemCoverage{Elem: e, Target: target[e], Matched: matched[e], CloneAny: cloneAny[e]})
+	}
+	return out
+}
+
+// missingElements names the elements the target draws and the clone never does.
+func missingElements(cov []elemCoverage) []string {
+	var miss []string
+	for _, c := range cov {
+		if c.Target > 0 && c.CloneAny == 0 {
+			miss = append(miss, c.Elem)
+		}
+	}
+	return miss
+}
+
 func matchCount(tgt, clone [][]string) int {
 	n := 0
 	h := len(tgt)
@@ -499,16 +555,108 @@ func main() {
 		}
 		m := matchCount(fd.tgtElem, grid)
 		fmt.Printf("  content shift %+d: element match %d / %d\n", s, m, fd.h*160)
-		if m > bestM {
+		// Strictly better, or equal at no shift. A tie means the offset explains
+		// nothing — motion_glide scores 34232 at all nine — and the scan starting
+		// at -4 made "explains nothing" come out as "shift the picture up 4 lines".
+		if m > bestM || (m == bestM && s == 0) {
 			bestM, bestS = m, s
 		}
 	}
 	fmt.Printf("  chosen content shift: %+d\n", bestS)
 
 	src := emit(fd.shifted(bestS), p0in, p1in, vblankAdj)
+
+	// What did it actually reproduce? Measured per element against the clone's
+	// own rendered frame, because "pixel-exact" on a target that draws no
+	// missiles says nothing about a target that does.
+	var cov []elemCoverage
+	if grid, _, err := renderGrid(src, *spec, *frames); err == nil {
+		// fd.tgtElem, not the shifted copy: shifted() moves the REPLAY tables, and
+		// the target's own attribution is the reference the shift was chosen against.
+		cov = coverage(fd.tgtElem, grid)
+	} else {
+		fmt.Fprintln(os.Stderr, "coverage: could not render the clone:", err)
+	}
+	miss := missingElements(cov)
+	src = annotate(src, cov, miss)
+
 	if err := os.WriteFile(*out, []byte(src), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "write:", err)
 		os.Exit(2)
 	}
 	fmt.Printf("wrote %s (%d bytes source)\n", *out, len(src))
+
+	fmt.Println("reproduction by element (target cells / matched / drawn anywhere in the clone):")
+	for _, c := range cov {
+		note := ""
+		switch {
+		case c.Target > 0 && c.CloneAny == 0:
+			note = "  <-- NOT REPRODUCED: this kernel never draws this element"
+		case c.Target > 0 && c.Matched < c.Target:
+			note = fmt.Sprintf("  (%d cells differ)", c.Target-c.Matched)
+		}
+		fmt.Printf("  %-2s target %6d  matched %6d  clone %6d%s\n", c.Elem, c.Target, c.Matched, c.CloneAny, note)
+	}
+	if len(miss) > 0 {
+		fmt.Printf("RESULT: partial reproduction — the target draws %s and the generated kernel emits "+
+			"no %s writes at all, so every one of those pixels is absent from the clone. "+
+			"Use it as a PF/player validator, not as a full-frame reproduction.\n",
+			strings.Join(miss, "/"), strings.Join(enableRegs(miss), "/"))
+		os.Exit(1)
+	}
+	// An element the clone draws SOMEWHERE but in the wrong cells is a different
+	// finding from one it never draws, and it must not fall through to a success
+	// line: a kernel that carries one X per player cannot follow a multiplexed
+	// target that moves its sprites per zone, and that shows up here as a cell
+	// count, not as a missing element.
+	short := 0
+	for _, c := range cov {
+		short += c.Target - c.Matched
+	}
+	if short > 0 {
+		fmt.Printf("RESULT: differences remain — %d of %d visible cells are drawn by a different element "+
+			"than the target's. Every element is present, so this is placement, not omission "+
+			"(one X per player cannot follow a per-zone multiplexed target).\n", short, len(fd.tgtElem)*160)
+		os.Exit(1)
+	}
+	fmt.Println("RESULT: pixel-exact — every visible cell is drawn by the same element as the target")
+}
+
+// enableRegs names the TIA register that would have to be written for each
+// missing element, so the report says what is absent from the source, not just
+// what is absent from the picture.
+func enableRegs(elems []string) []string {
+	reg := map[string]string{"M0": "ENAM0", "M1": "ENAM1", "BL": "ENABL", "P0": "GRP0", "P1": "GRP1", "PF": "PF0/1/2"}
+	out := make([]string, 0, len(elems))
+	for _, e := range elems {
+		if r, ok := reg[e]; ok {
+			out = append(out, r)
+		} else {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// annotate burns the coverage measurement into the generated source's banner.
+// The file outlives the terminal it was generated in; a clone that is missing
+// every bullet must say so where it will still be read months later.
+func annotate(src string, cov []elemCoverage, miss []string) string {
+	var b strings.Builder
+	b.WriteString("; --- reproduction coverage (measured against the target's own frame) ---\n")
+	for _, c := range cov {
+		fmt.Fprintf(&b, "; %-2s target %6d  matched %6d  clone %6d\n", c.Elem, c.Target, c.Matched, c.CloneAny)
+	}
+	if len(miss) > 0 {
+		fmt.Fprintf(&b, "; NOT REPRODUCED: %s — this kernel emits no %s, so those pixels are\n"+
+			"; absent by construction. This file is a PF/player reproduction, not the whole frame.\n",
+			strings.Join(miss, "/"), strings.Join(enableRegs(miss), "/"))
+	}
+	b.WriteString("; ---------------------------------------------------------------------\n")
+	const anchor = "; ==========================================================================\n    processor 6502\n"
+	if i := strings.Index(src, anchor); i >= 0 {
+		return src[:i+len("; ==========================================================================\n")] +
+			b.String() + src[i+len("; ==========================================================================\n"):]
+	}
+	return b.String() + src
 }

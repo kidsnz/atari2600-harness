@@ -8,6 +8,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **`framegen` now reports what it did NOT reproduce** (v1.115.0, audit RL-7). The field evaluation of
+  `framegen` found the generator sound but the *report* misleading: its only output was a single
+  `element match N / 34240` line, which on Fishing Derby read **96.9%** followed by `wrote clone.asm` — while
+  the fisherman was 11% correct (P0 75/665 cells) and the hook and line were absent entirely. Background is
+  77% of the visible area, so it carries the headline number and buries everything the reproduction is for.
+  The cause is structural, not a tuning error: the emitted kernel writes PF + GRP0/GRP1 and **no
+  `ENAM0`/`ENAM1`/`ENABL` at all** (`grep -c` over every generated clone: 0), and it carries one X per player
+  for the whole frame, so a per-zone multiplexed sprite cannot be followed.
+  - Per-element coverage is now measured against the clone's own rendered frame and reported in three places:
+    the terminal, a `; NOT REPRODUCED:` block burned into the generated `.asm` banner (the file outlives the
+    terminal it came from), and the **exit code** — 1 when incomplete, matching `vismatch`/`behavmatch`.
+  - Structural absence (`clone 0` cells) is reported separately from misplacement (`clone > 0`, wrong cells):
+    different causes, different fixes.
+  - Field results, `-frames 28`: **21/31 technique ROMs pixel-exact**; 8 misplaced (`zone_multiplex` loses 190
+    cells per player); 2 missing elements (`shared_setxpos` M0 1712 / M1 1712 / BL 428, `road` M0/M1/BL).
+    Cartridges: **Outlaw and Combat pixel-exact, Fishing Derby partial.** Verdict recorded: a sound
+    **BG/PF/P0/P1 validator for single-position kernels**, not a whole-frame reproducer.
+  - Also fixed: a tie in the vertical-shift search resolved to the first candidate scanned, so "no offset
+    explains anything" came out as "shift the picture up 4 lines" (`motion_glide` scored 34232 at all nine
+    offsets and chose −4). Ties now resolve to 0.
+  - Follow-up filed as **RL-8**: missile/ball replay and per-zone sprite X.
+
 ### Added
 - **Static program analysis — def-use, proven beam windows, conditional bounds, and the tools to check them**
   (v1.114.0). A night of work whose theme turned out to be that several existing tools were answering

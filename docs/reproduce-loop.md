@@ -74,6 +74,34 @@ residual content vertical shift (±lines, chosen by element-match). Validated: p
 clone (gunmen at 2× width with P1 reflected, asymmetric cactus, score, bars, borders) with the target's
 exact TIA colours. The output is stand-alone (register equates inline, no includes).
 
+### What it does not reproduce — and how it tells you
+
+The replay kernel writes **PF + GRP0/GRP1 and nothing else**. It emits no `ENAM0`/`ENAM1`/`ENABL`, so
+**missiles and the ball are absent by construction**, and it carries **one X per player for the whole
+frame**, so a target that repositions a sprite per zone cannot be followed. Neither limit is a bug to be
+fixed by tuning; both are properties of the emitted kernel (RL-8 tracks lifting them).
+
+So the tool measures its own output per element and says so three ways — the terminal report, a
+`; NOT REPRODUCED:` block in the generated `.asm` banner, and **exit 1**:
+
+```
+reproduction by element (target cells / matched / drawn anywhere in the clone):
+  P0 target    665  matched     75  clone     98  (590 cells differ)
+  M1 target     42  matched      0  clone      0  <-- NOT REPRODUCED: this kernel never draws this element
+  BL target     58  matched      0  clone      0  <-- NOT REPRODUCED: this kernel never draws this element
+RESULT: partial reproduction — the target draws M1/BL and the generated kernel emits no ENAM1/ENABL
+        writes at all, so every one of those pixels is absent from the clone.
+```
+
+That is Fishing Derby, whose **single-number match is 96.9%** — because background is 77% of the visible
+area and outvotes everything the reproduction exists to check. Read the per-element table, never the
+percentage. Structural absence (`clone 0`) is reported apart from misplacement (`clone > 0`, wrong cells):
+different causes, different fixes.
+
+Field-measured over 31 technique ROMs: 21 pixel-exact, 8 misplaced (multiplexed sprites; `zone_multiplex`
+loses 190 cells per player), 2 missing elements. Cartridges: **Outlaw and Combat pixel-exact, Fishing Derby
+partial.** Use it as a **BG/PF/P0/P1 validator on single-position kernels** — not as a whole-frame reproducer.
+
 ### Scenarios live in files, not in the package
 
 `behavmatch -export-scenarios > mygame.json` dumps the built-in library; `-scenarios mygame.json` (or a
