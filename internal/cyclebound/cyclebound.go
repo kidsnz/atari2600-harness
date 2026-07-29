@@ -217,6 +217,240 @@ func cartHotspotKey(addr uint16) (uint16, bool) {
 	return memorymap.OriginCart | (addr & memorymap.CartridgeBits), true
 }
 
+// hotspotTargetBank parses the bank a bank-switch hotspot selects out of the
+// mapper's OWN symbol for it, or reports that the symbol does not name one.
+//
+// The match is deliberately strict — the whole symbol must be "BANK" followed by
+// decimal digits — because the vendored mappers publish two other shapes for
+// which "the same address in another 4K image" is simply not where execution
+// lands, and a loose digit-scrape would invent a control-flow edge the hardware
+// does not have. Measured over Gopher2600/hardware/memory/cartridge:
+//
+//	BANK0..BANK1    F8, WF8              (mapper_atari.go, mapper_atari_wf8.go)
+//	BANK0..BANK3    F6                   (mapper_atari.go)
+//	BANK0..BANK7    F4                   (mapper_atari.go)
+//	BANK0..BANK15   EF                   (mapper_atari_ef.go)
+//	BANK0..BANK63   BF                   (mapper_atari_bf.go)
+//	BANK0..BANK2    CBS/FA               (mapper_cbs.go)
+//	BANK0..BANK3    JANE                 (mapper_atari_jane.go)
+//	B0S0..B7S2      Parker Bros E0       (mapper_parkerbros.go) — bank-in-SEGMENT:
+//	                                     only a 1K slice moves, so the landing
+//	                                     address may not move at all
+//	RAM0..RAM3      M-Network            (mapper_mnetwork.go) — selects cartridge
+//	                                     RAM into the window, which is not in the
+//	                                     image and cannot be decoded
+//
+// "B0S0" would scrape to bank 0 and "RAM3" to bank 3; both are wrong, so both are
+// reported unresolvable rather than guessed.
+func hotspotTargetBank(symbol string) (int, bool) {
+	if !strings.HasPrefix(symbol, "BANK") {
+		return 0, false
+	}
+	digits := symbol[len("BANK"):]
+	if digits == "" {
+		return 0, false
+	}
+	for _, r := range digits {
+		if r < '0' || r > '9' {
+			return 0, false // strconv.Atoi accepts "+1"/"-1"; a hotspot symbol is neither
+		}
+	}
+	n, err := strconv.Atoi(digits)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
+}
+
+// unitDecode is one analysis unit after decoding: the bank's own vector-reachable
+// code plus whatever cross-bank seeding added to it.
+type unitDecode struct {
+	bank     int
+	prog     *program
+	hotspots map[uint16]string
+	instrs   map[uint16]Instr
+	entries  []uint16
+	seeded   int // landing addresses seeded into this bank from another bank
+}
+
+// CrossBankSeed is one decode entry point contributed by a bank switch: the
+// instruction that reaches the hotspot, the hotspot it reaches, and the address
+// the next fetch comes from in the bank the hotspot names.
+type CrossBankSeed struct {
+	FromBank int    `json:"from_bank"`
+	FromAddr uint16 `json:"from_addr"`
+	Hotspot  uint16 `json:"hotspot"`
+	Symbol   string `json:"symbol"`
+	ToBank   int    `json:"to_bank"`
+	ToAddr   uint16 `json:"to_addr"`
+	// Desc is the same edge in the hex a 6502 author reads. The numeric fields keep
+	// the package's existing decimal-address convention (see Region.Start); an
+	// address nobody can read at a glance is a fact that does not get checked.
+	Desc string `json:"desc"`
+}
+
+// seedRoundCap bounds the seeding fixpoint. Each round can only add landing
+// addresses that were not already seeded, and the set of (bank, address) pairs is
+// finite, so the loop terminates on its own; the cap exists so that a mapper
+// shape nobody has measured cannot spin here. Measured on the four bank ROMs in
+// the corpus, the fixpoint closes in 2 rounds (1 productive + 1 that adds
+// nothing), so 8 is not a limit any of them approaches — and when it IS hit the
+// report says so rather than presenting a capped decode as a closed one.
+const seedRoundCap = 8
+
+// seedOutcome is everything the seeding pass wants reported: it must never be
+// possible to read a decode as complete when part of it was skipped.
+type seedOutcome struct {
+	seeds      []CrossBankSeed
+	rounds     int
+	capped     bool
+	unresolved []string // hotspot symbols that do not name a bank number
+	// unresolvable counts instructions whose memory target could not be resolved at
+	// all under a hotspot-bearing mapper. Such an access MIGHT be a switch, but no
+	// symbol is reached, so no bank can be named and nothing can be seeded. The
+	// region containing it is still refused by hotspotRefusal.
+	unresolvable int
+}
+
+// decodeUnits decodes every analysis unit, then closes the decode over bank
+// switches: an instruction whose memory access reaches a bank-switch hotspot
+// continues at the FOLLOWING address in the bank that hotspot names, so that
+// address is a decode entry point for the target bank.
+//
+// This is what a worker bank is missing. A bank's own reset/NMI/IRQ vectors reach
+// only whatever that bank's stub does; the code that matters is entered by the
+// trampoline that switched to it. Measured before seeding: litmus_bank executed 4
+// (bank,pc) pairs the decode never saw — bank 1 $FF03/$FF05/$FF07/$FF09, all of
+// them the body reached from bank 0's `lda $FFF9` at $FF00 — and banked_game 1,
+// bank 1 $FF83.
+//
+// No map key changes, because the landing address is in the OTHER bank at the SAME
+// address and each bank is already decoded as its own flat 4K image.
+//
+// Seeding is a fixpoint: seeding bank B can reveal a hotspot access in B that
+// seeds bank C. It is also STRICTLY ADDITIVE — it only ever hands more entry
+// points to a decode that was already running — so it cannot remove an
+// instruction the old decode had.
+//
+// Address resolution uses topState() rather than the abstract-interpretation
+// result, because the states are computed FROM the decode and would therefore be
+// circular here. Top over-approximates: an indexed access with an unknown index
+// contributes its whole 256-address footprint, so a hotspot inside that footprint
+// is seen. Over-seeding costs precision (extra decoded bytes); under-seeding would
+// leave executed code out of the decode, which is the direction that lies.
+func decodeUnits(units []analysisUnit) ([]unitDecode, seedOutcome) {
+	decodes := make([]unitDecode, len(units))
+	byBank := map[int]int{}
+	for i, u := range units {
+		instrs, entries := u.prog.decodeFromVectors()
+		decodes[i] = unitDecode{bank: u.bank, prog: u.prog, hotspots: u.hotspots, instrs: instrs, entries: entries}
+		byBank[u.bank] = i
+	}
+	// A flat ROM has exactly one unit and no hotspots, so there is nothing to seed
+	// and it goes down a path identical to the one before this existed. That is why
+	// its JSON is byte-for-byte unchanged.
+	if len(units) < 2 {
+		return decodes, seedOutcome{}
+	}
+
+	var out seedOutcome
+	seen := map[[2]int]bool{}    // (target bank, landing address) already seeded
+	badSym := map[string]bool{}  // hotspot symbols already reported unresolvable
+	badSite := map[[2]int]bool{} // (bank, pc) already counted as unresolvable
+	for {
+		if out.rounds >= seedRoundCap {
+			out.capped = true
+			break
+		}
+		out.rounds++
+		added := 0
+		for i := range decodes {
+			d := &decodes[i]
+			if len(d.hotspots) == 0 {
+				continue
+			}
+			// Snapshot the addresses before walking them: this loop decodes INTO
+			// d.instrs when i is also the target bank, and ranging over a map being
+			// written to visits new keys unpredictably. The outer round loop is what
+			// picks anything up that this pass could not see.
+			addrs := make([]uint16, 0, len(d.instrs))
+			for a := range d.instrs {
+				addrs = append(addrs, a)
+			}
+			sort.Slice(addrs, func(x, y int) bool { return addrs[x] < addrs[y] })
+			for _, a := range addrs {
+				in := d.instrs[a]
+				acc, ok := accessOf(in, topState())
+				if !ok {
+					continue // instruction touches no memory
+				}
+				for _, ea := range acc.Addrs {
+					ma, ok := cartHotspotKey(ea)
+					if !ok {
+						continue
+					}
+					sym, ok := d.hotspots[ma]
+					if !ok {
+						continue
+					}
+					tb, ok := hotspotTargetBank(sym)
+					if !ok {
+						if !badSym[sym] {
+							badSym[sym] = true
+							out.unresolved = append(out.unresolved,
+								fmt.Sprintf("%s ($%04X): the symbol does not name a bank number, so the "+
+									"landing bank cannot be resolved and nothing was seeded", sym, ma))
+						}
+						continue
+					}
+					j, ok := byBank[tb]
+					if !ok {
+						if !badSym[sym] {
+							badSym[sym] = true
+							out.unresolved = append(out.unresolved,
+								fmt.Sprintf("%s ($%04X): names bank %d, which this cartridge's %d analysed "+
+									"banks do not include", sym, ma, tb, len(units)))
+						}
+						continue
+					}
+					land := in.next()
+					if _, ok := decodes[j].prog.canon(land); !ok {
+						continue
+					}
+					key := [2]int{tb, int(land)}
+					if seen[key] {
+						continue
+					}
+					seen[key] = true
+					out.seeds = append(out.seeds, CrossBankSeed{
+						FromBank: d.bank, FromAddr: in.Addr, Hotspot: ma, Symbol: sym,
+						ToBank: tb, ToAddr: land,
+						Desc: fmt.Sprintf("bank %d $%04X reaches %s ($%04X), so the next fetch is "+
+							"bank %d $%04X", d.bank, in.Addr, sym, ma, tb, land),
+					})
+					decodes[j].prog.decodeInto(decodes[j].instrs, land)
+					decodes[j].entries = append(decodes[j].entries, land)
+					decodes[j].seeded++
+					added++
+				}
+				if acc.Unbounded {
+					// No address, therefore no symbol, therefore no bank to name. Counted,
+					// not guessed; hotspotRefusal still refuses the region it sits in.
+					if k := [2]int{d.bank, int(in.Addr)}; !badSite[k] {
+						badSite[k] = true
+						out.unresolvable++
+					}
+				}
+			}
+		}
+		if added == 0 {
+			break
+		}
+	}
+	sort.Strings(out.unresolved)
+	return decodes, out
+}
+
 // hotspotRefusal reports why a region cannot be bounded because something in it
 // can switch banks, or "" when nothing in it can.
 //
@@ -236,11 +470,51 @@ func hotspotRefusal(instrs map[uint16]Instr, start uint16, hotspots map[uint16]s
 		nodes: map[uint16]Instr{}, sinks: map[uint16]bool{}, folds: map[uint16]loopInfo{},
 		memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states,
 	}
-	if msg := s.collectRegion(instrs, instrs[start]); msg != "" {
-		return "" // unbounded for another reason; that reason is the more specific one
+	// Collect, but scan whatever was collected even when collection FAILS. A
+	// collection that fails because flow left for an address the map does not hold
+	// is very often the bank switch itself, and returning early there swallowed
+	// every one of the control-transfer cases: a `jmp $1FF9` makes the walk leave
+	// the current bank, the walk reports it could not finish, and the switch that
+	// caused it went unreported.
+	_ = s.collectRegion(instrs, instrs[start])
+	if len(s.nodes) == 0 {
+		s.nodes = map[uint16]Instr{start: instrs[start]}
 	}
 	for _, in := range s.nodes {
 		st := states[in.Addr]
+		// A control transfer INTO a hotspot switches banks too, and by a different
+		// mechanism: `jmp $1FF9` does not read $1FF9 as data, it sets PC there, and
+		// the instruction FETCH at that address is a cartridge read, so the byte
+		// executed comes from the new bank. Gopher2600 classifies jmp/jsr as
+		// Subroutine/Flow rather than Read, so a check driven off the data access
+		// alone never looks at them — 33 of the three-byte opcodes are outside
+		// Read/Write. Missing it is the unsound direction: the region would not be
+		// refused, UnmodelledSwitches would not count it, and a cartridge that leaves
+		// for another bank could be certified.
+		switch in.Def.Operator {
+		case instructions.JMP, instructions.JSR:
+			if in.Def.AddressingMode == instructions.Absolute {
+				if ma, ok := cartHotspotKey(in.Operand); ok {
+					if sym, isHot := hotspots[ma]; isHot {
+						return fmt.Sprintf("region can switch banks: the %v at $%04X transfers control to "+
+							"%s ($%04X), whose instruction fetch selects another bank — flow between banks "+
+							"is not modelled", in.Def.Operator, in.Addr, sym, ma)
+					}
+				}
+			}
+		}
+		// The instruction's OWN bytes are fetched from the cartridge, so an opcode or
+		// operand sitting on a hotspot switches the bank mid-instruction. That is a
+		// measured authoring bug in this repo already (banked_game.asm records a
+		// reboot loop from putting `rts` on $FFF9); it is refused, never modelled.
+		for off := uint16(0); off < in.size(); off++ {
+			if ma, ok := cartHotspotKey(in.Addr + off); ok {
+				if sym, isHot := hotspots[ma]; isHot {
+					return fmt.Sprintf("region can switch banks: the instruction at $%04X is fetched "+
+						"across %s ($%04X), so the fetch itself selects another bank", in.Addr, sym, ma)
+				}
+			}
+		}
 		acc, ok := accessOf(in, st)
 		if !ok {
 			continue // instruction touches no memory
@@ -1278,9 +1552,15 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 
 // BankCoverage is how much of one bank the analysis actually reached.
 type BankCoverage struct {
-	Bank         int `json:"bank"`
-	Instructions int `json:"instructions"` // decoded from THIS bank's own vectors
+	Bank int `json:"bank"`
+	// Instructions is the decode reached from this bank's own reset/NMI/IRQ vectors
+	// PLUS every cross-bank landing address seeded into it (see decodeUnits).
+	Instructions int `json:"instructions"`
 	Regions      int `json:"regions"`
+	// SeededEntries is how many of those entry points came from a bank switch
+	// rather than from this bank's own vectors. A worker bank whose count is 0 was
+	// entered by nothing this analysis could see.
+	SeededEntries int `json:"seeded_entries,omitempty"`
 }
 
 // Report is the proof outcome over all WSYNC-to-WSYNC regions of a kernel.
@@ -1326,14 +1606,48 @@ type Report struct {
 	// was barely decoded cannot pass for one that was checked.
 	//
 	// A bank is normally entered by the trampoline that switched to it, not by its
-	// own reset vector, and cross-bank flow is not modelled yet — so a worker bank
-	// typically shows only the handful of instructions its own vectors reach.
-	// Measured on litmus_bank: 4 of the 36 (bank,pc) pairs the machine executes are
-	// in bank 1 and absent from the decode, because bank 1's code at $FF03 is
-	// reached only across the switch. Printing the per-bank counts is what keeps
-	// that residue visible instead of letting a full-looking report imply coverage
-	// it does not have.
+	// own reset vector. Seeding the target bank at the address after each hotspot
+	// access closes that (see CrossBankSeeds): measured on litmus_bank, bank 1 went
+	// from 4 decoded instructions with 4 executed-but-undecoded, to 99 decoded with
+	// 0 undecoded.
+	//
+	// Read that 99 as over-approximation, not as coverage: the machine executes 4
+	// instructions in bank 1, and the other 95 decoded are mostly the $FF filler
+	// between that body and the reset stub, decoded as a chain of undocumented
+	// opcodes. None of them stores WSYNC, so bank 1 still carries 0 regions — which
+	// is why the region count sits beside the instruction count here. A large
+	// instruction count on its own says the decoder walked a long way, not that
+	// anything was checked.
 	BankCoverage []BankCoverage `json:"bank_coverage,omitempty"`
+
+	// CrossBankSeeds lists the decode entry points that came from a bank switch:
+	// instruction at (from_bank, from_addr) reaches hotspot `symbol`, so the next
+	// fetch is (to_bank, to_addr).
+	//
+	// This closes the DECODE only. It does not model flow inside a region, so a
+	// region that can reach a hotspot is still refused (see hotspotRefusal) and
+	// UnmodelledSwitches still blocks certification — the analysis now knows what
+	// the other bank CONTAINS, not how the cycles run across the boundary.
+	CrossBankSeeds []CrossBankSeed `json:"cross_bank_seeds,omitempty"`
+
+	// CrossBankSeedRounds is how many passes the seeding fixpoint took (the last one
+	// adds nothing, which is how it knows it is done).
+	CrossBankSeedRounds int `json:"cross_bank_seed_rounds,omitempty"`
+
+	// CrossBankSeedCapped reports that the fixpoint stopped at seedRoundCap instead
+	// of closing. The decode is then INCOMPLETE by an unknown amount, and saying so
+	// is the whole point of the field: a capped run must not read as a converged one.
+	CrossBankSeedCapped bool `json:"cross_bank_seed_capped,omitempty"`
+
+	// UnresolvedHotspots names bank-switch hotspots whose mapper symbol could not be
+	// parsed to a bank number (Parker Bros publishes "B0S0", M-Network "RAM0"), so
+	// no target bank could be seeded. Guessing one would invent a control-flow edge.
+	UnresolvedHotspots []string `json:"unresolved_hotspots,omitempty"`
+
+	// UnresolvableSwitchAccesses counts instructions under a hotspot-bearing mapper
+	// whose memory target could not be resolved at all. Each MIGHT be a switch, but
+	// no address means no symbol and no bank to seed. They are refused, not seeded.
+	UnresolvableSwitchAccesses int `json:"unresolvable_switch_accesses,omitempty"`
 
 	// UnmodelledSwitches counts regions refused because they can change bank and
 	// cross-bank flow is not modelled.
@@ -1427,14 +1741,27 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		return &Report{Asm: filepath.Base(asmPath), Budget: budget, BankedDeclined: unitErr}, nil
 	}
 
+	// Each bank's decode is then closed over bank switches: an instruction reaching
+	// a hotspot continues at the following address in the bank the hotspot's own
+	// symbol names, so that address seeds the target bank. Without it a worker bank
+	// shows only its reset stub: measured, litmus_bank bank 1 decoded 4 instructions
+	// and the machine executed 4 OTHERS there ($FF03/$FF05/$FF07/$FF09), none of
+	// them among the 4 decoded — the residue this closes.
+	decodes, seeds := decodeUnits(units)
+
 	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget, Converged: true}
 	if len(units) > 1 {
 		rep.Banks = len(units)
+		rep.CrossBankSeeds = seeds.seeds
+		rep.CrossBankSeedRounds = seeds.rounds
+		rep.CrossBankSeedCapped = seeds.capped
+		rep.UnresolvedHotspots = seeds.unresolved
+		rep.UnresolvableSwitchAccesses = seeds.unresolvable
 	}
-	for _, u := range units {
+	for _, u := range decodes {
 		p := u.prog
-		instrs, entries := p.decodeFromVectors()
-		bc := BankCoverage{Bank: u.bank, Instructions: len(instrs)}
+		instrs, entries := u.instrs, u.entries
+		bc := BankCoverage{Bank: u.bank, Instructions: len(instrs), SeededEntries: u.seeded}
 		states, converged := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
 		if !converged {
 			rep.Converged = false

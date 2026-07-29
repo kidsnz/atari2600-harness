@@ -61,6 +61,36 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s   ?  /%3d  %s: %s\n", mark, r.Budget, r.StartLoc, r.Reason)
 		}
 	}
+	// Bank accounting. A per-bank line is what stops a barely-decoded bank from
+	// reading as a checked one, and the seed list names the cross-bank entry points
+	// the decode was closed over (see cyclebound.CrossBankSeed).
+	if rep.Banks > 0 {
+		for _, c := range rep.BankCoverage {
+			fmt.Fprintf(os.Stderr, "   bank %d: %d instrs / %d regions (%d seeded entry point(s))\n",
+				c.Bank, c.Instructions, c.Regions, c.SeededEntries)
+		}
+		for _, s := range rep.CrossBankSeeds {
+			fmt.Fprintf(os.Stderr, "   seed: %s\n", s.Desc)
+		}
+		if rep.CrossBankSeedCapped {
+			fmt.Fprintf(os.Stderr, "   WARNING: cross-bank seeding stopped at its %d-round cap — the "+
+				"decode is INCOMPLETE by an unknown amount\n", rep.CrossBankSeedRounds)
+		}
+		for _, u := range rep.UnresolvedHotspots {
+			fmt.Fprintf(os.Stderr, "   unresolved hotspot: %s\n", u)
+		}
+		if rep.UnresolvableSwitchAccesses > 0 {
+			// State the count and what it does NOT tell you. Claiming "the regions
+			// holding them are refused" asserts a coupling this line does not check,
+			// and it prints directly above the CERTIFIED verdict where a reader is
+			// deciding how much to trust that word. The refusal count is a separate
+			// number and is printed as one.
+			fmt.Fprintf(os.Stderr, "   %d access(es) whose target could not be resolved: each MAY select "+
+				"a bank and none could be seeded. Whether the region holding one was refused is the "+
+				"unmodelled-switch count, not this one (%d refused).\n",
+				rep.UnresolvableSwitchAccesses, rep.UnmodelledSwitches)
+		}
+	}
 	if rep.Certified {
 		fmt.Fprintf(os.Stderr, "CERTIFIED: %d regions within budget (base %d cy/line; worst region %d cy, scaled per @lines)\n", rep.Regions, rep.Budget, rep.MaxWorst)
 		return

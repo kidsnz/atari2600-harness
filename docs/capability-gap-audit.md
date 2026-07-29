@@ -1074,6 +1074,75 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   **Corpus gap recorded, not papered over:** in all four bank ROMs the banks never execute the same address,
   so `#(bank,pc) == #pc` and **none of them can catch a flat-keyed instrument**. The test says so in its own
   output rather than passing quietly. A litmus where two banks run code at one address is the missing piece.
+
+  #### SD-8b — the decode is closed over bank switches (stage 2 of bank support)
+
+  Stage 1's residue was the worker banks: a bank was decoded only from its OWN reset/NMI/IRQ vectors, and a
+  worker bank is entered by the trampoline that switched to it, never by its own stub. **Measured before, per
+  ROM, as executed `(bank,pc)` pairs absent from the decode** (`banksound_test.go`, the emulator as oracle):
+
+  | ROM | mapper | absent before | where | absent after |
+  |---|---|---|---|---|
+  | `litmus_bank` | F8, 2 banks | **4** of 36 | bank 1 `$FF03/$FF05/$FF07/$FF09` | **0** |
+  | `banked_game` | F8, 2 banks | **1** of 61 | bank 1 `$FF83` | **0** |
+  | `litmus_bank_f6` | F6, 4 banks | 0 of 41 | — | **0** |
+  | `litmus_bank_f4` | F4, 8 banks | 0 of 57 | — | **0** |
+
+  **The fix needs no new map key.** An instruction whose memory access reaches a bank-switch hotspot continues
+  at the FOLLOWING address in the bank that hotspot names — and because each bank is already analysed as its
+  own self-contained 4K image, that landing address is just another decode entry point for the target unit.
+  Nothing in `map[uint16]Instr` changes. Seeding is a fixpoint (seeding B can reveal a hotspot access in B
+  that seeds C); measured, it closes in **2 rounds on all four ROMs** (1 productive + 1 that adds nothing),
+  against a cap of 8, and `cross_bank_seed_capped` exists so a capped run can never read as a closed one.
+
+  **The bank comes from the mapper's own symbol, and an unparseable symbol is refused, not scraped.** Read via
+  `emu.BankSwitchHotspots()`, never hardcoded — measured: F8 publishes `$1FF8=BANK0 $1FF9=BANK1`, F6
+  `$1FF6..$1FF9 = BANK0..BANK3`, F4 `$1FF4..$1FFB = BANK0..BANK7`. The parse insists the whole symbol be
+  `BANK<digits>` because two vendored mappers publish other shapes for which "the same address in the other
+  bank" is simply not where execution lands: **Parker Bros E0 publishes `B0S0`..`B7S2`** (bank-in-SEGMENT —
+  only a 1K slice moves) and **M-Network publishes `RAM0`..`RAM3`** (cartridge RAM, which is not in the image
+  at all). A digit-scrape would read those as banks 0 and 0..3 and invent an edge the hardware does not have,
+  so they are reported in `unresolved_hotspots` and seed nothing.
+
+  **Target addresses resolve through `cartHotspotKey`** (the SD-8 mirror-folding defect: `$FFF9`, `$1FF9` and
+  `$3FF9` are one hotspot), **a READ switches as a write does** (`lda $FFF9` is the canonical form), and
+  addresses are resolved under `topState()` rather than the abstract-interpretation result — the states are
+  computed FROM the decode, so using them here would be circular. Top over-approximates: an unknown index
+  contributes its whole 256-address footprint. Over-seeding costs precision; under-seeding would leave
+  executed code out of the decode, which is the direction that lies. An access whose target cannot be
+  resolved at all yields no address, therefore no symbol, therefore no bank: counted in
+  `unresolvable_switch_accesses`, never guessed.
+
+  **This closes the DECODE, not the flow.** `hotspotRefusal` is untouched: a region that can reach a hotspot
+  is still refused, `UnmodelledSwitches` still gates `Certified`, and all four ROMs still report
+  `unmodelled_switches: 1, certified: false`. The analysis now knows what the other bank CONTAINS, not how
+  the cycles run across the boundary. That is stage 3.
+
+  **BankCoverage, before → after** (instructions / regions; seeded entry points in brackets):
+
+  | ROM | bank 0 | worker banks |
+  |---|---|---|
+  | `litmus_bank` | 52/6 → 52/6 [2] | bank1 **4/0 → 99/0** [1] |
+  | `banked_game` | 67/7 → 67/7 [2] | bank1 **66/0 → 67/0** [1] |
+  | `litmus_bank_f6` | 67/6 → 67/6 [2] | banks 1-3 1362/1368/1374, unchanged [1 each] |
+  | `litmus_bank_f4` | 103/6 → 103/6 [2] | banks 1-7 1362..1398, unchanged [1 each] |
+
+  `litmus_bank` bank 1 jumping 4 → 99 is over-approximation, and it is measured rather than assumed: 4 of the
+  95 new instructions are the body the machine really runs (`$FF03/$FF05/$FF07/$FF09`) and the rest is the
+  `$FF` filler between that body and the reset stub, decoded as a chain of undocumented `isc abs,X`. None of
+  it stores WSYNC, so bank 1 still carries **0 regions** — extra decoded bytes, not extra verdicts.
+
+  **Golden diff, mandatory:** cyclebound JSON for all 31 `roms/techniques/*.asm` + all 12 `roms/litmus/cb_*.asm`,
+  before vs after: **42 of 43 byte-identical**. The one that changed is `banked_game`, the only banked image
+  in the set. Flat ROMs are untouched by construction — one analysis unit means no hotspots, no seeding, and
+  `TestFlatRomIsNotSeeded` asserts the flat decode, entry list and every new report field are unchanged.
+
+  **The test was given teeth.** A containment check the seeding cannot affect would keep passing with the
+  seeding deleted, so `banksound_test.go` now also (a) computes the vector-only decode and requires seeding to
+  be **strictly additive** (a lost pair is a hard failure), (b) fails if the corpus stops containing code
+  reachable only across a switch — **measured: 5 such executed pairs, litmus_bank 4 + banked_game 1** — and
+  (c) requires every seed whose SOURCE the machine executed to have a landing address the machine also
+  executed, so a seed cannot be an invented edge.
 - **RL-8a — `framegen` draws missiles and the ball. DONE (v1.116.0).** RL-7 measured that the generated
   kernel emitted no `ENAM0`/`ENAM1`/`ENABL` at all, so those pixels were absent by construction. They are
   now measured, positioned and drawn wherever the kernel shape allows, and reported when it does not.

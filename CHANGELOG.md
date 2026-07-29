@@ -8,6 +8,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`cyclebound` closes its decode over bank switches** (SD-8b, stage 2 of bank support). Stage 1 decoded each
+  bank only from its OWN reset/NMI/IRQ vectors, but a worker bank is entered by the trampoline that switched
+  to it. Measured residue, executed `(bank,pc)` pairs absent from the decode: **`litmus_bank` 4 of 36**
+  (bank 1 `$FF03/$FF05/$FF07/$FF09`), **`banked_game` 1 of 61** (bank 1 `$FF83`), `litmus_bank_f6` 0 of 41,
+  `litmus_bank_f4` 0 of 57 — **now 0 on all four**.
+  - An instruction whose memory access reaches a bank-switch hotspot continues at the FOLLOWING address in
+    the bank that hotspot names, and since each bank is already analysed as its own 4K image, that address is
+    just another decode entry point: **no `map[uint16]Instr` key changes**. A read switches as a write does
+    (`lda $FFF9`), targets fold through `cartHotspotKey` so `$FFF9`/`$1FF9`/`$3FF9` are one hotspot, and the
+    fixpoint (seeding B can reveal a switch in B that seeds C) closes in **2 rounds on all four ROMs** against
+    a cap of 8, with `cross_bank_seed_capped` so a capped run cannot read as a closed one.
+  - **The target bank is parsed from the mapper's own symbol, never guessed.** `emu.BankSwitchHotspots()`,
+    measured: F8 `$1FF8=BANK0 $1FF9=BANK1`, F6 `$1FF6..$1FF9`, F4 `$1FF4..$1FFB`. The whole symbol must be
+    `BANK<digits>`, because Parker Bros publishes `B0S0` (bank-in-segment) and M-Network `RAM0` (cartridge
+    RAM), for which "the same address in the other bank" is not where execution lands; those are reported in
+    `unresolved_hotspots` and seed nothing. An access whose target cannot be resolved at all has no symbol
+    and no bank, so it is counted in `unresolvable_switch_accesses` rather than guessed.
+  - **This improves the DECODE, not the flow model.** `hotspotRefusal` is unchanged, `UnmodelledSwitches`
+    still gates `Certified`, and all four bank ROMs still report `unmodelled_switches: 1, certified: false`.
+  - New report fields (`cross_bank_seeds`, `cross_bank_seed_rounds`, `cross_bank_seed_capped`,
+    `unresolved_hotspots`, `unresolvable_switch_accesses`, `bank_coverage[].seeded_entries`) are all
+    bank-only. **Golden diff over 31 technique + 12 `cb_*` litmus ROMs: 42/43 byte-identical**, the one
+    change being `banked_game`, the only banked image in the set.
+
 ### Fixed
 - **`framegen` printed a cause it had not measured, and replayed a single frame-final NUSIZ** (RL-7c). On
   `roms/litmus/litmus_nusiz_all.bin` it reported 2666 of 34240 cells wrong and explained them with a fixed
