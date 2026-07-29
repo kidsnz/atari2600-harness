@@ -1143,6 +1143,25 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   reachable only across a switch — **measured: 5 such executed pairs, litmus_bank 4 + banked_game 1** — and
   (c) requires every seed whose SOURCE the machine executed to have a landing address the machine also
   executed, so a seed cannot be an invented edge.
+- **SD-10 — measured whether the flat key can hold two banks. It cannot.** Stage 1 kept a bare `uint16`
+  code key workable by giving each bank its OWN decode map and never merging them. Cross-bank region analysis
+  has to merge, so "can one flat map hold two banks?" decides whether a composite `(bank, addr)` key is
+  optional or mandatory. New `DecodedAddrsPerBank` answers it by measurement rather than argument:
+
+  | ROM | banks | decoded addresses | claimed by 2+ banks |
+  |---|---|---|---|
+  | `litmus_bank` | 2 | 142 | 9 (6%) |
+  | `banked_game` | 2 | 123 | 11 (9%) |
+  | `litmus_bank_f6` | 4 | 1403 | **1375 (98%)** |
+  | `litmus_bank_f4` | 8 | 1427 | **1399 (98%)** |
+
+  Not marginal: every bank is a 4K image occupying the same `$F000-$FFFF` window, so on the four- and
+  eight-bank ROMs almost every decoded address collides. A merged flat map keeps whichever bank was inserted
+  last — and the region set, the abstract states and the source locations all sit on that map. **The composite
+  key is mandatory for stage 3**, and the per-bank-map design stage 1 chose was the right way to defer it.
+
+  Locked as a test that fails if the premise changes — if the banks ever stop overlapping, it is the test's
+  assumption that broke, not the code.
 - **SD-9 — the loop-bound heuristic under-approximated by 40× on a `roll_free:true` verdict. DONE
   (v1.116.0).** The judged plan for cross-bank flow named this as its top risk and framed it as a hazard the
   *splice* approach would introduce. It is not: it reproduces on a **flat 4K image with no bank switching**,

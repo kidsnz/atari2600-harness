@@ -549,6 +549,33 @@ func hotspotRefusal(instrs map[uint16]Instr, start uint16, hotspots map[uint16]s
 	return ""
 }
 
+// DecodedAddrsPerBank returns, per bank, the set of addresses the decode reached.
+//
+// Exposed so the flat-uint16 key's central assumption can be MEASURED rather than
+// argued: if two banks decode code at the same address, one map keyed on the bare
+// address cannot hold both, and everything built on that map — the region set, the
+// abstract states, the source locations — silently describes whichever bank won.
+func DecodedAddrsPerBank(binPath string) (map[int]map[uint16]bool, error) {
+	rom, err := os.ReadFile(binPath)
+	if err != nil {
+		return nil, err
+	}
+	units, decline := analysisUnits(rom, binPath)
+	if decline != "" {
+		return nil, fmt.Errorf("%s", decline)
+	}
+	decodes, _ := decodeUnits(units)
+	out := map[int]map[uint16]bool{}
+	for _, d := range decodes {
+		set := map[uint16]bool{}
+		for a := range d.instrs {
+			set[a] = true
+		}
+		out[d.bank] = set
+	}
+	return out, nil
+}
+
 // declineBanked returns a reason string when the image must not be analysed by
 // this flat-address package, or "" when it is safe to proceed.
 //
