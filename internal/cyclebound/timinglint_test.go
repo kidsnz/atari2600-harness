@@ -68,7 +68,7 @@ func TestLintNoFalsePositivesOnTechniques(t *testing.T) {
 	if err != nil {
 		t.Skipf("techniques corpus not present (%v) — covered by the manual sweep", err)
 	}
-	n := 0
+	n, skipped := 0, 0
 	for _, e := range ents {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".asm" {
 			continue
@@ -76,12 +76,35 @@ func TestLintNoFalsePositivesOnTechniques(t *testing.T) {
 		n++
 		asm := filepath.Join(dir, e.Name())
 		ws := mustLint(t, asm)
-		if len(ws) != 0 {
-			t.Errorf("FALSE POSITIVE on known-good %s: %+v", e.Name(), ws)
+		// A refusal is not a timing claim. "not-analysed" says the ROM was never
+		// decoded, which is the opposite of asserting something wrong about it —
+		// counting it as a false positive would push the linter back towards
+		// staying silent about programs it cannot read.
+		var timing []LintWarning
+		declined := false
+		for _, w := range ws {
+			if w.Rule == "not-analysed" {
+				declined = true
+				continue
+			}
+			timing = append(timing, w)
+		}
+		if len(timing) != 0 {
+			t.Errorf("FALSE POSITIVE on known-good %s: %+v", e.Name(), timing)
+		}
+		if declined {
+			skipped++
 		}
 	}
 	if n == 0 {
 		t.Skip("no technique kernels found")
 	}
-	t.Logf("linted %d known-good technique kernels: zero false positives", n)
+	// Report the denominator. A clean sweep over a corpus that was silently mostly
+	// skipped is how a check passes while proving nothing.
+	t.Logf("linted %d technique kernels with zero timing false positives; %d were DECLINED "+
+		"(bank-switched) and are not covered by that claim", n-skipped, skipped)
+	if skipped == 0 {
+		t.Error("no ROM in the corpus was declined; banked_game.asm is an 8K F8 cartridge, so a " +
+			"linter that analysed all 31 is reading a program that does not exist in at least one")
+	}
 }

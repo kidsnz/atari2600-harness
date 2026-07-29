@@ -1,6 +1,7 @@
 package cyclebound
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/kidsnz/atari2600-harness/internal/emu"
@@ -286,11 +287,71 @@ func TestProveTimerBlankSkipped(t *testing.T) {
 // litmus ROMs all use WSYNC, so they never hit this path).
 func TestProveNoWSYNCNotCertified(t *testing.T) {
 	rep := mustProve(t, "../../roms/techniques/banked_game.asm", 76)
-	if rep.Regions != 0 {
-		t.Skipf("banked_game now exposes %d WSYNC regions; the 0-region premise changed", rep.Regions)
-	}
 	if rep.Certified {
 		t.Fatal("a 0-region ROM must NOT certify (no WSYNC reached = out of scope, not proven safe)")
+	}
+	// The 0-region backstop used to be the ONLY thing standing between this ROM
+	// and a confident report about a program that does not exist: nothing declined
+	// the image, the flat model folded it to one bank, and it was saved purely by
+	// that bank happening to contain no reachable STA WSYNC. This assertion used to
+	// be a t.Skipf on exactly that premise — a test that stops testing the moment
+	// its subject changes. The refusal is now explicit, so require it.
+	if rep.BankedDeclined == "" {
+		t.Fatal("banked_game is an 8K F8 cartridge and must be DECLINED by name, not merely fail to " +
+			"certify: a banked image whose flat fold did contain a WSYNC would otherwise be " +
+			"analysed and reported on with confidence")
+	}
+	if !strings.Contains(rep.BankedDeclined, "F8") {
+		t.Errorf("the decline must name the mapper the ENGINE identified, so a size-based guess and "+
+			"the emulator cannot disagree about which machine is described; got %q", rep.BankedDeclined)
+	}
+}
+
+// Every entry point must reach the same verdict. Three of the five used to decide
+// separately and two decided nothing at all, so a caller could be refused by one
+// tool and answered by another about the same ROM.
+func TestBankedImageDeclinedByEveryEntryPoint(t *testing.T) {
+	const asm = "../../roms/techniques/banked_game.asm"
+
+	rep := mustProve(t, asm, 76)
+	if rep.BankedDeclined == "" {
+		t.Error("Prove did not decline")
+	}
+	if br, err := BeamIntervals(asm); err != nil {
+		t.Errorf("BeamIntervals: %v", err)
+	} else if br.BankedDeclined == "" {
+		t.Errorf("BeamIntervals did not decline; it reported %d regions of beam windows for a "+
+			"program that does not exist", len(br.Regions))
+	}
+	if ws, err := Lint(asm); err != nil {
+		t.Errorf("Lint: %v", err)
+	} else {
+		declined := false
+		for _, w := range ws {
+			if w.Rule == "not-analysed" {
+				declined = true
+			}
+		}
+		if !declined {
+			t.Errorf("Lint did not decline; %d warnings, and silence from a linter reads as clean", len(ws))
+		}
+	}
+	if du, err := DefUse(asm, 76); err != nil {
+		t.Errorf("DefUse: %v", err)
+	} else if du.FlatBankOnly == "" {
+		t.Error("DefUse did not decline")
+	}
+}
+
+// The refusal must not spread to flat ROMs: a tool that refuses everything is
+// sound and useless. litmus_lastline is a plain 4K image.
+func TestFlatImageIsNotDeclined(t *testing.T) {
+	rep := mustProve(t, "../../roms/litmus/litmus_lastline.asm", 76)
+	if rep.BankedDeclined != "" {
+		t.Errorf("a flat 4K image was declined: %q", rep.BankedDeclined)
+	}
+	if rep.Regions == 0 {
+		t.Error("premise broken: litmus_lastline should expose WSYNC regions")
 	}
 }
 

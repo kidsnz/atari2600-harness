@@ -936,6 +936,18 @@ func (e *Emu) Bank() (number int, isRAM bool) {
 	return info.Number, info.IsRAM
 }
 
+// CartInfo reports what cartridge the engine decided this image is: the mapper
+// it fingerprinted, and how many banks that mapper has.
+//
+// Size is not the machine. An 8192-byte image is F8 only unless it fingerprints
+// as WF8/3F/E0/E7/WD/FE/UA, and a superchip variant overlays RAM on part of the
+// window whatever the length says. Any analysis that infers the cartridge from
+// len(rom) can therefore describe a different machine from the one its own
+// acceptance tests run on.
+func (e *Emu) CartInfo() (id string, banks int) {
+	return e.VCS.Mem.Cart.ID(), e.VCS.Mem.Cart.NumBanks()
+}
+
 // SetInput はジョイスティック入力を注入する（headless ハーネスの入力経路。poke は入力に効かない）。
 // player 0=PortLeft / 1=PortRight。action は left/right/up/down/fire/center。
 // pressed=true で押下保持・false で解除（次に変えるまで状態は持続）。center は全方向解除。

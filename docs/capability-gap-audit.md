@@ -941,6 +941,43 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   Twin litmus `roms/litmus/litmus_jsr_display.asm` holds three routines of identical shape differing in one
   store (`sta COLUP0,x` / `sta VSYNC,x` / `sta VBLANK`), all called from the same place with the same index
   values, so a rule that answers the same way for all three is wrong whichever answer it gives.
+- **SD-7 — the bank-switching refusal was not real. DONE (v1.115.0), stage 0 of bank support.**
+  The premise "cyclebound declines bank-switched cartridges" was only true of `DefUse`. Measured on
+  `banked_game.asm` (8192 bytes, F8, 2 banks):
+
+  | entry point | before |
+  |---|---|
+  | `DefUse` | declines (`FlatBankOnly`) |
+  | `StaticBranches` | returns flat branches + `banked=true` so `cover` can mark `decoder_incomplete` |
+  | **`Prove`** | **does not decline** — `regions:0, certified:false`, no decline field at all |
+  | **`BeamIntervals`** | **does not decline** |
+  | **`Lint`** | **does not decline**, and built its own `program` literal that did not even set `banked` |
+
+  `Prove` was not refusing; it was analysing a program that does not exist and being saved by the incidental
+  fact that whichever bank the flat fold landed in contained no reachable `STA WSYNC`, which tripped the
+  "0 regions never certify" backstop. That is luck. A banked image whose flat fold *did* contain a WSYNC
+  would have been analysed and reported on with confidence. The guarding test encoded the luck as its
+  premise and `t.Skipf`'d the moment it changed — a test that stops testing.
+
+  **The verdict now comes from the engine, not from `len(rom)`.** Size is not the machine: an 8192-byte
+  image is F8 only unless it fingerprints as WF8/3F/E0/E7/WD/FE/UA, and a superchip variant overlays RAM on
+  part of the window whatever the length says. `emu.CartInfo()` returns the mapper the cartridge actually
+  fingerprinted as and its bank count, so the analysis and the emulator its own acceptance tests run on
+  cannot disagree about which machine is being described. Decided once in `loadProgram`, so all four entry
+  points share one verdict: measured, `F8/F8/F6/F4` correctly named on `banked_game`, `litmus_bank`,
+  `litmus_bank_f6`, `litmus_bank_f4`.
+
+  A linter that stays silent about a program it never decoded reads as an all-clear, so `Lint` returns a
+  `not-analysed` warning rather than nothing. The corpus false-positive test now separates a refusal from a
+  timing claim and **prints its own denominator**: "30 kernels with zero timing false positives; 1 DECLINED".
+  It also fails if *nothing* was declined — a linter that analysed all 31 is reading fiction in at least one.
+
+  Golden diff across all 31 technique ROMs + all `cb_*` litmus: **byte-identical except `banked_game`**, the
+  only banked image among them.
+
+  The full staged design for real bank support (site identity `(bank, addr)`, hotspot edges as
+  "same address, other bank", phantom-read switches, per-mapper decline list, and the unsoundness risks
+  including ROM tables read from the wrong bank) is researched and recorded — stages 1-4 remain.
 - **RL-8 — `framegen` missile/ball replay + per-zone sprite X.** The two limits RL-7 measured. Missiles and
   the ball need one enable bit and one X per scanline (cheap: the attribution is already extracted, only the
   emitter lacks it); per-zone sprite X needs the extracted single `p0x`/`p1x` to become a per-scanline series

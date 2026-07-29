@@ -672,9 +672,14 @@ func loadProgram(asmPath string) (*program, map[uint16]Instr, []uint16, *srcmap.
 		return nil, nil, nil, nil, fmt.Errorf("read %s: %w", bin, err)
 	}
 	if len(rom) < 6 || len(rom) > 0x10000 {
-		return nil, nil, nil, nil, fmt.Errorf("unexpected ROM size %d bytes (expect a flat 2K/4K image)", len(rom))
+		return nil, nil, nil, nil, fmt.Errorf("unexpected ROM size %d bytes", len(rom))
 	}
 	p := newProgram(rom)
+	// Decided once, here, so every entry point through this loader inherits the
+	// same verdict. Three of them used to reach their own conclusion — and two
+	// reached none at all, analysing the fictional flat program and being saved
+	// only by the incidental absence of a reachable WSYNC.
+	p.declined = p.declineBanked(bin)
 	instrs, entries := p.decodeFromVectors()
 	return p, instrs, entries, sm, nil
 }

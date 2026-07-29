@@ -39,6 +39,7 @@ import (
 	"github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
 	"github.com/jetsetilly/gopher2600/hardware/memory/memorymap"
 	"github.com/kidsnz/atari2600-harness/internal/build"
+	"github.com/kidsnz/atari2600-harness/internal/emu"
 	"github.com/kidsnz/atari2600-harness/internal/srcmap"
 )
 
@@ -112,11 +113,62 @@ type program struct {
 	// decoded 66 instructions from entry points $FFE0/$FFFF and produced a
 	// confident finding about an address it had never decoded.
 	banked bool
+
+	// declined is the reason this image must not be analysed at all, or "" when it
+	// is safe. Set once by the loader so every entry point shares one verdict.
+	declined string
 }
 
 // newProgram wraps a flat cartridge image.
 func newProgram(rom []byte) *program {
 	return &program{rom: rom, base: uint16(0x10000 - len(rom)), banked: len(rom) > 4096}
+}
+
+// cartInfo asks the engine what cartridge this image actually is: the mapper it
+// fingerprints as, and how many banks that mapper has.
+func cartInfo(binPath string) (id string, banks int, err error) {
+	e, err := emu.New("NTSC")
+	if err != nil {
+		return "", 0, err
+	}
+	if err := e.LoadROM(binPath); err != nil {
+		return "", 0, err
+	}
+	id, banks = e.CartInfo()
+	return id, banks, nil
+}
+
+// declineBanked returns a reason string when the image must not be analysed by
+// this flat-address package, or "" when it is safe to proceed.
+//
+// The verdict comes from the ENGINE — it loads the cartridge and fingerprints the
+// mapper — rather than from len(rom). Size is not the machine: an 8192-byte image
+// is F8 only unless it fingerprints as WF8/3F/E0/E7/WD/FE/UA, and a superchip
+// variant overlays RAM on part of the window whatever the size says. Guessing
+// from the length means the analysis and the emulator the acceptance tests run on
+// can disagree about which machine is being described.
+//
+// A single bank is not automatically fine either: a mapper can map cartridge RAM
+// into the window, and bytes executed from there are not in the image at all, so
+// any decode of them is fiction.
+func (p *program) declineBanked(binPath string) string {
+	id, banks, err := cartInfo(binPath)
+	if err != nil {
+		// Fall back to the size test rather than proceeding blind. Being unable to
+		// ask the engine is a reason to be MORE careful, not less.
+		if p.banked {
+			return fmt.Sprintf("image is %d bytes and the cartridge could not be identified (%v); "+
+				"the console addresses 4K at a time, so a flat-address analysis would describe "+
+				"a program that does not exist", len(p.rom), err)
+		}
+		return ""
+	}
+	if banks > 1 {
+		return fmt.Sprintf("cartridge is mapper %s with %d banks; every address in this package is a "+
+			"flat 16-bit number, so the vectors, the decode and everything built on them would "+
+			"describe a program that does not exist", id, banks)
+	}
+	return ""
 }
 
 // canon folds a CPU address to the cartridge offset it addresses, or reports
@@ -1116,6 +1168,18 @@ type Report struct {
 	// UNDER-approximated states, which every downstream consumer treats as sound,
 	// so a report with Converged=false proves nothing and must not be certified.
 	Converged bool `json:"converged"`
+
+	// BankedDeclined names the reason the image was not analysed at all.
+	//
+	// Everything in this package keys on a flat 16-bit address, so on a
+	// bank-switched cartridge the vectors, the decode and every analysis built on
+	// them describe a program that does not exist. Until this field existed the
+	// refusal was not real: Prove analysed the fiction anyway and was saved only by
+	// the incidental fact that no STA WSYNC was reachable in whichever bank the
+	// flat model happened to fold to, which tripped the "0 regions never certify"
+	// backstop. That is luck, not a refusal — a banked ROM whose flat fold DID
+	// contain a WSYNC would have been analysed and reported on with confidence.
+	BankedDeclined string `json:"banked_declined,omitempty"`
 }
 
 // Prove assembles asmPath, statically proves every WSYNC-to-WSYNC region's
@@ -1184,9 +1248,12 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		return nil, fmt.Errorf("read %s: %w", bin, err)
 	}
 	if len(rom) < 6 || len(rom) > 0x10000 {
-		return nil, fmt.Errorf("unexpected ROM size %d bytes (expect a flat 2K/4K image)", len(rom))
+		return nil, fmt.Errorf("unexpected ROM size %d bytes", len(rom))
 	}
 	p := newProgram(rom)
+	if why := p.declineBanked(bin); why != "" {
+		return &Report{Asm: filepath.Base(asmPath), Budget: budget, BankedDeclined: why}, nil
+	}
 	instrs, entries := p.decodeFromVectors()
 	states, converged := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
 

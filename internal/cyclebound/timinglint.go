@@ -1,6 +1,7 @@
 package cyclebound
 
 import (
+	"path/filepath"
 	"fmt"
 	"os"
 	"sort"
@@ -96,7 +97,19 @@ func Lint(asmPath string) ([]LintWarning, error) {
 	if len(rom) < 6 || len(rom) > 0x10000 {
 		return nil, fmt.Errorf("unexpected ROM size %d", len(rom))
 	}
-	p := &program{rom: rom, base: uint16(0x10000 - len(rom))}
+	p := newProgram(rom)
+	// A linter that stays silent on a program it never decoded reads as "clean".
+	// This built its own program literal and did not even set `banked`, so on a
+	// bank-switched cartridge it decoded whichever bank the flat fold happened to
+	// land in and reported zero warnings about the rest.
+	if why := p.declineBanked(bin); why != "" {
+		return []LintWarning{{
+			Rule: "not-analysed",
+			Loc:  filepath.Base(asmPath),
+			Msg:  why,
+			Hint: "no timing warning below should be read as an all-clear for this ROM",
+		}}, nil
+	}
 	instrs := map[uint16]Instr{}
 	var entries []uint16
 	for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {

@@ -85,6 +85,13 @@ type BeamReport struct {
 	// Bounded/Unbounded count regions the analysis could and could not place.
 	Bounded   int `json:"bounded_regions"`
 	Unbounded int `json:"unbounded_regions"`
+
+	// BankedDeclined names the reason the image was not analysed. Beam positions
+	// are computed from a flat-address decode, so on a bank-switched cartridge
+	// every window in this report would be a window in a program that does not
+	// exist — and unlike a missing region, a confidently wrong beam clock looks
+	// exactly like a right one.
+	BankedDeclined string `json:"banked_declined,omitempty"`
 }
 
 // cyclesAfterWSYNC is the beam clock at which the instruction following a WSYNC
@@ -358,6 +365,9 @@ func BeamIntervals(asmPath string) (*BeamReport, error) {
 	p, instrs, entries, sm, err := loadProgram(asmPath)
 	if err != nil {
 		return nil, err
+	}
+	if p.declined != "" {
+		return &BeamReport{Asm: baseName(asmPath), BankedDeclined: p.declined}, nil
 	}
 	states, converged := computeStates(instrs, entries, p.byteAt)
 	rep := &BeamReport{Asm: baseName(asmPath), Converged: converged}
