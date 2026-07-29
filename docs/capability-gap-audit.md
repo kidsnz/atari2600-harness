@@ -591,6 +591,35 @@ follow a bank switch or an RTS-computed dispatch. Not a wrong prediction — a h
 and reported separately so neither hides the other. Fixing it is the stack-modelling and bank-hotspot work
 described in SD-3.
 
+### SD-4 — A proven worst case that the machine EXCEEDS (highest priority)
+Found by extending the observed-vs-proven cross-check from one litmus to the whole technique corpus:
+**`bitmap48.asm` region `Krow` (bitmap48.asm:146, strobe $F0D0) is proven at 93 cycles and the machine takes
+911**, spanning 12 physical lines. 84 intervals were measured over six frames and only one is long, which
+points at the loop-EXIT iteration: on every other iteration the next WSYNC is the loop's own, 93 cycles away,
+but when the loop finishes the next WSYNC is far. The proof does not appear to price that path.
+
+This predates all of tonight's work — the same failure appears with tonight's commits stashed. It is the most
+serious open item here, because a proven number the hardware exceeds is worse than no number: it gets
+trusted. 215 other measured regions across 30 ROMs are within their proven bound.
+
+`TestProvenWorstIsNeverExceededOnCorpus` names this case rather than skipping it, and FAILS if it ever stops
+violating — a stale exemption would hide the repair.
+
+### SD-5 — Call-context resolution for a region opened inside a subroutine (attempted, REVERTED)
+A WSYNC inside a callee opens a region whose continuation lives in the caller, so with no call context the
+walk hits an RTS, finds no WSYNC, and the region is unbounded. Measured: 5 regions fail as "no WSYNC reached"
+and 3 as "RTS with no caller in context", across bullets/game_states/road/shared_setxpos/text12/text24.
+
+An implementation that enumerated each JSR's return address, re-analysed the region per context and took the
+worst brought unbounded regions from 29 to 24 — and was **unsound**. The corpus cross-check caught it
+immediately: `text12`/`text24` region `KrowA+36` was newly reported as bounded at 110 cycles while the
+machine takes 143. Reverted the same block it was written in; the numbers are recorded here so the next
+attempt starts from the failure rather than repeating it.
+
+Likely cause to check first: taking the worst over JSR return addresses assumes the region is entered only
+through a call, but these kernels re-enter the routine from a loop in the caller, so the continuation crosses
+the call boundary more than once and a single-level return context under-counts it.
+
 ### SD-2 — Beam position as a tracked interval
 Carry colour-clocks-since-WSYNC in the abstract domain so every TIA write gets a proven clock interval on
 every path. Nothing in the community or the RE ecosystem has this; the state of the art is hand-counting a
