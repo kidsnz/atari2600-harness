@@ -31,7 +31,18 @@ must always hold *only* in a doc — burn them here or into memory.
    No bulk changes.
 4. **litmus test:** place a sprite at an arbitrary X / move it 1px and have it match `X = 3N − 55`. If this
    passes, the environment is real.
-5. **Author by the protocol.** When building a ROM/kernel, follow `docs/authoring-protocol.md` — the 6-step
+5. **Use every bit of the artifact you can decode YOURSELF; never read someone else's answer.**
+   Decoding a binary is a capability, and it applies to your own kernels as much as to anyone's — the
+   vendored `Gopher2600/disassembly` package (`FromCartridge` / `bless` flow-following code-vs-data /
+   `jmpTargets` / `EntryLevel` = Decoded/Blessed/**Executed**), `cmd/dissect`, DiStella's machine output and
+   `internal/cyclebound`'s CFG are all fair game and under-used. What is off limits is *someone else's
+   interpretation*: a published labelled/commented `.asm`, a third-party RAM map, or treating one of our own
+   builds as ground truth. The line is **whether interpretation is baked in** — raw bytes carry none
+   (`A9 48` is just `LDA #$48`), and deriving meaning from them is the skill being built. A rule about not
+   reading published disassemblies was once over-generalised into avoiding decoding altogether, which left
+   the engine's own disassembler unused for months; do not repeat that. Full statement: memory
+   `feedback-goal-standard`.
+6. **Author by the protocol.** When building a ROM/kernel, follow `docs/authoring-protocol.md` — the 6-step
    loop (retrieve→plan→author→preflight→verify→**feedback**). It is the single entry that activates the whole
    knowledge base in order (cookbook → design-principles/`pkg/design` checks → known-traps/`check_traps` →
    nearest technique → verify). Don't reach for techniques you haven't budgeted; reject unworkable layouts on
