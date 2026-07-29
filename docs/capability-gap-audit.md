@@ -896,6 +896,61 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
 
   The lesson is the RL-7 lesson one level up: the tool that checks the picture cannot see the frame around
   it, and a clone can be pixel-perfect and unplayable at the same time.
+- **RL-7c — `framegen` asserted a cause it had not measured, and replayed one frame-final NUSIZ. DONE.**
+  Found on `roms/litmus/litmus_nusiz_all.bin` (the eight-NUSIZ-mode litmus added by the statecov work).
+  `framegen` reported **2666 of 34240 cells wrong** and explained them with a fixed sentence: *"this is
+  placement, not omission (one X per player cannot follow a per-zone multiplexed target)"*. That ROM places
+  P0 and P1 **once, before the frame loop, and never moves them** — measured, 1 distinct reset X per player
+  over 191/190 drawn lines. The explanation was printed unconditionally on every non-exact run, so it was
+  never a finding; it was a slogan.
+
+  **The first hypothesis was wrong too, and killing it is the load-bearing part.** The obvious suspect was
+  `nusizWidth`, which maps only $05→2 and $07→4 and returns 1 for the five COPY modes. Falsified by
+  experiment: eight otherwise-identical probe ROMs, one per NUSIZ mode held CONSTANT for the whole frame,
+  reproduce **pixel-exact in all eight** (P0 cells matched 864/864, 1728/1728, 1728/1728, 2592/2592,
+  1728/1728, 1728/1728, 2592/2592, 3456/3456 for modes 0..7). The copies are hardware replication of the
+  same 8-bit byte, so 1 pixel per bit is the *correct* width for a copy mode and `grpByte` was already
+  reading the right pixels. The real cause is that `extract` read NUSIZ **once, at the end of the rendered
+  frame** — litmus_nusiz_all ends in mode $07, so all 214 lines were reproduced quad-width.
+
+  **Fix, in two parts.**
+  1. *Diagnosis.* Per visible line the extractor now measures, for each player, the NUSIZ in force, the reset
+     position, and the number of separate runs `DecomposeRow` reports; the same measurement is taken off the
+     **clone**. The RESULT line now names a cause only when the number that proves it was counted — copies
+     (`target orders up to 3 copies (NUSIZ $06 on 37 lines) and the clone draws up to 1`), multiplexing
+     (**only** when distinct reset X > 1, with the positions and their line counts), or a late write (the
+     kernel's own store lands after the object's leftmost pixel — arithmetic on the emitted block schedule).
+     When none of the three is measurable it says so instead of picking whichever sounds plausible. The size
+     shift is removed before counting positions, because HmovedPixel moves ±1 on a 1x↔2x change without the
+     sprite having moved (`SetNUSIZ` in the engine does exactly that, and it is measured: 24 for modes
+     0,1,2,3,4,6 and 25 for 5 and 7 with an identical RESP0).
+  2. *Reproduction.* When per-line NUSIZ varies, the kernel replays it from a table. Room is made by dropping
+     playfield writes the target provably does not need, decided per PF register: both halves 0 on every line
+     (the reset clear already leaves the register at 0), or right-half bytes equal to the left on every line
+     (CTRLPF repeat reproduces it). A left write is never dropped alone — the next line would inherit the
+     right half's value.
+
+  **Result: 2666 → 2 cells** (P0 3616/3616, P1 3120/3120; the 2 are BG cells the clone paints P1). Those 2
+  are reported, not swept up: the target clears GRP1 *part-way along* scanline 228, leaving a 10-pixel P1
+  run, and a kernel that writes each register once per line in HBLANK can only draw 8 or 12 at quad width.
+
+  **Where it still gives up, with the number.** `rts_dispatch` needs 6 PF + 2 GRP + 1 NUSIZ0 = 9 blocks.
+  Nine blocks *run*: `lda TABLE,y` on a page-aligned table costs 4, so 3+7·9+7 = 73 of 76, and the 9-block
+  clone measured 262 scanlines with its picture improved from 376 wrong cells to 8. But `cyclebound` bounds
+  `lda abs,y` at 5 (it cannot assume the alignment) and scores the same kernel at **82 against a 76 budget,
+  `certified:false`**. The kernel is therefore capped at the *certifiable* 8 blocks, `rts_dispatch` keeps its
+  baseline 376 cells, and the tool says why — naming the mode, the copy count and the cycle arithmetic.
+  Emitting an artifact that trips the repo's own line-budget gate is the RL-7b failure mode again.
+
+  **Regression: none.** Whenever NUSIZ is constant down the frame — 30 of the 31 technique ROMs, Outlaw and
+  Combat — the historical eight-block layout is emitted unchanged, verified by diffing the generated sources
+  (only the new per-block deadline comments differ). Corpus after: **21 pixel-exact / 8 differ / 2 partial,
+  262 scanlines on 31/31**, identical to before except `rts_dispatch`'s wording; Outlaw and Combat still
+  pixel-exact with and without `-reset`. Two interim versions of this change *did* regress
+  (`flicker_multiplex` 0→78, `sprite_anim` 0→84, `text24` 162→P0/P1 absent) by sampling the graphics byte at
+  the per-line reset position — the end-of-frame marker and the visible-line position are not the same number
+  on a target that parks its sprites during overscan. That is why the sampling position stayed put and only
+  the size shift was applied to it.
 - **SD-6 — `prove_line_budget` false-positived every two-call shared subroutine. DONE (v1.115.0).** Found by
   running a generated clone through the prover rather than only looking at its picture. The ordinary
   two-sprite shape — both players placed through one shared `SetXPos` — reported `certified:false` with the
@@ -978,6 +1033,47 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   The full staged design for real bank support (site identity `(bank, addr)`, hotspot edges as
   "same address, other bank", phantom-read switches, per-mapper decline list, and the unsoundness risks
   including ROM tables read from the wrong bank) is researched and recorded — stages 1-4 remain.
+- **SD-8 — bank-switched cartridges are analysed, one bank at a time. DONE (v1.116.0), stage 1 of bank
+  support.** Rather than key every address on `(bank, addr)` — a ~20-call-site refactor across five files —
+  each bank is handed to the EXISTING pipeline as the self-contained 4K image it already is: its own length
+  gives the mask, the address space gives the base, and its own vectors seed the decode. A flat ROM is
+  literally the one-unit case of the same loop, which is why its output is unchanged.
+
+  | ROM | before | after |
+  |---|---|---|
+  | `banked_game` (F8, 2 banks) | 0 regions, no decline | **7 regions**, `certified:false`, 1 unmodelled switch |
+  | `litmus_bank` (F8) | — | bank0 52 instrs/6 regions, **bank1 4 instrs/0 regions** |
+  | 42 flat ROMs | — | **byte-identical JSON** |
+
+  **Cross-bank flow is refused, not guessed.** A region whose instructions can touch a bank-switch hotspot
+  continues in a bank this analysis never entered; costing the bytes that happen to follow in the *current*
+  bank would be a number about a path the hardware does not take, which is worse than no number because it
+  looks like one. The refusal names the mapper's own symbol: *"the access at $FF00 reaches BANK1 ($1FF9)"*.
+  It cannot key on stores — `lda $FFF9` is the canonical switch — and it counts an unresolvable access under
+  a hotspot-bearing mapper as a possible switch.
+
+  **Two defects found on the way, both of the "confidently wrong" kind:**
+  - **`memorymap.MapAddress` does not fold cartridge mirrors.** Measured: `$FFF9 → $FFF9`, `$3FF9 → $3FF9`.
+    It identifies cartridge space but leaves the address alone, so comparing its output against a hotspot
+    table keyed in the primary mirror (`$1FF9`) matched **nothing at all** — a region full of `lda $FFF9`
+    reported no bank switch whatsoever. Folding now mirrors what the cartridge itself does
+    (`OriginCart | (addr & CartridgeBits)`).
+  - **`litmus_bank` came back `certified:true`** — a true statement about bank 0 of 2, presented as a verdict
+    on the cartridge. Certification now requires `UnmodelledSwitches == 0`, for the same reason it requires
+    `Converged`: "every region I looked at passed" is not a proof when the reason some were not looked at is
+    that the program leaves for somewhere the analysis does not follow.
+
+  **The residue is named, not hidden.** `BankCoverage` reports decoded instructions and regions per bank, so
+  `bank1: 4 instrs / 0 regions` cannot pass for a bank that was checked. Graded against the machine
+  (`banksound_test.go`): every `(bank, pc)` the emulator executes must be in the static decode. **Bank 0 —
+  the bank the reset vector reaches — is complete on all four ROMs (0 missing).** The remaining absences are
+  exactly the worker banks entered only across a switch (`litmus_bank`: 4 of 36), which is Stage 2's job; the
+  test requires each to be reported as a barely-decoded bank carrying no region verdicts, and requires the
+  report to state a cause for the residue.
+
+  **Corpus gap recorded, not papered over:** in all four bank ROMs the banks never execute the same address,
+  so `#(bank,pc) == #pc` and **none of them can catch a flat-keyed instrument**. The test says so in its own
+  output rather than passing quietly. A litmus where two banks run code at one address is the missing piece.
 - **RL-8 — `framegen` missile/ball replay + per-zone sprite X.** The two limits RL-7 measured. Missiles and
   the ball need one enable bit and one X per scanline (cheap: the attribution is already extracted, only the
   emitter lacks it); per-zone sprite X needs the extracted single `p0x`/`p1x` to become a per-scanline series

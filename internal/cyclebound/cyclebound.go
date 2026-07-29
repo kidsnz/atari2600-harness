@@ -138,6 +138,132 @@ func cartInfo(binPath string) (id string, banks int, err error) {
 	return id, banks, nil
 }
 
+// analysisUnit is one bank presented as a self-contained 4K image, together with
+// the addresses that switch away from it.
+type analysisUnit struct {
+	bank     int
+	prog     *program
+	hotspots map[uint16]string
+}
+
+// analysisUnits splits a cartridge into the units this package can analyse: one
+// per bank for a bank-switched image, or the single flat image otherwise. The
+// second return is a decline reason; non-empty means analyse nothing.
+//
+// Each bank is a 4K image in its own right — the mask falls out of its own length
+// and the base out of the address space — so `newProgram` over the bank's bytes
+// needs no special case, and the flat ROM is literally the one-unit version of
+// the same thing.
+func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
+	flat := []analysisUnit{{bank: 0, prog: newProgram(rom)}}
+
+	e, err := emu.New("NTSC")
+	if err == nil {
+		err = e.LoadROM(binPath)
+	}
+	if err != nil {
+		// Cannot ask the engine. Being unable to identify the cartridge is a reason
+		// to be MORE careful, not less: fall back to the size test and decline.
+		if len(rom) > 4096 {
+			return nil, fmt.Sprintf("image is %d bytes and the cartridge could not be identified (%v); "+
+				"the console addresses 4K at a time, so a flat-address analysis would describe a "+
+				"program that does not exist", len(rom), err)
+		}
+		return flat, ""
+	}
+
+	id, banks := e.CartInfo()
+	if banks <= 1 {
+		return flat, ""
+	}
+	hotspots, published := e.BankSwitchHotspots()
+	if !published || len(hotspots) == 0 {
+		// The mapper's switch is not an address in cartridge space — it is driven by
+		// a data value (3E, 3F), by bus behaviour outside the cartridge (UA, SB), by
+		// bus timing (FE, WD), or by a coprocessor. An address model does not lose
+		// precision there, it misses the switch entirely.
+		return nil, fmt.Sprintf("cartridge is mapper %s with %d banks and publishes no bank-switch "+
+			"hotspot addresses; its switch is driven by data, bus behaviour or a coprocessor, which "+
+			"an address-based analysis cannot see at all", id, banks)
+	}
+	contents, err := e.CopyBanks()
+	if err != nil {
+		return nil, fmt.Sprintf("cartridge is mapper %s with %d banks and its banks could not be "+
+			"read for analysis: %v", id, banks, err)
+	}
+	var units []analysisUnit
+	for _, c := range contents {
+		if len(c.Data) == 0 {
+			return nil, fmt.Sprintf("cartridge is mapper %s: bank %d came back empty", id, c.Number)
+		}
+		units = append(units, analysisUnit{bank: c.Number, prog: newProgram(c.Data), hotspots: hotspots})
+	}
+	return units, ""
+}
+
+// cartHotspotKey folds a CPU address to the form the mapper keys its hotspot
+// table by: the primary cartridge mirror, $1000-$1FFF.
+//
+// memorymap.MapAddress is NOT enough here and the difference is silent.
+// Measured: it returns $FFF9 unchanged for $FFF9 and $3FF9 for $3FF9 — it
+// identifies cartridge space but does not fold the mirrors — so comparing its
+// output against a table keyed at $1FF9 matches nothing at all, and a region full
+// of `lda $FFF9` reports no bank switch whatsoever. The cartridge itself masks
+// with its cartridgeBits and adds the origin, so this does the same.
+func cartHotspotKey(addr uint16) (uint16, bool) {
+	if _, area := memorymap.MapAddress(addr, false); area != memorymap.Cartridge {
+		return 0, false
+	}
+	return memorymap.OriginCart | (addr & memorymap.CartridgeBits), true
+}
+
+// hotspotRefusal reports why a region cannot be bounded because something in it
+// can switch banks, or "" when nothing in it can.
+//
+// Cross-bank flow is not modelled yet, so an instruction that touches a hotspot
+// continues in a bank this analysis never looked at. Costing the bytes that
+// happen to follow in the CURRENT bank would produce a number about a path the
+// hardware does not take — worse than no number, because it looks like one.
+//
+// A read switches just as a write does (`lda $FFF9` is the canonical form), so
+// this cannot key on stores. Addresses are folded through the engine's memory map
+// first, because $FFF9, $1FF9 and $3FF9 are the same hotspot.
+func hotspotRefusal(instrs map[uint16]Instr, start uint16, hotspots map[uint16]string, states map[uint16]State) string {
+	if len(hotspots) == 0 {
+		return ""
+	}
+	s := &solver{
+		nodes: map[uint16]Instr{}, sinks: map[uint16]bool{}, folds: map[uint16]loopInfo{},
+		memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states,
+	}
+	if msg := s.collectRegion(instrs, instrs[start]); msg != "" {
+		return "" // unbounded for another reason; that reason is the more specific one
+	}
+	for _, in := range s.nodes {
+		st := states[in.Addr]
+		acc, ok := accessOf(in, st)
+		if !ok {
+			continue // instruction touches no memory
+		}
+		for _, a := range acc.Addrs {
+			ma, ok := cartHotspotKey(a)
+			if !ok {
+				continue
+			}
+			if sym, ok := hotspots[ma]; ok {
+				return fmt.Sprintf("region can switch banks: the access at $%04X reaches %s ($%04X), "+
+					"and flow between banks is not modelled — the continuation is in a bank this "+
+					"analysis did not follow", in.Addr, sym, ma)
+			}
+		}
+		if acc.Unbounded {
+			return fmt.Sprintf("region contains an access at $%04X whose target cannot be resolved, "+
+				"and this cartridge has bank-switch hotspots — it may therefore switch banks", in.Addr)
+		}
+	}
+	return ""
+}
+
 // declineBanked returns a reason string when the image must not be analysed by
 // this flat-address package, or "" when it is safe to proceed.
 //
@@ -295,6 +421,11 @@ type Region struct {
 	Start    uint16 `json:"start"` // address of the WSYNC store that opens the region
 	StartLoc string `json:"start_loc,omitempty"`
 	Kind     string `json:"kind,omitempty"` // "visible" (budget-checked) or "blank" (VSYNC/VBLANK; skipped)
+	// Bank names which bank this region lives in. BankValid distinguishes "bank 0"
+	// from "not a banked image", so a flat ROM's JSON is unchanged (omitempty on a
+	// plain int would also hide a real bank 0).
+	Bank      int  `json:"bank,omitempty"`
+	BankValid bool `json:"bank_valid,omitempty"`
 	Worst    int    `json:"worst"`          // proven worst-case cycles from here to the next WSYNC
 	Budget   int    `json:"budget"`
 	Over     bool   `json:"over"`             // Worst > Budget
@@ -1145,6 +1276,13 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 
 // --- top-level ---
 
+// BankCoverage is how much of one bank the analysis actually reached.
+type BankCoverage struct {
+	Bank         int `json:"bank"`
+	Instructions int `json:"instructions"` // decoded from THIS bank's own vectors
+	Regions      int `json:"regions"`
+}
+
 // Report is the proof outcome over all WSYNC-to-WSYNC regions of a kernel.
 type Report struct {
 	Asm        string   `json:"asm"`
@@ -1180,6 +1318,33 @@ type Report struct {
 	// backstop. That is luck, not a refusal — a banked ROM whose flat fold DID
 	// contain a WSYNC would have been analysed and reported on with confidence.
 	BankedDeclined string `json:"banked_declined,omitempty"`
+
+	// Banks is the number of banks analysed, set only for a bank-switched image.
+	Banks int `json:"banks,omitempty"`
+
+	// BankCoverage says how much of each bank was actually reached, so a bank that
+	// was barely decoded cannot pass for one that was checked.
+	//
+	// A bank is normally entered by the trampoline that switched to it, not by its
+	// own reset vector, and cross-bank flow is not modelled yet — so a worker bank
+	// typically shows only the handful of instructions its own vectors reach.
+	// Measured on litmus_bank: 4 of the 36 (bank,pc) pairs the machine executes are
+	// in bank 1 and absent from the decode, because bank 1's code at $FF03 is
+	// reached only across the switch. Printing the per-bank counts is what keeps
+	// that residue visible instead of letting a full-looking report imply coverage
+	// it does not have.
+	BankCoverage []BankCoverage `json:"bank_coverage,omitempty"`
+
+	// UnmodelledSwitches counts regions refused because they can change bank and
+	// cross-bank flow is not modelled.
+	//
+	// Certification must require this to be zero, for the same reason it requires
+	// Converged: "every region I looked at passed" is not a proof when the reason
+	// some were not looked at is that the program leaves for somewhere this
+	// analysis does not follow. Before this counter existed, litmus_bank came back
+	// certified:true having analysed bank 0 of 2 — a true statement about a
+	// fragment presented as a verdict on the cartridge.
+	UnmodelledSwitches int `json:"unmodelled_switches,omitempty"`
 }
 
 // Prove assembles asmPath, statically proves every WSYNC-to-WSYNC region's
@@ -1250,54 +1415,90 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	if len(rom) < 6 || len(rom) > 0x10000 {
 		return nil, fmt.Errorf("unexpected ROM size %d bytes", len(rom))
 	}
-	p := newProgram(rom)
-	if why := p.declineBanked(bin); why != "" {
-		return &Report{Asm: filepath.Base(asmPath), Budget: budget, BankedDeclined: why}, nil
+	// A bank-switched cartridge is analysed ONE BANK AT A TIME. Each bank is a
+	// 4K image in its own right — same mask, same $F000 base, same vectors — so the
+	// existing pipeline runs over it unchanged; what does NOT hold is flow BETWEEN
+	// banks, and that is refused rather than guessed (see hotspotRefusal).
+	//
+	// A flat ROM is simply the one-bank case and goes down the identical path, so
+	// its report is unchanged byte for byte.
+	units, unitErr := analysisUnits(rom, bin)
+	if unitErr != "" {
+		return &Report{Asm: filepath.Base(asmPath), Budget: budget, BankedDeclined: unitErr}, nil
 	}
-	instrs, entries := p.decodeFromVectors()
-	states, converged := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
 
-	var starts []uint16
-	for a, in := range instrs {
-		if in.isWSYNC() {
-			starts = append(starts, a)
+	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget, Converged: true}
+	if len(units) > 1 {
+		rep.Banks = len(units)
+	}
+	for _, u := range units {
+		p := u.prog
+		instrs, entries := p.decodeFromVectors()
+		bc := BankCoverage{Bank: u.bank, Instructions: len(instrs)}
+		states, converged := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
+		if !converged {
+			rep.Converged = false
 		}
-	}
-	sort.Slice(starts, func(i, j int) bool { return starts[i] < starts[j] })
 
-	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget, Converged: converged}
-	for _, sa := range starts {
-		reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa), regionAmax(sa), sm, states)
-		rep.Regions++
-		if reg.Kind == "blank" {
-			// ①: a blank region no longer vanishes as worst=0. It is not a visible-line
-			// tear (so it stays OUT of Lines/MaxWorst/Violations/Certified for backward
-			// compatibility), but a blank region over its budget adds a scanline = roll,
-			// so surface it and feed the ③ roll_free ∀ verdict.
-			rep.Blank++
-			rep.BlankLines = append(rep.BlankLines, reg)
-			if !reg.Bounded {
-				rep.BlankUnbounded = append(rep.BlankUnbounded, reg)
-			} else {
-				if reg.Worst > rep.BlankMaxWorst {
-					rep.BlankMaxWorst = reg.Worst
-				}
-				if reg.Over {
-					rep.BlankOver = append(rep.BlankOver, reg)
+		var starts []uint16
+		for a, in := range instrs {
+			if in.isWSYNC() {
+				starts = append(starts, a)
+			}
+		}
+		sort.Slice(starts, func(i, j int) bool { return starts[i] < starts[j] })
+
+		for _, sa := range starts {
+			reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa), regionAmax(sa), sm, states)
+			if len(units) > 1 {
+				reg.Bank = u.bank
+				reg.BankValid = true
+				// Cross-bank flow is not modelled, so a region that can touch a
+				// bank-switch hotspot continues somewhere this analysis never looked.
+				// Bounding it on the bytes that follow in THIS bank would be a number
+				// about a path the hardware does not take.
+				if why := hotspotRefusal(instrs, sa, u.hotspots, states); why != "" {
+					reg.Bounded = false
+					reg.Reason = why
+					reg.Worst, reg.Over, reg.Path = 0, false, nil
+					rep.UnmodelledSwitches++
 				}
 			}
-			continue
+			bc.Regions++
+			rep.Regions++
+			if reg.Kind == "blank" {
+				// ①: a blank region no longer vanishes as worst=0. It is not a visible-line
+				// tear (so it stays OUT of Lines/MaxWorst/Violations/Certified for backward
+				// compatibility), but a blank region over its budget adds a scanline = roll,
+				// so surface it and feed the ③ roll_free ∀ verdict.
+				rep.Blank++
+				rep.BlankLines = append(rep.BlankLines, reg)
+				if !reg.Bounded {
+					rep.BlankUnbounded = append(rep.BlankUnbounded, reg)
+				} else {
+					if reg.Worst > rep.BlankMaxWorst {
+						rep.BlankMaxWorst = reg.Worst
+					}
+					if reg.Over {
+						rep.BlankOver = append(rep.BlankOver, reg)
+					}
+				}
+				continue
+			}
+			rep.Lines = append(rep.Lines, reg) // PONG-C3: keep EVERY visible region, passing or not
+			if !reg.Bounded {
+				rep.Unbounded = append(rep.Unbounded, reg)
+				continue
+			}
+			if reg.Worst > rep.MaxWorst {
+				rep.MaxWorst = reg.Worst
+			}
+			if reg.Over {
+				rep.Violations = append(rep.Violations, reg)
+			}
 		}
-		rep.Lines = append(rep.Lines, reg) // PONG-C3: keep EVERY visible region, passing or not
-		if !reg.Bounded {
-			rep.Unbounded = append(rep.Unbounded, reg)
-			continue
-		}
-		if reg.Worst > rep.MaxWorst {
-			rep.MaxWorst = reg.Worst
-		}
-		if reg.Over {
-			rep.Violations = append(rep.Violations, reg)
+		if len(units) > 1 {
+			rep.BankCoverage = append(rep.BankCoverage, bc)
 		}
 	}
 	if rep.Regions == 0 {
@@ -1310,12 +1511,13 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	// A capped fixpoint leaves under-approximated states, so nothing derived from
 	// them may be certified — the bound would rest on values the analysis never
 	// finished computing.
-	rep.Certified = rep.Converged && rep.Regions > 0 && len(rep.Violations) == 0 && len(rep.Unbounded) == 0
+	rep.Certified = rep.Converged && rep.Regions > 0 && rep.UnmodelledSwitches == 0 &&
+		len(rep.Violations) == 0 && len(rep.Unbounded) == 0
 	// ③ roll_free: the ∀ roll-freedom verdict — EVERY region (blank AND visible) is
 	// bounded and within its budget×@lines span. Stricter than Certified (visible-only):
 	// a blank region over budget or unbounded means the frame's line total is NOT
 	// statically proven here (it is delegated to the runtime ∃ ntsc_frame_lines check).
-	rep.RollFree = rep.Converged && rep.Regions > 0 &&
+	rep.RollFree = rep.Converged && rep.Regions > 0 && rep.UnmodelledSwitches == 0 &&
 		len(rep.Violations) == 0 && len(rep.Unbounded) == 0 &&
 		len(rep.BlankOver) == 0 && len(rep.BlankUnbounded) == 0
 	return rep, nil

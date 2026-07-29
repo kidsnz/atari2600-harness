@@ -1,7 +1,6 @@
 package cyclebound
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/kidsnz/atari2600-harness/internal/emu"
@@ -288,34 +287,45 @@ func TestProveTimerBlankSkipped(t *testing.T) {
 func TestProveNoWSYNCNotCertified(t *testing.T) {
 	rep := mustProve(t, "../../roms/techniques/banked_game.asm", 76)
 	if rep.Certified {
-		t.Fatal("a 0-region ROM must NOT certify (no WSYNC reached = out of scope, not proven safe)")
+		t.Fatal("a bank-switched ROM must NOT certify while cross-bank flow is unmodelled")
 	}
-	// The 0-region backstop used to be the ONLY thing standing between this ROM
-	// and a confident report about a program that does not exist: nothing declined
-	// the image, the flat model folded it to one bank, and it was saved purely by
-	// that bank happening to contain no reachable STA WSYNC. This assertion used to
-	// be a t.Skipf on exactly that premise — a test that stops testing the moment
-	// its subject changes. The refusal is now explicit, so require it.
-	if rep.BankedDeclined == "" {
-		t.Fatal("banked_game is an 8K F8 cartridge and must be DECLINED by name, not merely fail to " +
-			"certify: a banked image whose flat fold did contain a WSYNC would otherwise be " +
-			"analysed and reported on with confidence")
+	// This ROM used to produce 0 regions, and that was the ONLY thing standing
+	// between it and a confident report about a program that does not exist: the
+	// flat model folded 8K to one bank and was saved purely by that bank happening
+	// to contain no reachable STA WSYNC. The assertion here used to be a t.Skipf on
+	// exactly that premise — a test that stops testing the moment its subject
+	// changes. It is now analysed properly, per bank, so require the real reasons.
+	if rep.Banks != 2 {
+		t.Fatalf("banked_game is an 8K F8 cartridge; the report says %d bank(s)", rep.Banks)
 	}
-	if !strings.Contains(rep.BankedDeclined, "F8") {
-		t.Errorf("the decline must name the mapper the ENGINE identified, so a size-based guess and "+
-			"the emulator cannot disagree about which machine is described; got %q", rep.BankedDeclined)
+	if rep.Regions == 0 {
+		t.Error("per-bank analysis should now reach this ROM's kernel; 0 regions means it is still " +
+			"being skipped, just more politely")
+	}
+	if rep.UnmodelledSwitches == 0 {
+		t.Error("this ROM switches banks through $FFF8/$FFF9; a report that found no unmodelled " +
+			"switch is not seeing the hotspot at all")
+	}
+	// Per-bank coverage must be visible, or a bank barely decoded passes for one
+	// that was checked.
+	if len(rep.BankCoverage) != 2 {
+		t.Errorf("expected per-bank coverage for both banks, got %+v", rep.BankCoverage)
 	}
 }
 
-// Every entry point must reach the same verdict. Three of the five used to decide
-// separately and two decided nothing at all, so a caller could be refused by one
-// tool and answered by another about the same ROM.
-func TestBankedImageDeclinedByEveryEntryPoint(t *testing.T) {
+// No entry point may answer about a bank-switched cartridge as if it were flat.
+// Three of the five used to decide separately and two decided nothing at all, so
+// a caller could be refused by one tool and answered confidently by another about
+// the same ROM.
+func TestBankedImageHandledByEveryEntryPoint(t *testing.T) {
 	const asm = "../../roms/techniques/banked_game.asm"
 
+	// Prove analyses a banked image per bank (it refuses the switching regions and
+	// gates certification on them). The other three still model a flat address
+	// space, so for them the only honest answer is to decline by name.
 	rep := mustProve(t, asm, 76)
-	if rep.BankedDeclined == "" {
-		t.Error("Prove did not decline")
+	if rep.Certified {
+		t.Error("Prove certified a bank-switched cartridge")
 	}
 	if br, err := BeamIntervals(asm); err != nil {
 		t.Errorf("BeamIntervals: %v", err)

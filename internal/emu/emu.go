@@ -16,6 +16,7 @@ import (
 	"github.com/jetsetilly/gopher2600/environment"
 	"github.com/jetsetilly/gopher2600/hardware"
 	"github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
+	"github.com/jetsetilly/gopher2600/hardware/memory/cartridge/mapper"
 	"github.com/jetsetilly/gopher2600/hardware/memory/memorymap"
 	"github.com/jetsetilly/gopher2600/hardware/peripherals/controllers"
 	"github.com/jetsetilly/gopher2600/hardware/riot/ports"
@@ -946,6 +947,60 @@ func (e *Emu) Bank() (number int, isRAM bool) {
 // acceptance tests run on.
 func (e *Emu) CartInfo() (id string, banks int) {
 	return e.VCS.Mem.Cart.ID(), e.VCS.Mem.Cart.NumBanks()
+}
+
+// CartBank is one bank of a cartridge as the engine hands it over for static
+// analysis: the bytes, and the origins in the 4K window this bank may be mapped
+// to. A 2K image answers TWICE inside that window, so Origins has two entries for
+// it — which is why the origin must come from the mapper rather than be assumed.
+type CartBank struct {
+	Number  int
+	Data    []uint8
+	Origins []uint16
+}
+
+// CopyBanks returns every bank's bytes, taken through the mapper's own
+// disassembly path so reading them cannot disturb the running cartridge (a plain
+// cartridge access has bank-switching side effects — that is the whole hazard).
+func (e *Emu) CopyBanks() ([]CartBank, error) {
+	cs, err := e.VCS.Mem.Cart.CopyBanks()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]CartBank, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, CartBank{Number: c.Number, Data: c.Data, Origins: c.Origins})
+	}
+	return out, nil
+}
+
+// BankSwitchHotspots returns the cartridge addresses that select a bank when
+// touched, keyed in the primary mirror ($1000-$1FFF), with the mapper's own
+// symbol for each.
+//
+// Only HotspotBankSwitch entries are returned. The other kinds — function,
+// register read/write, reserved — do things that are not "the next instruction
+// comes from a different bank", and lumping them together would put edges in a
+// control-flow graph that the hardware does not have.
+//
+// A nil map with ok=false means the mapper publishes no hotspot table at all.
+// That is not "there are none": every mapper whose switch is driven by a data
+// value, by bus timing, or by an address OUTSIDE cartridge space (3F, 3E, UA, SB,
+// FE, WD) is in that group, and for those an address-hotspot model does not
+// merely lose precision — it misses the switch entirely, which is the unsound
+// direction. Callers must decline rather than assume an empty set.
+func (e *Emu) BankSwitchHotspots() (map[uint16]string, bool) {
+	bus := e.VCS.Mem.Cart.GetCartHotspotsBus()
+	if bus == nil {
+		return nil, false
+	}
+	out := map[uint16]string{}
+	for addr, info := range bus.Hotspots() {
+		if info.Action == mapper.HotspotBankSwitch {
+			out[addr] = info.Symbol
+		}
+	}
+	return out, true
 }
 
 // SetInput はジョイスティック入力を注入する（headless ハーネスの入力経路。poke は入力に効かない）。
