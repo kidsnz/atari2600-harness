@@ -576,6 +576,23 @@ func (e *Emu) effectiveAddr() (addr uint16, mem bool) {
 	y := uint16(e.VCS.CPU.Y.Value())
 	peek := func(a uint16) uint16 { v, _ := e.VCS.Mem.Peek(a); return uint16(v) }
 	switch d.AddressingMode {
+	case instructions.Implied:
+		// A push has no operand, but it certainly has an effective address: the
+		// stack, at $0100+SP. On the 2600 page 1 mirrors the same addresses the
+		// console decodes, so a program that aims SP at a TIA register turns PHA
+		// into a store to it — the "stack trick" Combat uses for its missile
+		// enable. Treating an implied opcode as touching no memory made that write
+		// invisible to every tool here, while the screen showed it happening
+		// (roms/litmus/litmus_stack_trick.asm turns the background green with a PHA).
+		//
+		// SP is read after the instruction completed and a push decrements it, so
+		// the byte went one slot above where SP now points.
+		switch d.Operator {
+		case instructions.PHA, instructions.PHP:
+			sp := uint16(e.VCS.CPU.SP.Address()) & 0xFF
+			return 0x0100 | ((sp + 1) & 0xFF), true
+		}
+		return 0, false
 	case instructions.Absolute:
 		return base, true
 	case instructions.AbsoluteX:
@@ -1370,6 +1387,10 @@ func (e *Emu) LastTIAWrite() (TIAWrite, bool) {
 		w.Val, w.HasVal = e.XReg(), true
 	case instructions.STY:
 		w.Val, w.HasVal = e.YReg(), true
+	case instructions.PHA:
+		w.Val, w.HasVal = e.A(), true
+	case instructions.PHP:
+		w.Val, w.HasVal = e.VCS.CPU.Status.Value(), true
 	}
 	return w, true
 }

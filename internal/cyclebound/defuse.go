@@ -119,9 +119,27 @@ func accessOf(in Instr, st State) (Access, bool) {
 			return Access{}, false
 		}
 	}
-	// Immediate / implied / relative touch no memory address of interest.
+	// Immediate and relative touch no memory address. Implied usually does not
+	// either — except for a push, whose target is the stack, and on the 2600 the
+	// stack is in the same address space the console decodes. A program that aims
+	// SP at a TIA register writes it with PHA; roms/litmus/litmus_stack_trick.asm
+	// turns the background green that way, and until SP was tracked no analysis
+	// here could see the write at all.
 	switch d.AddressingMode {
-	case instructions.Immediate, instructions.Implied, instructions.Relative:
+	case instructions.Immediate, instructions.Relative:
+		return Access{}, false
+	case instructions.Implied:
+		switch d.Operator {
+		case instructions.PHA, instructions.PHP:
+			a := Access{PC: in.Addr, Kind: AccessWrite}
+			sp, ok := st.SP.konst()
+			if !ok {
+				a.Unbounded = true // SP unknown: the push could be anywhere in page 1
+				return a, true
+			}
+			a.Addrs, a.Exact = []uint16{uint16(0x0100 | (sp & 0xFF))}, true
+			return a, true
+		}
 		return Access{}, false
 	}
 

@@ -329,10 +329,14 @@ func tiaTarget(in Instr, st State) (string, bool) {
 	if acc.Kind != AccessWrite && acc.Kind != AccessModify {
 		return "", false
 	}
-	a := acc.Addrs[0] & 0x3F
-	if acc.Addrs[0] >= 0x40 {
+	t := acc.Addrs[0]
+	if t >= 0x0100 && t < 0x0180 {
+		t &= 0xFF // page-1 mirror: a push aimed at TIA space
+	}
+	if t >= 0x40 {
 		return "", false // not a TIA write register
 	}
+	a := t & 0x3F
 	if n, _ := beamtrace.RegInfo(a); n != "" {
 		return n, true
 	}

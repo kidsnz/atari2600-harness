@@ -605,10 +605,16 @@ Recorded because three of these were previously mistaken for hard limits when th
   (which TIA register the byte flows into). Three independent witnesses that can disagree, which is what
   makes the answer falsifiable. What stays out of reach is naming in the work's own vocabulary, not the
   functional role.
-- **Stack-pointer dispatch is NOT a static-analysis limit** — `LDX #$1C; TXS` then `PHP` writes `$011C`
-  deterministically. `absint` simply does not track SP (`absint.go:246-250`). Track it and the famous 2600
-  trick becomes an ordinary store to a known address. (Measured: the Outlaw cartridge sweeps SP `$FF`->`$1C`
-  every frame, so this is not hypothetical.)
+- **Stack-pointer tracking — DONE.** `absint.State.SP` is tracked through TXS/TSX/PHA/PHP/PLA/PLP/JSR/RTS,
+  and a push now resolves to `$0100+SP` wherever SP is known. Before this, BOTH sides of the harness were
+  blind to a write the hardware performs: `emu.LastTIAWrite` reported zero COLUBK writes for
+  `roms/litmus/litmus_stack_trick.asm` while the rendered background was green, because `effectiveAddr`
+  treated an implied opcode as touching no memory. Static and dynamic now agree exactly — PC `$F023`,
+  COLUBK, value `$C4`, clock `-11` — and the picture arbitrates. A push with SP unknown still drops the
+  whole tracked map; with SP known it drops only the cell it wrote. Prover unchanged (14/31, zero diff);
+  def-use containment 9053 -> 9055/9055; beam containment 7117/7117.
+  REMAINING here: JSR/RTS move SP by two but the pushed return address is not modelled as a write, and an
+  interrupt would move SP without being seen at all.
 - **Self-modifying code is detectable even when not resolvable** — a store whose effective address lands in
   decoded code space is a fact, not a guess. Correct terminal state is "region suspended", never a guess.
 - **"Unprovable" should become a CONDITIONAL proof** — "71 cycles, provided `$8A <= 15`" turns a refusal

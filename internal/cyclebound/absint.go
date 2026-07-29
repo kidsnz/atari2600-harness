@@ -142,6 +142,13 @@ func (t TriBool) join(o TriBool) TriBool {
 // (unreachable). An absent Mem key means that cell is unknown (Top).
 type State struct {
 	A, X, Y ValueRange
+	// SP is the stack pointer's low byte. It is tracked because on the 2600 the
+	// stack is not merely bookkeeping: page 1 mirrors the addresses the console
+	// decodes, so a program that aims SP at a TIA register turns PHA/PHP into a
+	// store to it. Leaving SP untracked made that write invisible to every
+	// analysis here while the hardware performed it, and forced every push to be
+	// treated as clobbering all of RAM.
+	SP      ValueRange
 	C, Z, N TriBool
 	Mem     map[uint16]ValueRange
 	VBlank  TriBool // VBLANK display-disable bit (bit1 of the last value stored to $01)
@@ -162,7 +169,7 @@ type State struct {
 
 func botState() State { return State{} } // bottom: valid=false (unreachable)
 func topState() State {
-	return State{A: vTop(), X: vTop(), Y: vTop(), Mem: map[uint16]ValueRange{}, ZPVal: vTop(), valid: true}
+	return State{A: vTop(), X: vTop(), Y: vTop(), SP: vTop(), Mem: map[uint16]ValueRange{}, ZPVal: vTop(), valid: true}
 }
 func (s State) clone() State {
 	m := make(map[uint16]ValueRange, len(s.Mem))
@@ -195,6 +202,7 @@ func (s State) joinState(o State) State {
 	}
 	r := topState()
 	r.A, r.X, r.Y = s.A.join(o.A), s.X.join(o.X), s.Y.join(o.Y)
+	r.SP = s.SP.join(o.SP)
 	r.C, r.Z, r.N = s.C.join(o.C), s.Z.join(o.Z), s.N.join(o.N)
 	r.VBlank, r.VSync = s.VBlank.join(o.VBlank), s.VSync.join(o.VSync)
 	r.ZPVal = s.ZPVal.join(o.ZPVal)
@@ -216,7 +224,7 @@ func (s State) eqState(o State) bool {
 	if !s.valid {
 		return true
 	}
-	if !(s.A.eq(o.A) && s.X.eq(o.X) && s.Y.eq(o.Y) && s.C == o.C && s.Z == o.Z && s.N == o.N &&
+	if !(s.A.eq(o.A) && s.X.eq(o.X) && s.Y.eq(o.Y) && s.SP.eq(o.SP) && s.C == o.C && s.Z == o.Z && s.N == o.N &&
 		s.VBlank == o.VBlank && s.VSync == o.VSync && s.ZPVal.eq(o.ZPVal)) {
 		return false
 	}
@@ -482,10 +490,10 @@ func (s State) transfer(in Instr) State {
 		n.A = s.Y
 		n.setNZ(n.A)
 	case instructions.TSX:
-		n.X = vTop()
+		n.X = s.SP
 		n.setNZ(n.X)
 	case instructions.TXS:
-		// SP not tracked
+		n.SP = s.X // no flags
 	case instructions.INX:
 		n.X = incWrap(s.X)
 		n.setNZ(n.X)
@@ -553,16 +561,43 @@ func (s State) transfer(in Instr) State {
 	case instructions.PLA:
 		n.A = vTop()
 		n.setNZ(n.A)
+		n.SP = incWrap(s.SP)
 	case instructions.PLP:
 		n.C, n.Z, n.N = triUnknown, triUnknown, triUnknown
+		n.SP = incWrap(s.SP)
 	case instructions.PHA, instructions.PHP:
-		// A push writes to page 1, which on the 2600 mirrors this same 128 bytes of
-		// RAM, so it is a store into RAM. SP is not tracked (see SD-3 in the audit),
-		// so the target is unknown and nothing tracked survives. Measured on a real
-		// cartridge this session: its SP sweeps $FF down to $1C every frame, i.e.
-		// pushes really can land anywhere in RAM.
-		n.Mem = map[uint16]ValueRange{}
-	case instructions.JMP, instructions.JSR, instructions.RTS, instructions.RTI, instructions.BRK,
+		// A push stores to $0100+SP, and page 1 mirrors this same RAM, so it is a
+		// store like any other — with a target that is known exactly whenever SP is.
+		// When SP is unknown the push could have landed anywhere in RAM, which is
+		// why the whole tracked map used to be dropped on every push.
+		if sp, ok := s.SP.konst(); ok {
+			if t := uint16(0x0100 | (sp & 0xFF)); t >= 0x0180 {
+				delete(n.Mem, t&0xFF) // page-1 mirror of RAM $80-$FF
+			}
+		} else {
+			n.Mem = map[uint16]ValueRange{}
+		}
+		n.SP = decWrap(s.SP)
+	case instructions.JSR:
+		// pushes the return address: two bytes.
+		if sp, ok := s.SP.konst(); ok {
+			for i := 0; i < 2; i++ {
+				if t := uint16(0x0100 | ((sp - i) & 0xFF)); t >= 0x0180 {
+					delete(n.Mem, t&0xFF)
+				}
+			}
+			n.SP = vConst((sp - 2) & 0xFF)
+		} else {
+			n.Mem = map[uint16]ValueRange{}
+			n.SP = vTop()
+		}
+	case instructions.RTS, instructions.RTI:
+		if sp, ok := s.SP.konst(); ok {
+			n.SP = vConst((sp + 2) & 0xFF)
+		} else {
+			n.SP = vTop()
+		}
+	case instructions.JMP, instructions.BRK,
 		instructions.BEQ, instructions.BNE, instructions.BCS, instructions.BCC,
 		instructions.BMI, instructions.BPL, instructions.BVS, instructions.BVC:
 		// control flow: registers/flags unchanged here (branch refinement is separate)

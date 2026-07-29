@@ -5,6 +5,7 @@ import "testing"
 // TestTimerWrapDetector は VV-10 T-1 の falsifiable 自己テスト：
 //   - clean ツイン（TIM64T を 0 まで正しくポーリングし wrap 前に抜ける）は NO hit。
 //   - trap（TIM1T で 0 を取り逃し wrap 後の値を読み続ける）は HIT。
+//
 // 両方向を固定する（誤検出ゼロ・見逃しゼロ）。
 func TestTimerWrapDetector(t *testing.T) {
 	run := func(rom string) *TimerWrapHit {
