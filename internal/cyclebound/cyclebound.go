@@ -173,6 +173,17 @@ func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
 	}
 
 	id, banks := e.CartInfo()
+	// A superchip overlays 128 bytes of RAM on $F000-$F0FF, so the image is not what
+	// the CPU reads there. romTableRange constant-folds real bytes into an EXACT
+	// value range, that range sets a loop's trip count, and the trip count sets the
+	// worst case — so folding a RAM address produces a narrow, confident, wrong
+	// number in the forbidden direction. Measured hole: this function accepted any
+	// mapper with banks > 1 that published hotspots and never asked.
+	if e.HasSuperchip() {
+		return nil, fmt.Sprintf("cartridge is mapper %s with superchip RAM overlaid on $F000-$F0FF; "+
+			"the image is not what the CPU reads there, so folding those bytes into a value range "+
+			"would bound a loop on data the hardware never holds", id)
+	}
 	if banks <= 1 {
 		return flat, ""
 	}

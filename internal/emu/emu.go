@@ -949,6 +949,16 @@ func (e *Emu) CartInfo() (id string, banks int) {
 	return e.VCS.Mem.Cart.ID(), e.VCS.Mem.Cart.NumBanks()
 }
 
+// HasSuperchip reports whether the cartridge overlays 128 bytes of RAM on the
+// bottom of its window — $F000-$F07F as a write port, $F080-$F0FF as a read port.
+//
+// It matters to any static analysis that constant-folds cartridge bytes: those
+// addresses are NOT the image there, so a value range derived from the image is a
+// range the hardware never holds. And it is fingerprinted from the bytes, not
+// declared, so the same image is F8 or F8SC depending on the engine's own
+// decision — which is exactly why the analysis has to ask rather than infer.
+func (e *Emu) HasSuperchip() bool { return e.VCS.Mem.Cart.HasSuperchip() }
+
 // CartBank is one bank of a cartridge as the engine hands it over for static
 // analysis: the bytes, and the origins in the 4K window this bank may be mapped
 // to. A 2K image answers TWICE inside that window, so Origins has two entries for

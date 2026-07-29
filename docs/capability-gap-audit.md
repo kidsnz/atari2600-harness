@@ -1143,6 +1143,26 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   reachable only across a switch — **measured: 5 such executed pairs, litmus_bank 4 + banked_game 1** — and
   (c) requires every seed whose SOURCE the machine executed to have a landing address the machine also
   executed, so a seed cannot be an invented edge.
+- **SD-8c — a superchip cartridge was analysed as if its RAM were ROM. DONE (v1.116.0).** Found by the
+  adversarial verification of SD-8b, which asked what `analysisUnits` does NOT check.
+
+  A superchip overlays 128 bytes of RAM on the bottom of the cartridge window — `$F000-$F07F` write port,
+  `$F080-$F0FF` read port, both reaching the same 128 cells — so **the image is not what the CPU reads
+  there**. That is not cosmetic for this package: `romTableRange` folds real cartridge bytes into an *exact*
+  value range, that range bounds a loop's trip count, and the trip count sets the proven worst case. Folding
+  a RAM address therefore produces a narrow, confident, wrong number in the one direction the package
+  forbids. Measured hole: `analysisUnits` accepted any mapper with `banks > 1` that published hotspots and
+  asked nothing about RAM (`grep -c Superchip` over the package: **0**).
+
+  Presence is **fingerprinted from the bytes**, not declared — the engine requires every bank's first page to
+  mirror its own two halves — so the same image is `F8` or `F8SC` depending on the engine's decision. Which
+  is exactly why the analysis asks `emu.HasSuperchip()` instead of inferring from the size.
+
+  New `roms/litmus/litmus_superchip.asm` satisfies that fingerprint deliberately (each bank opens with 128
+  bytes of `$A5` twice over, code above the overlay). Measured: the engine reports **`mapper=F8SC banks=2
+  superchip=true`**, and `Prove` now declines it naming both the mapper and the reason. Locked by tests in
+  both directions — the superchip image must be declined, and a plain F8 cartridge must still be analysed
+  per bank with its 2 banks and 6 regions, because a guard that refuses everything is sound and useless.
 - **RL-8a — `framegen` draws missiles and the ball. DONE (v1.116.0).** RL-7 measured that the generated
   kernel emitted no `ENAM0`/`ENAM1`/`ENABL` at all, so those pixels were absent by construction. They are
   now measured, positioned and drawn wherever the kernel shape allows, and reported when it does not.
