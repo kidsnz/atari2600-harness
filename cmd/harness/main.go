@@ -4,12 +4,12 @@
 package main
 
 import (
-	"image"
-	_ "image/jpeg"
 	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
+	"image"
+	_ "image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -24,12 +24,13 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/cyclebound"
 	"github.com/kidsnz/atari2600-harness/internal/emu"
-	"github.com/kidsnz/atari2600-harness/internal/spritepos"
-	"github.com/kidsnz/atari2600-harness/internal/motion"
-	"github.com/kidsnz/atari2600-harness/internal/srcmap"
-	"github.com/kidsnz/atari2600-harness/pkg/audio"
 	"github.com/kidsnz/atari2600-harness/internal/ingest"
+	"github.com/kidsnz/atari2600-harness/internal/motion"
 	"github.com/kidsnz/atari2600-harness/internal/scenario"
+	"github.com/kidsnz/atari2600-harness/internal/spritepos"
+	"github.com/kidsnz/atari2600-harness/internal/srcmap"
+	"github.com/kidsnz/atari2600-harness/internal/version"
+	"github.com/kidsnz/atari2600-harness/pkg/audio"
 )
 
 // --- グローバル状態（stdio は逐次だが念のため mutex 保護）---
@@ -236,6 +237,7 @@ type CPUFlags struct {
 	Z bool `json:"z"`
 	C bool `json:"c"`
 }
+
 // --- read_bank（bankswitch ROM の現在バンク。4K 非バンクでは常に 0/false）---
 
 type ReadBankOut struct {
@@ -301,7 +303,7 @@ type ReadCyclesIn struct {
 }
 type ReadCyclesOut struct {
 	LastInstructionCycles int    `json:"last_instruction_cycles"` // 直近 1 命令のサイクル数
-	CyclesSinceMark       int64  `json:"cycles_since_mark"`        // 直近 mark 以降の累積
+	CyclesSinceMark       int64  `json:"cycles_since_mark"`       // 直近 mark 以降の累積
 	TotalCycles           int64  `json:"total_cycles"`            // ROM ロード以降の累積
 	Coords                Coords `json:"coords"`
 }
@@ -736,7 +738,7 @@ func handleSpriteY(ctx context.Context, req *mcp.CallToolRequest, in SpriteYIn) 
 // --- set_input（ジョイスティック注入。poke は入力に効かない）---
 
 type SetInputIn struct {
-	Player  int    `json:"player,omitempty" jsonschema:"player port (0 left/P0 default, 1 right/P1)"`
+	Player  int     `json:"player,omitempty" jsonschema:"player port (0 left/P0 default, 1 right/P1)"`
 	Action  string  `json:"action" jsonschema:"joystick: left|right|up|down|fire|center|paddle; console panel switches: reset|select|color|p0pro|p1pro"`
 	Pressed bool    `json:"pressed,omitempty" jsonschema:"press/hold when set, release when unset (ignored for center/paddle)"`
 	Value   float64 `json:"value,omitempty" jsonschema:"paddle position 0.0..1.0 (action=paddle only; plugs the paddle peripheral on first use)"`
@@ -872,10 +874,10 @@ type BudgetIn struct {
 	Pokes     []PokeSpec  `json:"pokes,omitempty" jsonschema:"RAM pokes applied after boot, before running (only with patch)"`
 }
 type BudgetOut struct {
-	Over       bool   `json:"over"`        // true=ある論理ラインが予算超過（ロール要因）で停止
+	Over       bool   `json:"over"`         // true=ある論理ラインが予算超過（ロール要因）で停止
 	At         string `json:"at,omitempty"` // 停止時 PC のソース位置（assemble_and_load 経由時のみ）
-	AtScanline int    `json:"at_scanline"` // 超過した論理ラインの開始 scanline（over=true 時）
-	LineCycles int    `json:"line_cycles"` // そのラインが消費した概算 machine cycle（消費ライン数×76）
+	AtScanline int    `json:"at_scanline"`  // 超過した論理ラインの開始 scanline（over=true 時）
+	LineCycles int    `json:"line_cycles"`  // そのラインが消費した概算 machine cycle（消費ライン数×76）
 	Coords     Coords `json:"coords"`
 }
 
@@ -1367,7 +1369,6 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 	return result, out, nil
 }
 
-
 // --- analyze_image: スクリーンショット → TIA データ（ingest パイプライン） ---
 
 type AnalyzeImageIn struct {
@@ -1447,7 +1448,6 @@ func handleAnalyzeImage(ctx context.Context, req *mcp.CallToolRequest, in Analyz
 	}
 	return result, AnalyzeImageOut{Report: rep, Multi: multi, OverlayPath: ovPath}, nil
 }
-
 
 // --- run_scenario: 回帰シナリオを live ループから実行 ---
 
@@ -1536,7 +1536,6 @@ func handleAnalyzeScreen(ctx context.Context, req *mcp.CallToolRequest, in Analy
 	return result, AnalyzeImageOut{Report: rep, OverlayPath: ovPath}, nil
 }
 
-
 // --- watch_ram: RAM 変化トラップ ---
 
 type WatchRAMIn struct {
@@ -1575,7 +1574,6 @@ func handleWatchRAM(ctx context.Context, req *mcp.CallToolRequest, in WatchRAMIn
 	}
 	return nil, out, nil
 }
-
 
 // --- trace_clocks: 命令毎のビーム解剖（step_clock の観測版） ---
 
@@ -1619,7 +1617,7 @@ func handleTraceClocks(ctx context.Context, req *mcp.CallToolRequest, in TraceCl
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "atari2600-harness",
-		Version: "1.112.0",
+		Version: version.Harness,
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "load_rom", Description: "Load a .bin ROM and reset the VCS (TV spec NTSC/PAL/AUTO)."}, handleLoadROM)
