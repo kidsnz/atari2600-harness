@@ -51,6 +51,10 @@ type Emu struct {
 	// クロック呼び、GetLastSignal().Index を索引に Video.LastElement を記録する。
 	// 値は element+1（0=未記録）。elemCB=nil のとき VCS.Step(nil) と等価＝ゼロコスト。
 	elemBuf []uint8          // 索引 = signal.Index（フルフレーム 228×scanline 空間）
+	// elemCtBuf は elemBuf と同じ索引で「その要素の何番目のコピーが描いたか」。
+	// player/missile なら NUSIZ 複製のコピー番号、playfield なら PF0/1/2 のどれか。
+	// 0 は未記録の番兵で、格納値は実際の値 +1。
+	elemCtBuf []uint8
 	elemCB  func(bool) error // 事前確保クロージャ（stepInstr で毎回渡す。per-call alloc 回避）
 
 	// フレーム内ウォッチ（StartFrameWatch / FrameWatch）。watching=false でゼロコスト。
@@ -210,6 +214,7 @@ func (e *Emu) EnableElementCapture() {
 		return
 	}
 	e.elemBuf = make([]uint8, specification.AbsoluteMaxClks)
+	e.elemCtBuf = make([]uint8, specification.AbsoluteMaxClks)
 	e.elemCB = func(isCycle bool) error {
 		sig := e.VCS.TV.GetLastSignal()
 		if sig.Index == signal.NoSignal {
@@ -218,6 +223,15 @@ func (e *Emu) EnableElementCapture() {
 		if sig.Index >= 0 && sig.Index < len(e.elemBuf) {
 			// element(0..6) を +1 して格納（0=未記録の番兵）
 			e.elemBuf[sig.Index] = uint8(e.VCS.TIA.Video.LastElement) + 1
+			// WHICH copy drew the pixel, alongside WHICH object. The TIA already
+			// carries it next to LastElement and we were throwing it away: for a
+			// player or missile it is the sprite's copy index (NUSIZ replication),
+			// for the playfield it is which of PF0/PF1/PF2 lit the pixel. Without
+			// it, three copies of a sprite and one wide sprite are the same
+			// observation, which is precisely the confusion that made a generated
+			// clone of an all-NUSIZ-modes ROM miss 2666 cells and then blame
+			// multiplexing for it.
+			e.elemCtBuf[sig.Index] = uint8(e.VCS.TIA.Video.LastElementCt) + 1
 		}
 		// フレーム内で起きた衝突の蓄積（下記 FrameWatch）。LastColorClock は
 		// 毎ビデオサイクル reset されるので、ここで拾わないと二度と見えない。
@@ -872,6 +886,9 @@ type ElemRun struct {
 	Clock   int    `json:"clock"`   // 区間先頭の可視 clock（0..159）
 	Len     int    `json:"len"`     // 連続ピクセル数
 	Element string `json:"element"` // BG/PF/P0/P1/M0/M1/BL（none=未記録）
+	// Copy は「その要素の何番目のコピーが描いたか」。player/missile は NUSIZ 複製の
+	// コピー番号、playfield は PF0/1/2 のどれか。未記録は -1。
+	Copy int `json:"copy"`
 }
 
 // elemNames は video.Element(0..6) → 表示名。索引は elemBuf 格納値 −1。
@@ -890,24 +907,32 @@ func (e *Emu) DecomposeRow(scanline int) (runs []ElemRun, width int, err error) 
 	if scanline < vt || scanline > vb {
 		return nil, specification.ClksVisible, fmt.Errorf("scanline %d out of visible range %d..%d", scanline, vt, vb)
 	}
-	elemAt := func(x int) string {
+	elemAt := func(x int) (string, int) {
 		idx := scanline*specification.ClksScanline + specification.ClksHBlank + x
 		if idx < 0 || idx >= len(e.elemBuf) {
-			return "none"
+			return "none", -1
 		}
 		v := e.elemBuf[idx]
 		if v == 0 || int(v) > len(elemNames) {
-			return "none"
+			return "none", -1
 		}
-		return elemNames[v-1]
+		cpy := -1
+		if idx < len(e.elemCtBuf) && e.elemCtBuf[idx] > 0 {
+			cpy = int(e.elemCtBuf[idx]) - 1
+		}
+		return elemNames[v-1], cpy
 	}
+	// A run breaks on the COPY as well as on the element: two adjacent copies of a
+	// sprite are one uninterrupted stretch of the same colour, so merging them
+	// would report a single wide object where the hardware drew two narrow ones —
+	// exactly the ambiguity that let all eight NUSIZ modes look alike.
 	for x := 0; x < specification.ClksVisible; x++ {
-		el := elemAt(x)
-		if len(runs) > 0 && runs[len(runs)-1].Element == el {
-			runs[len(runs)-1].Len++
+		el, cpy := elemAt(x)
+		if n := len(runs); n > 0 && runs[n-1].Element == el && runs[n-1].Copy == cpy {
+			runs[n-1].Len++
 			continue
 		}
-		runs = append(runs, ElemRun{Clock: x, Len: 1, Element: el})
+		runs = append(runs, ElemRun{Clock: x, Len: 1, Element: el, Copy: cpy})
 	}
 	return runs, specification.ClksVisible, nil
 }
