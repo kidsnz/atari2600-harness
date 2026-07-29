@@ -91,12 +91,21 @@ func featureName(code int) string {
 
 // transition is one observed (previous state, input) -> (byte value) pair.
 type transition struct {
-	trace int // which recording it came from
-	prev  [emu.RAMSize]uint8
-	coll  emu.Collisions
-	input string
-	next  uint8
+	trace    int    // which recording it came from
+	scenario string // its name, for reporting where a conflict is
+	frame    int    // frame index within that recording
+	prev     [emu.RAMSize]uint8
+	coll     emu.Collisions
+	input    string
+	next     uint8
 }
+
+// SkipFrames drops this many frames from the START of every recording before
+// transitions are gathered. Power-on initialisation is a bulk RAM clear, not a
+// per-byte update rule, so folding it into the same model makes bytes look
+// unexplainable for a reason that has nothing to do with gameplay. Separating the
+// two is how "this byte needs a feature we cannot see" stays a meaningful claim.
+var SkipFrames int
 
 func gatherTransitions(traces map[string]*behavmatch.Trace, idx int) []transition {
 	var out []transition
@@ -110,13 +119,16 @@ func gatherTransitions(traces map[string]*behavmatch.Trace, idx int) []transitio
 		if tr == nil {
 			continue
 		}
-		for f := 1; f < len(tr.Samples); f++ {
+		start := 1 + SkipFrames
+		for f := start; f < len(tr.Samples); f++ {
 			out = append(out, transition{
-				trace: ti,
-				prev:  tr.Samples[f-1].AllRAM,
-				coll:  tr.Samples[f-1].Coll,
-				input: tr.Samples[f].Inputs.Key(),
-				next:  tr.Samples[f].AllRAM[idx],
+				trace:    ti,
+				scenario: n,
+				frame:    f,
+				prev:     tr.Samples[f-1].AllRAM,
+				coll:     tr.Samples[f-1].Coll,
+				input:    tr.Samples[f].Inputs.Key(),
+				next:     tr.Samples[f].AllRAM[idx],
 			})
 		}
 	}
@@ -193,6 +205,15 @@ func keyOf(t transition, feats []int) string {
 // conflicts counts transitions whose feature key is shared with a transition
 // that produced a different value — the evidence that the feature set is too small.
 func conflicts(ts []transition, feats []int) int {
+	n, _ := conflictsWhere(ts, feats, 0)
+	return n
+}
+
+// conflictsWhere additionally names up to maxNames of the conflicting transitions.
+// A bare count says a feature set is too small; the LOCATIONS say why. When every
+// conflict sits on the first frame of each recording it is a start-up transient,
+// not a missing dependency — and those two look identical in a count.
+func conflictsWhere(ts []transition, feats []int, maxNames int) (int, []string) {
 	seen := make(map[string]uint8, len(ts))
 	bad := map[string]bool{}
 	for _, t := range ts {
@@ -206,15 +227,20 @@ func conflicts(ts []transition, feats []int) int {
 		seen[k] = t.next
 	}
 	if len(bad) == 0 {
-		return 0
+		return 0, nil
 	}
 	n := 0
+	var where []string
 	for _, t := range ts {
-		if bad[keyOf(t, feats)] {
-			n++
+		if !bad[keyOf(t, feats)] {
+			continue
+		}
+		n++
+		if len(where) < maxNames {
+			where = append(where, fmt.Sprintf("%s:f%d", t.scenario, t.frame))
 		}
 	}
-	return n
+	return n, where
 }
 
 // ByteArity is one byte's result.
@@ -239,6 +265,9 @@ type ByteArity struct {
 
 	// UsesFrameIndex marks a resolution that leaned on a frame-counter-like byte.
 	UsesFrameIndex bool `json:"uses_frame_index,omitempty"`
+
+	// ConflictAt names where the best feature set was contradicted (scenario:frame).
+	ConflictAt []string `json:"conflict_at,omitempty"`
 }
 
 // ArityReport is the whole-RAM result plus the summary that answers the premise.
@@ -409,7 +438,15 @@ func Arity(prov Provenance, traces map[string]*behavmatch.Trace) *ArityReport {
 		}
 		if !ba.Resolved {
 			ba.Method = fmt.Sprintf("unresolved with <=2 companions (beam %d)", beamWidth)
-			ba.Residual = best
+			// Re-run the best single-companion set to report WHERE it broke.
+			bestFeats := []int{idx, featInputBase}
+			if len(ranked) > 0 {
+				bestFeats = append(bestFeats, ranked[0].c)
+			}
+			ba.Residual, ba.ConflictAt = conflictsWhere(ts, bestFeats, 8)
+			if ba.Residual == 0 || ba.Residual > best {
+				ba.Residual = best
+			}
 		}
 		rep.finish(&ba)
 		rep.Bytes = append(rep.Bytes, ba)
@@ -467,6 +504,9 @@ func (r *ArityReport) Text() string {
 		feats := strings.Join(x.Features, ", ")
 		if !x.Resolved {
 			feats = fmt.Sprintf("%s — %d conflicting transitions remain", x.Method, x.Residual)
+			if len(x.ConflictAt) > 0 {
+				feats += "  at " + strings.Join(x.ConflictAt, " ")
+			}
 		} else {
 			feats = fmt.Sprintf("%s — {%s}", x.Method, feats)
 			if x.Memorising {

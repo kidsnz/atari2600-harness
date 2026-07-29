@@ -65,10 +65,12 @@ func main() {
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
 	rom := fs.String("rom", "", "ROM .bin or .asm (required)")
 	spec := fs.String("spec", "NTSC", "TV spec")
-	scenario := fs.String("scenario", "all", "scenario name or 'all'")
+	scenario := fs.String("scenario", "all", "scenario name, comma-separated list, or 'all'")
+	exclude := fs.String("exclude", "", "comma-separated scenario names to leave out")
 	warmup := fs.Int("warmup", 0, "frames with no input before the scenario")
 	out := fs.String("out", "", "write JSON to this path")
 	asJSON := fs.Bool("json", false, "JSON output for activity/arity")
+	skip := fs.Int("skip", 0, "arity: ignore this many frames at the start of each recording (power-on initialisation is a bulk RAM clear, not a per-byte rule)")
 	if err := fs.Parse(os.Args[2:]); err != nil {
 		os.Exit(2)
 	}
@@ -84,12 +86,33 @@ func main() {
 
 	names := behavmatch.ScenarioNames()
 	if *scenario != "all" {
-		if _, ok := behavmatch.Library[*scenario]; !ok {
-			fmt.Fprintln(os.Stderr, "unknown scenario:", *scenario)
-			fmt.Fprintln(os.Stderr, "known:", strings.Join(behavmatch.ScenarioNames(), ", "))
-			os.Exit(2)
+		names = nil
+		for _, n := range strings.Split(*scenario, ",") {
+			n = strings.TrimSpace(n)
+			if _, ok := behavmatch.Library[n]; !ok {
+				fmt.Fprintln(os.Stderr, "unknown scenario:", n)
+				fmt.Fprintln(os.Stderr, "known:", strings.Join(behavmatch.ScenarioNames(), ", "))
+				os.Exit(2)
+			}
+			names = append(names, n)
 		}
-		names = []string{*scenario}
+	}
+	if *exclude != "" {
+		drop := map[string]bool{}
+		for _, n := range strings.Split(*exclude, ",") {
+			drop[strings.TrimSpace(n)] = true
+		}
+		var kept []string
+		for _, n := range names {
+			if !drop[n] {
+				kept = append(kept, n)
+			}
+		}
+		names = kept
+	}
+	if len(names) == 0 {
+		fmt.Fprintln(os.Stderr, "no scenarios selected")
+		os.Exit(2)
 	}
 
 	switch cmd {
@@ -139,6 +162,7 @@ func main() {
 			r := ramtrace.Analyse(prov, traces)
 			doc, text = r, r.Text()
 		} else {
+			ramtrace.SkipFrames = *skip
 			r := ramtrace.Arity(prov, traces)
 			doc, text = r, r.Text()
 		}
