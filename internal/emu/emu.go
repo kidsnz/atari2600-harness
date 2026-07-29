@@ -1191,7 +1191,6 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 	}
 
 	target := e.VCS.TV.GetCoords().Frame + maxFrames
-	prevRdy := e.VCS.CPU.RdyFlg
 	rows := map[uint16]*LineWorst{}
 
 	var (
@@ -1223,11 +1222,28 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 			break
 		}
 		pcBefore := e.VCS.CPU.PC.Address()
-		if _, err := e.stepInstr(); err != nil {
+		executed, err := e.stepInstr()
+		if err != nil {
 			return nil, err
 		}
-		rdy := e.VCS.CPU.RdyFlg
-		if prevRdy && !rdy { // WSYNC ストローブ完了
+		// WSYNC の検出は「RdyFlg が true→false になった瞬間」ではなく、WSYNC への
+		// **ストアそのもの**で行う。停止時間が 1 命令ステップ未満で終わる WSYNC は
+		// RdyFlg の遷移として観測できず、実測でその取りこぼしが起きていた：
+		// bitmap48 の Krow($F0D0) は 8 フレームで 192 回実行されるのに、遷移方式では
+		// 108 区間しか数えられなかった。取りこぼすと区間が次のストローブまで連結し、
+		// 本来 1 行の区間が 13 行・987 サイクルとして報告される。静的証明（93）を
+		// 実機が破っているように見えた原因はこれで、証明器ではなく測定器の側だった。
+		// Only on a step that actually retired an instruction: LastResult — and so
+		// LastTIAWrite — is unchanged while the CPU is stalled, so the same strobe
+		// would otherwise be seen again on every step of its own halt, closing a
+		// string of zero-length intervals.
+		wsyncNow := false
+		if executed {
+			if w, ok := e.LastTIAWrite(); ok && w.Reg == 0x02 {
+				wsyncNow = true
+			}
+		}
+		if wsyncNow { // WSYNC ストローブ完了
 			c := e.VCS.TV.GetCoords()
 			if havePrev && c.Frame == prevFrame {
 				clocks := (c.Scanline-(prevScanline+1))*228 + (c.Clock + 68)
@@ -1258,7 +1274,6 @@ func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, erro
 			prevWatch = snap()
 			havePrev = true
 		}
-		prevRdy = rdy
 	}
 
 	out := make([]LineWorst, 0, len(rows))

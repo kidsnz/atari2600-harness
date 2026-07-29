@@ -24,14 +24,13 @@ func TestProvenWorstIsNeverExceededOnCorpus(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Skip("technique corpus unavailable")
 	}
-	// A single region is known to exceed its proven worst, measured and recorded
-	// as SD-4 in docs/capability-gap-audit.md: bitmap48's Krow is proven at 93
-	// cycles and one interval in six frames takes 911, spanning 12 physical lines
-	// out of 84 measured intervals — i.e. the loop-exit iteration, which the proof
-	// does not appear to price. It is listed here by name rather than skipped, so
-	// it stays visible, and the test fails if it ever STOPS violating: an
-	// exemption that silently becomes unnecessary hides that the bug was fixed.
-	known := map[string]bool{"bitmap48.asm|Krow (bitmap48.asm:146)": true}
+	// No known exceptions. One was listed here — bitmap48's Krow, proven at 93
+	// cycles and apparently taking 911 — and the guard below caught its own
+	// obsolescence within the hour: the discrepancy was in the MEASURING
+	// instrument, not the proof (SD-4 in the audit). Keeping the list and the
+	// guard, because the next real gap should be recorded the same way rather
+	// than skipped.
+	known := map[string]bool{}
 	knownSeen := map[string]bool{}
 
 	regions, roms := 0, 0
@@ -100,7 +99,7 @@ func TestProvenWorstIsNeverExceededOnCorpus(t *testing.T) {
 				"remove it from the list and close SD-4; a stale exemption hides a repaired bug", k)
 		}
 	}
-	t.Logf("observed <= proven on %d measured regions across %d ROMs (1 known gap, SD-4)", regions, roms)
+	t.Logf("observed <= proven on %d measured regions across %d ROMs, no exceptions", regions, roms)
 }
 
 // A region cannot cost zero cycles: reaching the next WSYNC takes at least the

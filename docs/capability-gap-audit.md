@@ -591,19 +591,28 @@ follow a bank switch or an RTS-computed dispatch. Not a wrong prediction — a h
 and reported separately so neither hides the other. Fixing it is the stack-modelling and bank-hotspot work
 described in SD-3.
 
-### SD-4 — A proven worst case that the machine EXCEEDS (highest priority)
-Found by extending the observed-vs-proven cross-check from one litmus to the whole technique corpus:
-**`bitmap48.asm` region `Krow` (bitmap48.asm:146, strobe $F0D0) is proven at 93 cycles and the machine takes
-911**, spanning 12 physical lines. 84 intervals were measured over six frames and only one is long, which
-points at the loop-EXIT iteration: on every other iteration the next WSYNC is the loop's own, 93 cycles away,
-but when the loop finishes the next WSYNC is far. The proof does not appear to price that path.
+### SD-4 — RESOLVED: it was the measuring instrument, not the proof
+Extending the observed-vs-proven cross-check from one litmus to the whole corpus produced what looked like
+the worst possible finding: `bitmap48.asm` region `Krow` proven at 93 cycles while the machine took 911,
+spanning 12 physical lines. A proven number the hardware exceeds is worse than no number, so this was
+recorded as the top item — and then measured rather than believed.
 
-This predates all of tonight's work — the same failure appears with tonight's commits stashed. It is the most
-serious open item here, because a proven number the hardware exceeds is worse than no number: it gets
-trusted. 215 other measured regions across 30 ROMs are within their proven bound.
+`emu.ProfileLineWorst` detected a WSYNC by the RdyFlg true->false transition, i.e. by the CPU stalling. A
+WSYNC whose stall is shorter than one instruction step never shows that transition, so the strobe is
+invisible; the interval it should have closed runs on to the next visible strobe and is reported as one huge
+region. Measured: `$F0D0` executes **192 times in 8 frames** and the transition method counted **108**
+intervals — 84 strobes missed, and the longest bogus interval spanned 13 lines.
 
-`TestProvenWorstIsNeverExceededOnCorpus` names this case rather than skipping it, and FAILS if it ever stops
-violating — a stale exemption would hide the repair.
+Detecting the WSYNC **store** instead fixes it, with one subtlety worth keeping: `LastResult` does not change
+while the CPU is stalled, so the check must be restricted to steps that actually retired an instruction or
+the same strobe is seen again on every step of its own halt (that draft closed a string of zero-length
+intervals and was caught by the exact-match litmus). After the fix, `$F0D0` counts **184** = 192 executions
+minus the 8 dropped at frame boundaries, and its worst is **87 cycles over 2 lines**, matching its `@lines 2`
+annotation and sitting inside the proven 93.
+
+The corpus check is now clean with no exceptions: 215 measured regions across 30 ROMs, observed <= proven.
+The "fails if a listed gap stops violating" guard caught its own obsolescence within the hour, which is
+exactly what it was for.
 
 ### SD-5 — Call-context resolution for a region opened inside a subroutine (attempted, REVERTED)
 A WSYNC inside a callee opens a region whose continuation lives in the caller, so with no call context the
