@@ -502,6 +502,79 @@ Four more harness-capability candidates from a 5-lens deep read of the original 
 - **CMB-6 — assembler/linter WARN: table or data bytes placed over the $FFFA-$FFFF vector region.** Combat squats **live game data on the CPU IRQ/BRK vector slot**: it `ORG`s vectors at $F7FC (a 2K cart mirrors $F000-$F7FF into $F800-$FFFF, so $F7FE/$F7FF *are* the $FFFE/$FFFF vector) and reads its own vector bytes as a data table (`LDA AudPitch,X`). It survives only because START `SEI`s and never takes BRK. This booby-traps a 2K→4K port. Capability: a harness assembler/linter **WARN** when an `ORG`/data directive lands bytes over $FFFA-$FFFF (accounting for the 2K/4K mirror). Zero false positives on the known-good corpus (AT-1 discipline). Size: S. 〔Combat `ORG $F7FC` / `AudPitch` at $F7FE (annotator: "move AudPitch out of the interrupt vector"); deep-read harvest 2026-07-23〕
 - **CMB-7 (negative / boundary fact) — Combat has ZERO self-modifying code; all mutable state in ~26 zero-page bytes.** A whole-file scan finds no classic SMC (no writes into instruction operands, no code from RAM; single `ORG $F000`, never rewritten). Nearest analogues are pure **data** ops (`MVadjA`/`MVadjB` rotated in-place via the `ROL`-MSB-in-carry idiom; `SCROFF` `INC`). Recorded as a **calibration boundary** so a future SMC-lint does not false-positive Combat — this era's density came from packing/aliasing/branchless masks, **not** SMC. Not a capability to build; a truth one must respect. 〔whole-file scan; `MVadjA`/`MVadjB`, `SCROFF` INC, single `ORG $F000`; deep-read harvest 2026-07-23〕
 
+## Static x dynamic program model (SD-*) — 2026-07-29
+
+A survey (8 agents: local assets, the vendored Gopher2600, DiStella/Stella, the external ecosystem, PL
+techniques; then a catalogue and two adversarial critiques) produced this backlog. Two conclusions worth
+recording before the items:
+
+- **No external analyser is worth adopting.** Ghidra/SLEIGH, Binary Ninja and angr have no cycle model at
+  all, so three of the five questions we care about are outside what they can express. radare2 has 6502
+  cycles but its page-crossing penalty is a FIXME in the source — unsound in exactly the case a 2600 kernel
+  cares about — while the Gopher2600 table already in tree is sound. The only external binary worth
+  considering is z3 as an SMT-LIB subprocess, the same shell-out pattern already used for perfect6502.
+- **The vendored `Gopher2600/disassembly` package is unimported** (verified by grep across cmd/ and
+  internal/). It recovers a CFG from a raw .bin, separates code from data by following flow, resolves
+  indirect jump targets, and carries a Decoded/Blessed/**Executed** confidence ladder — the static-vs-dynamic
+  distinction we need, already modelled. Its blessed set is a heuristic, so it is a cross-check and a data
+  source, never the sound denominator.
+
+### SD-0 — Soundness and honesty repairs (blocking; do before anything is built on top)
+- **SD-0a `applyStore` has no kill-set.** `internal/cyclebound/absint.go:336-369`: `storeAddr` returns a
+  location only for Absolute mode, so `sta $80,x` and `sta ($90),y` leave previously-tracked `State.Mem`
+  cells intact and a later absolute load reads a stale constant. That range reaches `refineBranch`,
+  `determineBound` and `pagePenalty`, so a proven worst case can sit BELOW the machine's. Stack pushes are
+  unmodelled and land in the same 128 bytes. Fix: invalidate the may-set of every non-Absolute store.
+  Demonstrate the unsoundness with a planted case before fixing, and keep that case as a regression.
+- **SD-0b `LastTIAWrite` mis-attributes indexed TIA stores.** `internal/emu/emu.go:1350` maps
+  `lr.InstructionData` (the raw operand) rather than the effective address, so `sta RESP0,x` is reported as
+  a write to the base register. `beamtrace` inherits this, and it breaks precisely on the multiplexed-object
+  kernels the tool exists for. Fix: route through `effectiveAddr`; add a litmus with an indexed TIA store.
+- **SD-0c Address canonicalisation.** `cyclebound` keys the decode on the raw address with
+  `base = 0x10000 - len(rom)`, while coverage records the PC actually executed. On a mirrored or 2K ROM the
+  two live in different address spaces, so any static-minus-dynamic subtraction fabricates its answer. Fix:
+  one shared `canon(addr) -> (bank, offset)` used by decode, coverage, srcmap and beamtrace.
+- **SD-0d Non-convergence is silent.** `absint.computeStates` returns after `maxIter` without signalling it;
+  unconverged cells are under-approximations consumed as sound. Fix: return a converged flag and refuse to
+  certify without it.
+- **SD-0e `cover` divides by branches OBSERVED**, so a branch never reached is invisible and the percentage
+  flatters itself. Fix once SD-0c gives a static denominator.
+
+### SD-1 — Static def-use / reaching definitions (selected 2026-07-29)
+The forall answer to "which instruction wrote which RAM/TIA address, in what order within a frame,
+including read-before-write in a shared block". Both critics flagged its absence independently: every other
+option either declines the question or answers it only for the runs that happened to execute. Builds on the
+CFG already recovered by `cyclebound.decodeInto`, the WSYNC-to-WSYNC region partition (which is exactly the
+"within a frame" ordering scope), the existing worklist fixpoint, and the store-address machinery.
+May/must semantics per address. Soundness is checkable, and must be checked: the static may-write set must
+CONTAIN every write observed by a real trace.
+
+### SD-2 — Beam position as a tracked interval
+Carry colour-clocks-since-WSYNC in the abstract domain so every TIA write gets a proven clock interval on
+every path. Nothing in the community or the RE ecosystem has this; the state of the art is hand-counting a
+single path. Two costs the first sketch missed: an interval needs a LOWER bound too, and no shortest-path
+solver exists (only `solver.longest`); and clocks-since-WSYNC is unbounded, so it breaks the termination
+argument and needs an explicit widening. SD-0d first.
+
+### SD-3 — The limits, and how far each can actually be pushed
+Recorded because three of these were previously mistaken for hard limits when they are missing features.
+- **Semantic role of a byte** — recoverable by triangulation rather than by any single tool:
+  `probe_ram_semantics` (poke it, see what moves) x `DecomposeRow` (which object drew those pixels) x SD-1
+  (which TIA register the byte flows into). Three independent witnesses that can disagree, which is what
+  makes the answer falsifiable. What stays out of reach is naming in the work's own vocabulary, not the
+  functional role.
+- **Stack-pointer dispatch is NOT a static-analysis limit** — `LDX #$1C; TXS` then `PHP` writes `$011C`
+  deterministically. `absint` simply does not track SP (`absint.go:246-250`). Track it and the famous 2600
+  trick becomes an ordinary store to a known address. (Measured: the Outlaw cartridge sweeps SP `$FF`->`$1C`
+  every frame, so this is not hypothetical.)
+- **Self-modifying code is detectable even when not resolvable** — a store whose effective address lands in
+  decoded code space is a fact, not a guess. Correct terminal state is "region suspended", never a guess.
+- **"Unprovable" should become a CONDITIONAL proof** — "71 cycles, provided `$8A <= 15`" turns a refusal
+  into a checkable obligation that can be discharged by another proof, by a runtime assertion, or by an
+  explicit author-accepted assumption. Most current refusals come from domain imprecision, RAM-held loop
+  counters, or single-context subroutine analysis — all addressable. Only input-dependent unbounded loops
+  are irreducible. The rule that survives all of this: never merge proven with assumed.
+
 ## Housekeeping backlog (docs/repo, not a harness capability)
 - **DOC-EN — translate the JA-heavy canonical docs to English** to finish the public-repo English-only pass
   (`design-principles.md` ~98 JA lines, `casebook.md` ~39, `build-to-learn.md` ~33). Deferred from the

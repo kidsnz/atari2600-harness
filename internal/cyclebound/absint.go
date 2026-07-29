@@ -340,9 +340,70 @@ func storeAddr(in Instr) (uint16, bool) {
 	return 0, false
 }
 
+// storeIndex returns the range of the index register a store uses, or Top when
+// the mode does not index (in which case it is unused).
+func (s State) storeIndex(in Instr) ValueRange {
+	switch in.Def.AddressingMode {
+	case instructions.AbsoluteX, instructions.PreIndexed:
+		return s.X
+	case instructions.AbsoluteY, instructions.PostIndexed:
+		return s.Y
+	}
+	return vTop()
+}
+
+// killStoreTargets drops every tracked cell the store MIGHT have written.
+//
+// Without this the interpreter is unsound, not merely imprecise: `sta $80,X` or
+// `sta ($90),Y` would leave earlier tracked cells standing, a later absolute load
+// would read a value the machine no longer holds, and that too-narrow range feeds
+// refineBranch, determineBound and pagePenalty — so a "proven" worst case can come
+// out BELOW what the hardware does. A budget that certifies a kernel the hardware
+// overruns is precisely the failure this package exists to prevent.
+//
+// idx is the index register's range at the store; a bounded index kills only the
+// window it can reach, an unknown one kills all of RAM. A zero-page indexed store
+// wraps inside the page, so a base below $100 with an unbounded index can reach
+// anywhere and is treated as such.
+func (n *State) killStoreTargets(in Instr, idx ValueRange) {
+	killAll := func() {
+		if len(n.Mem) > 0 {
+			n.Mem = map[uint16]ValueRange{}
+		}
+	}
+	switch in.Def.AddressingMode {
+	case instructions.Absolute:
+		return // exact target; the caller does a strong update
+	case instructions.AbsoluteX, instructions.AbsoluteY:
+		base := int(in.Operand)
+		if idx.Top {
+			killAll()
+			return
+		}
+		zp := base < 0x100
+		for a := range n.Mem {
+			for i := idx.Lo; i <= idx.Hi; i++ {
+				t := base + i
+				if zp {
+					t = (base + i) & 0xFF // zero-page indexing wraps within the page
+				}
+				if uint16(t) == a {
+					delete(n.Mem, a)
+					break
+				}
+			}
+		}
+	default:
+		// Indirect, (ind,X), (ind),Y and any mode not modelled above: the target is
+		// unknown, so nothing tracked can be trusted to have survived.
+		killAll()
+	}
+}
+
 // applyStore updates VSYNC/VBLANK tracking and a tracked zero-page cell for a
 // store of value v to a statically known address.
-func (n *State) applyStore(in Instr, v ValueRange) {
+func (n *State) applyStore(in Instr, v ValueRange, idx ValueRange) {
+	n.killStoreTargets(in, idx)
 	// 3B: any store landing in zero-page RAM ($80-$FF) contributes to the RAM value
 	// range. Restricted to $80-$FF on purpose: $00-$7F is TIA/RIOT registers (not
 	// RAM), which kernels write with computed values constantly — including those
@@ -457,11 +518,11 @@ func (s State) transfer(in Instr) State {
 	case instructions.CPY:
 		n.setCmp(s.Y, src())
 	case instructions.STA:
-		n.applyStore(in, s.A)
+		n.applyStore(in, s.A, s.storeIndex(in))
 	case instructions.STX:
-		n.applyStore(in, s.X)
+		n.applyStore(in, s.X, s.storeIndex(in))
 	case instructions.STY:
-		n.applyStore(in, s.Y)
+		n.applyStore(in, s.Y, s.storeIndex(in))
 	case instructions.AND:
 		if imm {
 			n.A = andImm(s.A, immv) // 3A: `and #$7F` → [0,127]
@@ -495,7 +556,12 @@ func (s State) transfer(in Instr) State {
 	case instructions.PLP:
 		n.C, n.Z, n.N = triUnknown, triUnknown, triUnknown
 	case instructions.PHA, instructions.PHP:
-		// no tracked change
+		// A push writes to page 1, which on the 2600 mirrors this same 128 bytes of
+		// RAM, so it is a store into RAM. SP is not tracked (see SD-3 in the audit),
+		// so the target is unknown and nothing tracked survives. Measured on a real
+		// cartridge this session: its SP sweeps $FF down to $1C every frame, i.e.
+		// pushes really can land anywhere in RAM.
+		n.Mem = map[uint16]ValueRange{}
 	case instructions.JMP, instructions.JSR, instructions.RTS, instructions.RTI, instructions.BRK,
 		instructions.BEQ, instructions.BNE, instructions.BCS, instructions.BCC,
 		instructions.BMI, instructions.BPL, instructions.BVS, instructions.BVC:

@@ -183,15 +183,15 @@ type Step struct {
 
 // Region is one WSYNC-to-WSYNC interval and its proven worst case.
 type Region struct {
-	Start    uint16 `json:"start"`             // address of the WSYNC store that opens the region
+	Start    uint16 `json:"start"` // address of the WSYNC store that opens the region
 	StartLoc string `json:"start_loc,omitempty"`
-	Kind     string `json:"kind,omitempty"`    // "visible" (budget-checked) or "blank" (VSYNC/VBLANK; skipped)
-	Worst    int    `json:"worst"`             // proven worst-case cycles from here to the next WSYNC
+	Kind     string `json:"kind,omitempty"` // "visible" (budget-checked) or "blank" (VSYNC/VBLANK; skipped)
+	Worst    int    `json:"worst"`          // proven worst-case cycles from here to the next WSYNC
 	Budget   int    `json:"budget"`
-	Over     bool   `json:"over"`              // Worst > Budget
-	Bounded  bool   `json:"bounded"`           // false => could not prove (reported, not passed)
-	Reason   string `json:"reason,omitempty"`  // why unbounded
-	Path     []Step `json:"path,omitempty"`    // worst-case breakdown (filled when Over)
+	Over     bool   `json:"over"`             // Worst > Budget
+	Bounded  bool   `json:"bounded"`          // false => could not prove (reported, not passed)
+	Reason   string `json:"reason,omitempty"` // why unbounded
+	Path     []Step `json:"path,omitempty"`   // worst-case breakdown (filled when Over)
 }
 
 type loopInfo struct {

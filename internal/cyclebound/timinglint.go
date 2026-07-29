@@ -17,8 +17,9 @@ import (
 // checks (assert_line_budget / VV-10 HMOVE hazard) by being proactive.
 //
 // Canonical TIA write registers used here:
-//   $20-$24 = HMP0/HMP1/HMM0/HMM1/HMBL (horizontal motion)   $2A = HMOVE strobe
-//   $2B = HMCLR (clear motion)                                $25-$27 = VDELP0/P1/BL
+//
+//	$20-$24 = HMP0/HMP1/HMM0/HMM1/HMBL (horizontal motion)   $2A = HMOVE strobe
+//	$2B = HMCLR (clear motion)                                $25-$27 = VDELP0/P1/BL
 const (
 	regHMP0  = 0x20
 	regHMBL  = 0x24
