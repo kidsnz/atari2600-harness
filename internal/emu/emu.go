@@ -732,6 +732,109 @@ func (e *Emu) WatchTimerWrap(frames int) (*TimerWrapHit, error) {
 	return nil, nil
 }
 
+// TimerDividerHazard records a write to a timer divider register that lands on the
+// counter's wraparound — the classic "passes in every emulator, rolls on real
+// hardware" trap (G8).
+//
+// On the real RIOT the divider internally drops to 1T when INTIM underflows. A
+// write to TIM8T/TIM64T/T1024T on that exact cycle loses the race: the requested
+// divider does not take, the timer keeps counting at 1T, and an interval the ROM
+// intended to last hundreds of scanlines ends almost immediately — the frame comes
+// out short and the picture rolls.
+//
+// Gopher2600 does NOT reproduce it. Read timer.go's Update: it assigns the
+// requested divider unconditionally and resets ticksRemaining to 0, with no
+// wraparound race. That is exactly why this needs a detector rather than a test —
+// the consequence is invisible in the emulator, so the HAZARD is what gets
+// reported, not the failure.
+type TimerDividerHazard struct {
+	Frame    int    // frame on which it occurred
+	Scanline int    // beam position of the write
+	Clock    int    // beam clock, read_row coordinates
+	PC       uint16 // address of the writing instruction
+	Reg      string // TIM1T / TIM8T / TIM64T / T1024T
+	// Divider is the divider the ROM asked for. On hardware the write would be
+	// lost and 1T would stand instead, so the larger this is the worse the
+	// consequence: a T1024T interval running at 1T is 1024x too short.
+	Divider int
+	// INTIM and TicksRemaining are the counter state sampled BEFORE the store, and
+	// UntilWrap is the cycles from there to the underflow. The hazard is
+	// UntilWrap <= StoreCycles: the write and the divider's drop to 1T coincide.
+	INTIM          uint8
+	TicksRemaining int
+	UntilWrap      int
+	StoreCycles    int
+}
+
+// timerDividerRegs maps the canonical RIOT addresses of the divider registers.
+// Every mirror folds onto these through memorymap.MapAddress, so a write via any
+// alias is caught rather than compared as a raw number.
+var timerDividerRegs = map[uint16]string{
+	0x0294: "TIM1T",
+	0x0295: "TIM8T",
+	0x0296: "TIM64T",
+	0x0297: "T1024T",
+}
+
+// WatchTimerDividerHazard steps the ROM instruction by instruction for the given
+// number of frames and reports every write to a timer divider register that lands
+// on the counter's underflow.
+//
+// The state is sampled BEFORE the instruction runs, because the write itself
+// resets the counter and would erase the very condition being looked for.
+//
+// It reports ALL hits rather than the first: a kernel that sets its timer once per
+// frame can be safe on one frame's alignment and unsafe on another, and "the first
+// one" would hide how often it happens.
+func (e *Emu) WatchTimerDividerHazard(frames int) ([]TimerDividerHazard, error) {
+	var out []TimerDividerHazard
+	start := e.Coords().Frame
+	for e.Coords().Frame-start < frames {
+		pre := e.TimerState()
+		if err := e.StepInstruction(); err != nil {
+			return out, err
+		}
+		lr := e.VCS.CPU.LastResult
+		if lr.Defn == nil || lr.Defn.Effect != instructions.Write {
+			continue
+		}
+		canon, area := memorymap.MapAddress(lr.InstructionData, false)
+		if area != memorymap.RIOT {
+			continue
+		}
+		reg, ok := timerDividerRegs[canon]
+		if !ok {
+			continue
+		}
+		// The hazard is not "INTIM is 0" — at instruction granularity that instant is
+		// almost never observable. Measured on litmus_timerwrap_write, the state at
+		// the hazardous store is INTIM=255, ticks=0, div=8: the counter had ALREADY
+		// wrapped, because the polling loop's exit plus the intervening instruction
+		// take longer than the remaining ticks. A condition keyed on INTIM==0 fires on
+		// nothing.
+		//
+		// What is computable is whether the store's own cycles CONTAIN the wraparound.
+		// From the pre-state, the underflow is
+		//     ticksRemaining + INTIM*divider
+		// CPU cycles away, and the store spans its instruction's cycle count. If the
+		// underflow falls inside that span, the write and the divider's drop to 1T
+		// coincide, which is the race.
+		untilWrap := pre.TicksRemaining + int(pre.INTIM)*pre.Divider
+		span := int(lr.Defn.Cycles)
+		if untilWrap < 0 || untilWrap > span {
+			continue
+		}
+		c := e.Coords()
+		out = append(out, TimerDividerHazard{
+			Frame: c.Frame, Scanline: c.Scanline, Clock: c.Clock,
+			PC: lr.Address, Reg: reg, Divider: pre.Divider,
+			INTIM: pre.INTIM, TicksRemaining: pre.TicksRemaining,
+			UntilWrap: untilWrap, StoreCycles: span,
+		})
+	}
+	return out, nil
+}
+
 // UninitReadHit records a read of a RAM byte never written since reset (T-3).
 type UninitReadHit struct {
 	Frame int    // frame on which it occurred

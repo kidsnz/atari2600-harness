@@ -52,6 +52,32 @@ own authoring loop**, not the editor. The G work stands on its own; M references
 - **G5:** mid-line HMOVE / RESP pipeline = *observed* via `trace_clocks`, not litmus-locked.
 - **G6:** oracle sub-frame phase offset for per-frame-mutating RAM.
 - **G7:** collision trap (`watch_ram` is RAM-only); `step_clock` (parked).
+- **G8 — PARTIAL (v1.116.0): the detector exists, the positive case has no ROM witness.** New
+  `emu.WatchTimerDividerHazard` reports every write to TIM1T/TIM8T/TIM64T/T1024T whose own cycles straddle
+  the counter's underflow, folding every RIOT mirror through `memorymap.MapAddress` and taking the register
+  addresses from the engine's own table (`cpubus`: `$0294`..`$0297`) rather than a literal.
+
+  **Confirmed first that the emulator does not reproduce the bug**, which is why a detector is needed rather
+  than a test: `Gopher2600/hardware/riot/timer/timer.go` `Update` assigns the requested divider
+  unconditionally and resets `ticksRemaining` to 0, with no wraparound race. The consequence is invisible
+  here, so only the hazard can be reported.
+
+  **The condition took two measurements to get right, and the first was wrong.** "INTIM == 0 with the
+  decrement due" fires on nothing, because at instruction granularity that instant is almost never observed:
+  measured at the deliberately-hazardous store in `litmus_timerwrap_nearmiss`, the timer reads **INTIM=255,
+  ticksRemaining=0, divider=8** — it had already wrapped, the polling loop's exit plus one `lda` taking longer
+  than the ticks that remained. The computable condition is instead whether the store's cycles CONTAIN the
+  underflow: `ticksRemaining + INTIM*divider ≤ storeCycles`. On that ROM that is **2040 against 4**.
+
+  **So the litmus is named for what it measured as, not what it was built as.** `litmus_timerwrap_nearmiss`
+  writes a divider just AFTER a wrap — the ordinary, safe shape — and is the negative control: a detector that
+  flagged it would cry wolf on every timer-driven kernel. Locked, with 0 hazards on it, on `game_states` and
+  on a timer-free ROM, plus a test proving **6 divider writes are actually observed** so the silence is not a
+  detector returning nil.
+
+  **Stated, not implied: the positive case is untested.** Arranging a store whose cycles straddle the wrap
+  needs cycle-level tuning of the polling exit. Until such a ROM exists this detector's silence must not be
+  read as "no hazard here". Original entry follows.
 - **G8 (mined 2026-06-14, on-mission):** RIOT timer-wraparound roll detector. Writing `TIM64T`/`TIM1024T`
   on the exact wraparound cycle silently drops the divider to 1T → the ROM rolls on real hardware while
   Stella/emulators pass. This is precisely the "passes-in-emu / fails-on-hardware" timing trap the harness
