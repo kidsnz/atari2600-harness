@@ -617,11 +617,20 @@ Recorded because three of these were previously mistaken for hard limits when th
   interrupt would move SP without being seen at all.
 - **Self-modifying code is detectable even when not resolvable** — a store whose effective address lands in
   decoded code space is a fact, not a guess. Correct terminal state is "region suspended", never a guess.
-- **"Unprovable" should become a CONDITIONAL proof** — "71 cycles, provided `$8A <= 15`" turns a refusal
-  into a checkable obligation that can be discharged by another proof, by a runtime assertion, or by an
-  explicit author-accepted assumption. Most current refusals come from domain imprecision, RAM-held loop
-  counters, or single-context subroutine analysis — all addressable. Only input-dependent unbounded loops
-  are irreducible. The rule that survives all of this: never merge proven with assumed.
+- **Conditional bounds — DONE for the dominant case.** Measured first: of 29 unbounded regions across the
+  technique corpus, **15 fail for one reason — "loop bound unknown"**. The body of such a loop is fully
+  understood; only its trip count is missing, so the region's cost is still a known function of it and the
+  largest count that fits the budget is computable. `Region.Conditional` now carries that:
+  *"within 76 cycles provided the loop at $F126 runs at most 11 time(s) (worst 75 there)"*.
+  14 of the 15 produce a statement; 5 of those report that the region misses its budget even at ONE
+  iteration, which is a finding in itself rather than a refusal.
+  The number is checked for TIGHTNESS by re-deriving both edges independently of the search that produced
+  it (n fits, n+1 does not) — a bound that is merely safe would send an author trimming work that was never
+  over budget. And it never certifies: `Bounded` stays false and 14/31 is unchanged with a zero diff,
+  because an obligation is something to discharge, not a proof.
+  REMAINING: the other refusal reasons — no WSYNC reached (5), RTS with no caller in context (3), WSYNC
+  inside a loop body (2), multiple back-edges (2), branch inside the loop body (1). Also, discharging an
+  obligation automatically (prove the trip count elsewhere, or emit a runtime assertion) is not built.
 
 ## Housekeeping backlog (docs/repo, not a harness capability)
 - **DOC-EN — translate the JA-heavy canonical docs to English** to finish the public-repo English-only pass

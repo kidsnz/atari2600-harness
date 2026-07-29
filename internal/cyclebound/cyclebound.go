@@ -249,6 +249,29 @@ type Region struct {
 	Bounded  bool   `json:"bounded"`          // false => could not prove (reported, not passed)
 	Reason   string `json:"reason,omitempty"` // why unbounded
 	Path     []Step `json:"path,omitempty"`   // worst-case breakdown (filled when Over)
+
+	// Conditional turns "cannot prove" into something a builder can act on.
+	// When the ONLY obstacle is a loop whose iteration count could not be
+	// established, the region's cost is still a known function of that count, so
+	// the largest count that fits the budget is computable — and that number is
+	// the useful one: not "unprovable" but "stays inside 76 cycles as long as
+	// this loop runs at most 7 times".
+	//
+	// It is an OBLIGATION, not a proof. Bounded stays false and the region never
+	// counts towards Certified; discharging it means proving the bound elsewhere,
+	// asserting it at run time, or the author accepting it explicitly.
+	Conditional *Obligation `json:"conditional,omitempty"`
+}
+
+// Obligation is a conditional bound: the region is within budget provided the
+// named loop does not exceed MaxIterations.
+type Obligation struct {
+	LoopHeader    string `json:"loop_header"`
+	LoopLoc       string `json:"loop_loc,omitempty"`
+	MaxIterations int    `json:"max_iterations"`
+	WorstAtMax    int    `json:"worst_at_max"`
+	Budget        int    `json:"budget"`
+	Statement     string `json:"statement"`
 }
 
 type loopInfo struct {
@@ -292,6 +315,29 @@ type solver struct {
 	unbReason string // why
 	sm        *srcmap.Map
 	amaxHint  int // ②: `@amax N` = author-declared upper bound of a divide-loop accumulator; used by determineBound when the abstract range is Top
+
+	// pending holds a loop whose body is perfectly well understood but whose
+	// iteration count could not be established. Keeping it, instead of only
+	// reporting that the region is unbounded, is what lets the caller ask the
+	// question that actually helps: how many times may this run before the
+	// region misses its budget?
+	pending *pendingLoop
+}
+
+type pendingLoop struct {
+	header       uint16
+	latch        Instr
+	bodyNoBranch int
+	pen          int
+	exit         uint16
+}
+
+// costAt returns the loop's cycle cost for exactly n iterations.
+func (pl *pendingLoop) costAt(n int) int {
+	if n < 1 {
+		n = 1
+	}
+	return n*pl.bodyNoBranch + (n-1)*(pl.latch.Def.Cycles+pl.pen) + pl.latch.Def.Cycles
 }
 
 func prepend(s Step, rest []Step) []Step {
@@ -439,6 +485,53 @@ func (s *solver) collectRegion(instrs map[uint16]Instr, start Instr) string {
 	return ""
 }
 
+// solveObligation answers "how many times may this loop run before the region
+// misses its budget?" by folding the pending loop at successive trip counts and
+// re-solving the longest path. The search is linear from 1 and stops at the
+// first count that overruns, so the answer is the largest count that still fits.
+//
+// A count of 0 means the region cannot meet its budget even with a single
+// iteration — a fact worth reporting plainly rather than as "unprovable".
+func (s *solver) solveObligation(start Instr, budget int) *Obligation {
+	pl := s.pending
+	if pl == nil {
+		return nil
+	}
+	const maxTrip = 256
+	best := 0
+	worstAtBest := 0
+	for n := 1; n <= maxTrip; n++ {
+		// Fresh solver state per trial: memo and colouring are per-solve.
+		s.folds = map[uint16]loopInfo{pl.header: {cost: pl.costAt(n), minCost: pl.costAt(1), exit: pl.exit, n: n}}
+		s.memo = map[lkey]result{}
+		s.state = map[lkey]int{}
+		s.cyclic, s.unbounded, s.unbReason = false, false, ""
+		r := s.longest(start.next(), 0)
+		if s.cyclic || s.unbounded {
+			return nil // something else is wrong too; no clean obligation to state
+		}
+		if r.cyc > budget {
+			break
+		}
+		best, worstAtBest = n, r.cyc
+	}
+	ob := &Obligation{
+		LoopHeader:    fmt.Sprintf("$%04X", pl.header),
+		LoopLoc:       s.loc(pl.header),
+		MaxIterations: best,
+		WorstAtMax:    worstAtBest,
+		Budget:        budget,
+	}
+	if best == 0 {
+		ob.Statement = fmt.Sprintf("the region misses its %d-cycle budget even at one iteration of the loop at $%04X",
+			budget, pl.header)
+	} else {
+		ob.Statement = fmt.Sprintf("within %d cycles provided the loop at $%04X runs at most %d time(s) (worst %d there)",
+			budget, pl.header, best, worstAtBest)
+	}
+	return ob
+}
+
 func (s *solver) foldHit(addr uint16) bool { _, ok := s.folds[addr]; return ok }
 
 func (s *solver) loc(addr uint16) string { return s.sm.Locate(addr) }
@@ -494,13 +587,16 @@ func (s *solver) foldLoops() string {
 		}
 	}
 
-	n := determineBound(s.nodes, header, latch, s.absStates, s.amaxHint)
-	if n <= 0 {
-		return "loop bound unknown (need a counted dex/dey or sbc-divide idiom with a proven range)"
-	}
 	pen := 1
 	if (latch.next() >> 8) != (header >> 8) {
 		pen = 2
+	}
+	n := determineBound(s.nodes, header, latch, s.absStates, s.amaxHint)
+	if n <= 0 {
+		// The body is fully understood; only the trip count is missing. Keep it so
+		// the caller can still answer "how many iterations fit the budget?".
+		s.pending = &pendingLoop{header: header, latch: latch, bodyNoBranch: bodyNoBranch, pen: pen, exit: latch.next()}
+		return "loop bound unknown (need a counted dex/dey or sbc-divide idiom with a proven range)"
 	}
 	// n iterations: n bodies, (n-1) taken branches back, 1 final not-taken exit.
 	loopCost := n*bodyNoBranch + (n-1)*(latch.Def.Cycles+pen) + latch.Def.Cycles
@@ -674,7 +770,13 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 		return unbounded("no WSYNC reached from region start")
 	}
 	if msg := s.foldLoops(); msg != "" {
-		return unbounded(msg)
+		reg = unbounded(msg)
+		// If the only thing missing was the trip count, the region's cost is still
+		// a known function of it, so the largest count that fits is computable.
+		if s.pending != nil {
+			reg.Conditional = s.solveObligation(start, budget)
+		}
+		return reg
 	}
 
 	r := s.longest(start.next(), 0)
