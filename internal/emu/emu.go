@@ -1374,6 +1374,35 @@ func (e *Emu) LastTIAWrite() (TIAWrite, bool) {
 	return w, true
 }
 
+// LastMemWrite は直前の命令がメモリへ**書いた**なら、その実効アドレスを返す。
+//
+// 静的解析が「ここに書きうる」と主張した集合を、実際の実行が破っていないかを
+// 突き合わせるための観測点。静的側の may-set は実測の書込を**包含**していなければ
+// 健全でない（過大近似は許されるが、取りこぼしは誤り）。基底オペランドではなく
+// 実効アドレスであることが肝で、`sta $80,x` は $80 ではなくその時の X 次第の番地を
+// 書く（[[LastTIAWrite]] が同じ理由で壊れていた）。
+//
+// RMW（INC/DEC/シフトのメモリ形）も書込として返す。
+func (e *Emu) LastMemWrite() (addr uint16, ok bool) {
+	lr := e.VCS.CPU.LastResult
+	d := lr.Defn
+	if d == nil {
+		return 0, false
+	}
+	writes := d.Effect == instructions.Write
+	if !writes {
+		switch d.Operator {
+		case instructions.INC, instructions.DEC, instructions.ASL, instructions.LSR,
+			instructions.ROL, instructions.ROR:
+			writes = d.AddressingMode != instructions.Implied
+		}
+	}
+	if !writes {
+		return 0, false
+	}
+	return e.effectiveAddr()
+}
+
 // ObjectX は object の現在の水平位置（HmovedPixel・可視 0..159）を返す。obj は
 // "P0"/"P1"/"M0"/"M1"/"BL"。HMOVE 適用後の実描画位置（HMOVE 未使用なら ResetPixel と同値）。
 func (e *Emu) ObjectX(obj string) (int, bool) {
