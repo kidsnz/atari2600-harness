@@ -249,6 +249,11 @@ func GateRAM(target, mine *Trace, m Mask) *RAMGate {
 	return g
 }
 
+// thinGateBytes is where a comparison stops being worth much. Not a hard rule —
+// the count is always printed — but below this the verdict needs a warning beside
+// it rather than a reader inferring thinness from the address list.
+const thinGateBytes = 4
+
 // String renders the verdict with its exclusions — never the verdict alone.
 func (g *RAMGate) String() string {
 	var b strings.Builder
@@ -260,6 +265,17 @@ func (g *RAMGate) String() string {
 	b.WriteByte('\n')
 	if len(g.Compared) == 0 || g.FramesCompared == 0 {
 		b.WriteString("    VACUOUS: nothing was compared — this verdict proves nothing\n")
+	} else if len(g.Compared) <= thinGateBytes {
+		// VACUOUS only fires at zero, so a gate comparing one or two bytes used to
+		// print "first_divergence: none" and read as a pass. The mask's thickness is a
+		// property of the SCENARIOS, not of the ROM: measured over the first six
+		// built-in scenarios, paddle_demo compared 0 of 128 bytes, game_states and
+		// bullets 1, litmus_bank 2 — against Outlaw's 15 and Combat's 45. A reader
+		// deciding how much "no divergence" is worth needs that number in front of
+		// them, not buried in the compared-address list.
+		fmt.Fprintf(&b, "    THIN: only %d of 128 bytes varied in the target's own traces, so this "+
+			"verdict covers almost none of its state — the scenarios did not exercise it, and a "+
+			"matching build would look identical here whatever else it got wrong\n", len(g.Compared))
 	}
 	if g.First == nil {
 		fmt.Fprintf(&b, "    first_divergence: none\n")

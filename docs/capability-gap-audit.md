@@ -1340,6 +1340,46 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   plus RESPx/HMOVE placement in the replay kernel, which is the harder half. Gate: `shared_setxpos`,
   `road` and Fishing Derby reach pixel-exact; `zone_multiplex`'s 380 off-cells go to 0. Size: M.
 
+### A RAM gate that compares one byte read as a pass (2026-07-29)
+
+`behavmatch -ram-gate` reports the first frame and address where a build's RAM stops matching the target's,
+and it was built to print what it excluded — so the exclusion bookkeeping was the thing to check first.
+Measured over the first six built-in scenarios on six ROMs: **not one excluded byte actually varied in the
+traces.** The mask drops nothing that mattered; that part is sound.
+
+What the same numbers exposed is how THIN the comparison can be:
+
+| ROM | bytes compared, of 128 |
+|---|---|
+| `paddle_demo` | **0** |
+| `game_states` | **1** |
+| `bullets` | **1** |
+| `litmus_bank` | 2 |
+| Outlaw | 15 |
+| Combat | 45 |
+
+`VACUOUS` fires only at zero, so a gate comparing ONE byte printed `first_divergence: none` and read as a
+pass. And the mask's thickness is a property of the **scenarios**, not of the ROM — `game_states` needs
+specific input to move its state, so six generic scenarios leave 127 of its bytes constant and therefore
+excluded as "dead or unexercised".
+
+Now warned, with the number stated both ways:
+
+```
+  RAM gate [p0-right]: 1/128 bytes compared over 150 frames
+    THIN: only 1 of 128 bytes varied in the target's own traces, so this verdict covers almost none
+    of its state — the scenarios did not exercise it, and a matching build would look identical here
+    whatever else it got wrong
+```
+
+Asserted in both directions, because a warning that fires on everything is noise: the 1-byte gate must warn,
+and Combat's 45-byte gate must not.
+
+**The deeper statement, recorded rather than fixed:** the RAM gate's power is bounded by scenario coverage,
+and on the current ROM-agnostic library that bound is severe for anything that needs specific input to change
+state. A game carrying its own scenarios (`-scenarios file.json`, already supported) is the intended answer;
+until one does, `-ram-gate` on a technique ROM is close to decorative and now says so.
+
 ### The technique corpus is playfield-light, and the PF tools are graded on 7 ROMs (2026-07-29)
 
 `MeasurePF` decides whether a target's playfield is repeat, reflect or asymmetric, and the caller emits
