@@ -1,0 +1,8 @@
+{
+  "rom": "roms/litmus/litmus_bound_proxy.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tiareg.playfield.background_color", "op": "==", "value": 132}
+  ],
+  "checks": {"ntsc_frame_lines": 273}
+}

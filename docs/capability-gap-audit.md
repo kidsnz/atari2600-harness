@@ -1143,6 +1143,44 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   reachable only across a switch — **measured: 5 such executed pairs, litmus_bank 4 + banked_game 1** — and
   (c) requires every seed whose SOURCE the machine executed to have a landing address the machine also
   executed, so a seed cannot be an invented edge.
+- **SD-9 — the loop-bound heuristic under-approximated by 40× on a `roll_free:true` verdict. DONE
+  (v1.116.0).** The judged plan for cross-bank flow named this as its top risk and framed it as a hazard the
+  *splice* approach would introduce. It is not: it reproduces on a **flat 4K image with no bank switching**,
+  so it was already there.
+
+  `determineBound` took a counted loop's trip count from *"the immediate LDX/LDY at the greatest address
+  below the loop header"* — a proxy for "the initialiser that ran most recently", sound only while address
+  order matches execution order. A backward jump breaks that.
+
+  **New `roms/litmus/litmus_bound_proxy.asm` plants it:** the `ldx #200` the loop really runs with sits
+  ABOVE the header, reached by a forward jump, while a `ldx #2` that executes and is then discarded sits
+  below it. The proxy could only see the decoy.
+
+  | | before | after |
+  |---|---|---|
+  | proven worst | **25** | **1015** |
+  | machine measured | 1015 | 1015 |
+  | `certified` / `roll_free` | true / **true** | true / **false** |
+  | frame (machine) | 273 scanlines | 273 scanlines |
+
+  A **fortyfold under-approximation carried on the `roll_free` verdict**, on a ROM the emulator runs at 1015
+  cycles across 14 scanlines in a 273-line frame. That is the one direction this package forbids, and it was
+  the headline claim.
+
+  **The fix** takes the counter's entry range from the abstract state of every predecessor of the header
+  except the back-edge, maximised — sound, because more iterations cost more — and returns 0 (stays
+  unbounded) when any predecessor's range is unknown. The address proxy is gone; a stated refusal is worth
+  more than a number that can be wrong by 40×. The BCS/BCC divide-loop path already worked this way, which
+  is why only the `dex`/`bne` path was affected.
+
+  **Precision cost: none, measured.** Golden diff over all 31 technique ROMs and every `cb_*` litmus:
+  **43 of 43 byte-identical**. The abstract states were already accurate enough; only the fallback was
+  unsound.
+
+  Graded against the machine, not against the prover's own arithmetic: the test asks the emulator and
+  requires proven ≥ measured. Negative control: restoring the address proxy makes it fail with 2
+  disagreements. The 273-line frame is locked in `scenarios/bound_proxy.json` so the planted premise cannot
+  drift unnoticed.
 - **SD-8d — the ∃ oracle could not be trusted for what comes next. DONE (v1.116.0), graft G1.** The judged
   plan for full cross-bank flow analysis names this as the step that must come BEFORE any prover work: the
   runtime profiler is what the static proof is graded against, so it has to be trustworthy first.

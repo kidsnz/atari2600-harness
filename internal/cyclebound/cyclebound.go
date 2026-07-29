@@ -1415,25 +1415,60 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 	if !decX && !decY {
 		return 0
 	}
-	wantLoad := instructions.LDY
-	if decX {
-		wantLoad = instructions.LDX
-	}
-	// Closest immediate initializer before the header within the region.
-	bestAddr := -1
-	bestN := 0
+	// The counter's range ENTERING the loop, taken from the abstract state of every
+	// predecessor of the header except the back-edge, maximised. Sound: more
+	// iterations cost more, so the largest entry value is the worst case.
+	//
+	// This used to be "the immediate LDX/LDY at the greatest address below the
+	// header" — a proxy for "the initialiser that ran most recently", valid only
+	// while address order matches execution order. A backward jump breaks that, and
+	// it needs no bank switching to do so: measured on litmus_bound_proxy, a flat 4K
+	// image whose real `ldx #200` sits ABOVE the header (reached by a forward jump)
+	// while a discarded `ldx #2` sits below it, the proxy returned 2. The prover
+	// answered certified:true, roll_free:true, max_worst 25, and the machine measured
+	// that same interval at 1015 cycles across 14 scanlines in a 273-line frame.
+	// A fortyfold under-approximation carried on the roll_free verdict — the one
+	// direction this package forbids, and pre-existing rather than anything the bank
+	// work introduced.
+	//
+	// An unknown range now returns 0, i.e. stays unbounded. That is a loss of
+	// precision in exchange for the guarantee; a stated refusal is worth more than a
+	// number that can be wrong by 40x.
+	best := -1
 	for addr, in := range nodes {
-		if int(addr) >= int(header) {
-			continue
+		if addr == latch.Addr {
+			continue // the back-edge carries the DECREMENTED value, not the entry value
 		}
-		if in.Def.AddressingMode == instructions.Immediate && in.Def.Operator == wantLoad {
-			if int(addr) > bestAddr {
-				bestAddr = int(addr)
-				bestN = int(in.Operand & 0xFF)
+		reaches := false
+		for _, nx := range decodeSuccessors(in) {
+			if nx == header {
+				reaches = true
+				break
 			}
 		}
+		if !reaches {
+			continue
+		}
+		st, ok := absStates[addr]
+		if !ok || !st.valid {
+			return 0 // a predecessor we know nothing about: no bound
+		}
+		post := st.transfer(in)
+		r := post.Y
+		if decX {
+			r = post.X
+		}
+		if r.Top {
+			return 0 // unknown entry value: stay unbounded rather than guess
+		}
+		if r.Hi > best {
+			best = r.Hi
+		}
 	}
-	return bestN
+	if best < 0 {
+		return 0
+	}
+	return best
 }
 
 // regionTouchesDisplay reports whether any node stores to VSYNC($00)/VBLANK($01),
