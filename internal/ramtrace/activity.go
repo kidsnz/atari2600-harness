@@ -47,8 +47,10 @@ type ActivityReport struct {
 	Scenarios  []string   `json:"scenarios"`
 	Frames     int        `json:"frames_total"`
 
-	StackLow       string   `json:"stack_low"`       // lowest SP seen in RAM, or "(none)"
-	CollisionsSeen []string `json:"collisions_seen"` // latched collision pairs, ever
+	StackLow       string   `json:"stack_low"`       // lowest SP seen inside RAM, or "(none)"
+	SPMin          string   `json:"sp_min_observed"` // lowest SP seen at all, wherever it pointed
+	SPMax          string   `json:"sp_max_observed"` // highest SP seen at all
+	CollisionsSeen []string `json:"collisions_seen"` // collision pairs that occurred, ever
 
 	LiveCount int        `json:"live_count"` // bytes that changed at least once
 	DeadCount int        `json:"dead_count"` // bytes that never changed
@@ -78,6 +80,7 @@ func Analyse(prov Provenance, traces map[string]*behavmatch.Trace) *ActivityRepo
 	}
 	collSeen := map[string]bool{}
 	stackLow, stackOK := uint16(0xFF), false
+	spMin, spMax, spSeen := uint16(0xFF), uint16(0x00), false
 
 	for _, name := range rep.Scenarios {
 		tr := traces[name]
@@ -89,10 +92,20 @@ func Analyse(prov Provenance, traces map[string]*behavmatch.Trace) *ActivityRepo
 			for k := range collisionMap(s.Coll) {
 				collSeen[k] = true
 			}
-			if sp := uint16(s.SP); sp >= emu.RAMBase {
+			lo, hi := uint16(s.SPLow), uint16(s.SPHigh)
+			if !spSeen {
+				spMin, spMax, spSeen = lo, hi, true
+			}
+			if lo < spMin {
+				spMin = lo
+			}
+			if hi > spMax {
+				spMax = hi
+			}
+			if lo >= emu.RAMBase {
 				stackOK = true
-				if sp < stackLow {
-					stackLow = sp
+				if lo < stackLow {
+					stackLow = lo
 				}
 			}
 			for i := 0; i < emu.RAMSize; i++ {
@@ -116,6 +129,10 @@ func Analyse(prov Provenance, traces map[string]*behavmatch.Trace) *ActivityRepo
 	}
 	if stackOK {
 		rep.StackLow = fmt.Sprintf("$%02X", stackLow)
+	}
+	rep.SPMin, rep.SPMax = "(none)", "(none)"
+	if spSeen {
+		rep.SPMin, rep.SPMax = fmt.Sprintf("$%02X", spMin), fmt.Sprintf("$%02X", spMax)
 	}
 	for k := range collSeen {
 		rep.CollisionsSeen = append(rep.CollisionsSeen, k)
@@ -178,11 +195,17 @@ func (r *ActivityReport) Text() string {
 	out := fmt.Sprintf("RAM activity — %s (md5 %s)\n", r.Provenance.ROM, r.Provenance.ROMMD5)
 	out += fmt.Sprintf("scenarios: %v   frames sampled: %d\n", r.Scenarios, r.Frames)
 	out += fmt.Sprintf("live bytes: %d / 128    never changed: %d\n", r.LiveCount, r.DeadCount)
-	out += fmt.Sprintf("stack low-water: %s\n", r.StackLow)
+	out += fmt.Sprintf("stack low-water inside RAM: %s   (SP observed range %s..%s)\n",
+		r.StackLow, r.SPMin, r.SPMax)
+	if r.StackLow == "(none)" && r.SPMin != "(none)" {
+		out += "  NOTE: SP never pointed inside RAM. On the 2600 that means the program has aimed\n" +
+			"  the stack pointer somewhere else — page 1 below $80 mirrors the TIA registers, which\n" +
+			"  is a deliberate technique (PHP/PHA as a register write), not a malfunction.\n"
+	}
 	if len(r.CollisionsSeen) == 0 {
-		out += "collision latches: NONE latched in any sampled frame\n"
+		out += "collisions: NONE occurred in any sampled frame\n"
 	} else {
-		out += fmt.Sprintf("collision latches: %v\n", r.CollisionsSeen)
+		out += fmt.Sprintf("collisions that occurred: %v\n", r.CollisionsSeen)
 	}
 	out += "\n addr  distinct  chg  first  min  max  deltas                 values\n"
 	for _, a := range r.Bytes {

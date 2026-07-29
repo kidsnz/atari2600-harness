@@ -50,8 +50,14 @@ type Emu struct {
 	// AT-5: per-pixel の描画オブジェクト帰属（PF/P0/P1/M0/M1/BL/BG）。elemCB を毎カラー
 	// クロック呼び、GetLastSignal().Index を索引に Video.LastElement を記録する。
 	// 値は element+1（0=未記録）。elemCB=nil のとき VCS.Step(nil) と等価＝ゼロコスト。
-	elemBuf []uint8         // 索引 = signal.Index（フルフレーム 228×scanline 空間）
+	elemBuf []uint8          // 索引 = signal.Index（フルフレーム 228×scanline 空間）
 	elemCB  func(bool) error // 事前確保クロージャ（stepInstr で毎回渡す。per-call alloc 回避）
+
+	// フレーム内ウォッチ（StartFrameWatch / FrameWatch）。watching=false でゼロコスト。
+	watching bool
+	cxAccum  video.CollisionEvent // 起きた衝突の OR 蓄積（CXCLR に消されない）
+	spLow    uint8                // SP が到達した最小値
+	spHigh   uint8                // SP が到達した最大値（低い値に「固定」なのか「途中で降りた」のかを区別する）
 }
 
 // EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。
@@ -124,6 +130,15 @@ func (e *Emu) stepInstr() (executed bool, err error) {
 	ready := e.VCS.CPU.RdyFlg
 	if err := e.VCS.Step(e.elemCB); err != nil { // elemCB=nil のとき従来どおり（ゼロコスト）
 		return false, err
+	}
+	if e.watching {
+		sp := uint8(e.VCS.CPU.SP.Address())
+		if sp < e.spLow {
+			e.spLow = sp
+		}
+		if sp > e.spHigh {
+			e.spHigh = sp
+		}
 	}
 	if ready {
 		lr := e.VCS.CPU.LastResult
@@ -204,9 +219,78 @@ func (e *Emu) EnableElementCapture() {
 			// element(0..6) を +1 して格納（0=未記録の番兵）
 			e.elemBuf[sig.Index] = uint8(e.VCS.TIA.Video.LastElement) + 1
 		}
+		// フレーム内で起きた衝突の蓄積（下記 FrameWatch）。LastColorClock は
+		// 毎ビデオサイクル reset されるので、ここで拾わないと二度と見えない。
+		if e.watching {
+			e.cxAccum |= e.VCS.TIA.Video.Collisions.LastColorClock
+		}
 		return nil
 	}
 }
+
+// --- フレーム内ウォッチ（衝突の蓄積・スタック到達点） ---
+//
+// フレーム境界だけを標本化すると、この 2 つは取り逃す：
+//
+//   - 衝突ラッチ CXxx は sticky だが、ROM はふつう毎フレーム CXCLR で消す。フレーム末に
+//     読むと「その時点で残っていたもの」しか見えず、フレーム中に起きて消された衝突は
+//     観測できない。「このゲームは衝突を使っていない」を*証明*したいのに、証拠が
+//     消えた後に見ていることになる。
+//   - スタックポインタはフレーム末にはほぼ必ず $FF に戻っている。実測でも Outlaw の
+//     stack low-water はフレーム境界サンプリングだと常に $FF ＝ RAM のどこをスタックが
+//     踏んだかを 1 バイトも除外できていなかった。
+//
+// どちらもフレームの*中*でしか見えない。衝突は per-videocycle の LastColorClock を
+// 毎カラークロックで OR 蓄積し（CXCLR と独立に、起きた事実そのものを拾う）、SP は
+// 命令ごとに最小値を追う。
+//
+// ビット割当の出典: Gopher2600 `hardware/tia/video/collisions.go`（CollisionEvent の
+// 非公開ビットマスク定数）。ここは複製なので、ズレていないことを
+// TestFrameWatchAgreesWithLatches が実測で検証する。
+const (
+	cxeM0P1 video.CollisionEvent = 1 << 0
+	cxeM0P0 video.CollisionEvent = 1 << 1
+	cxeM0PF video.CollisionEvent = 1 << 2
+	cxeM0BL video.CollisionEvent = 1 << 3
+	cxeM1P0 video.CollisionEvent = 1 << 4
+	cxeM1P1 video.CollisionEvent = 1 << 5
+	cxeM1PF video.CollisionEvent = 1 << 6
+	cxeM1BL video.CollisionEvent = 1 << 7
+	cxeP0PF video.CollisionEvent = 1 << 8
+	cxeP0BL video.CollisionEvent = 1 << 9
+	cxeP1PF video.CollisionEvent = 1 << 10
+	cxeP1BL video.CollisionEvent = 1 << 11
+	cxeBLPF video.CollisionEvent = 1 << 12
+	cxeP0P1 video.CollisionEvent = 1 << 13
+	cxeM0M1 video.CollisionEvent = 1 << 14
+	// bit 15 は CXCLR イベント＝衝突ではないので蓄積対象外。
+)
+
+// StartFrameWatch は蓄積をリセットして観測を開始する（毎フレームの直前に呼ぶ）。
+func (e *Emu) StartFrameWatch() {
+	e.watching = true
+	e.cxAccum = 0
+	sp := uint8(e.VCS.CPU.SP.Address())
+	e.spLow, e.spHigh = sp, sp
+}
+
+// FrameWatch は StartFrameWatch 以降に**実際に起きた**衝突すべてと、SP が到達した
+// 最小値を返す。衝突は CXCLR で消されていても残る＝「起きたか」を答える。
+func (e *Emu) FrameWatch() (Collisions, uint8) {
+	a := e.cxAccum
+	has := func(m video.CollisionEvent) bool { return a&m != 0 }
+	return Collisions{
+		M0P1: has(cxeM0P1), M0P0: has(cxeM0P0), M0PF: has(cxeM0PF), M0BL: has(cxeM0BL),
+		M1P0: has(cxeM1P0), M1P1: has(cxeM1P1), M1PF: has(cxeM1PF), M1BL: has(cxeM1BL),
+		P0PF: has(cxeP0PF), P0BL: has(cxeP0BL), P1PF: has(cxeP1PF), P1BL: has(cxeP1BL),
+		BLPF: has(cxeBLPF), P0P1: has(cxeP0P1), M0M1: has(cxeM0M1),
+	}, e.spLow
+}
+
+// FrameWatchSPRange は StartFrameWatch 以降に SP が動いた範囲を返す。low だけでは
+// 「ずっと低い値に固定」と「高い所から降りてきた」が区別できない＝スタックとして
+// 使われているのか、SP を別用途に向けているのかの判別に high が要る。
+func (e *Emu) FrameWatchSPRange() (low, high uint8) { return e.spLow, e.spHigh }
 
 // Snapshot は最新フレームの可視域（160×可視高さ）を独立コピーで返す。
 // visibleTop はクロップ y=0 に対応する絶対 scanline（縦座標マッピング用）。
@@ -1059,14 +1143,14 @@ func (e *Emu) RunUntilBudget(maxFrames, budgetCycles int) (over bool, atScanline
 // コード位置で安定に集計できる）。cycles の定義は静的 prover の Region.Worst と同一＝
 // 「開き WSYNC の解放（次ライン先頭）から、閉じ WSYNC ストア完了まで」。≤76 なら1ラインに収まる。
 type LineWorst struct {
-	StrobePC      uint16  `json:"strobe_pc"`                // 開き STA WSYNC の PC
-	At            string  `json:"at,omitempty"`             // ソース位置（cmd/harness が srcmap で充填・emu は触らない）
-	Count         int     `json:"count"`                    // 計測できた区間数
-	WorstCycles   int     `json:"worst_cycles"`             // 実測ワースト CPU サイクル（ビーム座標から厳密算出）
-	WorstLines    int     `json:"worst_lines"`              // ワースト時に消費した物理ライン数（1=予算内の形）
-	WorstFrame    int     `json:"worst_frame"`              // ワーストが出たフレーム
-	WorstScanline int     `json:"worst_scanline"`           // ワースト区間の開始 scanline（開き strobe の次ライン）
-	Watch         []uint8 `json:"watch,omitempty"`          // ワースト区間の開き strobe 時点の RAM watch 値（=その行が読む引数）
+	StrobePC      uint16  `json:"strobe_pc"`       // 開き STA WSYNC の PC
+	At            string  `json:"at,omitempty"`    // ソース位置（cmd/harness が srcmap で充填・emu は触らない）
+	Count         int     `json:"count"`           // 計測できた区間数
+	WorstCycles   int     `json:"worst_cycles"`    // 実測ワースト CPU サイクル（ビーム座標から厳密算出）
+	WorstLines    int     `json:"worst_lines"`     // ワースト時に消費した物理ライン数（1=予算内の形）
+	WorstFrame    int     `json:"worst_frame"`     // ワーストが出たフレーム
+	WorstScanline int     `json:"worst_scanline"`  // ワースト区間の開始 scanline（開き strobe の次ライン）
+	Watch         []uint8 `json:"watch,omitempty"` // ワースト区間の開き strobe 時点の RAM watch 値（=その行が読む引数）
 }
 
 // ProfileLineWorst は maxFrames フレーム走らせ、WSYNC 区間ごとの実測ワーストサイクルを
@@ -1076,8 +1160,10 @@ type LineWorst struct {
 // 区間開始時点の値（その行が読む引数＝ワーストパスの条件）を併記する。
 //
 // サイクル算出: WSYNC 解放は必ず次スキャンライン先頭（clock -68）なので、
-//   clocks = (閉じstrobe.Scanline − (開きstrobe.Scanline+1))×228 + (閉じstrobe.Clock+68)
-//   cycles = clocks/3（CPU 1cy=3clock・解放はサイクル境界に整列）
+//
+//	clocks = (閉じstrobe.Scanline − (開きstrobe.Scanline+1))×228 + (閉じstrobe.Clock+68)
+//	cycles = clocks/3（CPU 1cy=3clock・解放はサイクル境界に整列）
+//
 // フレームを跨ぐ区間（オーバースキャン最終行→次フレーム VSYNC）は集計しない。
 func (e *Emu) ProfileLineWorst(maxFrames int, watch []uint16) ([]LineWorst, error) {
 	// フレッシュブート時のみ安定化（RunUntilBudget と同じ規律＝poke 状態を食い潰さない）。

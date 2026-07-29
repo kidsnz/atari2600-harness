@@ -67,20 +67,24 @@ type Sample struct {
 	// measured, so it cannot be declared in advance.
 	AllRAM [emu.RAMSize]uint8
 
-	// Coll is the TIA collision latch state. Cross-frame hardware state is
-	// invisible to a RAM-only sampler, so a byte driven by a collision would
-	// otherwise show an unexplainable residual. Sampling it is also what lets
-	// "this game does not use collision latches" be *proven* rather than assumed.
+	// Coll is every collision that OCCURRED during the frame, not merely what was
+	// still latched at its end. Cross-frame hardware state is invisible to a
+	// RAM-only sampler, so a byte driven by a collision would otherwise show an
+	// unexplainable residual — and recording it is also what lets "this game does
+	// not use collision detection" be *proven* rather than assumed. Reading CXxx
+	// at the frame boundary would not do: games clear the latches every frame, so
+	// the evidence is gone by the time the boundary arrives.
 	Coll emu.Collisions
 
 	// Inputs is what was held when this frame stepped.
 	Inputs InputState
 
-	// SP is the stack pointer after the frame. The 6502 stack lives in page 1,
-	// which on the 2600 mirrors this same 128-byte RAM — so the region the stack
-	// has reached is *measurable* rather than guessed, and can be excluded from a
-	// byte-equality gate on evidence instead of on a hardcoded address range.
-	SP uint8
+	// SPLow/SPHigh bound where the stack pointer travelled during the frame.
+	// Sampling SP at the frame boundary instead gives $FF on essentially every
+	// frame, which says nothing at all; and the LOW value alone cannot distinguish
+	// "pinned low" from "descended from the top", which turned out to matter — see
+	// SPRange in ramgate.go for what this can and cannot be used to conclude.
+	SPLow, SPHigh uint8
 }
 
 // Trace is a scenario's full recording.
@@ -133,6 +137,7 @@ func Record(romPath, spec string, scn Scenario, warmup int) (*Trace, error) {
 				held.set("action", ic.Player, ic.Action, ic.Press)
 			}
 		}
+		e.StartFrameWatch() // collisions + stack depth are only visible INSIDE the frame
 		if _, err := e.StepFrame(); err != nil {
 			return nil, err
 		}
@@ -159,12 +164,8 @@ func Record(romPath, spec string, scn Scenario, warmup int) (*Trace, error) {
 				s.RAM[a] = v
 			}
 		}
-		coll, err := e.ReadCollisions()
-		if err != nil {
-			return nil, fmt.Errorf("frame %d collisions: %w", f, err)
-		}
-		s.Coll = coll
-		s.SP = uint8(e.VCS.CPU.SP.Address())
+		s.Coll, _ = e.FrameWatch()
+		s.SPLow, s.SPHigh = e.FrameWatchSPRange()
 		tr.Samples = append(tr.Samples, s)
 	}
 	return tr, nil

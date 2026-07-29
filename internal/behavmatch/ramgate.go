@@ -116,35 +116,43 @@ func ChangedAddrs(traces ...*Trace) []uint16 {
 	return out
 }
 
-// StackReach returns the lowest RAM address the stack pointer reached across the
-// traces, and whether the stack was in RAM at all. The 6502 stack lives in page
-// 1, which mirrors this RAM, so pushes land at addresses at or above SP+1. An SP
-// outside $80–$FF means the program has repointed SP somewhere else entirely
-// (a known 2600 trick — SP is aimed at TIA registers so PHP writes a register),
-// in which case it is not describing a stack in RAM and is ignored here.
-func StackReach(traces ...*Trace) (low uint16, ok bool) {
-	low = 0xFF
+// SPRange returns the range the stack pointer moved through across the traces.
+//
+// It is reported, never acted on. A first version of this gate excluded every
+// address "at or above the lowest SP", on the reasoning that the 6502 stack lives
+// in page 1, which mirrors this RAM, so anything the stack reached is scratch.
+// Measuring the real target killed that rule outright: its SP sweeps $FF down to
+// $1C on every single frame, which would have excluded all 128 bytes and turned
+// the gate into a guaranteed pass. Descending past an address is a TXS, not a
+// write — the pointer moving over RAM disturbs nothing.
+//
+// Deciding which bytes a push actually wrote needs write attribution (which
+// instruction stored where), not the pointer's position. Until that exists, no
+// byte is excluded on stack grounds and this range is printed as evidence.
+func SPRange(traces ...*Trace) (low, high uint8, ok bool) {
+	low, high = 0xFF, 0x00
 	for _, tr := range traces {
 		if tr == nil {
 			continue
 		}
 		for _, s := range tr.Samples {
-			sp := uint16(s.SP)
-			if sp < emu.RAMBase {
-				continue // SP repointed outside RAM — not a stack we can bound
-			}
 			ok = true
-			if sp < low {
-				low = sp
+			if s.SPLow < low {
+				low = s.SPLow
+			}
+			if s.SPHigh > high {
+				high = s.SPHigh
 			}
 		}
 	}
-	return low, ok
+	return low, high, ok
 }
 
-// LiveMask builds the default gate mask from measurement: start from the bytes
-// the target actually exercised, then drop the region the stack reached. Both
-// decisions come from the recorded traces, never from a hardcoded map.
+// LiveMask builds the default gate mask from measurement: the bytes the target
+// actually exercised. A byte that never took a second value across the whole
+// recorded suite is either dead or unreached, and comparing it proves nothing —
+// but which of those two it is cannot be settled from values alone, so the
+// exclusion is stated as the honest disjunction rather than as "dead".
 func LiveMask(targetTraces ...*Trace) Mask {
 	m := NewMask()
 	for _, a := range ChangedAddrs(targetTraces...) {
@@ -153,13 +161,6 @@ func LiveMask(targetTraces ...*Trace) Mask {
 	for i := range m.In {
 		if !m.In[i] {
 			m.Reason[uint16(emu.RAMBase+i)] = "constant across the recorded traces (dead or unexercised)"
-		}
-	}
-	if low, ok := StackReach(targetTraces...); ok {
-		for a := low; a <= 0xFF; a++ {
-			if m.Has(a) {
-				m.drop(a, fmt.Sprintf("stack reached $%02X", low))
-			}
 		}
 	}
 	return m

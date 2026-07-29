@@ -21,7 +21,7 @@ func synth(name string, frames int, base, delta [emu.RAMSize]uint8, sp uint8) *T
 		for i := 0; i < emu.RAMSize; i++ {
 			s.AllRAM[i] = base[i] + uint8(f)*delta[i]
 		}
-		s.SP = sp
+		s.SPLow, s.SPHigh = sp, 0xFF
 		tr.Samples = append(tr.Samples, s)
 	}
 	return tr
@@ -150,20 +150,27 @@ func TestLiveMaskKeepsMovedDropsConstantAndStack(t *testing.T) {
 			t.Errorf("$%02X never changed but was included", a)
 		}
 	}
-	if low, ok := StackReach(tr); !ok || low != 0xF0 {
-		t.Errorf("StackReach = $%02X ok=%v, want $F0 true", low, ok)
+	if low, high, ok := SPRange(tr); !ok || low != 0xF0 || high != 0xFF {
+		t.Errorf("SPRange = $%02X..$%02X ok=%v, want $F0..$FF true", low, high, ok)
 	}
-	// A byte that both moved AND sits under the stack must be dropped, with the
-	// stack cited as the reason rather than "constant".
-	base2, delta2 := liveBases()
-	delta2[0xF5-emu.RAMBase] = 3
-	tr2 := synth("live2", 30, base2, delta2, 0xF0)
-	m2 := LiveMask(tr2)
-	if m2.Has(0xF5) {
-		t.Error("$F5 is inside the stack's reach but was included")
+}
+
+// The rule this replaced: "exclude everything at or above the lowest SP". It was
+// killed by measuring the real target, whose SP sweeps $FF down to $1C every
+// frame — under that rule all 128 bytes drop out and the gate becomes a
+// guaranteed pass. A pointer descending past an address is a TXS, not a write.
+func TestLiveMaskIgnoresStackPointerExcursions(t *testing.T) {
+	base, delta := liveBases()
+	tr := synth("txs", 30, base, delta, 0x1C) // SP dives far below RAM, as the target's does
+
+	m := LiveMask(tr)
+	if len(m.Addrs()) == 0 {
+		t.Fatal("a deep SP excursion emptied the mask — the gate would pass unconditionally")
 	}
-	if r := m2.Reason[0xF5]; !strings.Contains(r, "stack") {
-		t.Errorf("$F5 exclusion reason = %q, want it to cite the stack", r)
+	for a := uint16(0x80); a <= 0x8F; a++ {
+		if !m.Has(a) {
+			t.Errorf("$%02X changed every frame but was excluded because SP went low", a)
+		}
 	}
 }
 

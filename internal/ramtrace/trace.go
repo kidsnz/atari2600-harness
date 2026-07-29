@@ -85,7 +85,7 @@ type FrameSample struct {
 	Changed    []string                `json:"changed"`
 	Inputs     behavmatch.InputState   `json:"inputs"`
 	Collisions map[string]bool         `json:"collisions,omitempty"`
-	SP         string                  `json:"sp"`
+	SP         string                  `json:"sp_range"`
 	Objects    map[string]ObjectSample `json:"objects,omitempty"`
 }
 
@@ -131,7 +131,7 @@ func FromTrace(prov Provenance, tr *behavmatch.Trace, objects []int) *Doc {
 			RAM:        hex.EncodeToString(s.AllRAM[:]),
 			Inputs:     s.Inputs,
 			Collisions: collisionMap(s.Coll),
-			SP:         fmt.Sprintf("$%02X", s.SP),
+			SP:         fmt.Sprintf("$%02X..$%02X", s.SPLow, s.SPHigh),
 		}
 		if i > 0 {
 			prev := tr.Samples[i-1].AllRAM

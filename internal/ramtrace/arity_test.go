@@ -39,7 +39,7 @@ func simulate(inputs []string) *behavmatch.Trace {
 
 	// Frame 0 is the initial state with no input, so the first transition is
 	// frame 0 -> frame 1 under inputs[0].
-	tr.Samples = append(tr.Samples, behavmatch.Sample{AllRAM: st, SP: 0xFF})
+	tr.Samples = append(tr.Samples, behavmatch.Sample{AllRAM: st, SPLow: 0xFF, SPHigh: 0xFF})
 
 	for _, in := range inputs {
 		old80, old82, old87 := at(0x80), at(0x82), at(0x87)
@@ -62,7 +62,7 @@ func simulate(inputs []string) *behavmatch.Trace {
 		next[0x86-emu.RAMBase] = old82 + old87 + old80
 
 		st = next
-		smp := behavmatch.Sample{AllRAM: st, SP: 0xFF}
+		smp := behavmatch.Sample{AllRAM: st, SPLow: 0xFF, SPHigh: 0xFF}
 		if in != "" {
 			smp.Inputs = behavmatch.InputState{P0: []string{in}}
 		}
@@ -187,14 +187,14 @@ func TestArityDetectsFrameCounterTrap(t *testing.T) {
 	var st [emu.RAMSize]uint8
 	st[0x91-emu.RAMBase] = 1
 	tr := &behavmatch.Trace{Scenario: "counter"}
-	tr.Samples = append(tr.Samples, behavmatch.Sample{AllRAM: st, SP: 0xFF})
+	tr.Samples = append(tr.Samples, behavmatch.Sample{AllRAM: st, SPLow: 0xFF, SPHigh: 0xFF})
 	for f := 1; f < 100; f++ {
 		next := st
 		next[0x80-emu.RAMBase] = uint8(f)                 // free-running frame counter
 		next[0x90-emu.RAMBase] = uint8(f * 3)             // only the counter explains this
 		next[0x91-emu.RAMBase] = st[0x91-emu.RAMBase] ^ 1 // an honest self-contained rule
 		st = next
-		tr.Samples = append(tr.Samples, behavmatch.Sample{AllRAM: st, SP: 0xFF})
+		tr.Samples = append(tr.Samples, behavmatch.Sample{AllRAM: st, SPLow: 0xFF, SPHigh: 0xFF})
 	}
 	rep := Arity(Provenance{ROM: "counter"}, map[string]*behavmatch.Trace{"counter": tr})
 
