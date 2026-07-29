@@ -29,20 +29,58 @@ type InputChange struct {
 // InputChanges in At[f] are applied, then one frame is stepped and sampled.
 type Scenario struct {
 	Name    string
-	Frames  int                    // total frames to run & sample
-	Reset   bool                   // press RESET (8f) then release before frame 0
-	At      map[int][]InputChange  // frame index → input edits applied before that frame
-	Objects []int                  // object idxs to trace: 0=P0 1=M0 2=P1 3=M1 4=BL
-	RAM     []uint16               // RAM addrs ($80-$FF) to trace
+	Frames  int                   // total frames to run & sample
+	Reset   bool                  // press RESET (8f) then release before frame 0
+	At      map[int][]InputChange // frame index → input edits applied before that frame
+	Objects []int                 // object idxs to trace: 0=P0 1=M0 2=P1 3=M1 4=BL
+	RAM     []uint16              // RAM addrs ($80-$FF) to trace
 }
 
 var objName = [...]string{"P0", "M0", "P1", "M1", "BL"}
+
+// InputState is the controller/panel state in force when a frame was sampled —
+// the *input half* of the (state, input) → state' transition the reproduction
+// system is trying to recover. Recording it alongside RAM is what lets a byte's
+// update function be fitted against what the player was doing, rather than
+// against frame number alone. Slices are kept sorted so equal states compare and
+// key equal.
+type InputState struct {
+	P0    []string `json:"p0"`    // actions held by player 0 (up/down/left/right/fire)
+	P1    []string `json:"p1"`    // actions held by player 1
+	Panel []string `json:"panel"` // console switches held (reset/select/…)
+}
+
+// Key is a canonical, comparable rendering of the input state, usable as a map
+// key when grouping transitions by input.
+func (s InputState) Key() string {
+	return strings.Join(s.P0, "+") + "|" + strings.Join(s.P1, "+") + "|" + strings.Join(s.Panel, "+")
+}
 
 // Sample is one frame's observation.
 type Sample struct {
 	X, YTop, Height map[int]int
 	Present         map[int]bool
-	RAM             map[uint16]uint8
+	RAM             map[uint16]uint8 // the scenario's declared subset (reports)
+
+	// AllRAM is every one of the 128 RAM bytes ($80–$FF), indexed addr−$80.
+	// Recorded unconditionally: which bytes carry meaning is the thing being
+	// measured, so it cannot be declared in advance.
+	AllRAM [emu.RAMSize]uint8
+
+	// Coll is the TIA collision latch state. Cross-frame hardware state is
+	// invisible to a RAM-only sampler, so a byte driven by a collision would
+	// otherwise show an unexplainable residual. Sampling it is also what lets
+	// "this game does not use collision latches" be *proven* rather than assumed.
+	Coll emu.Collisions
+
+	// Inputs is what was held when this frame stepped.
+	Inputs InputState
+
+	// SP is the stack pointer after the frame. The 6502 stack lives in page 1,
+	// which on the 2600 mirrors this same 128-byte RAM — so the region the stack
+	// has reached is *measurable* rather than guessed, and can be excluded from a
+	// byte-equality gate on evidence instead of on a hardcoded address range.
+	SP uint8
 }
 
 // Trace is a scenario's full recording.
@@ -80,23 +118,26 @@ func Record(romPath, spec string, scn Scenario, warmup int) (*Trace, error) {
 		}
 	}
 	tr := &Trace{Scenario: scn.Name}
+	held := newHeldInputs()
 	for f := 0; f < scn.Frames; f++ {
 		for _, ic := range scn.At[f] {
 			if ic.Panel != "" {
 				if err := e.SetPanel(ic.Panel, ic.Press); err != nil {
 					return nil, err
 				}
+				held.set("panel", 0, ic.Panel, ic.Press)
 			} else if ic.Action != "" {
 				if err := e.SetInput(ic.Player, ic.Action, ic.Press); err != nil {
 					return nil, err
 				}
+				held.set("action", ic.Player, ic.Action, ic.Press)
 			}
 		}
 		if _, err := e.StepFrame(); err != nil {
 			return nil, err
 		}
 		s := Sample{X: map[int]int{}, YTop: map[int]int{}, Height: map[int]int{},
-			Present: map[int]bool{}, RAM: map[uint16]uint8{}}
+			Present: map[int]bool{}, RAM: map[uint16]uint8{}, Inputs: held.snapshot()}
 		for _, idx := range scn.Objects {
 			yTop, _, h, present := e.ObjectYExtent(idx)
 			s.Present[idx] = present
@@ -106,14 +147,87 @@ func Record(romPath, spec string, scn Scenario, warmup int) (*Trace, error) {
 			}
 			s.X[idx] = e.Markers()[idx].Clock
 		}
+		ram, err := e.CurrentRAM()
+		if err != nil {
+			return nil, fmt.Errorf("frame %d: %w", f, err)
+		}
+		s.AllRAM = ram
 		for _, a := range scn.RAM {
-			if v, err := e.PeekRAM(a); err == nil {
+			if a >= emu.RAMBase && a < emu.RAMBase+emu.RAMSize {
+				s.RAM[a] = ram[a-emu.RAMBase] // same read, no second peek
+			} else if v, err := e.PeekRAM(a); err == nil {
 				s.RAM[a] = v
 			}
 		}
+		coll, err := e.ReadCollisions()
+		if err != nil {
+			return nil, fmt.Errorf("frame %d collisions: %w", f, err)
+		}
+		s.Coll = coll
+		s.SP = uint8(e.VCS.CPU.SP.Address())
 		tr.Samples = append(tr.Samples, s)
 	}
 	return tr, nil
+}
+
+// heldInputs tracks which controller actions / panel switches are currently
+// pressed, so each sample can carry the input that produced it. The scenario
+// script only ever states *edges* (press/release), so the level has to be
+// accumulated here.
+type heldInputs struct {
+	actions [2]map[string]bool
+	panel   map[string]bool
+}
+
+func newHeldInputs() *heldInputs {
+	return &heldInputs{
+		actions: [2]map[string]bool{{}, {}},
+		panel:   map[string]bool{},
+	}
+}
+
+func (h *heldInputs) set(kind string, player int, name string, pressed bool) {
+	var m map[string]bool
+	switch {
+	case kind == "panel":
+		m = h.panel
+	case player >= 0 && player < len(h.actions):
+		m = h.actions[player]
+	default:
+		return
+	}
+	// "center" is a release of every direction, not a button of its own.
+	if name == "center" {
+		for _, d := range []string{"up", "down", "left", "right"} {
+			delete(m, d)
+		}
+		return
+	}
+	if pressed {
+		m[name] = true
+	} else {
+		delete(m, name)
+	}
+}
+
+func sortedKeys(m map[string]bool) []string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (h *heldInputs) snapshot() InputState {
+	return InputState{
+		P0:    sortedKeys(h.actions[0]),
+		P1:    sortedKeys(h.actions[1]),
+		Panel: sortedKeys(h.panel),
+	}
 }
 
 // --- metrics ---------------------------------------------------------------
@@ -121,9 +235,9 @@ func Record(romPath, spec string, scn Scenario, warmup int) (*Trace, error) {
 // AxisMetric summarises one object's motion on one axis across a trace.
 type AxisMetric struct {
 	Object      int
-	Axis        string // "X" or "Y"
-	Min, Max    int    // range reached
-	NetDelta    int    // last - first
+	Axis        string  // "X" or "Y"
+	Min, Max    int     // range reached
+	NetDelta    int     // last - first
 	StepPxPer2F float64 // median |Δ| per frame doubled (≈ px per 2 frames); 0 = frozen
 	FramesMoved int
 }
