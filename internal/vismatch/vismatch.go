@@ -58,6 +58,14 @@ func ExtractROM(romPath, spec string, frames int, reset bool) (*Grid, error) {
 	if err := e.RunFrames(frames); err != nil {
 		return nil, err
 	}
+	return GridFrom(e), nil
+}
+
+// GridFrom reads the emulator's current frame into a Grid. Split out so a caller
+// that has already driven the machine somewhere — through a scripted input
+// scenario, say — can compare the picture at THAT state rather than at a plain
+// frame count.
+func GridFrom(e *emu.Emu) *Grid {
 	img, top := e.Snapshot()
 	w := img.Bounds().Dx()
 	h := img.Bounds().Dy()
@@ -86,7 +94,7 @@ func ExtractROM(romPath, spec string, frames int, reset bool) (*Grid, error) {
 		g.Elem[y] = erow
 		g.Hex[y] = hrow
 	}
-	return g, nil
+	return g
 }
 
 // Report is the outcome of Diff.

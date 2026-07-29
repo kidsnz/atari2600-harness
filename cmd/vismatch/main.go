@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kidsnz/atari2600-harness/internal/behavmatch"
 	"github.com/kidsnz/atari2600-harness/internal/build"
 	"github.com/kidsnz/atari2600-harness/internal/vismatch"
 )
@@ -53,6 +54,10 @@ func main() {
 	region := flag.String("region", "122-185", "genpf: target scanline range of the PF element, LO-HI")
 	arenaTop := flag.Int("arena-top", 74, "genpf: absolute scanline of arena line 0 (scanline→arena-line offset)")
 	tableLen := flag.Int("table-len", 112, "genpf: CacLTbl/CacRTbl length in arena lines")
+	scenName := flag.String("scenario", "", "drive BOTH ROMs through this behavmatch scenario's input script, then compare the picture — a single-frame diff is exact for a static playfield and misleading for anything that moves, because two ROMs at different points in their game read as a difference in the object")
+	tWarmup := flag.Int("target-warmup", 0, "matched state: frames to run the TARGET with no input before the scenario (skip a title screen). Deliberately separate from -target-frames: reusing the capture-frame counts here gave the two sides different warmups and reported a ROM as differing from itself")
+	mWarmup := flag.Int("mine-warmup", 0, "matched state: frames to run YOUR build with no input before the scenario")
+	scenFile := flag.String("scenarios", "", "load the scenario from a .json file or directory instead of the built-in library")
 	untilPlay := flag.Bool("target-until-gameplay", false, "report the first frame at which the TARGET's playfield settles after its opening screen, so -target-frames need not be hand-tuned")
 	untilFrames := flag.Int("until-gameplay-frames", 240, "how many frames to search for the settling point")
 	untilStable := flag.Int("until-gameplay-stable", 8, "frames the new picture must hold still before it counts as settled")
@@ -136,15 +141,60 @@ func main() {
 		os.Exit(2)
 	}
 
-	tg, err := vismatch.ExtractROM(tBin, *spec, *tFrames, *tReset)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "target:", err)
-		os.Exit(2)
+	var tg, mg *vismatch.Grid
+
+	// Matched state: drive both ROMs through the SAME input script and compare
+	// the picture there. Without it, two ROMs at different points in their game
+	// report a moving object as a difference — the difference being when they
+	// were looked at, not where the object is.
+	if *scenName != "" {
+		lib := behavmatch.Library
+		if *scenFile != "" {
+			l, _, err := behavmatch.LoadScenarios(*scenFile)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "scenarios:", err)
+				os.Exit(2)
+			}
+			lib = l
+		}
+		scn, ok := lib[*scenName]
+		if !ok {
+			fmt.Fprintln(os.Stderr, "unknown scenario:", *scenName)
+			os.Exit(2)
+		}
+		te, err := behavmatch.RunScenario(tBin, *spec, scn, *tWarmup)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "target:", err)
+			os.Exit(2)
+		}
+		me, err := behavmatch.RunScenario(mBin, *spec, scn, *mWarmup)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "mine:", err)
+			os.Exit(2)
+		}
+		fmt.Printf("matched state: both ROMs driven through scenario %q (%d frames)\n", scn.Name, scn.Frames)
+		if *tWarmup != *mWarmup {
+			// An asymmetry here is legitimate (one ROM has a title screen the other
+			// does not) but it is also exactly what makes a ROM differ from itself,
+			// so it is stated rather than left in the flags.
+			fmt.Printf("  NOTE: warmups differ (target %d, mine %d) — the two sides start from different points\n",
+				*tWarmup, *mWarmup)
+		}
+		tg, mg = vismatch.GridFrom(te), vismatch.GridFrom(me)
 	}
-	mg, err := vismatch.ExtractROM(mBin, *spec, *mFrames, *mReset)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "mine:", err)
-		os.Exit(2)
+
+	if tg == nil {
+		var err error
+		tg, err = vismatch.ExtractROM(tBin, *spec, *tFrames, *tReset)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "target:", err)
+			os.Exit(2)
+		}
+		mg, err = vismatch.ExtractROM(mBin, *spec, *mFrames, *mReset)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "mine:", err)
+			os.Exit(2)
+		}
 	}
 
 	rep := vismatch.Diff(tg, mg)

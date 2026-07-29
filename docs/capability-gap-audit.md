@@ -776,7 +776,19 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   shifted by a constant, a human currently reads the band-diff and infers it. Emit `best global vertical
   shift = −11 (removes X% of PF mismatch)` automatically (framegen already does this content-shift search
   internally — lift it into vismatch). Size: S. 〔TOOL-EVAL V3 / idea #2〕
-- **RL-3 — matched-state moving-object comparison (`vismatch` × `behavmatch`).** Single-frame vismatch is
+- **RL-3 — matched-state moving-object comparison — DONE.** `vismatch -scenario NAME [-scenarios file]`
+  drives BOTH ROMs through the same input script (`behavmatch.RunScenario`) and compares the picture there.
+  Reproduced as a measurement first: the SAME ROM compared at frames 10 and 20 reports its ball as a
+  difference, because motion_glide moves it a scanline per frame — the difference being when it was looked
+  at, not where the object is. Driven through one script, the same comparison is pixel-exact; two genuinely
+  different ROMs still come out different, so the feature cannot turn comparisons green.
+  Caught while wiring the CLI, and worth recording because the Go test did not catch it: the first version
+  reused `-target-frames`/`-mine-frames` (defaults 28 and 12) as the per-side warmup, so matched state gave
+  the two sides DIFFERENT warmups and reported a ROM as differing from itself. Separate `-target-warmup` /
+  `-mine-warmup` default to 0, and an asymmetry between them is printed rather than left in the flags —
+  it is legitimate (one ROM has a title the other does not) and it is also exactly what makes a ROM differ
+  from itself.
+- **(original) RL-3 — matched-state moving-object comparison (`vismatch` × `behavmatch`).** Single-frame vismatch is
   perfect for static PF but a moving object (bike/taxi) reads as transient diff when the two ROMs are in
   different game-state. Drive both to the **same scripted state/frame (behavmatch), then vismatch** — measures
   moving-object position fidelity in one shot. (Done manually via matched-state this session; automate.)

@@ -171,6 +171,57 @@ func Record(romPath, spec string, scn Scenario, warmup int) (*Trace, error) {
 	return tr, nil
 }
 
+// RunScenario drives a ROM through a scenario's input script and returns the
+// emulator sitting at the end of it, so a caller can look at the PICTURE in that
+// state.
+//
+// A single-frame visual diff is exact for a static playfield and misleading for
+// anything that moves: two ROMs at different points in their game read as a
+// difference in the object, when the only difference is when they were looked
+// at. Driving both through the same script first removes that, and what remains
+// is position fidelity.
+func RunScenario(romPath, spec string, scn Scenario, warmup int) (*emu.Emu, error) {
+	e, err := emu.New(spec)
+	if err != nil {
+		return nil, err
+	}
+	if err := e.LoadROM(romPath); err != nil {
+		return nil, fmt.Errorf("load %s: %w", romPath, err)
+	}
+	if scn.Reset {
+		_ = e.SetPanel("reset", true)
+		if err := e.RunFrames(8); err != nil {
+			return nil, err
+		}
+		_ = e.SetPanel("reset", false)
+		if err := e.RunFrames(1); err != nil {
+			return nil, err
+		}
+	}
+	if warmup > 0 {
+		if err := e.RunFrames(warmup); err != nil {
+			return nil, err
+		}
+	}
+	for f := 0; f < scn.Frames; f++ {
+		for _, ic := range scn.At[f] {
+			if ic.Panel != "" {
+				if err := e.SetPanel(ic.Panel, ic.Press); err != nil {
+					return nil, err
+				}
+			} else if ic.Action != "" {
+				if err := e.SetInput(ic.Player, ic.Action, ic.Press); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if _, err := e.StepFrame(); err != nil {
+			return nil, err
+		}
+	}
+	return e, nil
+}
+
 // heldInputs tracks which controller actions / panel switches are currently
 // pressed, so each sample can carry the input that produced it. The scenario
 // script only ever states *edges* (press/release), so the level has to be
