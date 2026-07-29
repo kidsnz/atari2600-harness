@@ -32,6 +32,28 @@ versions follow [Semantic Versioning](https://semver.org/).
     `unresolved_hotspots`, `unresolvable_switch_accesses`, `bank_coverage[].seeded_entries`) are all
     bank-only. **Golden diff over 31 technique + 12 `cb_*` litmus ROMs: 42/43 byte-identical**, the one
     change being `banked_game`, the only banked image in the set.
+- **`framegen` follows a sprite that moves down the frame — a zone-structured kernel** (RL-8b, the last RL-7
+  limit). It carried one reset X per object and strobed RESxx once; it now emits a replay loop per zone with
+  RESxx/HMOVE placement in the target's own blank lines. **`zone_multiplex` 380 → 0 cells, pixel-exact**
+  (BG 33808/33808, P0 228/228, P1 204/204).
+  - **Scope is measured, not assumed.** The extractor records the per-line reset X as a series and folds it
+    into bands with the gap before each. A boundary costs one scanline per object placed + 1 HMOVE line + 1
+    replayed blank line: `zone_multiplex`'s six bands per player have gaps 11/9/9/9/9 against a need of 4 and
+    fit; `dyn_multisprite`'s P0 changes 48 → 78 at line 142 with **gap 0** and `road`'s M0 takes 27 bands of
+    which 25 have gap 0, so both are refused with the counted reason instead of approximated.
+  - **Five of the eight "placement differs" ROMs were never a per-zone problem** — `rts_dispatch`, `bitmap48`,
+    `score6`, `text12`, `text24` all measure **1 reset X per player**, and `hscroll` draws no player at all.
+    RL-7's "the 8 share one cause" was wrong about them.
+  - Three defects found by measuring the clone: the prologue's div-15 `SetXPos` needs `k=11` to reach reset X 4
+    and then spends TWO scanlines (263-line frame, 72 cells wrong that were not a positioning error) — replaced
+    with a branch-free fixed-cost block strobing at `2n+3`; the reset marker is up to a pixel from the drawn
+    window (same 8-px line reads X 49 span 49..56, X 117 span 116..123), so both sides are now anchored on the
+    leftmost drawn pixel (12 cells); and the historical block order puts `GRP1` at visible clock +37, too late
+    for a band at X 4 (64 cells).
+  - **Regression gate held:** 22/31 technique ROMs + Outlaw and Combat (with and without `-reset`) pixel-exact,
+    **262 scanlines on 35/35 runs**, `cyclebound certified:true` on 35/35 (74/76, the zoned one 66/76), and the
+    generated source **byte-identical on all 34 non-zone runs** (`dyn_multisprite`/`road` gain only the new
+    `NOT REPRODUCED: per-zone X` note).
 
 ### Fixed
 - **`framegen` printed a cause it had not measured, and replayed a single frame-final NUSIZ** (RL-7c). On

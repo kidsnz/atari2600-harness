@@ -76,10 +76,21 @@ exact TIA colours. The output is stand-alone (register equates inline, no includ
 
 ### What it does not reproduce — and how it tells you
 
-The replay kernel writes **PF + GRP0/GRP1 and nothing else**. It emits no `ENAM0`/`ENAM1`/`ENABL`, so
-**missiles and the ball are absent by construction**, and it carries **one X per player for the whole
-frame**, so a target that repositions a sprite per zone cannot be followed. Neither limit is a bug to be
-fixed by tuning; both are properties of the emitted kernel (RL-8 tracks lifting them).
+The replay kernel has **eight write blocks per scanline** — the number `cyclebound` can certify — and every
+picture register it does not carry costs pixels. Missiles and the ball are drawn (RL-8a) and a sprite that
+moves down the frame is followed by a ZONE-STRUCTURED kernel (RL-8b): a replay loop per zone, with the
+RESxx/HMOVE placement running in the target's own blank lines. What is still refused, always with the count
+that refuses it:
+
+- **an object whose position changes on a line where it is still being drawn.** A boundary costs one scanline
+  per object placed + one HMOVE line + one replayed blank line, all of which must be lines the target draws
+  nothing on. Measured: `zone_multiplex`'s six bands per player have gaps of 11, 9, 9, 9, 9 against a need of
+  4 and reproduce **pixel-exact**; `dyn_multisprite`'s P0 goes 48 → 78 at visible line 142 with **gap 0**, and
+  `road`'s M0 takes 27 bands of which 25 have gap 0. Those are reported, not approximated to one position.
+- **more copies than the kernel orders**, and **a slot that had to be dropped** to stay inside 76 cycles
+  (RL-7c). `rts_dispatch` needs 9 blocks and 9 do not certify.
+
+None of these is a bug to be fixed by tuning; each is a property of the emitted kernel, stated as a number.
 
 So the tool measures its own output per element and says so three ways — the terminal report, a
 `; NOT REPRODUCED:` block in the generated `.asm` banner, and **exit 1**:
@@ -98,9 +109,13 @@ area and outvotes everything the reproduction exists to check. Read the per-elem
 percentage. Structural absence (`clone 0`) is reported apart from misplacement (`clone > 0`, wrong cells):
 different causes, different fixes.
 
-Field-measured over 31 technique ROMs: 21 pixel-exact, 8 misplaced (multiplexed sprites; `zone_multiplex`
-loses 190 cells per player), 2 missing elements. Cartridges: **Outlaw and Combat pixel-exact, Fishing Derby
-partial.** Use it as a **BG/PF/P0/P1 validator on single-position kernels** — not as a whole-frame reproducer.
+Field-measured over 31 technique ROMs: **22 pixel-exact, 8 with cells in the wrong place, 1 with an element
+absent** (`road`, whose missiles take 21 and 16 reset X with no blank line to move them in), **262 scanlines
+on every one**. Cartridges: **Outlaw and Combat pixel-exact** (with and without `-reset`), Fishing Derby
+partial. Of the 8 that differ, **five have exactly one reset X per player, measured** — `rts_dispatch`,
+`bitmap48`, `score6`, `text12`, `text24` — so their cells are copies and the block budget, not position;
+`hscroll` draws no player at all and its 64 cells are playfield. Read the per-element table and the measured
+cause, never the percentage.
 
 ### Scenarios live in files, not in the package
 

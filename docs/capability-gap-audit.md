@@ -1395,8 +1395,20 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   Not reproduced, with the number: `dyn_multisprite` (P0 goes 48 → 78 at visible line 142 while it is still
   being drawn — **0 of the 4 blank lines** the move needs), `road`'s M0/M1/BL (**0 of 7 / 0 of 6 / 0 of 5**
   blank lines at their first change, line 9), and the five one-X ROMs above, whose causes are copies and the
-  block budget (RL-7c) and are unchanged. Every generated clone still passes `cyclebound -asm` with
-  `certified:true`.
+  block budget (RL-7c) and are unchanged.
+
+  **Gates, all measured on the 35 runs.** `cyclebound -asm` returns `certified:true` on **35/35** clones —
+  `max_worst` 74/76 on the 34 single-zone ones and **66/76 on the zoned one**, whose worst region is a
+  positioning line, so the fixed-cost block's own arithmetic bound (`2n+11 <= 75`) is confirmed by the repo's
+  prover and not only by hand. `timinglint` reports no warnings on the zoned clone (its HMxx-then-HMOVE order
+  and the 24-cycle rule), and `vismatch` — a different code path from `framegen`'s own coverage table —
+  independently returns `pixel-exact, band diffs: none` for `zone_multiplex`, Outlaw and Combat.
+
+  **Found and NOT fixed, deliberately.** Every pixel-exact clone's banner ends with *"Every element is
+  present and every object cell matches; the difference is in BG cells only."* — on a clone with **zero**
+  differing cells that sentence is false, and it is on all 22 of them (verified in the pre-change output too,
+  so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
+  exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
 ### A frame counter that WRAPS was not recognised as a clock — and it had been carrying 12 "resolved" bytes (2026-07-29)
 

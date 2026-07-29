@@ -193,8 +193,39 @@ type frameData struct {
 	// msz0/msz1/bsz are the measured missile and ball widths (NUSIZ bits 4-5 and
 	// CTRLPF bits 4-5), taken from the run lengths the machine actually drew.
 	msz0, msz1, bsz uint8
+	// bx[i][y] is object i's reset X on visible line y with the NUSIZ size shift
+	// removed, or notDrawn when it drew nothing there. objFacts collapses the same
+	// measurement into a histogram, which cannot say WHERE a position changed — and
+	// where is the whole question for a zone-structured kernel: a target that takes
+	// six positions in six separated bands can be followed, one that takes six while
+	// drawing continuously cannot.
+	bx [5][]int
+	// lx[i][y] is the LEFTMOST clock object i actually drew a pixel at on visible
+	// line y, or notDrawn. It exists because the reset position and the drawn window
+	// are not the same number: measured on zone_multiplex, the same 8-pixel-wide
+	// sprite line reports reset X 49 with span 49..56 in one band, reset X 117 with
+	// span 116..123 in another, and reset X 4 with span 4..11 in a third — the
+	// marker is off by -1, 0 or +1 depending on the fine HMOVE nibble that put the
+	// object there. A kernel calibrated against the marker is therefore up to a pixel
+	// out, and a graphics byte sampled at the marker reads the wrong 8 clocks. Both
+	// sides of the comparison are anchored on drawn pixels instead.
+	lx   [5][]int
 	kern []writeBlock
+	// zones is the reproduction plan when the target repositions down the frame:
+	// nil means the historical single-position kernel. See planZones.
+	zones   []zone
+	zfollow [5]bool // objects the zone plan repositions per zone
+	// zdrop[i] is the measured reason the zone plan could NOT follow object i, kept
+	// so the final RESULT line can name it. Without it the report says only "this
+	// kernel strobes RESPx once" — true, but it hides that a zone kernel WAS costed
+	// against the target's own gaps and came up short by a counted number of lines.
+	zdrop [5]string
 }
+
+// notDrawn marks a visible line on which an object drew no pixels at all. A real
+// reset X is 0..159, so a sentinel is needed: "drawn at clock 0" and "not drawn"
+// are different facts and collapsing them would invent a position.
+const notDrawn = -1
 
 // objIndex names the five movable objects in the order fd.obj holds them, and in
 // the order SetXPos's X register selects them: RESP0=$10, RESP1=$11, RESM0=$12,
@@ -290,6 +321,92 @@ func (f objFacts) xList() string {
 	return "[" + strings.Join(parts, " ") + "]"
 }
 
+// xRun is one maximal band of consecutive visible lines on which an object was
+// drawn at ONE reset X, plus the number of blank lines immediately before it.
+//
+// This is the measurement the per-zone kernel stands on. `objFacts.distinctX`
+// counts HOW MANY positions a target used; it cannot say whether they are
+// reachable, because repositioning costs whole scanlines (SetXPos opens with `sta
+// WSYNC`) and those scanlines have to come from somewhere. A band structure with
+// blank lines between the bands has room; a continuously-drawn object that slides
+// every few lines does not, and the difference is `gap`.
+type xRun struct {
+	start, end int // inclusive visible-line indices
+	x          int // reset X, size shift removed
+	gap        int // blank lines (object not drawn) immediately before start
+}
+
+func (r xRun) lines() int { return r.end - r.start + 1 }
+
+// xRuns folds a per-line reset-X series into bands. A band breaks when the object
+// stops being drawn OR when its position changes while it is still being drawn —
+// the second case is recorded as a band with gap 0, which is exactly the case a
+// zone kernel cannot serve, so it must not be smoothed over.
+func xRuns(bx []int) []xRun {
+	var out []xRun
+	blank := 0
+	for y := 0; y < len(bx); y++ {
+		if bx[y] == notDrawn {
+			blank++
+			continue
+		}
+		if n := len(out); n > 0 && blank == 0 && out[n-1].end == y-1 && out[n-1].x == bx[y] {
+			out[n-1].end = y
+			continue
+		}
+		out = append(out, xRun{start: y, end: y, x: bx[y], gap: blank})
+		blank = 0
+	}
+	return out
+}
+
+// runList renders the measured bands so every claim about zone structure arrives
+// with the lines, the position and the gap that were counted. Long series are
+// truncated with the count of what was left out — a report that scrolls off the
+// screen is a report nobody reads, but silently dropping rows would hide evidence.
+func runList(rs []xRun, max int) string {
+	if len(rs) == 0 {
+		return "(never drawn)"
+	}
+	n := len(rs)
+	if max > 0 && n > max {
+		n = max
+	}
+	parts := make([]string, 0, n+1)
+	for _, r := range rs[:n] {
+		parts = append(parts, fmt.Sprintf("L%d-%d(%dL)@x%d gap%d", r.start, r.end, r.lines(), r.x, r.gap))
+	}
+	if n < len(rs) {
+		parts = append(parts, fmt.Sprintf("...+%d more bands", len(rs)-n))
+	}
+	return strings.Join(parts, " ")
+}
+
+// blankLine reports that the target drew nothing but background on visible line y.
+// A positioning line is a scanline the replay loop does not run on, so the picture
+// it shows is whatever the registers were left holding; the only content that can
+// be reproduced there without a table read is none at all.
+func (fd *frameData) blankLine(y int) bool {
+	if y < 0 || y >= len(fd.tgtElem) {
+		return false
+	}
+	for _, e := range fd.tgtElem[y] {
+		if e != "BG" {
+			return false
+		}
+	}
+	return true
+}
+
+// blankRun counts consecutive background-only target lines ending at y (inclusive).
+func (fd *frameData) blankRun(y int) int {
+	n := 0
+	for ; y >= 0 && fd.blankLine(y); y-- {
+		n++
+	}
+	return n
+}
+
 // shiftUint8 returns a copy of a shifted by s (out[i]=a[i+s], edges clamp to 0).
 func shiftUint8(a []uint8, s int) []uint8 {
 	out := make([]uint8, len(a))
@@ -324,7 +441,71 @@ func (fd *frameData) shifted(s int) *frameData {
 	// picture without them would move a band's graphics off its own copy mode.
 	c.nz0 = shiftKeepEdges(fd.nz0, s)
 	c.nz1 = shiftKeepEdges(fd.nz1, s)
+	// The zone plan is indexed by the SAME y the tables are, so it has to travel
+	// with them: out[y] = table[y+s] means the band that sat at target lines
+	// [a,b] is emitted at kernel lines [a-s, b-s]. Leaving the boundaries behind
+	// would reposition the sprite s lines away from the band it belongs to.
+	for i := range c.bx {
+		c.bx[i] = shiftInt(fd.bx[i], s, notDrawn)
+	}
+	if fd.zones != nil {
+		c.zones = make([]zone, len(fd.zones))
+		for k, z := range fd.zones {
+			z.start -= s
+			z.end -= s
+			if z.posStart >= 0 {
+				z.posStart -= s
+			}
+			c.zones[k] = z
+		}
+		// The loops have to cover the whole frame however the content moved, so the
+		// outer edges are pinned rather than shifted. Both edges are inside a blank
+		// region on any target this plan accepts (a boundary needs background-only
+		// lines), so a line added or dropped there changes no pixel.
+		c.zones[0].start = 0
+		c.zones[len(c.zones)-1].end = fd.h - 1
+	}
 	return &c
+}
+
+// shiftInt is shiftUint8 for the per-line position series, with its own fill
+// value: 0 is a legal reset X, so an edge has to read "not drawn", not "drawn at
+// the left edge".
+func shiftInt(a []int, s, fill int) []int {
+	out := make([]int, len(a))
+	for i := range out {
+		j := i + s
+		if j >= 0 && j < len(a) {
+			out[i] = a[j]
+		} else {
+			out[i] = fill
+		}
+	}
+	return out
+}
+
+// zonesValid reports that every zone still replays at least one line and that no
+// boundary has been pushed outside the frame. A vertical-shift candidate that
+// breaks the plan is skipped rather than emitted: the emitted loop would run
+// `cpy` against a bound it never reaches.
+func (fd *frameData) zonesValid() bool {
+	if fd.zones == nil {
+		return true
+	}
+	prev := -1
+	for k, z := range fd.zones {
+		if z.start > z.end || z.start < 0 || z.end >= fd.h {
+			return false
+		}
+		if z.start <= prev {
+			return false
+		}
+		if k > 0 && (z.posStart <= fd.zones[k-1].end || z.posStart >= z.start) {
+			return false
+		}
+		prev = z.end
+	}
+	return true
 }
 
 // shiftKeepEdges shifts like shiftUint8 but clamps to the first/last element
@@ -429,6 +610,8 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 		fd.nz1 = append(fd.nz1, ls.nz1)
 		countRuns(&fd.obj[objP0], runsPerLine[y], "P0", ls.nz0, ls.x0)
 		countRuns(&fd.obj[objP1], runsPerLine[y], "P1", ls.nz1, ls.x1)
+		fd.bx[objP0] = append(fd.bx[objP0], lineBaseX(runsPerLine[y], "P0", ls.nz0, ls.x0))
+		fd.bx[objP1] = append(fd.bx[objP1], lineBaseX(runsPerLine[y], "P1", ls.nz1, ls.x1))
 		// Missiles and the ball are measured from the pixels they DREW rather than
 		// from a register read: a missile has no graphics byte, so its run in the
 		// attribution is its position and its width directly, and reading it that way
@@ -436,10 +619,13 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 		// passed as 0 because the size shift countRuns removes applies to a player's
 		// graphics start, not to a missile — a missile's run starts where it starts.
 		for i, name := range []string{"M0", "M1", "BL"} {
+			bx := notDrawn
 			if x, w, ok := firstRun(runsPerLine[y], name); ok {
 				countRuns(&fd.obj[objM0+i], runsPerLine[y], name, 0, x)
 				fd.obj[objM0+i].widths[w]++
+				bx = x
 			}
+			fd.bx[objM0+i] = append(fd.bx[objM0+i], bx)
 		}
 		fd.en0 = append(fd.en0, enableByte(runsPerLine[y], "M0"))
 		fd.en1 = append(fd.en1, enableByte(runsPerLine[y], "M1"))
@@ -447,30 +633,77 @@ func extract(rom, spec string, frames int, reset bool) (*frameData, error) {
 	}
 	for i := range fd.obj {
 		fd.obj[i].distinctX = len(fd.obj[i].baseX)
+		fd.lx[i] = leftmostDrawn(fd.tgtElem, objNames[i])
 	}
 	fd.msz0 = sizeBits(fd.obj[objM0])
 	fd.msz1 = sizeBits(fd.obj[objM1])
 	fd.bsz = sizeBits(fd.obj[objBL])
 
-	// The graphics byte is sampled at the line's OWN pixel width, from the same
-	// end-of-frame reset position as before, corrected only by that line's size
-	// shift. It deliberately does NOT sample at the per-line HmovedPixel: this
-	// kernel strobes RESPx once, and the position it strobes to is calibrated
-	// against the end-of-frame marker, so reading the pattern from anywhere else
-	// draws the right shape in the wrong column. Measured cost of getting that
-	// wrong: sampling at the per-line position turned flicker_multiplex (0 cells
-	// wrong) into 78, sprite_anim (0) into 84 and text24 (162) into P0/P1 absent
-	// entirely — the end-of-frame marker and the visible-line position are not the
-	// same number on a target that parks its sprites during overscan.
+	return fd, nil
+}
+
+// buildGRP samples the two players' graphics bytes. It runs AFTER planZones,
+// because where the pattern has to be read from depends on where the kernel will
+// have put the sprite.
+//
+// For a player the kernel places ONCE, the byte is sampled at the line's own pixel
+// width from the END-OF-FRAME reset position, corrected only by that line's size
+// shift. It deliberately does NOT sample at the per-line HmovedPixel: the position
+// the kernel strobes to is calibrated against the end-of-frame marker, so reading
+// the pattern from anywhere else draws the right shape in the wrong column.
+// Measured cost of getting that wrong: sampling at the per-line position turned
+// flicker_multiplex (0 cells wrong) into 78, sprite_anim (0) into 84 and text24
+// (162) into P0/P1 absent entirely — the end-of-frame marker and the visible-line
+// position are not the same number on a target that parks its sprites during
+// overscan.
+//
+// For a player the zone plan FOLLOWS, the opposite is true and for the same
+// reason: the kernel puts the sprite at the band's own measured position, so the
+// pattern must be read from that position. Sampling such a target at the
+// end-of-frame marker reads 8 bits of background — zone_multiplex's P0 ends its
+// frame at reset X 99 while its six bands sit at 52, 82, 119, 22, 11 and 99.
+func (fd *frameData) buildGRP() {
+	fd.grp0, fd.grp1 = nil, nil
 	sh0 := nusizStartShift(fd.nusiz0)
 	sh1 := nusizStartShift(fd.nusiz1)
-	for y := 0; y < h; y++ {
+	for y := 0; y < fd.h; y++ {
 		x0 := fd.p0x - sh0 + nusizStartShift(fd.nz0[y])
 		x1 := fd.p1x - sh1 + nusizStartShift(fd.nz1[y])
-		fd.grp0 = append(fd.grp0, grpByte(fd.tgtElem[y], x0, nusizWidth(fd.nz0[y]), "P0"))
-		fd.grp1 = append(fd.grp1, grpByte(fd.tgtElem[y], x1, nusizWidth(fd.nz1[y]), "P1"))
+		k := -1
+		if fd.zones != nil {
+			k = fd.zoneOf(y)
+		}
+		b0 := grpByte(fd.tgtElem[y], x0, nusizWidth(fd.nz0[y]), "P0")
+		b1 := grpByte(fd.tgtElem[y], x1, nusizWidth(fd.nz1[y]), "P1")
+		if fd.zfollow[objP0] {
+			b0 = fd.zoneGRP(y, k, objP0, x0)
+		}
+		if fd.zfollow[objP1] {
+			b1 = fd.zoneGRP(y, k, objP1, x1)
+		}
+		fd.grp0 = append(fd.grp0, b0)
+		fd.grp1 = append(fd.grp1, b1)
 	}
-	return fd, nil
+}
+
+// zoneGRP reads a followed player's byte for one line from the anchor its own zone
+// was measured at. A line no zone replays (one a positioning block consumed) and a
+// zone the object never appears in both give 0 — the kernel is not writing GRP
+// there at all, and inventing a byte would paint a sprite the target has no pixel
+// for. `fallback` is only used when there is no zone plan for this object.
+func (fd *frameData) zoneGRP(y, k, i int, fallback int) uint8 {
+	if k < 0 || fd.lx[i][y] == notDrawn {
+		return 0
+	}
+	anchor := fd.zones[k].lt[i]
+	if anchor == notDrawn {
+		return 0
+	}
+	nz := fd.nz0[y]
+	if i == objP1 {
+		nz = fd.nz1[y]
+	}
+	return grpByte(fd.tgtElem[y], anchor, nusizWidth(nz), objNames[i])
 }
 
 // countRuns folds one visible line into an object's measured facts.
@@ -523,6 +756,58 @@ func sizeBits(f objFacts) uint8 {
 	return 0
 }
 
+// leftmostDrawn reads, per visible line, the leftmost clock at which an element
+// actually appears in an attribution grid, or notDrawn. Taken off the picture, so
+// the same function serves the target and the clone and the two numbers are
+// commensurable — which the reset markers are not, being up to a pixel out.
+func leftmostDrawn(grid [][]string, name string) []int {
+	out := make([]int, len(grid))
+	for y, row := range grid {
+		out[y] = notDrawn
+		for x, e := range row {
+			if e == name {
+				out[y] = x
+				break
+			}
+		}
+	}
+	return out
+}
+
+// zoneLeftmost is the leftmost clock an object was drawn at anywhere inside a
+// zone — the anchor the band's graphics bytes are read from and the position the
+// clone is driven to. Taking the minimum over the band matters: a sprite whose top
+// line is 2 pixels wide and whose middle line is 8 (measured on zone_multiplex:
+// widths 2,4,6,8,8,6,4 down every band) reveals its left edge only on the widest
+// lines, and anchoring on a narrow line would shift the whole band.
+func zoneLeftmost(lx [5][]int, z zone, i int) int {
+	best := notDrawn
+	if lx[i] == nil {
+		return best
+	}
+	for y := z.start; y <= z.end && y < len(lx[i]); y++ {
+		if y < 0 || lx[i][y] == notDrawn {
+			continue
+		}
+		if best == notDrawn || lx[i][y] < best {
+			best = lx[i][y]
+		}
+	}
+	return best
+}
+
+// lineBaseX is the reset X countRuns would record for this line, or notDrawn.
+// Kept in one place so the per-line series and the histogram can never disagree
+// about what "the position on this line" means.
+func lineBaseX(runs []emu.ElemRun, name string, nz uint8, x int) int {
+	for _, r := range runs {
+		if r.Element == name {
+			return x - nusizStartShift(nz)
+		}
+	}
+	return notDrawn
+}
+
 func countRuns(f *objFacts, runs []emu.ElemRun, name string, nz uint8, x int) {
 	n := 0
 	for _, r := range runs {
@@ -557,30 +842,30 @@ func countRuns(f *objFacts, runs []emu.ElemRun, name string, nz uint8, x int) {
 // facts: the players' calibration target is the marker the target was measured
 // with, and a missile's is the reset X its pixels were drawn at. Comparing a
 // player against a base X instead would be comparing two different numbers.
-func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [5]objFacts, err error) {
+func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [5]objFacts, bx [5][]int, err error) {
 	for i := range obj {
 		obj[i] = newObjFacts(objNames[i])
 	}
 	dir, err := os.MkdirTemp("", "framegen")
 	if err != nil {
-		return nil, 0, obj, err
+		return nil, 0, obj, bx, err
 	}
 	asm, bin := dir+"/c.asm", dir+"/c.bin"
 	if err := os.WriteFile(asm, []byte(src), 0o644); err != nil {
-		return nil, 0, obj, err
+		return nil, 0, obj, bx, err
 	}
 	if out, aerr := build.Assemble(asm, bin); aerr != nil {
-		return nil, 0, obj, fmt.Errorf("assemble:\n%s", out)
+		return nil, 0, obj, bx, fmt.Errorf("assemble:\n%s", out)
 	}
 	e, err := emu.New(spec)
 	if err != nil {
-		return nil, 0, obj, err
+		return nil, 0, obj, bx, err
 	}
 	if err := e.LoadROM(bin); err != nil {
-		return nil, 0, obj, err
+		return nil, 0, obj, bx, err
 	}
 	if err := e.RunFrames(frames); err != nil {
-		return nil, 0, obj, err
+		return nil, 0, obj, bx, err
 	}
 	img, vt := e.Snapshot()
 	h := img.Bounds().Dy()
@@ -600,6 +885,12 @@ func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [5]
 		}
 		grid = append(grid, row)
 	}
+	for i := range bx {
+		bx[i] = make([]int, h)
+		for y := range bx[i] {
+			bx[i][y] = notDrawn
+		}
+	}
 	if st, merr := measureLines(e); merr == nil {
 		for y := 0; y < h; y++ {
 			ls, ok := st[vt+y]
@@ -608,6 +899,8 @@ func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [5]
 			}
 			countRuns(&obj[0], runsPerLine[y], "P0", ls.nz0, ls.x0)
 			countRuns(&obj[1], runsPerLine[y], "P1", ls.nz1, ls.x1)
+			bx[objP0][y] = lineBaseX(runsPerLine[y], "P0", ls.nz0, ls.x0)
+			bx[objP1][y] = lineBaseX(runsPerLine[y], "P1", ls.nz1, ls.x1)
 		}
 	}
 	for y := 0; y < h; y++ {
@@ -615,13 +908,14 @@ func renderGrid(src, spec string, frames int) (grid [][]string, top int, obj [5]
 			if x, w, ok := firstRun(runsPerLine[y], name); ok {
 				countRuns(&obj[objM0+i], runsPerLine[y], name, 0, x)
 				obj[objM0+i].widths[w]++
+				bx[objM0+i][y] = x
 			}
 		}
 	}
 	for i := range obj {
 		obj[i].distinctX = len(obj[i].baseX)
 	}
-	return grid, vt, obj, nil
+	return grid, vt, obj, bx, nil
 }
 
 // elemCoverage is one TIA element's share of the reproduction: how many visible
@@ -765,21 +1059,27 @@ const (
 func blockLands(i int) int { return 21*(i+1) - 68 } // i is 0-based
 
 // placeable reports whether this kernel can put the object where the target has
-// it: it must be drawn at all, and it must sit at ONE reset X for the whole
-// frame, because the kernel strobes each RESxx once. An object that moves per
-// zone is measured, reported and not drawn — never approximated to its first
-// position, which would put pixels somewhere the target never had them.
+// it: it must be drawn at all, and either sit at ONE reset X for the whole frame
+// or be followed by the zone plan (fd.zfollow), because outside a zone block the
+// kernel strobes each RESxx once. An object that moves and cannot be followed is
+// measured, reported and not drawn — never approximated to its first position,
+// which would put pixels somewhere the target never had them.
 func (fd *frameData) placeable(i int) bool {
+	return fd.placeableWith(i, fd.zfollow)
+}
+
+func (fd *frameData) placeableWith(i int, follow [5]bool) bool {
 	o := fd.obj[i]
 	if i == objP0 || i == objP1 {
 		return true // the players are always placed; their X is the calibrated marker
 	}
-	return o.lines > 0 && o.distinctX == 1
+	return o.lines > 0 && (o.distinctX == 1 || follow[i])
 }
 
-// wantX is the position the calibration drives this object to. Players use the
-// end-of-frame marker the whole kernel is calibrated against; missiles and the
-// ball use the single reset X measured from the pixels they drew.
+// wantX is the position the calibration drives this object to OUTSIDE a zone
+// plan. Players use the end-of-frame marker the whole kernel is calibrated
+// against; missiles and the ball use the single reset X measured from the pixels
+// they drew.
 func (fd *frameData) wantX(i int) int {
 	switch i {
 	case objP0:
@@ -788,6 +1088,217 @@ func (fd *frameData) wantX(i int) int {
 		return fd.p1x
 	}
 	return fd.obj[i].onlyX
+}
+
+// zone is one band of visible lines the replay loop runs over without moving
+// anything, together with the reset X every followed object holds during it.
+//
+// A zone boundary costs whole scanlines, which is the entire reason the plan is
+// measured rather than assumed: repositioning is `sta WSYNC` + a div-15 subtract
+// loop per object plus one line for the HMOVE strobe, and the lines it eats have
+// to be lines the target draws nothing on — the replay loop is not running on
+// them, so the only picture reproducible there is no picture.
+type zone struct {
+	start, end int    // inclusive visible-line indices this zone's loop replays
+	posStart   int    // first visible line eaten by the positioning block before it (-1 for zone 0)
+	x          [5]int // reset X each followed object holds here (notDrawn = never drawn in this zone)
+	lt         [5]int // leftmost clock the target actually drew it at in this zone (notDrawn = not drawn)
+}
+
+// zoneWantX is the position the calibration drives object i to in zone k, as the
+// leftmost clock the target drew it at there. A followed object inherits the
+// previous zone's anchor when it draws nothing in its own (the position is a
+// register, it does not stop existing); everything else keeps its single
+// frame-wide target, measured the way it always was.
+func (fd *frameData) zoneWantX(k, i int) int {
+	if fd.zones == nil || !fd.zfollow[i] {
+		return fd.wantX(i)
+	}
+	for ; k >= 0; k-- {
+		if v := fd.zones[k].lt[i]; v != notDrawn {
+			return v
+		}
+	}
+	// Never drawn up to and including zone k: fall forward to the first zone that
+	// does draw it, so the object is parked somewhere it was actually measured.
+	for _, z := range fd.zones {
+		if z.lt[i] != notDrawn {
+			return z.lt[i]
+		}
+	}
+	return fd.wantX(i)
+}
+
+// zoneOf is the zone whose replay loop covers visible line y, or -1 when the line
+// is one a positioning block consumed.
+func (fd *frameData) zoneOf(y int) int {
+	for k, z := range fd.zones {
+		if y >= z.start && y <= z.end {
+			return k
+		}
+	}
+	return -1
+}
+
+// zonePosLines is what one positioning block costs in scanlines: one per placed
+// object (the inline block opens with `sta WSYNC`, so it owns its line) plus one
+// for the HMOVE strobe line.
+//
+// EVERY placeable object is repositioned in every block, including ones that did
+// not move. That is not waste, it is correctness: HMOVE applies whatever the HMxx
+// registers hold, so an object left out of the block would be moved a SECOND time
+// by its stale prologue nibble. Rewriting all of them costs a line and needs no
+// HMCLR, which would otherwise have to run before the first div-15 loop and push
+// its `sta.w RESxx` past the end of the scanline.
+func (fd *frameData) zonePosLines(follow [5]bool) int {
+	n := 1
+	for i := range fd.obj {
+		if fd.placeableWith(i, follow) {
+			n++
+		}
+	}
+	return n
+}
+
+// tryZones builds the zone plan for one candidate follow-set, or reports the
+// object and the measured numbers that make it impossible.
+func tryZones(fd *frameData, follow [5]bool) ([]zone, int, string) {
+	posLines := fd.zonePosLines(follow)
+	var zs []zone
+	cur := zone{start: 0, end: 0, posStart: -1}
+	for i := range cur.x {
+		cur.x[i] = notDrawn
+	}
+	pin := func(z *zone, y int) int {
+		for i := 0; i < 5; i++ {
+			if !follow[i] {
+				continue
+			}
+			v := fd.bx[i][y]
+			if v == notDrawn {
+				continue
+			}
+			if z.x[i] == notDrawn {
+				z.x[i] = v
+				continue
+			}
+			if z.x[i] != v {
+				return i
+			}
+		}
+		return -1
+	}
+	for y := 0; y < fd.h; y++ {
+		conflict := pin(&cur, y)
+		if conflict < 0 {
+			cur.end = y
+			continue
+		}
+		// The block has to finish before line y, so it owns [y-posLines, y-1], and
+		// the line before it must be background-only too: that is the last line the
+		// replay loop runs, and it is what leaves GRP0/GRP1/PF at 0 so the
+		// positioning lines show background rather than the previous zone's picture.
+		ps := y - posLines
+		if have := fd.blankRun(y - 1); have < posLines+1 {
+			return nil, posLines, fmt.Sprintf("%s changes reset X from %d to %d at visible line %d, "+
+				"but only %d of the %d background-only lines the move needs are there (%d objects to place at one "+
+				"scanline each + 1 HMOVE line + 1 replayed blank line to clear GRP/PF)",
+				objNames[conflict], cur.x[conflict], fd.bx[conflict][y], y, have, posLines+1, posLines-1)
+		}
+		if ps-1 < cur.start {
+			return nil, posLines, fmt.Sprintf("%s changes reset X from %d to %d at visible line %d, "+
+				"and the %d-line positioning block would start at line %d, before this zone's own first line %d — "+
+				"the zone would replay nothing",
+				objNames[conflict], cur.x[conflict], fd.bx[conflict][y], y, posLines, ps, cur.start)
+		}
+		cur.end = ps - 1
+		zs = append(zs, cur)
+		nz := zone{start: y, end: y, posStart: ps}
+		for i := range nz.x {
+			nz.x[i] = notDrawn
+		}
+		if c := pin(&nz, y); c >= 0 {
+			// Two positions on ONE line: no amount of blank lines can serve that.
+			return nil, posLines, fmt.Sprintf("%s is drawn at two reset X on the single visible line %d, "+
+				"which no per-zone kernel can express", objNames[c], y)
+		}
+		cur = nz
+	}
+	cur.end = fd.h - 1
+	zs = append(zs, cur)
+	for k := range zs {
+		for i := range zs[k].lt {
+			zs[k].lt[i] = zoneLeftmost(fd.lx, zs[k], i)
+		}
+	}
+	return zs, posLines, ""
+}
+
+// planZones decides which objects the kernel will follow per zone, and reports
+// every one it drops with the measurement that ruled it out.
+//
+// Only an object measured at MORE THAN ONE reset X can force a zone boundary, so
+// a target with one position per object produces no zones at all and the
+// historical single-position kernel is emitted unchanged — that is the property
+// that keeps 21 pixel-exact clones byte-identical.
+func planZones(fd *frameData) ([]zone, [5]bool, []string) {
+	var follow [5]bool
+	any := false
+	for i := range fd.obj {
+		if fd.obj[i].lines > 0 && fd.obj[i].distinctX > 1 {
+			follow[i] = true
+			any = true
+		}
+	}
+	if !any {
+		return nil, follow, nil
+	}
+	var notes []string
+	for {
+		zs, posLines, bad := tryZones(fd, follow)
+		if bad == "" {
+			var desc []string
+			for k, z := range zs {
+				desc = append(desc, fmt.Sprintf("z%d L%d-%d", k, z.start, z.end))
+			}
+			notes = append(notes, fmt.Sprintf("zone kernel: %d zones (%s), repositioning %d objects + 1 HMOVE line = %d scanlines per boundary, taken from measured background-only gaps",
+				len(zs), strings.Join(desc, " "), posLines-1, posLines))
+			return zs, follow, notes
+		}
+		// Drop the object the plan failed on and retry: losing one multiplexed object
+		// does not have to cost the others. A dropped player reverts to the single
+		// position it was always given; a dropped missile or ball is not drawn at all,
+		// which the coverage table then reports as structurally absent.
+		drop := -1
+		for i := range follow {
+			if follow[i] && strings.HasPrefix(bad, objNames[i]+" ") {
+				drop = i
+				break
+			}
+		}
+		if drop < 0 {
+			for i := range follow {
+				if follow[i] {
+					drop = i
+					break
+				}
+			}
+		}
+		if drop < 0 {
+			return nil, follow, notes
+		}
+		follow[drop] = false
+		fd.zdrop[drop] = bad
+		notes = append(notes, fmt.Sprintf("NOT REPRODUCED: per-zone X for %s. Measured: %s. Bands: %s",
+			objNames[drop], bad, runList(xRuns(fd.bx[drop]), 8)))
+		still := false
+		for _, f := range follow {
+			still = still || f
+		}
+		if !still {
+			return nil, follow, notes
+		}
+	}
 }
 
 // alwaysOn reports that the object drew on EVERY visible line, so its enable can
@@ -806,6 +1317,121 @@ func positionCode(fd *frameData, in [5]int) string {
 		fmt.Fprintf(&b, "    ldx #%d              ; %s\n    lda #%d\n    jsr SetXPos\n", i, objNames[i], in[i])
 	}
 	return b.String()
+}
+
+// resetRegs/moveRegs name the strobe and motion register of each object. RESP0..
+// RESBL are $10-$14 and HMP0..HMBL are $20-$24, which is why SetXPos can index
+// both from one base — but an INLINE block writes them by name, because the two
+// cycles an `ldx #n` costs move the RESxx strobe 6 pixels and would have to be
+// calibrated out again.
+var resetRegs = [5]string{"RESP0", "RESP1", "RESM0", "RESM1", "RESBL"}
+var moveRegs = [5]string{"HMP0", "HMP1", "HMM0", "HMM1", "HMBL"}
+
+// A zone positioning block places one object per scanline with a FIXED-cost
+// delay chain, not with the prologue's div-15 subtract loop, and the reason is a
+// measured scanline:
+//
+//	sta WSYNC | n x nop 2n | sta.w RESxx 4 | lda #nib 2 | sta HMxx 3 | sta WSYNC 3
+//
+// so the RESxx write lands on cycle 2n+3 and the block's CLOSING `sta WSYNC`
+// writes on cycle 2n+11, which has to be <= 75 for the block to own exactly one
+// scanline. A div-15 block costs 5k+19 to the strobe and 5k+22 to that closing
+// write, i.e. it needs k <= 10 — and k <= 10 only reaches reset X 6..155, measured.
+// zone_multiplex asks for X=4. Pushing to k=11 to reach it made one block spend
+// two scanlines instead of one, which showed up as a 263-line frame and a picture
+// the shift search wanted to move 2 lines: 72 cells wrong that were not a
+// positioning error at all.
+//
+// The delay chain also has no branch, so there is no page-crossing cycle to
+// account for; `nop` is one byte and two cycles wherever it sits.
+const (
+	zoneNopCycles   = 2                        // one nop
+	zoneStrobeFixed = 3                        // sta.w RESxx write, relative to the end of the chain
+	zoneTailCycles  = 8                        // lda #nib 2 + sta HMxx 3 + sta WSYNC 3
+	zoneMaxNops     = (75 - zoneStrobeFixed - zoneTailCycles) / zoneNopCycles
+	// zoneInputMax: the input is in pixels (see zoneCoarseFine), 6 per nop plus the
+	// 0..5 the HMxx nibble covers.
+	zoneInputMax = zoneMaxNops*6 + 5
+)
+
+// zoneCoarseFine splits a position input into the delay-chain length and the HMxx
+// nibble. One nop moves the RESxx strobe 2 CPU cycles = 6 colour clocks, and the
+// remaining 0..5 are made up by moving the object RIGHT with the motion register:
+// HMxx is upper-nibble two's complement with positive = LEFT, so a right move of f
+// is the nibble 16-f ($F0 = right 1 ... $B0 = right 5). Input therefore reads in
+// pixels — +1 input is +1 pixel right — the same way the prologue's input does.
+func zoneCoarseFine(in int) (nops int, nib uint8) {
+	nops = in / 6
+	f := in % 6
+	return nops, uint8((16-f)&0x0F) << 4
+}
+
+func zoneStrobeCycle(in int) int {
+	n, _ := zoneCoarseFine(in)
+	return zoneNopCycles*n + zoneStrobeFixed
+}
+
+// zonePositionCode is one positioning block: one fixed-cost placement per
+// placeable object, then the HMOVE strobe on its own line, then the replay index
+// stepped over the lines the block consumed so the tables stay single arrays.
+func zonePositionCode(fd *frameData, k int, in [5]int) string {
+	z := fd.zones[k]
+	var b strings.Builder
+	fmt.Fprintf(&b, "    ; --- reposition for zone %d. Target lines %d-%d draw nothing at all\n"+
+		"    ; (measured), so the replay loop gives them up: %d objects at one scanline\n"+
+		"    ; each + 1 HMOVE line. Line %d is the last line replayed, and it is blank,\n"+
+		"    ; which is what leaves GRP0/GRP1/PF at 0 across the block. ---\n",
+		k, z.posStart, z.start-1, z.start-z.posStart-1, z.posStart-1)
+	for i := range fd.obj {
+		if !fd.placeable(i) {
+			continue
+		}
+		nops, nib := zoneCoarseFine(in[i])
+		// "leftmost drawn clock", not "reset X": the two differ by up to a pixel with
+		// the fine nibble (measured), and this number is the one the calibration
+		// actually drove the clone onto — the leftmost pixel the target drew here.
+		fmt.Fprintf(&b, "    sta WSYNC           ; %s -> leftmost drawn clock %d: %s strobes on cycle %d of 76\n",
+			objNames[i], fd.zoneWantX(k, i), resetRegs[i], zoneStrobeCycle(in[i]))
+		if nops > 0 {
+			fmt.Fprintf(&b, "    REPEAT %d\n    nop\n    REPEND              ; %d nop = %d cycles of coarse delay\n",
+				nops, nops, zoneNopCycles*nops)
+		}
+		fmt.Fprintf(&b, "    sta.w %s\n    lda #$%02X\n    sta %-6s      ; fine move %d px right\n",
+			resetRegs[i], nib, moveRegs[i], in[i]%6)
+	}
+	fmt.Fprintf(&b, "    sta WSYNC\n    sta HMOVE\n    ldy #%d              ; skip the %d lines the block consumed\n",
+		z.start, z.start-z.posStart)
+	return b.String()
+}
+
+// kernelBody emits the replay loop. With no zone plan it emits exactly the single
+// loop it always did, byte for byte; with one it emits a loop per zone separated
+// by positioning blocks, all sharing one set of page-aligned tables indexed by the
+// SAME y that keeps counting across the boundaries.
+func kernelBody(fd *frameData, zin [][5]int, kb string) string {
+	if fd.zones == nil {
+		return fmt.Sprintf("    ; --- visible: replay %d scanlines ---\n    ldy #0\nKern:\n    sta WSYNC\n%s    iny\n    cpy #%d\n    bne Kern\n",
+			fd.h, kb, fd.h)
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "    ; --- visible: replay %d scanlines as %d zones, repositioning between them ---\n    ldy #0\n", fd.h, len(fd.zones))
+	for k, z := range fd.zones {
+		if k > 0 {
+			b.WriteString(zonePositionCode(fd, k, zin[k]))
+		}
+		fmt.Fprintf(&b, "Kern%d:\n    sta WSYNC\n%s    iny\n    cpy #%d\n    bne Kern%d\n", k, kb, z.end+1, k)
+	}
+	return b.String()
+}
+
+// zoneEquates are the strobe/motion registers only an inline zone block names.
+// Emitted ONLY when there is a zone plan: the single-position kernel's source must
+// stay byte-identical to what it has always been, and an unused equate is a diff.
+func zoneEquates(fd *frameData) string {
+	if fd.zones == nil {
+		return ""
+	}
+	return "RESM0  = $12\nRESM1  = $13\nRESBL  = $14\nHMM0   = $22\nHMM1   = $23\nHMBL   = $24\n"
 }
 
 // staticEnables writes, once before the frame loop, the enable bit of every
@@ -876,10 +1502,16 @@ func planKernel(fd *frameData) (blocks []writeBlock, notes []string) {
 
 	vary0 := !constBytes(fd.nz0)
 	vary1 := !constBytes(fd.nz1)
-	if !vary0 && !vary1 && len(extra) == 0 {
+	if !vary0 && !vary1 && len(extra) == 0 && fd.zones == nil {
 		// Historical order, unchanged: GRP0, PF left, GRP1, PF right.
 		return []writeBlock{g0, pf[0], pf[1], pf[2], g1, pf[3], pf[4], pf[5]}, nil
 	}
+	// A zone plan invalidates the historical order, and the number that says so is
+	// the deadline. GRP1 sits fifth there and lands at visible clock +37, which is
+	// early enough for a player parked on the right — but zone_multiplex moves P1 to
+	// reset X 4, and a store at +37 leaves that band drawing the previous line's
+	// byte. Measured: 64 P1 cells wrong with the historical order, and the
+	// deadline-sorted layout below puts GRP1 in a slot that lands at -26.
 
 	want := []writeBlock{g0, g1}
 	want = append(want, extra...)
@@ -1015,9 +1647,11 @@ func kernelHas(blocks []writeBlock, reg string) bool {
 	return false
 }
 
-// emit builds the full clone source. p0in/p1in are the SetXPos routine inputs
-// and vblankAdj shifts the VBLANK line count (all self-calibrated by the caller).
-func emit(fd *frameData, in [5]int, vblankAdj, osAdj int) string {
+// emit builds the full clone source. zin[k] holds the position-routine inputs for
+// zone k (zin[0] = the prologue's SetXPos calls) and vblankAdj shifts the VBLANK
+// line count — all self-calibrated by the caller.
+func emit(fd *frameData, zin [][5]int, vblankAdj, osAdj int) string {
+	in := zin[0]
 	nlines := fd.h
 	// Positioning costs one scanline per placed object (SetXPos opens with a WSYNC)
 	// plus one for the HMOVE line. That used to be the constant 3 — two players and
@@ -1107,7 +1741,7 @@ ENAM1  = $1E
 ENABL  = $1F
 HMP0   = $20
 HMP1   = $21
-HMOVE  = $2A
+%sHMOVE  = $2A
     org $F000
 
 Reset:
@@ -1160,14 +1794,7 @@ vb:
     bne vb
     lda #0
     sta VBLANK
-    ; --- visible: replay %d scanlines ---
-    ldy #0
-Kern:
-    sta WSYNC
-%s    iny
-    cpy #%d
-    bne Kern
-    sta WSYNC           ; end the last visible line BEFORE clearing anything:
+%s    sta WSYNC           ; end the last visible line BEFORE clearing anything:
     lda #0              ; without it the cleanup runs inside that line and clears
     sta GRP0            ; GRP0 at beam clock +133 and GRP1 at +142 (measured),
     sta GRP1            ; erasing any sprite pixel right of there on that one line
@@ -1199,9 +1826,9 @@ SetXPos:
     sta.w RESP0,x
     rts
 
-`, fd.p0col, fd.p1col, fd.pfcol, fd.bgcol,
+`, zoneEquates(fd), fd.p0col, fd.p1col, fd.pfcol, fd.bgcol,
 		fd.nusiz0|fd.msz0, fd.nusiz1|fd.msz1, fd.bsz, ctrlpfNote, staticEnables(fd),
-		positionCode(fd, in), vblank, nlines, kb.String(), nlines, nusizRestore, overscan)
+		positionCode(fd, in), vblank, kernelBody(fd, zin, kb.String()), nusizRestore, overscan)
 
 	// Only the tables the kernel actually reads (a dropped playfield write would
 	// otherwise leave 256 bytes of dead data behind), in a fixed order so two runs
@@ -1236,15 +1863,18 @@ func clampInput(v int) int {
 	return v
 }
 
-func renderClonePositions(src, spec string, frames int) (x [5]int, top int, err error) {
+func renderClonePositions(src, spec string, frames int) (x [5]int, lx [5][]int, top int, err error) {
 	p0, p1, t, err := renderClone(src, spec, frames)
 	if err != nil {
-		return x, 0, err
+		return x, lx, 0, err
 	}
 	x[objP0], x[objP1] = p0, p1
-	_, _, obj, err := renderGrid(src, spec, frames)
+	grid, _, obj, _, err := renderGrid(src, spec, frames)
 	if err != nil {
-		return x, t, err
+		return x, lx, t, err
+	}
+	for i := range lx {
+		lx[i] = leftmostDrawn(grid, objNames[i])
 	}
 	for i := objM0; i <= objBL; i++ {
 		if obj[i].lines == 0 {
@@ -1253,7 +1883,31 @@ func renderClonePositions(src, spec string, frames int) (x [5]int, top int, err 
 		}
 		x[i] = obj[i].onlyX
 	}
-	return x, t, nil
+	return x, lx, t, nil
+}
+
+// wrapZoneInput keeps an inline zone block inside its own scanline. Unlike the
+// prologue's SetXPos — whose overrun the frame-length calibration absorbs — a zone
+// block that runs long steals a scanline from the picture, so the bound is hard.
+//
+// It WRAPS rather than clamping, because clamping cannot reach the left edge and
+// wrapping can. The div-15 loop always runs at least once, so input 0 is the
+// leftmost coarse step with the largest available left nibble, and it was measured
+// at reset X 6 on zone_multiplex — two pixels short of the band at 4, and clamping
+// left those 7 lines permanently wrong. The object counter wraps at 160, so
+// input+160 asks for the same column from the other side; the input range 0..164
+// is 165 values wide, one more than a full wrap, so every column is reachable.
+func wrapZoneInput(v int) int {
+	for v < 0 {
+		v += 160
+	}
+	for v > zoneInputMax {
+		v -= 160
+	}
+	if v < 0 {
+		return 0
+	}
+	return v
 }
 
 func renderClone(src, spec string, frames int) (p0x, p1x, top int, err error) {
@@ -1317,8 +1971,26 @@ func main() {
 		fmt.Printf("  measured %s: drawn on %d lines, NUSIZ %s, up to %d copies, %d run(s) max per line, %d distinct reset X %s\n",
 			o.name, o.lines, o.modeList(), o.maxCopies, o.maxRuns, o.distinctX, o.xList())
 	}
-	var planNotes []string
-	fd.kern, planNotes = planKernel(fd)
+	// The band structure, printed whenever an object took more than one position.
+	// This is the measurement the zone plan is built from, so it is shown before the
+	// plan rather than only when the plan fails: L<a>-<b>(<n>L)@x<X> gap<G> reads as
+	// "drawn on lines a..b at reset X, with G lines drawn-nothing immediately before".
+	for i := range fd.obj {
+		if fd.obj[i].distinctX > 1 {
+			rs := xRuns(fd.bx[i])
+			fmt.Printf("  bands %s: %d bands over %d lines — %s\n",
+				objNames[i], len(rs), fd.obj[i].lines, runList(rs, 12))
+		}
+	}
+	// The zone plan has to be decided before anything that depends on where the
+	// sprites will be: which objects are placeable, and where the graphics bytes are
+	// sampled from.
+	zoneBlocks, zoneFollow, planNotes := planZones(fd)
+	fd.zones, fd.zfollow = zoneBlocks, zoneFollow
+	fd.buildGRP()
+	kern, kernNotes := planKernel(fd)
+	fd.kern = kern
+	planNotes = append(planNotes, kernNotes...)
 	names := make([]string, len(fd.kern))
 	for i, b := range fd.kern {
 		names[i] = b.reg
@@ -1338,13 +2010,25 @@ func main() {
 	// way already; missiles and the ball go through the same routine because
 	// RESP0..RESBL ($10-$14) and HMP0..HMBL ($20-$24) are consecutive, so SetXPos's
 	// X register selects any of the five.
-	in := [5]int{40, 40, 40, 40, 40}
-	var stuck [5]bool
-	var misses [5]int
+	// One input row per zone; with no zone plan there is exactly one row and this is
+	// the loop it always was. A zone row is calibrated independently because the
+	// clone is the only authority on where a given input lands, but it starts from
+	// the same 40 so a target with one zone and a target with six begin identically.
+	nz := 1
+	if fd.zones != nil {
+		nz = len(fd.zones)
+	}
+	zin := make([][5]int, nz)
+	for k := range zin {
+		zin[k] = [5]int{40, 40, 40, 40, 40}
+	}
+	stuck := make([][5]bool, nz)
+	misses := make([][5]int, nz)
 	vblankAdj, osAdj := 0, 0
+	lastSig := ""
 	for iter := 0; iter < 24; iter++ {
-		src := emit(fd, in, vblankAdj, osAdj)
-		got, top, err := renderClonePositions(src, *spec, *frames)
+		src := emit(fd, zin, vblankAdj, osAdj)
+		got, gotlx, top, err := renderClonePositions(src, *spec, *frames)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "calibrate:", err)
 			os.Exit(2)
@@ -1352,44 +2036,80 @@ func main() {
 		dtop := fd.top - top
 		done := dtop == 0
 		var parts []string
-		for i := range fd.obj {
-			if !fd.placeable(i) || stuck[i] {
-				continue
-			}
-			want := fd.wantX(i)
-			if got[i] < 0 {
-				// Not drawn THIS round is not the same as cannot be drawn. Every object
-				// starts at the same input, so they pile up on each other, and TIA
-				// priority hides the lower ones: measured on shared_setxpos, M1 was
-				// invisible until M0 moved off it, and freezing on the first miss left
-				// M1 stranded at its starting position with all 1712 of its cells wrong.
-				// So hold the input still, keep iterating, and give up only after
-				// several rounds — the others move away and it reappears.
-				//
-				// Chasing the full delta instead walks the input out of range in two
-				// rounds (measured 40 -> 149 -> 258, and `lda #258` does not assemble).
-				misses[i]++
-				if misses[i] >= 4 {
-					stuck[i] = true
+		for k := 0; k < nz; k++ {
+			for i := range fd.obj {
+				if !fd.placeable(i) || stuck[k][i] {
+					continue
 				}
-				done = false
-				parts = append(parts, fmt.Sprintf("%s NOT-DRAWN(want %d, miss %d)", objNames[i], want, misses[i]))
-				continue
+				want := fd.zoneWantX(k, i)
+				// With no zone plan the measurement is the frame-boundary marker, as it
+				// always was. With one, both sides are the LEFTMOST CLOCK THE OBJECT WAS
+				// DRAWN AT inside that zone — the marker is up to a pixel away from the
+				// drawn window (measured: the same sprite line reads reset X 49 with span
+				// 49..56, and reset X 117 with span 116..123), so driving the clone's
+				// marker onto the target's marker leaves the picture a pixel out.
+				have := got[i]
+				label := objNames[i]
+				if fd.zones != nil {
+					have = zoneLeftmost(gotlx, fd.zones[k], i)
+					label = fmt.Sprintf("z%d%s", k, objNames[i])
+					if !fd.zfollow[i] && k > 0 {
+						// Not followed: one position for the whole frame. The later zones
+						// re-place it to the same input, so calibrating it once is enough
+						// and calibrating it per zone would fight itself.
+						zin[k][i] = zin[0][i]
+						continue
+					}
+				}
+				if have < 0 {
+					// Not drawn THIS round is not the same as cannot be drawn. Every object
+					// starts at the same input, so they pile up on each other, and TIA
+					// priority hides the lower ones: measured on shared_setxpos, M1 was
+					// invisible until M0 moved off it, and freezing on the first miss left
+					// M1 stranded at its starting position with all 1712 of its cells wrong.
+					// So hold the input still, keep iterating, and give up only after
+					// several rounds — the others move away and it reappears.
+					//
+					// Chasing the full delta instead walks the input out of range in two
+					// rounds (measured 40 -> 149 -> 258, and `lda #258` does not assemble).
+					misses[k][i]++
+					if misses[k][i] >= 4 {
+						stuck[k][i] = true
+					}
+					done = false
+					parts = append(parts, fmt.Sprintf("%s NOT-DRAWN(want %d, miss %d)", label, want, misses[k][i]))
+					continue
+				}
+				misses[k][i] = 0
+				d := want - have
+				if d != 0 {
+					done = false
+				}
+				if fd.zones != nil && k > 0 {
+					zin[k][i] = wrapZoneInput(zin[k][i] + d)
+				} else {
+					zin[k][i] = clampInput(zin[k][i] + d) // +1 input ≈ +1px right near the target
+				}
+				parts = append(parts, fmt.Sprintf("%s %d(want %d,d%+d)", label, have, want, d))
 			}
-			misses[i] = 0
-			d := want - got[i]
-			if d != 0 {
-				done = false
-			}
-			in[i] = clampInput(in[i] + d) // +1 input ≈ +1px right near the target
-			parts = append(parts, fmt.Sprintf("%s %d(want %d,d%+d)", objNames[i], got[i], want, d))
 		}
 		fmt.Printf("  calib iter %d: %s top %d(want %d,d%+d) in=%v vbAdj=%d\n",
-			iter, strings.Join(parts, " "), top, fd.top, dtop, in, vblankAdj)
+			iter, strings.Join(parts, " "), top, fd.top, dtop, zin, vblankAdj)
 		if done {
 			break
 		}
 		vblankAdj += dtop // more VBLANK lines → visible top moves later (down)
+		// Stop when nothing moved. The loop is deterministic — same source, same
+		// render — so an iteration that changes no input and no VBLANK count cannot
+		// be followed by one that does, and the remaining rounds only cost time. The
+		// fixed point, and therefore the emitted source, is identical either way;
+		// what is left over is reported as a residual difference, not iterated at.
+		sig := fmt.Sprint(zin, vblankAdj)
+		if sig == lastSig {
+			fmt.Printf("  calib: fixed point reached with a residual difference (see the report below)\n")
+			break
+		}
+		lastSig = sig
 	}
 
 	// Content vertical-shift search: after the visible top matches, nudge the
@@ -1397,8 +2117,15 @@ func main() {
 	// target (kills the residual constant offset the top-match can't see).
 	bestS, bestM := 0, -1
 	for s := -4; s <= 4; s++ {
-		src := emit(fd.shifted(s), in, vblankAdj, osAdj)
-		grid, _, _, err := renderGrid(src, *spec, *frames)
+		sh := fd.shifted(s)
+		if !sh.zonesValid() {
+			// A shift that pushes a zone boundary out of the frame would emit a loop
+			// whose `cpy` bound it never reaches. Skipped, and said so.
+			fmt.Printf("  content shift %+d: skipped — the zone boundaries would leave the frame\n", s)
+			continue
+		}
+		src := emit(sh, zin, vblankAdj, osAdj)
+		grid, _, _, _, err := renderGrid(src, *spec, *frames)
 		if err != nil {
 			continue
 		}
@@ -1413,7 +2140,7 @@ func main() {
 	}
 	fmt.Printf("  chosen content shift: %+d\n", bestS)
 
-	src := emit(fd.shifted(bestS), in, vblankAdj, osAdj)
+	src := emit(fd.shifted(bestS), zin, vblankAdj, osAdj)
 
 	// Self-calibrate the frame LENGTH, for the same reason X and VBLANK are
 	// calibrated rather than computed: the prologue's cost is not a constant.
@@ -1437,7 +2164,7 @@ func main() {
 			break
 		}
 		osAdj += want - got
-		src = emit(fd.shifted(bestS), in, vblankAdj, osAdj)
+		src = emit(fd.shifted(bestS), zin, vblankAdj, osAdj)
 	}
 
 	// What did it actually reproduce? Measured per element against the clone's
@@ -1446,7 +2173,7 @@ func main() {
 	var cov []elemCoverage
 	var cloneObj [5]objFacts
 	cloneObj[0], cloneObj[1] = newObjFacts("P0"), newObjFacts("P1")
-	if grid, _, co, err := renderGrid(src, *spec, *frames); err == nil {
+	if grid, _, co, _, err := renderGrid(src, *spec, *frames); err == nil {
 		// fd.tgtElem, not the shifted copy: shifted() moves the REPLAY tables, and
 		// the target's own attribution is the reference the shift was chosen against.
 		cov = coverage(fd.tgtElem, grid)
@@ -1460,7 +2187,7 @@ func main() {
 	lines, lerr := cloneFrameLines(src, *spec)
 
 	miss := missingElements(cov)
-	why := diagnose(cov, fd.obj, cloneObj, fd.kern)
+	why := diagnose(cov, fd.obj, cloneObj, fd.kern, fd)
 	src = annotate(src, cov, miss, planNotes, why)
 
 	if err := os.WriteFile(*out, []byte(src), 0o644); err != nil {
@@ -1540,7 +2267,7 @@ func main() {
 //
 // Anything else is named as unexplained rather than attributed to whichever of
 // the three happens to sound plausible.
-func diagnose(cov []elemCoverage, tgt, clone [5]objFacts, blocks []writeBlock) string {
+func diagnose(cov []elemCoverage, tgt, clone [5]objFacts, blocks []writeBlock, fd *frameData) string {
 	differ := map[string]int{}
 	over := map[string]int{}
 	for _, c := range cov {
@@ -1559,9 +2286,28 @@ func diagnose(cov []elemCoverage, tgt, clone [5]objFacts, blocks []writeBlock) s
 			why = append(why, fmt.Sprintf("the target orders up to %d copies (NUSIZ %s) and the clone draws up to %d",
 				t.maxCopies, t.modeList(), c.maxCopies))
 		}
-		if t.distinctX > 1 {
-			why = append(why, fmt.Sprintf("its reset X takes %d distinct values across the frame %s and this kernel strobes RESP%d once",
-				t.distinctX, t.xList(), i))
+		switch {
+		case t.distinctX > 1 && !fd.zfollow[i]:
+			w := fmt.Sprintf("its reset X takes %d distinct values across the frame %s and this kernel strobes RESP%d once",
+				t.distinctX, t.xList(), i)
+			if fd.zdrop[i] != "" {
+				w += fmt.Sprintf(" — a per-zone kernel was costed against the target's own gaps and declined: %s", fd.zdrop[i])
+			}
+			why = append(why, w)
+		case t.distinctX > 1:
+			// The kernel DID follow it. Saying "one X cannot follow a multiplexed
+			// target" here would be the RL-7c failure again — a true statement about a
+			// kernel that is not the one emitted. What is measurable is where the clone
+			// landed per zone, so that is what is reported.
+			var off []string
+			for k, z := range fd.zones {
+				if z.lt[i] == notDrawn {
+					continue
+				}
+				off = append(off, fmt.Sprintf("z%d L%d-%d want x%d", k, z.start, z.end, z.lt[i]))
+			}
+			why = append(why, fmt.Sprintf("the kernel repositions it in %d zones (%s) and its cells still differ, "+
+				"so the residue is not the single-position limit", len(fd.zones), strings.Join(off, " ")))
 		}
 		for _, l := range lateWrites(blocks, fmt.Sprintf("%d", i)) {
 			why = append(why, l)
