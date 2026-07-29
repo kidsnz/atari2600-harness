@@ -182,6 +182,105 @@ func (v VerticalShift) Describe() string {
 		n, dir, 100*v.Removed, v.MismatchAtZero, v.MismatchAtBest)
 }
 
+// GameplayStart is where a ROM's picture settles after its opening screen.
+type GameplayStart struct {
+	Frame     int  `json:"frame"`      // first frame of the settled picture
+	Found     bool `json:"found"`      // a change followed by stability was seen
+	Changed   bool `json:"changed"`    // the playfield ever differed from frame 0's
+	StableFor int  `json:"stable_for"` // frames of stability the answer required
+	Searched  int  `json:"searched"`   // frames examined
+}
+
+// FindGameplayStart runs a ROM and reports the first frame whose PLAYFIELD both
+// differs from the opening frame's and then holds still for `stable` frames.
+//
+// It exists because comparing two ROMs from frame 0 measures one game's title
+// against another's gameplay, and every mechanic then reads as different for a
+// reason that has nothing to do with mechanics. The warmup that avoids that is
+// currently a number someone tunes by hand.
+//
+// The playfield is the signal rather than the whole picture because sprites move
+// during play — a settled game still has a still background, while a title
+// screen that auto-advances changes it exactly once. A ROM whose playfield never
+// changes reports Found=false and Frame=0 rather than inventing a transition:
+// no title is a perfectly ordinary thing for a ROM to have.
+func FindGameplayStart(romPath, spec string, maxFrames, stable int) (GameplayStart, error) {
+	if maxFrames < 2 {
+		maxFrames = 2
+	}
+	if stable < 1 {
+		stable = 8
+	}
+	e, err := emu.New(spec)
+	if err != nil {
+		return GameplayStart{}, err
+	}
+	if err := e.LoadROM(romPath); err != nil {
+		return GameplayStart{}, fmt.Errorf("load %s: %w", romPath, err)
+	}
+	// The first frames are the machine booting: RAM is still being cleared and the
+	// ROM has not drawn its picture yet, so their playfield differs from every
+	// later one. Taking a baseline there reports a transition on EVERY cartridge,
+	// including ones with no title at all — measured, before this settle existed.
+	const bootSettle = 2
+	if err := e.RunFrames(bootSettle); err != nil {
+		return GameplayStart{}, err
+	}
+	sigs := make([]string, 0, maxFrames)
+	for f := 0; f < maxFrames; f++ {
+		if err := e.RunFrames(1); err != nil {
+			return GameplayStart{}, err
+		}
+		sigs = append(sigs, pfSignature(e))
+	}
+	out := GameplayStart{StableFor: stable, Searched: maxFrames}
+	first := sigs[0]
+	for i := 1; i < len(sigs); i++ {
+		if sigs[i] == first {
+			continue
+		}
+		out.Changed = true
+		// Require the new picture to hold still, so a one-frame flash is not
+		// mistaken for the game starting.
+		end := i + stable
+		if end > len(sigs) {
+			break
+		}
+		steady := true
+		for j := i + 1; j < end; j++ {
+			if sigs[j] != sigs[i] {
+				steady = false
+				break
+			}
+		}
+		if steady {
+			out.Frame, out.Found = i+bootSettle, true
+			return out, nil
+		}
+	}
+	return out, nil
+}
+
+// pfSignature is a compact description of which cells the playfield drew.
+func pfSignature(e *emu.Emu) string {
+	img, top := e.Snapshot()
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
+	var sb strings.Builder
+	for y := 0; y < h; y++ {
+		runs, _, err := e.DecomposeRow(top + y)
+		if err != nil {
+			continue
+		}
+		for _, r := range runs {
+			if r.Element == "PF" {
+				fmt.Fprintf(&sb, "%d:%d-%d;", y, r.Clock, r.Clock+r.Len)
+			}
+		}
+	}
+	_ = w
+	return sb.String()
+}
+
 // allElems is the fixed object set (BG excluded from band diffs — it's the
 // negative space, already captured by the other elements' presence).
 var allElems = []string{"PF", "P0", "P1", "M0", "M1", "BL"}

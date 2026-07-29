@@ -767,7 +767,21 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   different game-state. Drive both to the **same scripted state/frame (behavmatch), then vismatch** — measures
   moving-object position fidelity in one shot. (Done manually via matched-state this session; automate.)
   Size: M. 〔TOOL-EVAL V5 / idea #3〕
-- **RL-4 — `-target-until-gameplay` auto frame-find.** Auto-detect the first frame where PF/sprites stabilise
+- **RL-4 — `-target-until-gameplay` auto frame-find — DONE.** `vismatch -target-until-gameplay` reports the
+  first frame whose PLAYFIELD both differs from the settled opening frame and then holds still, so
+  `-target-frames` / `-target-warmup` need not be hand-tuned. The playfield is the signal because sprites move
+  during play: a settled game still has a still background, while a title that auto-advances changes it once.
+  Graded against a frame known by construction — the new `roms/litmus/litmus_title_then_play.asm` switches
+  pattern at frame 30 and the detector returns 30. It must also NOT invent a transition (a static ROM reports
+  found=false at frame 0) and must not claim a settled picture without room to observe the stability it asks
+  for.
+  One measured correction on the way: the first frames are the machine booting, so a baseline taken there
+  differs from every later frame and reported a title on EVERY cartridge including ones with none. A two-frame
+  settle before the baseline fixes it.
+  On real cartridges: Outlaw settles at frame 7; Combat and Stampede report no settling point with
+  `playfield changed: false`, and the message says what that means — no title, or the game needs input to
+  start — rather than guessing.
+- **(original) RL-4 — `-target-until-gameplay` auto frame-find.** Auto-detect the first frame where PF/sprites stabilise
   (title exited) so the target frame count need not be hand-tuned. Complements RL-5. Size: S-M. 〔idea #4〕
 - **RL-7 — `framegen` field evaluation (validator track).** `framegen` self-calibrates VBLANK/vertical-shift/
   sprite-X — the −8 shift hand-iterated on Pizza Boy should be automatic. Evaluate as the visual-layer

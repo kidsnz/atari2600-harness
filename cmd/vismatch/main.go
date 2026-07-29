@@ -53,6 +53,9 @@ func main() {
 	region := flag.String("region", "122-185", "genpf: target scanline range of the PF element, LO-HI")
 	arenaTop := flag.Int("arena-top", 74, "genpf: absolute scanline of arena line 0 (scanline→arena-line offset)")
 	tableLen := flag.Int("table-len", 112, "genpf: CacLTbl/CacRTbl length in arena lines")
+	untilPlay := flag.Bool("target-until-gameplay", false, "report the first frame at which the TARGET's playfield settles after its opening screen, so -target-frames need not be hand-tuned")
+	untilFrames := flag.Int("until-gameplay-frames", 240, "how many frames to search for the settling point")
+	untilStable := flag.Int("until-gameplay-stable", 8, "frames the new picture must hold still before it counts as settled")
 	maxShift := flag.Int("max-shift", 24, "how far up/down to search for a global vertical offset between the two frames")
 	pfFormat := flag.String("format", "arena", "genpf output: 'arena' = Outlaw-style centre CacLTbl/CacRTbl; 'pf012' = full-width PF0tab/PF1tab/PF2tab for a playfield that spans the line")
 	flag.Parse()
@@ -104,6 +107,22 @@ func main() {
 		}
 		fmt.Println()
 		fmt.Print(vismatch.EmitCactusTables(bands, *tableLen))
+		os.Exit(0)
+	}
+
+	if *untilPlay {
+		gs, err := vismatch.FindGameplayStart(tBin, *spec, *untilFrames, *untilStable)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		if !gs.Found {
+			fmt.Printf("no settling point in %d frames (playfield changed: %v) — this cartridge may have "+
+				"no title screen, or it needs input to start\n", gs.Searched, gs.Changed)
+			os.Exit(1)
+		}
+		fmt.Printf("target's picture settles at frame %d (held still for %d frames) — use -target-frames %d\n",
+			gs.Frame, gs.StableFor, gs.Frame)
 		os.Exit(0)
 	}
 
