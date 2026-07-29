@@ -142,3 +142,153 @@ func emitRuns(b []byte) string {
 	}
 	return sb.String()
 }
+
+// --- full-width playfield (RL-1) ---
+
+// A generated table is only useful if it can express the playfield the game
+// actually has. The cactus generator above emits the two bytes Outlaw's centre
+// arena needs and nothing else, so a game whose playfield spans the full width —
+// four buildings across clk 4..143, say — cannot be described by it at all, even
+// though the measurement underneath already computes every byte. What was
+// missing was the emit, not the measurement.
+
+// PFMode is how the right half of the line is produced from the left.
+type PFMode string
+
+const (
+	// PFRepeat: CTRLPF D0=0, the right half repeats the left.
+	PFRepeat PFMode = "repeat"
+	// PFReflect: CTRLPF D0=1, the right half mirrors the left.
+	PFReflect PFMode = "reflect"
+	// PFAsymmetric: neither holds, so the kernel rewrites PF mid-line. The tables
+	// then need both halves, and the caller needs to know that the right-half
+	// writes have to land inside the line — which is a timing problem this cannot
+	// solve for them, so it is named rather than glossed over.
+	PFAsymmetric PFMode = "asymmetric"
+)
+
+// PFBand is a maximal run of scanlines whose playfield bytes are identical.
+type PFBand struct {
+	ScanlineLo, ScanlineHi int
+	Left                   pfHalf `json:"-"`
+	Right                  pfHalf `json:"-"`
+	PF0, PF1, PF2          byte   // left half (the only half a repeat/reflect ROM writes)
+	RPF0, RPF1, RPF2       byte   // right half, meaningful only when asymmetric
+	Spans                  string
+}
+
+// columns reads the 20 four-clock columns of one half as booleans.
+func columns(g *Grid, sl, base int) [20]bool {
+	var out [20]bool
+	y := sl - g.Top
+	for i := 0; i < 20; i++ {
+		clk := base + i*4
+		if y >= 0 && y < g.H && clk >= 0 && clk < g.W {
+			out[i] = g.Elem[y][clk] == "PF"
+		}
+	}
+	return out
+}
+
+// MeasurePF reads the target's playfield across the FULL line width over
+// [slLo,slHi] and returns its bands plus how the right half relates to the left.
+// Bands are maximal runs of consecutive scanlines with identical bytes, which is
+// what makes the emitted table a list of `ds N,$XX` runs rather than one entry
+// per line.
+func MeasurePF(g *Grid, slLo, slHi int) ([]PFBand, PFMode) {
+	repeatOK, reflectOK := true, true
+	var bands []PFBand
+	var cur *PFBand
+	for sl := slLo; sl <= slHi; sl++ {
+		l := columns(g, sl, 0)
+		r := columns(g, sl, 80)
+		for i := 0; i < 20; i++ {
+			if r[i] != l[i] {
+				repeatOK = false
+			}
+			if r[i] != l[19-i] {
+				reflectOK = false
+			}
+		}
+		lh := encodeHalf(func(c int) bool { return l[c/4] })
+		rh := encodeHalf(func(c int) bool { return r[c/4] })
+		if cur != nil && cur.Left == lh && cur.Right == rh {
+			cur.ScanlineHi = sl
+			continue
+		}
+		if cur != nil {
+			bands = append(bands, *cur)
+		}
+		cur = &PFBand{
+			ScanlineLo: sl, ScanlineHi: sl, Left: lh, Right: rh,
+			PF0: lh.PF0, PF1: lh.PF1, PF2: lh.PF2,
+			RPF0: rh.PF0, RPF1: rh.PF1, RPF2: rh.PF2,
+			Spans: elemSpans(g.Elem[sl-g.Top], "PF"),
+		}
+	}
+	if cur != nil {
+		bands = append(bands, *cur)
+	}
+	mode := PFAsymmetric
+	switch {
+	case repeatOK:
+		mode = PFRepeat
+	case reflectOK:
+		mode = PFReflect
+	}
+	return bands, mode
+}
+
+// EmitPFTables turns measured bands into paste-ready DASM: PF0tab/PF1tab/PF2tab
+// indexed by (scanline - slLo), as `ds N,$XX` runs. In asymmetric mode the
+// right-half tables are emitted too, with a note that landing them inside the
+// line is a timing problem the generator cannot solve.
+func EmitPFTables(bands []PFBand, mode PFMode, slLo, slHi int) string {
+	n := slHi - slLo + 1
+	if n < 1 || len(bands) == 0 {
+		return "; no playfield measured in the requested scanline range\n"
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "; playfield measured from the target, scanlines %d..%d (%d lines, %d bands)\n",
+		slLo, slHi, n, len(bands))
+	fmt.Fprintf(&sb, "; right half is %s of the left\n", mode)
+	switch mode {
+	case PFRepeat:
+		sb.WriteString("; CTRLPF D0 = 0 (repeat)\n")
+	case PFReflect:
+		sb.WriteString("; CTRLPF D0 = 1 (reflect)\n")
+	default:
+		sb.WriteString("; NEITHER repeat nor reflect: the target rewrites PF mid-line. The right-half\n" +
+			"; tables below are what it draws, but getting those writes to land inside the visible\n" +
+			"; line is a cycle-budget problem this generator does not solve — see prove_line_budget\n" +
+			"; and beam_intervals.\n")
+	}
+	emit := func(name string, pick func(PFBand) byte) {
+		vals := make([]byte, n)
+		for _, b := range bands {
+			for sl := b.ScanlineLo; sl <= b.ScanlineHi; sl++ {
+				if i := sl - slLo; i >= 0 && i < n {
+					vals[i] = pick(b)
+				}
+			}
+		}
+		fmt.Fprintf(&sb, "%s:\n", name)
+		for i := 0; i < n; {
+			j := i
+			for j < n && vals[j] == vals[i] {
+				j++
+			}
+			fmt.Fprintf(&sb, "        ds %d, $%02X\n", j-i, vals[i])
+			i = j
+		}
+	}
+	emit("PF0tab", func(b PFBand) byte { return b.PF0 })
+	emit("PF1tab", func(b PFBand) byte { return b.PF1 })
+	emit("PF2tab", func(b PFBand) byte { return b.PF2 })
+	if mode == PFAsymmetric {
+		emit("PF0Rtab", func(b PFBand) byte { return b.RPF0 })
+		emit("PF1Rtab", func(b PFBand) byte { return b.RPF1 })
+		emit("PF2Rtab", func(b PFBand) byte { return b.RPF2 })
+	}
+	return sb.String()
+}

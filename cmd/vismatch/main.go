@@ -53,6 +53,7 @@ func main() {
 	region := flag.String("region", "122-185", "genpf: target scanline range of the PF element, LO-HI")
 	arenaTop := flag.Int("arena-top", 74, "genpf: absolute scanline of arena line 0 (scanline→arena-line offset)")
 	tableLen := flag.Int("table-len", 112, "genpf: CacLTbl/CacRTbl length in arena lines")
+	pfFormat := flag.String("format", "arena", "genpf output: 'arena' = Outlaw-style centre CacLTbl/CacRTbl; 'pf012' = full-width PF0tab/PF1tab/PF2tab for a playfield that spans the line")
 	flag.Parse()
 	if *target == "" {
 		fmt.Fprintln(os.Stderr, "usage: vismatch -target ref.bin -mine build.asm [-target-reset] [-elem PF] [-diff out.png]")
@@ -77,6 +78,21 @@ func main() {
 		if _, err := fmt.Sscanf(*region, "%d-%d", &lo, &hi); err != nil {
 			fmt.Fprintln(os.Stderr, "bad -region (want LO-HI):", err)
 			os.Exit(2)
+		}
+		if *pfFormat == "pf012" {
+			// Full-width playfield: the measurement below already computes every PF
+			// byte; the Outlaw path just throws four of the six away.
+			bands, mode := vismatch.MeasurePF(tg, lo, hi)
+			fmt.Printf("measured %d playfield bands (scanline %d-%d); right half is %s of the left\n",
+				len(bands), lo, hi, mode)
+			fmt.Printf("  %-11s %-5s %-5s %-5s %s\n", "scanline", "PF0", "PF1", "PF2", "PF clk-spans")
+			for _, b := range bands {
+				fmt.Printf("  %4d-%-6d $%02X   $%02X   $%02X   %s\n",
+					b.ScanlineLo, b.ScanlineHi, b.PF0, b.PF1, b.PF2, b.Spans)
+			}
+			fmt.Println()
+			fmt.Print(vismatch.EmitPFTables(bands, mode, lo, hi))
+			os.Exit(0)
 		}
 		bands := vismatch.MeasureCactus(tg, lo, hi, *arenaTop)
 		fmt.Printf("measured %d cactus bands (scanline %d-%d, arena-top %d):\n", len(bands), lo, hi, *arenaTop)
