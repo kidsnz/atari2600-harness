@@ -1764,6 +1764,42 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### OPEN: is the page-cross penalty resolved from the index range, or always charged? (2026-07-30)
+
+Raised while measuring the last of known-traps.md's named static traps, "bank-move misaligns
+code -> page-cross". The question turned out to be about the prover rather than about a linter,
+and it is **recorded unresolved** rather than guessed at.
+
+`absStates` is commented "S3: abstract state per site, for page-cross **precision**", and the
+audit says page-cross `+1` is handled by the abstract interpreter. Measured, it does not appear
+to vary with the address:
+
+A fixture kernel reads `lda Table,y` four times in one WSYNC region with `ldy #200` — a constant,
+so the target address is decidable. Moving `Table`:
+
+| `Table` at | `$F0xx + 200` | crosses a page? | `max_worst` |
+|---|---|---|---|
+| `$F100` | `$F1C8` | no | **35** |
+| `$F0F8` | `$F1C0` | yes | **35** |
+| `$F130` | `$F1F8` | no | **35** |
+| `$F138` | `$F200` | yes | **35** |
+
+Four reads, so a precise model should differ by 4 cycles between the crossing and non-crossing
+layouts. Hand-counting the region gives ~30 without the penalty and ~34 with it, and the reported
+35 sits at the charged end — **consistent with the penalty being applied unconditionally, which is
+SOUND (an over-approximation) but not what "precision" claims**. The alternative reading, that the
+penalty is never charged, would be an under-approximation and the direction this package forbids,
+so the difference matters and the two are not distinguishable from the number alone.
+
+Not resolved here because the region carrying `max_worst` did not appear in `Report.Lines` under a
+`worst == max_worst` filter, so the per-instruction path was not read — the next step is to dump
+the worst path for that region and look at the `cyc` charged to each `lda Table,y`.
+
+**Separately measured and clean:** shifting each of the 31 technique kernels by 1, 2 and 3 bytes
+(`ds N` after the first `ORG`, verified to change the assembled image — three distinct SHA-1s at
+the same 4096 bytes) leaves `max_worst` **unchanged on all 31**. So no corpus kernel is alignment-
+fragile today, whichever way the question above resolves.
+
 ### 38 of the 95 scenarios were never run by any gate (2026-07-30)
 
 Found by widening the orphan question from "is this ROM referenced by anything" to "is this
