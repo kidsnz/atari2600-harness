@@ -1794,9 +1794,22 @@ helper that silently advances the emulator would be a trap of its own. Negative 
 refusal makes attract mode read as live; removing the final restore is caught as "the check advanced
 the emulator it was asked about".
 
-**Still open:** nothing calls this yet. The tools that read positions (`spritey`, `read_motion`,
-`ObjectYExtent`) do not require it, so the trap remains available to the next caller. Wiring it into
-the measurement entry points, and exposing it over MCP, is the follow-up.
+**★WIRED the same day.** `set_input` now runs the probe whenever a joystick direction or fire is
+**held** — not on a release, a centre, a paddle or a panel switch, where the question is meaningless —
+and returns `responds_to_input` plus the reason. Attached to the call that OPENS the trap rather than
+offered as an option, because the caller who needs it is exactly the one who will not think to ask.
+Measured cost ~0.3s per held input; side-effect free (the probe restores the machine, pinned by a test).
+
+`cmd/harness` had **no test at all** before this; `TestSetInputReportsLiveness` is its first, and it
+checks both directions — a held direction must carry a verdict, a release and a panel switch must not.
+Negative control: removing the wiring reports "a held direction came back with no liveness verdict —
+the trap is open again". The first version of that test was itself wrong: it pressed and released RESET
+with no frames in between, so the switch never registered and it "proved" the game was still dead after
+reset. Tenth instrument error of the day, caught by the test disagreeing with the emu-level one.
+
+**Requires an MCP reconnect** to reach the running session: `bin/harness` rebuilt and smoke-tested
+(`initialize OK 1.117.0`, 12 tools) per the standing rule of never asking for a reconnect without one.
+`spritey` / `read_motion` still do not require liveness — only `set_input` reports it.
 
 ### The shadowed branches, decided: unit-witness the logic, keep the code, record the reachability gap (2026-07-30)
 

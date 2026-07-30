@@ -745,6 +745,20 @@ type SetInputIn struct {
 }
 type SetInputOut struct {
 	Coords Coords `json:"coords"`
+	// Responds/Liveness answer the question that every measurement taken after an
+	// input should have asked first: is the program reacting at all?
+	//
+	// A cartridge in attract mode does not error and does not look stuck — it hands
+	// back a stable, plausible constant for as long as you keep reading. Measured on
+	// Outlaw: y_top pinned at 101 and x at 7 for hundreds of frames, and three
+	// separate measurements of its gunman were taken in that state in one day. A
+	// confident constant survives review in a way an error never would.
+	//
+	// Reported here rather than left to the caller to request, because the caller
+	// who needs it is exactly the one who will not think to ask. Skipped for
+	// releases and panel switches, where the question is meaningless.
+	Responds *bool  `json:"responds_to_input,omitempty"`
+	Liveness string `json:"liveness,omitempty"`
 }
 
 func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn) (*mcp.CallToolResult, SetInputOut, error) {
@@ -769,7 +783,21 @@ func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn
 			return nil, SetInputOut{}, err
 		}
 	}
-	return nil, SetInputOut{Coords: coordsOf(e)}, nil
+	out := SetInputOut{Coords: coordsOf(e)}
+	// Only a HELD joystick direction makes the question meaningful: a release, a
+	// centre, a paddle move or a panel switch has nothing to probe.
+	switch in.Action {
+	case "left", "right", "up", "down", "fire":
+		if in.Pressed {
+			// 20 frames each way. Measured cost ~0.3s, against a trap that has cost
+			// three wrong measurements. Side-effect free: RespondsToInput restores
+			// the machine, and internal/emu tests pin that it does.
+			if live, why, lerr := e.RespondsToInput(in.Player, in.Action, 20); lerr == nil {
+				out.Responds, out.Liveness = &live, why
+			}
+		}
+	}
+	return nil, out, nil
 }
 
 // --- peek / poke ---
