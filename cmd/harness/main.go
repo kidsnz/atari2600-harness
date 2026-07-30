@@ -572,7 +572,7 @@ func handleReadCollisions(ctx context.Context, req *mcp.CallToolRequest, _ struc
 // --- read_row（playfield 点灯列 / per-scanline 色を数値で読む）---
 
 type ReadRowIn struct {
-	Scanline int `json:"scanline" jsonschema:"visible scanline (0-based, same y as the annotated grid)"`
+	Scanline int `json:"scanline" jsonschema:"ABSOLUTE scanline — the y label on the annotated grid, NOT 0-based from the top of the visible area. NTSC accepts roughly 29..242; scanline=0 is an error, and an off-by-visibleTop request succeeds silently and returns the wrong row"`
 }
 type ReadRowOut struct {
 	Scanline int          `json:"scanline"`
@@ -604,7 +604,7 @@ func handleReadRow(ctx context.Context, req *mcp.CallToolRequest, in ReadRowIn) 
 // --- decompose_row（各ピクセルを "どの TIA オブジェクトが描いたか" で分解。AT-5）---
 
 type DecomposeRowIn struct {
-	Scanline int `json:"scanline" jsonschema:"visible scanline (0-based, same y as read_row / the annotated grid)"`
+	Scanline int `json:"scanline" jsonschema:"ABSOLUTE scanline — same coordinate as read_row and the annotated grid y label, NOT 0-based from the top of the visible area. NTSC accepts roughly 29..242"`
 }
 type DecomposeRowOut struct {
 	Scanline int           `json:"scanline"`
