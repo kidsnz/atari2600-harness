@@ -1764,6 +1764,44 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### TD-* — All 38 MCP tool descriptions audited against their handlers: 8 disagree (2026-07-30)
+
+Three instances of "the tool's description does not match what the tool does" were found by hand in two
+days — `timinglint` reading 0 of 133 instructions while reporting nothing, `spritey` advertising only the
+Y half of a trajectory that always carried X, and then the *repair* of that one landing on the field tag
+while leaving the tool's own Description saying Y-only. Three hand-found instances of a class is the point
+at which you stop finding them by hand. All 38 tools were sharded across parallel readers, each comparing
+the shipped Description and jsonschema tags against the handler and the packages it calls; every candidate
+then went to an independent skeptic instructed to refute it and to default to refuted when unsure.
+
+**10 candidates → 8 confirmed, 2 killed.** Two of the killed ones matter as much as the survivors: a
+`read_cycles` finding whose harm argument ran backwards, and a `set_input` finding claiming the liveness
+verdict is unadvertised when it is in the same tool definition. Both were killed by a verifier who built
+the server and read the live wire schema rather than the source — which is the standard the whole sweep
+was held to.
+
+| Tool | The description says | The code does | Class |
+|---|---|---|---|
+| `step_scanline` | "CPU cycles consumed across that scanline" | `TotalCycles()` delta, which **excludes WSYNC stall cycles** (`emu.go:142,144,159`). Measured: `cycles_consumed=8` on twelve consecutive 76-cycle lines of `smoke.bin` | wrong measurement |
+| `read_row` / `decompose_row` | tag: "visible scanline (**0-based**…)" | **Absolute** scanline; accepted range measured 29..242. `emu.go:1355` already records that "0起点" was the error and the fix landed on the Go comment only. `decompose_row`'s own Description says "absolute" while its own tag says 0-based | silent off-by-`visibleTop` |
+| `breakif` | "beam reaches this color clock (**0-227**)" | Compared against `GetCoords().Clock` = **−68..159**; 160..227 is unreachable, so the call silently runs to `max_frames` and returns `halted=false` | half the domain is dead |
+| `assert_line_budget` | "line_cycles (machine cycles it consumed)" | `lines * 76` (`emu.go:1683`) — a scanline delta, **always a multiple of 76**, never measured | invented arithmetic |
+| `beam_intervals` | min/max "same coordinates as read_row: −68..159" | `clockAt` folds modulo 228, so a window past the line end comes back **inverted** (min > max) with `crosses_line=false` | wrong measurement |
+| `beamtrace` | "trace `frames` frames and return, per scanline, every TIA write" | Traces N frames, then **keeps only the first** (`frs[0]`), while still advancing the emulator N frames irreversibly | pays N, returns 1 |
+| `read_audio` | "control, freq, volume … verify sound numerically" | Also returns **`note0`/`note1` = {note, cents}**, the only register→pitch conversion in the whole tool surface, mentioned nowhere | hidden capability |
+| `analyze_image` | "one screenshot is one frame of truth (flicker objects appear partially)" | Accepts **`paths[]`** and runs the multi-frame pipeline (static/dynamic split, union tracks, flicker) | the description **denies** the capability a flicker-hunter searches for |
+
+Two were re-verified by hand before any were acted on, because a sweep that trusts its own agents is the
+same failure one level up: `read_row`'s tag at `main.go:575`/`:607` and `assert_line_budget`'s
+`lines * 76` at `emu.go:1683` were both read directly. Both hold.
+
+**The shape worth keeping.** Six of the eight are `misleads-into-wrong-measurement` and two are
+`hides-an-existing-capability`, and the second kind cost real time this week: two separate attempts to
+measure a horizontal trajectory were hand-rolled against the wrong tool because the right one did not say
+it could do it. A description is part of the tool. An unstated capability is an absent one.
+
+Fixes land one tool at a time, each verified against the shipped schema, not the source.
+
 ### "Hold the input, then read" does not measure a clamp — a second confident-constant trap (2026-07-30)
 
 Found while settling a disputed measurement, minutes after wiring the liveness check, and it is the
