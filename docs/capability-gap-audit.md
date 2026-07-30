@@ -1764,6 +1764,30 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The neighbourhood of that bug, swept: 1 defect, 3 paths measured correct (2026-07-30)
+
+After fixing `pagePenalty` the same class of error was looked for around it, on the principle
+that one under-approximation in a costing function is a reason to distrust its siblings. **Nothing
+further was found**, and the three checks are recorded because a measured zero is a result:
+
+1. **`PageSensitive` is right across all 256 opcodes.** 32 indexed opcodes carry it and every one
+   is a READ. **No WRITE carries it** — `sta abs,X` is 5 cycles crossing or not, so marking it
+   would over-charge. Every indexed opcode that does NOT carry it is explained: zero-page indexed
+   (cannot leave page 0), a write, or read-modify-write (which always pays the extra cycle, so
+   there is no conditional penalty to model). The first sweep flagged 52 "under-charged" opcodes
+   and every one of them was one of those three — the instrument, again, before the finding.
+2. **Branches are charged by the correct rule.** The CFG edge uses
+   `(in.next()>>8) != (in.branchTarget()>>8)` — target page against the page of the instruction
+   AFTER the branch, which is the hardware's own test — and takes the max of taken and not-taken.
+   `pagePenalty` excludes branches so the cycle is not charged twice.
+3. **The unknown paths stay conservative.** `(ind),Y`, an unknown index range, and a missing
+   abstract state all return `+1`, which over-approximates. Sound.
+
+`TestPageSensitiveTableIsWhatTheCostingAssumes` pins all of it, including the count of 32 — these
+are premises about the ENGINE's opcode table, so nothing else in this repo would notice them
+changing. Negative control: removing the branch exclusion from `pagePenalty` reports all 8
+branches as double-charged.
+
 ### RESOLVED: the page-cross penalty was never charged for a CONSTANT index — an under-approximation (2026-07-30)
 
 Raised while measuring the last of known-traps.md's named static traps, "bank-move misaligns
