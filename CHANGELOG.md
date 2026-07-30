@@ -595,6 +595,25 @@ is matched to the artifacts already produced rather than the other way round.
   is baked in as a design constraint (tournament matrix, not a scalar rank; opponent model = explicit
   parameter). Registration only — implementation is a separate approval.
 
+## [1.105.0] - 2026-07-21
+
+> **★backfilled 2026-07-30 from the commit diff.** This version was tagged (`aab7ab7`) and shipped with
+> **no CHANGELOG entry at all** — the gap was found by counting 170 tags against 174 released sections.
+> Everything below is read off the diff, which is fact. **The rationale is not recorded**: nobody wrote
+> down why it was added at that moment, and inventing one after the fact would put a sentence in this
+> file that nothing supports. Left blank deliberately.
+
+### Added
+- **`read_ram_trace` MCP tool** (`cmd/harness/main.go`, +61/−1, one file). Traces **1–16 RAM addresses**
+  (`$80`–`$FF`) over **1–4000 frames** (default 60) and returns `traces[i][f]` — the per-frame value of
+  each address, indexed from the call. Out-of-range addresses, an empty list, more than 16 addresses and
+  a frame count outside 1–4000 are each rejected by name.
+- It **ADVANCES the emulator** by `frames`, and input set with `set_input` persists across the trace —
+  both stated in the tool's own description, so a caller is not surprised by the side effect.
+- Purpose per that description: collapse a manual `step_frame` + `peek` loop into one call, to measure
+  **as numbers** how a byte evolves — a tank's X/Y, an AI mode or timer, a score, frames-to-escape a
+  region, a decay curve, a stuck oscillation.
+
 ## [1.103.0] - 2026-07-03
 
 Interactive rollout of the two PONG-campaign capabilities (backlog PONG-C1/C2), live-proven on the real
