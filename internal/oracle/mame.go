@@ -9,10 +9,13 @@ import (
 	"strings"
 )
 
-// Mame is the MAME oracle (VV-6): a genuinely independent, FULLY HEADLESS third
-// emulator (unlike the Stella oracle, which needs a human keypress). It runs the
-// a2600 driver with -video none and a lua autoboot script that dumps RAM after N
-// frames, catching corners both Gopher2600 and Stella might share.
+// Mame is the MAME oracle (VV-6): a genuinely independent third emulator (unlike
+// the Stella oracle, which needs a human keypress). It runs the a2600 driver with a
+// lua autoboot script that dumps RAM after N frames, catching corners both
+// Gopher2600 and Stella might share.
+//
+// It is headless, but NOT because of -video none: see the environment set in
+// DumpRAM and TestMameRunsHeadless for what that option does and does not do.
 type Mame struct{ Exe string } // path to the mame binary; "" = look up "mame" on PATH
 
 // MameAvailable reports whether a MAME binary can be found (for test gating).
@@ -29,6 +32,12 @@ func mameExe(m Mame) (string, error) {
 }
 
 func (Mame) Name() string { return "mame" }
+
+// headlessEnv is what actually keeps MAME off the screen. Kept as a package
+// variable so a test can assert it is still applied: the failure it prevents is
+// invisible in the oracle's own output (the RAM dump is identical either way), so
+// nothing else would notice it coming back.
+var headlessEnv = []string{"SDL_VIDEODRIVER=dummy", "SDL_AUDIODRIVER=dummy"}
 
 // luaTemplate dumps RAM $80-$FF to OUTPATH after %d frames, then exits.
 const luaTemplate = `local count = 0
@@ -76,6 +85,18 @@ func (m Mame) DumpRAM(romPath string, frames int) (RAMDump, error) {
 		"-seconds_to_run", strconv.Itoa(secs),
 	)
 	cmd.Dir = dir // keep MAME's cfg/nvram scratch out of the repo
+	// -video none is NOT enough to keep this off the screen, which is the opposite of
+	// what the doc comment above used to claim. Measured on MAME 0.288 (SDL3, macOS):
+	// a single DumpRAM connects to `com.apple.dock.fullscreen`, creates an SDL3Window
+	// plus an NSToolbarFullScreenWindow and orders it front — 10 AppKit window events
+	// per call. On a machine whose terminal is a full-screen Space that yanks the
+	// display to another Space and back, once per oracle call, and this oracle runs
+	// from `go test ./...`. -sound none likewise still started MIDIServer.
+	//
+	// SDL decides whether to touch the display server BEFORE MAME's own options are
+	// read, so the fix has to be in the environment: the dummy drivers make SDL
+	// initialise no video and no audio backend at all.
+	cmd.Env = append(os.Environ(), headlessEnv...)
 	if outBytes, err := cmd.CombinedOutput(); err != nil {
 		// MAME often exits non-zero on -seconds_to_run; only fail if no dump appeared.
 		if _, statErr := os.Stat(out); statErr != nil {
