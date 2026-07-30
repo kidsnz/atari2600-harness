@@ -8,7 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+- **`spritey`'s description advertised half of what the tool returns.** Its multi-frame mode was documented
+  as returning "the per-frame Y trajectory", but every `SpriteYSample` has carried `X` (HmovedPixel) since
+  the tool existed. Someone looking for a HORIZONTAL trajectory therefore did not find the tool that already
+  had one. Measured cost on 2026-07-30: both attempts to pin down Outlaw's horizontal clamp were hand-rolled
+  against `read_tia` instead, and one of them read the position once after holding an input for 700 frames —
+  long enough for the round to end and the sprite to be reset — producing a confident, stable, wrong number.
+  The description now names the X trajectory and warns against the single late read. No behaviour change.
 
 ## [1.117.0] - 2026-07-30
 

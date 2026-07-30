@@ -677,7 +677,7 @@ func handleReadMotion(ctx context.Context, req *mcp.CallToolRequest, in ReadMoti
 
 type SpriteYIn struct {
 	Object string `json:"object,omitempty" jsonschema:"object: P0 M0 P1 M1 BL (default M0)"`
-	Frames int    `json:"frames,omitempty" jsonschema:"samples to return (default 1 = current frame only, no advance). >1 ADVANCES the emulator frames-1 steps and returns the per-frame Y trajectory — trace a bullet's ricochet (y_top rises then falls at a bounce) as numbers"`
+	Frames int    `json:"frames,omitempty" jsonschema:"samples to return (default 1 = current frame only, no advance). >1 ADVANCES the emulator frames-1 steps and returns the per-frame trajectory of BOTH X and Y — trace a bullet's ricochet (y_top rises then falls at a bounce) or watch X climb and PLATEAU at a horizontal clamp, as numbers. Prefer this over a single late read_tia: a position read once after holding an input for a long time measures wherever the GAME has moved on to (a round can end and reset the sprite), not the limit you were looking for"`
 }
 type SpriteYSample struct {
 	Frame   int  `json:"frame"`
@@ -695,6 +695,13 @@ type SpriteYOut struct {
 
 var spriteYIndex = map[string]int{"P0": 0, "M0": 1, "P1": 2, "M1": 3, "BL": 4}
 
+// NOTE on the description above. Every sample carries X as well as Y, and has since
+// this tool existed — but the multi-frame text advertised only "the per-frame Y
+// trajectory", so a reader looking for a HORIZONTAL trajectory did not find the tool
+// that already had one. Measured cost of that omission on 2026-07-30: two separate
+// attempts to find Outlaw's horizontal clamp were hand-rolled with read_tia instead,
+// and one of them read once after 700 held frames and got a number from a later game
+// state (the round had ended and the gunman was back at his start).
 func handleSpriteY(ctx context.Context, req *mcp.CallToolRequest, in SpriteYIn) (*mcp.CallToolResult, SpriteYOut, error) {
 	mu.Lock()
 	defer mu.Unlock()
