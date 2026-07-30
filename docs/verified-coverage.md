@@ -3,9 +3,21 @@
 The harness's credibility comes from **numeric verification on the embedded Gopher2600 emulator**, not
 assertion. Every behavior below is exercised by a litmus ROM under `roms/litmus/`, read back numerically
 (`read_tia` / `read_tia_registers` / `read_row` / `read_collisions` / `read_audio` / cycle counters), and
-locked for regression by a scenario under `roms/litmus/scenarios/` (run in CI on every push).
+locked for regression by **a scenario under `roms/litmus/scenarios/` or a Go test** — both run in CI on
+every push.
 
-Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios/<x>.json` (golden where noted).
+> **★corrected 2026-07-30 (measured).** This paragraph used to say "locked for regression by a scenario",
+> full stop. Counted against the tree: of the **35** ROMs this table names, **28 are driven by a scenario and
+> 7 by a Go test** — `litmus_color`, `litmus_cycles`, `litmus_hmove`, `litmus_overrun`, `litmus_pf`,
+> `litmus_pos`, `motion_stutter`. Nothing here is unguarded; the sentence describing how was wrong for 20% of
+> its own table. `scripts/check_wiring.py` now fails if this table names a ROM that does not exist or that
+> nothing runs, so a row cannot outlive its evidence.
+>
+> Two of the counts underneath were also wrong and are corrected in place: `litmus_cycles` has no fixed frame
+> length, and the coarse-adjust table's DELAY=0 row.
+
+Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios/<x>.json` (golden where
+noted); a scenario's file name does not always match its ROM (`litmus_48px` is driven by `p48.json`).
 
 ## Frame & timing
 | Behavior | ROM | Evidence |

@@ -4,6 +4,7 @@
 検査は2本立て:
   ① docs/*.md が入口（CLAUDE.md routing / authoring-protocol.md）から辿れるか。
   ② roms/litmus/*.asm が「回帰の網」に入っているか＝シナリオ or コード/テストから参照されているか。
+  ③ docs/verified-coverage.md が名指しする ROM が実在し、②の網に入っているか。
 
 ②の理由（2026-07-30 実測）: litmus は 91 本あり、42 本にシナリオが無い。うち 40 本は Go テストが
 直接使っているので健全だが、**2 本（cb_roll / litmus_color）はどこからも参照されていなかった**。
@@ -20,6 +21,7 @@ cb_roll はその間に主張が腐った——「cb_clean と画素完全一致
 """
 import glob
 import os
+import re
 import sys
 
 HARNESS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -70,6 +72,31 @@ def litmus_orphans():
     return orphans, len(asms), via_scenario, via_code
 
 
+def coverage_doc_roms():
+    """docs/verified-coverage.md が名指しする litmus ROM を返す（表の 2 列目）。
+
+    この表は冒頭で「全項目が litmus ROM で検証され、シナリオで回帰固定され、push ごとに CI で
+    走る」と断言している。実測（2026-07-30）では 35 本中 7 本がシナリオではなく Go テストで
+    守られていた——無防備な項目は 0 だったが、断言のほうが事実と違っていた。ここが検査するのは
+    「表が名指しした ROM が実在し、②の網に入っていること」＝将来この表に、誰も走らせない ROM が
+    書き足されたら落ちる。
+    """
+    path = os.path.join(HARNESS, "docs", "verified-coverage.md")
+    if not os.path.isfile(path):
+        return []
+    out = []
+    for line in open(path, encoding="utf-8"):
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 3:
+            continue
+        m = re.fullmatch(r"`([a-z0-9_]+)`", cells[1])
+        if m:
+            out.append(m.group(1))
+    return sorted(set(out))
+
+
 def main():
     entry_text = ""
     for e in ENTRYPOINTS:
@@ -104,9 +131,24 @@ def main():
         print("header's claim (\"pixel-identical to cb_clean\") drifted to false — 1 of 192 rows differ.")
         sys.exit(1)
 
+    named = coverage_doc_roms()
+    missing = [r for r in named if not os.path.isfile(os.path.join(HARNESS, "roms", "litmus", r + ".asm"))]
+    unnetted = [r for r in named if "roms/litmus/" + r + ".asm" in lit]
+    if missing or unnetted:
+        print("VERIFIED-COVERAGE ORPHANS — docs/verified-coverage.md names ROMs that do not exist or that "
+              "nothing runs:")
+        for r in missing:
+            print("  ✗", r, "(no such ROM)")
+        for r in unnetted:
+            print("  ✗", r, "(exists, but nothing runs it)")
+        print("\nThe table's own opening says every behaviour in it is locked for regression. A row whose")
+        print("ROM nobody runs makes that sentence false for the reader who trusts it.")
+        sys.exit(1)
+
     print("wiring OK — every docs/*.md is reachable from an entrypoint (no orphaned knowledge).")
     print(f"litmus OK — {total} ROMs in the regression net: {via_scenario} via scenario, "
           f"{via_code} via a test or tool, 0 orphaned.")
+    print(f"verified-coverage OK — all {len(named)} ROMs the table names exist and are in the net.")
 
 
 if __name__ == "__main__":
