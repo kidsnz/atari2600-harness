@@ -2,12 +2,40 @@
   "rom": "roms/litmus/motion_xclamp.asm",
   "warmup_frames": 2,
   "checks": {
-    "ntsc_frame_lines": 262
+    "ntsc_frame_lines": 262,
+    "motion": {
+      "object": "P0",
+      "axis": "x",
+      "frames": 30,
+      "warmup": 3,
+      "max_jerk_rms": 0.5,
+      "min_span": 50
+    }
   },
   "asserts": [
-    {"at_frame": 0,   "field": "tia.player0.hmoved_pixel", "op": "==", "value": 15},
-    {"at_frame": 38,  "field": "tia.player0.hmoved_pixel", "op": "==", "value": 91},
-    {"at_frame": 117, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 91},
-    {"at_frame": 118, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 11}
+    {
+      "at_frame": 0,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 15
+    },
+    {
+      "at_frame": 38,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 91
+    },
+    {
+      "at_frame": 117,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 91
+    },
+    {
+      "at_frame": 118,
+      "field": "tia.player0.hmoved_pixel",
+      "op": "==",
+      "value": 11
+    }
   ]
 }

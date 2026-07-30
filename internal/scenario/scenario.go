@@ -146,6 +146,13 @@ type ScoreCheck struct {
 // the rendered position's 2nd difference; 0 = constant velocity) to stay <=
 // MaxJerkRMS. Catches a judder/stutter regression. Track over a window where the
 // object moves on a uniform background; axis "x" (HmovedPixel) is always exact.
+//
+// A smoothness gate ALONE certifies nothing, and this was measured rather than
+// argued: jerk_rms is 0 for constant velocity and also 0 for an object that never
+// moves, so `{"axis":"x","max_jerk_rms":0.5}` PASSES on litmus_pos, whose P0 is
+// pinned at one X for the entire run. Set MinSpan to say how far the object is
+// supposed to travel; the measured span is printed either way, so a scenario that
+// has been quietly gating a frozen object shows it in its own output.
 type MotionCheck struct {
 	Object     string  `json:"object"`               // P0 M0 P1 M1 BL
 	Axis       string  `json:"axis,omitempty"`       // "top" (rendered vertical, default) or "x"
@@ -154,6 +161,7 @@ type MotionCheck struct {
 	YTop       int     `json:"y_top,omitempty"`      // scanline search window (grid-y)
 	YBot       int     `json:"y_bot,omitempty"`      // default 260
 	MaxJerkRMS float64 `json:"max_jerk_rms"`         // gate: jerk_rms must be <= this
+	MinSpan    int     `json:"min_span,omitempty"`   // gate: max(pos)-min(pos) must be >= this (0 = not gated, and then smoothness alone proves nothing)
 }
 
 // Scenario は 1 本のシナリオ定義。
@@ -711,14 +719,23 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			if err != nil {
 				return nil, err
 			}
-			jerk, axis := tr.Top.JerkRMS, "top"
+			st, axis := tr.Top, "top"
 			if mc.Axis == "x" {
-				jerk, axis = tr.X.JerkRMS, "x"
+				st, axis = tr.X, "x"
 			}
-			ok := jerk <= mc.MaxJerkRMS
+			jerk := st.JerkRMS
+			// The span is reported unconditionally. A gate on smoothness alone passes
+			// on an object that never moved, so the distance travelled has to be
+			// visible in the output even when nobody thought to gate it.
+			span := "span %d"
+			if mc.MinSpan > 0 {
+				span = fmt.Sprintf("span %%d >= %d", mc.MinSpan)
+			}
+			ok := jerk <= mc.MaxJerkRMS && st.Span >= mc.MinSpan
 			res.Asserts = append(res.Asserts, AssertResult{
-				Desc: fmt.Sprintf("motion %s.%s jerk_rms %.3g <= %.3g (missing %d)", mc.Object, axis, jerk, mc.MaxJerkRMS, tr.Missing),
-				Got:  int64(math.Round(jerk * 1000)), Pass: ok})
+				Desc: fmt.Sprintf("motion %s.%s jerk_rms %.3g <= %.3g, "+span+" (missing %d)",
+					mc.Object, axis, jerk, mc.MaxJerkRMS, st.Span, tr.Missing),
+				Got: int64(math.Round(jerk * 1000)), Pass: ok})
 			if !ok {
 				res.Pass = false
 			}

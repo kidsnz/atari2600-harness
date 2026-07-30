@@ -28,6 +28,14 @@ type Stats struct {
 	MaxStep   int     `json:"max_step"`  // max |velocity| (largest single-frame move)
 	MaxAccel  int     `json:"max_accel"` // max |accel| (largest velocity change = a snap)
 	Monotonic bool    `json:"monotonic"` // velocity never changes sign (no back-and-forth)
+
+	// Span is max(pos) - min(pos): how far the object actually travelled over the
+	// window. Smoothness alone cannot tell "moves at a constant speed" from "does
+	// not move": both have jerk_rms 0. Measured on litmus_pos, whose P0 is pinned
+	// at one X for the whole run, a jerk_rms <= 0.5 gate PASSES. Span is what
+	// distinguishes them, so a gate on smoothness needs to be paired with one on
+	// distance or it certifies nothing.
+	Span int `json:"span"`
 }
 
 // Analyze computes the smoothness stats of a position sequence.
@@ -53,6 +61,18 @@ func Analyze(pos []int) Stats {
 	}
 	if len(s.Accel) > 0 {
 		s.JerkRMS = math.Sqrt(sumsq / float64(len(s.Accel)))
+	}
+	if len(pos) > 0 {
+		lo, hi := pos[0], pos[0]
+		for _, p := range pos {
+			if p < lo {
+				lo = p
+			}
+			if p > hi {
+				hi = p
+			}
+		}
+		s.Span = hi - lo
 	}
 	s.Monotonic = monotonic(s.Velocity)
 	return s

@@ -24,6 +24,14 @@ versions follow [Semantic Versioning](https://semver.org/).
   situation I set up".
 
 ### Changed
+- **`checks.motion` certified nothing on its own, and now says so in its own output.** `jerk_rms` is the
+  RMS of the position's 2nd difference: 0 for constant velocity, and 0 for an object that never moves —
+  measured, `{"axis":"x","max_jerk_rms":0.5}` **PASSES on `litmus_pos`**, whose P0 is pinned at one X for
+  the whole run, so the judder regression the gate exists to catch and a completely dead kernel were
+  indistinguishable to it. `motion.Stats` now carries `span` = max(pos) − min(pos), the scenario check
+  **prints it unconditionally** (a scenario quietly gating a frozen object reports "span 0"), and the new
+  `min_span` gates it. Applied to both motion scenarios: `motion_glide` span 39 ≥ 30, `motion_xclamp` x
+  span 58 ≥ 50. Negative control: forcing `span` to 0 fails a genuinely gliding object.
 - **`beam_intervals`' `crosses_line` was wrong 81% of the time it spoke.** The flag was computed as
   `(minAbs+68)/228 != (maxAbs+68)/228`, which places the scanline boundary at clock 92 of each line
   instead of at the line's start — `MinAbs`/`MaxAbs` are already measured from a WSYNC, i.e. from a
