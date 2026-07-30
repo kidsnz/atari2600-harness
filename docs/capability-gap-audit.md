@@ -1764,6 +1764,38 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### Why the page-cross bug survived a passing gate: the branch had NO witness (2026-07-30)
+
+`TestProvenWorstIsNeverExceededOnCorpus` compares proven against measured on **228 regions
+across 31 ROMs** and passed the entire time the constant-index under-approximation was live. It
+had to: **no corpus ROM took the wrong branch.** An outcome gate cannot see a branch nothing
+reaches, and that is the general lesson, not a detail of this bug.
+
+Measured by counting which branch of `pagePenalty` each instruction takes, over 123 ROMs:
+
+| branch | hits | with `litmus_pagecross` removed |
+|---|---:|---:|
+| `not-sensitive-or-branch` | 23423 | 23423 |
+| `index-unknown` (-> +1, conservative) | 111 | 111 |
+| `indirect-or-other` (-> +1, conservative) | 51 | 51 |
+| `index-known-no-cross` (-> 0, **precise**) | 5 | **1** |
+| `index-known-CROSSES` (-> +1, **precise**) | **4** | **0** |
+| `state-unknown` (-> +1, conservative) | 0 | 0 |
+
+The bug lived in a branch with **zero** coverage, and the four hits it now has are the four reads
+of the litmus written to catch it. The two PRECISE branches are the ones worth guarding — every
+other branch returns the conservative `+1`, where a mistake over-approximates and is allowed.
+
+`TestEveryPagePenaltyBranchHasAWitness` classifies every instruction in the corpus by branch and
+**fails when either precise branch has no witness**. It also re-derives what `pagePenalty` should
+return from the same inputs and compares, so the classification cannot drift from the function it
+describes. Negative controls: removing `litmus_pagecross` fails with the branch named; restoring
+the old wrong condition reports 4 instructions whose classification no longer matches the
+function.
+
+`state-unknown` is still at 0 — never reached by any corpus ROM — but it returns the conservative
+`+1`, so a mistake there over-approximates. Recorded rather than guarded.
+
 ### The neighbourhood of that bug, swept: 1 defect, 3 paths measured correct (2026-07-30)
 
 After fixing `pagePenalty` the same class of error was looked for around it, on the principle
