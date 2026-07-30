@@ -1764,6 +1764,41 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The witness sweep, finished: 4 soundness functions, 1 real bug, 12 unwitnessed branches (2026-07-30)
+
+Last function: the blank-region classifier (`analyzeRegion`'s VSYNC/VBLANK test). It is the
+**best-covered of the four**, and one of its branches turns out to be carrying real weight:
+
+| branch | hits |
+|---|---:|
+| display off, but the region STORES to `$00`/`$01` -> **not** blank | **352** |
+| blank | 331 |
+| display on or unknown -> not blank | 249 |
+| no abstract state at the region start | 0 |
+
+The 352 is the finding. Without that second condition, **352 regions would have been skipped from the
+visible-line budget check** on the strength of the display being off at entry, while the region itself
+can turn the display back on inside itself. It fires more often than the blank verdict it guards. The
+single zero is the missing-state fallback, which treats the region as visible and therefore
+budget-checked — stricter, so a mistake there over-constrains.
+
+**Sweep total across the four functions:**
+
+| function | branches | unwitnessed | of those, refusals | real defect found |
+|---|---:|---:|---:|---|
+| `pagePenalty` | 6 | 1 (before the fix) | 0 | **yes — an under-approximation** |
+| `switchEdges` | 10 | 4 | 4 | no (one repair witnessed for the first time) |
+| `determineBound` | 12 | 4 | 4 | no (one proved unreachable) |
+| blank classifier | 4 | 1 | 1 | no |
+
+**One real bug, and it was in the only unwitnessed branch that was not a refusal.** That is the
+sweep's lesson in one line: an unwitnessed CONSERVATIVE branch can only fail by staying silent, but an
+unwitnessed PRECISE branch can be wrong in the forbidden direction and no outcome gate will see it.
+Rank future sweeps that way — precise branches first, refusals second.
+
+Twelve branches remain unwitnessed. Eleven are refusals; three of those were shown to be shadowed by a
+coarser guard that fires first, so they are plausibly dead. Filed above, not guessed at.
+
 ### `foldLoops`, and a PATTERN: fine-grained refusals are shadowed by coarser ones (2026-07-30)
 
 Fourth function through the witness method. Branch hits over 123 ROMs:
