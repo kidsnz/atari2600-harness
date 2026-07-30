@@ -47,6 +47,16 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **Four more descriptions made to match measured behaviour** (from the 38-tool sweep; no behaviour change).
+  `step_scanline` said "CPU cycles consumed across that scanline" for a figure that **excludes WSYNC stall
+  time** — measured 8 on twelve consecutive 76-cycle lines, so the remainder read as headroom that does not
+  exist. `assert_line_budget`'s `line_cycles` is `scanlines × 76`, a quantised figure and never a measured
+  count, so subtracting the budget from it yields a number of cycles to cut that means nothing.
+  `read_audio` returns `note0`/`note1` = {note, cents} and said so nowhere, although it is the only
+  register→pitch conversion in the whole tool surface. `analyze_image` told the reader "one screenshot is
+  one frame of truth (flicker objects appear partially)" while accepting `paths[]` and running a
+  multi-frame pipeline with an explicit flicker report — the description denied the one capability a
+  flicker-hunter would search for, and its three inputs shipped with **no descriptions at all** on the wire.
 - **`spritey`'s description advertised half of what the tool returns.** Its multi-frame mode was documented
   as returning "the per-frame Y trajectory", but every `SpriteYSample` has carried `X` (HmovedPixel) since
   the tool existed. Someone looking for a HORIZONTAL trajectory therefore did not find the tool that already
