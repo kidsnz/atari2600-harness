@@ -1764,6 +1764,31 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The shadowed branches, decided: unit-witness the logic, keep the code, record the reachability gap (2026-07-30)
+
+Two refusal branches were shown to be unreachable through any ROM this project can build, because a
+coarser guard always fires first. The question left open was whether to delete them. **Decided: keep,
+and witness them at the unit level instead**, because "no input reaches it" and "the logic is wrong"
+are different claims and only the first was established.
+
+`TestFoldLoopsRefusesABankSwitchInsideTheBody` builds the exact shape `foldLoops` looks for —
+`lda $FFF9` / `dex` / `bne` back to the header, with a two-bank hotspot table — and asserts the refusal.
+It checks its own premises first (the branch really targets the header; the planted access really
+reaches a hotspot) so it cannot pass for the wrong reason, and it finishes with the SAME loop minus the
+switching access, which must fold — otherwise the refusal would only prove that `foldLoops` rejects
+everything. Negative control: removing the refusal makes it fall through to
+"loop bound unknown (need a counted dex/dey…)", and the test names what was lost.
+
+**What this does and does not settle.** It settles that the branch is correct when reached. It does not
+make it reachable, and the test says so in place rather than reading as coverage. Deleting the branch
+was rejected: the coarse guards that currently shadow it are about the REGION (multiple back-edges, no
+WSYNC reached), not about bank switching, so a future change to region collection could expose this
+path with nothing behind it.
+
+The `determineBound` sibling (`dec: successor refusal`) is left as-is: it is shadowed the same way but
+its guard is a plain `return 0`, so a unit witness would assert only that a function returns zero — no
+information. Recorded as unverifiable rather than given a test that proves nothing.
+
 ### The witness sweep, finished: 4 soundness functions, 1 real bug, 12 unwitnessed branches (2026-07-30)
 
 Last function: the blank-region classifier (`analyzeRegion`'s VSYNC/VBLANK test). It is the
@@ -1829,8 +1854,10 @@ bank 0 of an F8 cartridge:
    start"**: the cross-bank edge sends the walk into bank 1, where it finds no WSYNC. Still 0.
 
 **This is the same shape as the `determineBound` finding above**, where `dec: successor refusal` proved
-unreachable because the region is refused at collection time. Two functions, three refusal branches,
-all shadowed by a coarser guard that fires first. Not a defect — the outcome is the same refusal — but
+unreachable because the region is refused at collection time. **★corrected 2026-07-30: TWO refusal
+branches, not three** — the earlier count treated the two failed construction attempts at the same
+`foldLoops` branch as separate branches. Two functions, two branches, each shadowed by a coarser
+guard that fires first. Not a defect — the outcome is the same refusal — but
 it means these branches are **unverifiable, and plausibly dead code**. Worth a deliberate pass later to
 decide whether the fine-grained checks earn their place or should be deleted in favour of the coarse
 ones they duplicate.
