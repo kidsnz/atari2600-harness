@@ -8,6 +8,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.117.0] - 2026-07-30
+
+**Release-hygiene cut.** Everything that had accumulated under `[Unreleased]` is versioned here as one
+**MINOR** release. It adds backward-compatible capability (new MCP tools and new `cmd/` tools), carries one
+prover **soundness fix** (a cycle-cost under-approximation in `cyclebound`), and adds tests and litmus ROMs.
+Not MAJOR: no exported Go API and no MCP tool was removed or re-signatured — the soundness fix changes the
+numbers `prove_line_budget` reports, not its contract, and that contract always was "a sound upper bound over
+all paths", so making it finally hold is a fix. Not PATCH: new functionality ships here. The number is
+`1.117.0` (not `1.108.0`) because `internal/version/version.go` already ships `const Harness = "1.117.0"`,
+and that constant is stamped into the MCP `serverInfo` and into `ramtrace` provenance headers — the CHANGELOG
+is matched to the artifacts already produced rather than the other way round.
+
+**Tag/CHANGELOG drift measured at this cut** — 170 tags vs 174 released sections:
+- `v1.104.0` / `v1.105.0` / `v1.106.0` / `v1.107.0` were **tagged but never given a `##` section**. Their
+  entries are folded in below and keep their inline `(v1.10x.0)` markers, so which work shipped when is not
+  lost. `v1.105.0` (`read_ram_trace`; tag at `aab7ab7`, 2026-07-21) has **no CHANGELOG text at all** — it is
+  recorded here as a known gap rather than reconstructed after the fact.
+- `1.108.0`–`1.115.0` were named inline inside `[Unreleased]` but were never sectioned and never tagged; they
+  ship here as part of `1.117.0`.
+- `1.80.0`–`1.102.0` (23 versions), plus `0.5.1` and `0.6.0`, have `##` sections but **no tag**. Deliberately
+  **not** tagged retroactively: a tag must point at the commit that shipped that version, and that mapping is
+  not recoverable from the CHANGELOG alone.
+- `1.74.0` and `1.116.0` were skipped entirely — no section, no tag, no mention anywhere.
+
 ### Added
 - **`cyclebound` proves a WSYNC-to-WSYNC region that CROSSES A BANK SWITCH** (SD-11, stage 3 of bank
   support). Stage 2 closed the DECODE over bank switches; the flow was still refused, so the region where a
@@ -1307,11 +1333,17 @@ includes the accumulated PONG-dogfooding items below (framesim normalization etc
   (DPC+/ARM/CDF data-exchange, Slick/Fast-Fetch kernels, wav2tia, INT2HEX/INT2BITS) logged as technique
   candidates. All sourced to mined blog entries.
 
-## [Unreleased]
-
-### Planned
-- Real game authoring on top of the 1.0 base (1.x).
+### Planned (historical — resolved; formerly a second `## [Unreleased]` heading)
+> This block was a stray **second** `## [Unreleased]` heading stranded here between 1.71.1 and 1.71.0. It
+> entered the file on 2026-06-10 in `f8ae33d` ("docs: English CHANGELOG"), was never cleared, and every later
+> release was prepended above it. Demoted to a dated note on 2026-07-30 so the file has exactly one
+> `[Unreleased]`. The three items are kept verbatim; all three had already shipped by the time this block was
+> buried:
+- Real game authoring on top of the 1.0 base (1.x). — delivered across the 1.x line.
 - Stella oracle v2 (TIA/pixel compare, full keystroke automation); Slocum note-table transcription for composing.
+  — Stella oracle v2 delivered in **1.54.0** (`stellacheck -pixels` / `-snap`, F-4 closed, hands-free via
+  `scripts/stella_oracle.sh`); Slocum note-table transcription delivered in **1.35.0**
+  (`pkg/audio.NoteFreq/FindNote` + `cmd/jingle`).
 
 ## [1.71.0] - 2026-06-15
 
