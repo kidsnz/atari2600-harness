@@ -38,13 +38,10 @@ MAX_LINES = 250
 # 上限の明示的な例外。**理由を書かないと通らない**（黙って緩めない）。
 # 借金は隠すのでなく grep できる形にする — roms 側の `@rom-write-ok` と同じ流儀。
 OVERSIZE_EXEMPT = {
-    "project-next-session-todo.md":
-        "322 lines / description: 8,361 chars on ONE line (2026-07-30 measured). The body holds 28 "
-        "dated handoffs back to 2026-06-17. It is NOT redundant: of 4 sampled sections, 2 "
-        "(PONG capstone 完成 / Combat v0.8.0) appear NOWHERE in STATUS.md, so trimming on the "
-        "assumption that STATUS.md is the canonical board would delete the only copy. The fix is to "
-        "move the history INTO STATUS.md first (completing the board), then cut here — real work, "
-        "not a line-count edit. Exempted with this reason rather than raising the cap for everyone.",
+    # 2026-07-30: 唯一の例外だった project-next-session-todo.md は解消済み（322 -> 34 行）。
+    # 履歴17節は memory/_archive/project-next-session-todo-history.md へ保管し、STATUS.md に
+    # 無かった3節は STATUS.md へ移設（20節すべての所在を1件ずつ確認・行方不明0）。8,361文字あった
+    # description は1行へ戻した。表を空で残すのは、次に超えたとき理由を書く場所を示すため。
 }
 
 # 正本ルール。ここは中身を薄くしてはいけない側。
