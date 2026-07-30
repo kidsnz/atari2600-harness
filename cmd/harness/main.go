@@ -642,8 +642,62 @@ type ReadMotionIn struct {
 	YBot   int    `json:"y_bot,omitempty" jsonschema:"scanline search window bottom (grid-y; default 260)"`
 }
 type ReadMotionOut struct {
-	Track  motion.Track `json:"track"`
-	Coords Coords       `json:"coords"`
+	Track     motion.Track `json:"track"`
+	Stillness *Stillness   `json:"stillness,omitempty"`
+	Coords    Coords       `json:"coords"`
+}
+
+// Stillness answers the question a position measurement should be asked before it is
+// believed: did anything move while it was being taken?
+//
+// It exists because of two failures a week apart, and it keeps them APART. A stuck
+// cartridge (attract mode, nothing started) hands back a stable, plausible number for as
+// long as you keep reading — three measurements of Outlaw's gunman were taken in that
+// state in one day. That is one failure. The other is a program that IS running while
+// the situation you set up has expired underneath you: hold "right" for 700 frames and
+// the round ends, so the position you read is the gunman back at his start.
+//
+// `set_input`'s liveness probe answers only the first, and it answers it by INJECTING an
+// input, which a measurement tool must not do. This is the non-invasive form: over the
+// window actually measured, how far did the object travel, and did any RAM byte change.
+//
+// Both numbers are FACTS, and the note deliberately draws no conclusion about the
+// program from them. The first version of this did — it called zero travel with
+// unchanged RAM "STUCK: the program is not running" — and it was measured wrong before
+// it shipped: litmus_pos and smoke run a full kernel, draw their sprite every frame, and
+// never write a byte of RAM after init, so a live ROM was confidently diagnosed as dead.
+// Whether a program is REACTING cannot be established without injecting an input, which
+// is why that question stays with `set_input` and not here.
+type Stillness struct {
+	XSpan      int    `json:"x_span"`      // max-min of the object's X over the window
+	YSpan      int    `json:"y_span"`      // same for the vertical reading
+	RAMChanged bool   `json:"ram_changed"` // any of $80-$FF differed from before the window
+	Note       string `json:"note,omitempty"`
+}
+
+// stillnessOf classifies a measurement window. ramBefore is the RAM as it was when the
+// window opened; the current machine state is the far end of it.
+func stillnessOf(e *emu.Emu, ramBefore [emu.RAMSize]uint8, frames, xSpan, ySpan int) *Stillness {
+	after, err := e.CurrentRAM()
+	if err != nil {
+		return nil
+	}
+	changed := after != ramBefore
+	s := &Stillness{XSpan: xSpan, YSpan: ySpan, RAMChanged: changed}
+	if xSpan == 0 && ySpan == 0 {
+		ram := "and no RAM byte changed either"
+		if changed {
+			ram = "though RAM did change, so something in the program moved on"
+		}
+		s.Note = fmt.Sprintf("CONSTANT: the object did not move across the %d frames measured, %s. "+
+			"Do not read that as 'it is clamped here'. It is equally consistent with the program not "+
+			"reacting to you at all, with the situation you set up having expired (a round can end and "+
+			"put the sprite back at its start), and with the window simply being in the wrong place. "+
+			"Only set_input's liveness probe answers whether the program reacts, and it has to inject "+
+			"an input to do it. ram_changed is a fact, not a verdict: litmus_pos and smoke run a full "+
+			"kernel and never write RAM after init.", frames, ram)
+	}
+	return s
 }
 
 func handleReadMotion(ctx context.Context, req *mcp.CallToolRequest, in ReadMotionIn) (*mcp.CallToolResult, ReadMotionOut, error) {
@@ -666,11 +720,16 @@ func handleReadMotion(ctx context.Context, req *mcp.CallToolRequest, in ReadMoti
 	if yBot == 0 {
 		yBot = 260
 	}
+	ramBefore, ramErr := e.CurrentRAM()
 	tr, err := motion.TrackObject(e, obj, frames, in.YTop, yBot)
 	if err != nil {
 		return nil, ReadMotionOut{}, err
 	}
-	return nil, ReadMotionOut{Track: tr, Coords: coordsOf(e)}, nil
+	out := ReadMotionOut{Track: tr, Coords: coordsOf(e)}
+	if ramErr == nil {
+		out.Stillness = stillnessOf(e, ramBefore, frames, tr.X.Span, tr.Top.Span)
+	}
+	return nil, out, nil
 }
 
 // --- spritey（オブジェクトの縦位置 Y を数値で。read_tia=Xのみ・read_motion top=小missile不可 の穴埋め。弾の軌道/リコシェを数値化）---
@@ -690,7 +749,12 @@ type SpriteYSample struct {
 type SpriteYOut struct {
 	Object  string          `json:"object"`
 	Samples []SpriteYSample `json:"samples"`
-	Coords  Coords          `json:"coords"`
+	// Stillness is present only for a multi-frame read: with frames=1 there is no
+	// window to have moved in, and the tool promises not to advance the machine to
+	// manufacture one. That absence is itself the honest answer — a single read
+	// cannot tell you whether what it measured was alive.
+	Stillness *Stillness `json:"stillness,omitempty"`
+	Coords    Coords     `json:"coords"`
 }
 
 var spriteYIndex = map[string]int{"P0": 0, "M0": 1, "P1": 2, "M1": 3, "BL": 4}
@@ -723,6 +787,8 @@ func handleSpriteY(ctx context.Context, req *mcp.CallToolRequest, in SpriteYIn) 
 		frames = 1
 	}
 	out := SpriteYOut{Object: obj}
+	ramBefore, ramErr := e.CurrentRAM()
+	xLo, xHi, yLo, yHi, seen := 0, 0, 0, 0, false
 	for f := 0; f < frames; f++ {
 		if f > 0 {
 			if _, err := e.StepFrame(); err != nil {
@@ -736,7 +802,20 @@ func handleSpriteY(ctx context.Context, req *mcp.CallToolRequest, in SpriteYIn) 
 		} else {
 			s.YTop, s.YBot, s.Height = -1, -1, 0
 		}
+		if present {
+			// Only frames where the object is actually drawn count towards travel:
+			// a not-present sample carries a stale X, and taking a span over those
+			// invents movement that never happened.
+			if !seen {
+				xLo, xHi, yLo, yHi, seen = s.X, s.X, s.YTop, s.YTop, true
+			}
+			xLo, xHi = min(xLo, s.X), max(xHi, s.X)
+			yLo, yHi = min(yLo, s.YTop), max(yHi, s.YTop)
+		}
 		out.Samples = append(out.Samples, s)
+	}
+	if frames > 1 && ramErr == nil {
+		out.Stillness = stillnessOf(e, ramBefore, frames, xHi-xLo, yHi-yLo)
 	}
 	out.Coords = coordsOf(e)
 	return nil, out, nil
@@ -1739,8 +1818,8 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "read_ram_trace", Description: "Trace up to 16 RAM addresses ($80-$FF) over N frames, returning each address's per-frame value time-series (traces[i][f]) — the read_motion of arbitrary game state. NOTE: ADVANCES the emulator N frames (input set via set_input sticks across the trace). Collapses a manual step_frame+peek loop into one call: measure as NUMBERS how a tank's X/Y, an AI mode/timer, a score, or any RAM byte evolves over time (e.g. frames-to-escape a region, a decay curve, a stuck oscillation) instead of hand-stepping."}, handleReadRAMTrace)
 	mcp.AddTool(server, &mcp.Tool{Name: "read_row", Description: "Read one visible scanline's pixel colors as run-length runs {clock,len,hex} across visible clock 0..159. Numerical readout for playfield lit-columns and per-scanline color (judge by data, not by eyeballing the screenshot)."}, handleReadRow)
 	mcp.AddTool(server, &mcp.Tool{Name: "decompose_row", Description: "Decompose one visible scanline into WHICH TIA OBJECT drew each pixel: run-length runs {clock,len,element} across visible clock 0..159, element in {BG,PF,P0,P1,M0,M1,BL}. The attribution sibling of read_row (colours) and beamtrace (register writes) — answers 'is this part of the picture playfield, a player, a missile, or the ball?'. Essential for reverse-engineering how a running ROM composes its screen (sprite vs missile vs ball vs playfield use per scanline). Same absolute scanline coordinate as read_row."}, handleDecomposeRow)
-	mcp.AddTool(server, &mcp.Tool{Name: "read_motion", Description: "Track a TIA object (P0/M0/P1/M1/BL) over N frames and report how smoothly it moves: per-frame velocity (1st difference), acceleration (2nd difference), and jerk_rms (RMS of the 2nd difference; 0 = constant velocity, high = judder/stutter). Tracks the exact horizontal HmovedPixel (x) and the rendered vertical top. Turns 'does it judder / ブルブル' into a number — automates the hand frame-by-frame trace. NOTE: ADVANCES the emulator N frames, so set up the state (serve/step) first; track the rendered top over a window where the object moves on a uniform background (x is always exact). For the exact vertical position of a small missile/ball (a bullet) — where the rendered-top scan latches onto a border — use spritey instead."}, handleReadMotion)
-	mcp.AddTool(server, &mcp.Tool{Name: "spritey", Description: "Numeric VERTICAL position of a TIA object (P0/M0/P1/M1/BL): its drawn scanline extent (y_top/y_bot/height in grid-y, same coord as read_row) + X (HmovedPixel), found by matching the object's OWN colour at its X column. Fills the gap read_tia (X only) and read_motion (rendered-top, unreliable for a 1-2px missile against a bordered playfield) leave. frames=1 (default) reports the CURRENT frame without advancing; frames>1 ADVANCES the emulator and returns the per-frame trajectory of BOTH axes — trace a bullet's ricochet (y_top rises then falls at each top/bottom bounce) or watch X climb and PLATEAU at a horizontal clamp, as numbers. Prefer the trajectory over a single late read of any position: read once after holding an input for a long time and you measure wherever the GAME has moved on to (a round can end and reset the sprite), not the limit you were looking for. present=false = disabled/off-screen. Caveat: matches by colour, so another same-colour object within ~8px right (e.g. a just-fired missile still overlapping its player) can widen the extent until they separate."}, handleSpriteY)
+	mcp.AddTool(server, &mcp.Tool{Name: "read_motion", Description: "Track a TIA object (P0/M0/P1/M1/BL) over N frames and report how smoothly it moves: per-frame velocity (1st difference), acceleration (2nd difference), and jerk_rms (RMS of the 2nd difference; 0 = constant velocity, high = judder/stutter). Tracks the exact horizontal HmovedPixel (x) and the rendered vertical top. Turns 'does it judder / ブルブル' into a number — automates the hand frame-by-frame trace. NOTE: ADVANCES the emulator N frames, so set up the state (serve/step) first; track the rendered top over a window where the object moves on a uniform background (x is always exact). Also returns `stillness`: the travel on each axis over the tracked window plus whether any RAM byte changed. A jerk_rms of 0 means constant velocity AND means the object never moved, so read the span before believing a smoothness verdict. For the exact vertical position of a small missile/ball (a bullet) — where the rendered-top scan latches onto a border — use spritey instead."}, handleReadMotion)
+	mcp.AddTool(server, &mcp.Tool{Name: "spritey", Description: "Numeric VERTICAL position of a TIA object (P0/M0/P1/M1/BL): its drawn scanline extent (y_top/y_bot/height in grid-y, same coord as read_row) + X (HmovedPixel), found by matching the object's OWN colour at its X column. Fills the gap read_tia (X only) and read_motion (rendered-top, unreliable for a 1-2px missile against a bordered playfield) leave. frames=1 (default) reports the CURRENT frame without advancing; frames>1 ADVANCES the emulator and returns the per-frame trajectory of BOTH axes — trace a bullet's ricochet (y_top rises then falls at each top/bottom bounce) or watch X climb and PLATEAU at a horizontal clamp, as numbers. Prefer the trajectory over a single late read of any position: read once after holding an input for a long time and you measure wherever the GAME has moved on to (a round can end and reset the sprite), not the limit you were looking for. present=false = disabled/off-screen. A multi-frame read also returns `stillness`: how far the object travelled on each axis over the window and whether any RAM byte changed. Both are facts, not a verdict — when the travel is 0 the reading is a CONSTANT, which is equally consistent with a clamp, with the program not reacting, and with the situation you set up having expired. frames=1 gets no stillness, because a single read has no window and this tool will not advance the machine to manufacture one. Caveat: matches by colour, so another same-colour object within ~8px right (e.g. a just-fired missile still overlapping its player) can widen the extent until they separate."}, handleSpriteY)
 	mcp.AddTool(server, &mcp.Tool{Name: "set_input", Description: "Inject controller input or a console panel switch (the headless input path; poke does NOT affect input). player 0=P0/left port, 1=P1/right. Joystick actions: left|right|up|down|fire|center|paddle. Console panel switches: reset|select|color|p0pro|p1pro (pressed=true is the active state; reset/select are momentary so press then release across frames to start a game). pressed=true holds, false releases (sticks). action=paddle uses value 0.0..1.0 and plugs the paddle peripheral on first use. center releases all directions."}, handleSetInput)
 	mcp.AddTool(server, &mcp.Tool{Name: "peek", Description: "Read one byte of memory without side effects."}, handlePeek)
 	mcp.AddTool(server, &mcp.Tool{Name: "poke", Description: "Write one byte of memory."}, handlePoke)
