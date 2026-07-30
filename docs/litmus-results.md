@@ -6,13 +6,23 @@ ensures we never repeat past-Pong failure #1 ("brute-forcing magic constants"). 
 emulator output (Gopher2600 nightly), not guesswork.**
 
 ROM: `roms/litmus/litmus_pos.asm` (one coarse-adjust loop iteration = `SBC#1`+`BCS` = 5 CPU cycles =
-15 color clocks). Procedure: poke `$80` (DELAY) → `step_frame` → `read_tia`. HMOVE is 0 via HMCLR.
+15 color clocks). Procedure: **`step_frame` FIRST**, then poke `$80` (DELAY) → `step_frame` → `read_tia`.
+HMOVE is 0 via HMCLR.
+
+> **★corrected 2026-07-30 (re-measured).** The procedure used to start with the poke, and that does not
+> work: on a freshly loaded ROM the poke lands before the kernel has initialised and is overwritten, so
+> **every DELAY reads back the same position** (measured 107 for DELAY 0/1/2/3/6 alike). Running one frame
+> first is stable and gives the same answer whether one, two or three frames follow. Under that protocol
+> the table below is correct **except DELAY=0**, which is **3** (the same left clamp as DELAY=1), not 72 —
+> 72 is what DELAY=**6** produces, and there is no protocol in which 0 yields 72. Now machine-checked by
+> `TestCoarseAdjustSweepIsWhatTheDocSays`, which also pins the +15 step and re-asserts that poking before
+> the first frame is useless.
 
 ## Coarse-adjust sweep (2026-06-09)
 
 | DELAY | ResetPixel | HmovedPixel | Δ vs prev | note |
 |------:|-----------:|------------:|-------:|------|
-| 0 | 72 | 72 | — | minimal delay; boundary artifact of a deep-HBLANK strobe |
+| 0 | 3 | 3 | — | **★corrected 2026-07-30: measured 3, not 72** — same left clamp as DELAY=1 |
 | 1 | 3 | 3 | — | **leftmost clamp (player minimum X=3)** |
 | 2 | 12 | 12 | +9 | HBLANK→visible transition boundary (nonlinear) |
 | 3 | 27 | 27 | +15 | ← linear from here |
