@@ -1764,6 +1764,29 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### 38 of the 95 scenarios were never run by any gate (2026-07-30)
+
+Found by widening the orphan question from "is this ROM referenced by anything" to "is this
+CHECK actually executed". Measured: **95 scenario files in three directories** — 57 under
+`roms/litmus`, 31 under `roms/techniques`, 7 under `roms/exerciser`. The CI mirror ran
+`cmd/scenario roms/litmus/scenarios/*.json` and nothing else, so **38 of 95 (40%) were written
+and then never executed**.
+
+All 38 pass today (`techniques` 31/31, `exerciser` 7/7), so nothing was hiding behind them.
+That is the whole point: a check nobody runs reports nothing when it breaks, and these had been
+sitting outside the gate for long enough that their state was unknown until it was measured.
+
+`internal/scenario.TestEveryScenarioRuns` walks `roms/**/scenarios/*.json` and runs every one
+inside `go test ./...` — **discovering** the directories rather than naming them, so a fourth
+scenario directory is covered without anyone remembering to extend a command line. It reports the
+per-directory denominator and fails if the walk finds only one directory, since a sweep that
+silently covered one place is the state it replaces. Runtime 19s (litmus 3.3, the rest 15.5).
+Negative control: breaking one `techniques` scenario — previously invisible to CI — fails it.
+
+**The ROM corpora themselves are clean:** all 31 `roms/techniques` ROMs are referenced (18 places
+glob the directory) and after the litmus gate, 0 of 92 litmus ROMs are orphaned. The gap was never
+the ROMs; it was which checks the runner was pointed at.
+
 ### The timing linter had ZERO coverage of every bank-switched cartridge (2026-07-30)
 
 Found by re-measuring AT-1's "0 false positives on all 31 technique kernels". The claim

@@ -235,6 +235,12 @@ Clone Gopher2600 into the **harness/** root (untracked, referenced via `go.mod` 
 - ROM build: `dasm x.asm -f3 -ox.bin`.
 - Plumbing check (harness/): `go run ./cmd/probe`. MCP server: `go build -o bin/harness ./cmd/harness`.
 - litmus regression (harness/): `go run ./cmd/scenario roms/litmus/scenarios/*.json` (exit 0 on all pass).
+  **★2026-07-30: this command is no longer the gate, because it never was the whole one.** Measured: 95
+  scenario files exist — 57 under `roms/litmus`, 31 under `roms/techniques`, 7 under `roms/exerciser` — and
+  this line named 57 of them. The other 38 (40%) were written and never run by anything. All of them pass,
+  so nothing was hiding; nothing would have noticed if they stopped. `internal/scenario.TestEveryScenarioRuns`
+  now walks `roms/**/scenarios/*.json` and runs all 95 inside `go test ./...`, discovering the directories
+  rather than listing them, so a fourth one is covered without editing a command line. ~19s.
 - Calibration (harness/): `go run ./cmd/calibrate` (sweeps litmus_pos → reproduces slope 3 px/CPU-cycle).
 - ROM generation (roms/): `go run ./<game>/gen [scene]`.
 - ROM regression (roms/): `go run github.com/kidsnz/atari2600-harness/cmd/scenario <game>/scenarios/*.json`.
