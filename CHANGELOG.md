@@ -24,6 +24,17 @@ versions follow [Semantic Versioning](https://semver.org/).
   situation I set up".
 
 ### Changed
+- **`beam_intervals`' `crosses_line` was wrong 81% of the time it spoke.** The flag was computed as
+  `(minAbs+68)/228 != (maxAbs+68)/228`, which places the scanline boundary at clock 92 of each line
+  instead of at the line's start — `MinAbs`/`MaxAbs` are already measured from a WSYNC, i.e. from a
+  boundary, so no shift belongs there. Measured over 127 ROMs / 1016 proven writes before the fix: **43
+  flags raised, 35 of them false, and 11 real crossings missed**; after, 19 flags with 0 wrong in either
+  direction. Concretely, `bullets.asm $F108 GRP0` proves to `[130..-20]` — a window that runs off the end
+  of the line and folds into an inverted pair — and was NOT flagged, while `$F0FB GRP0` at `[82..154]`,
+  entirely inside one line, WAS. The regression test uses the one direction checkable without restating
+  the formula: folding preserves order within a line, so an inverted window is a proof of a crossing and
+  must be flagged (13 such windows in the corpus; non-vacuity asserted). Negative control: restoring the
+  old expression fails both tests.
 - **`breakif` now halts when the beam REACHES a position, instead of silently never halting.** It required
   an exact `(scanline, clock)` match, and observations only happen at instruction boundaries: the CPU
   advances 3 colour clocks per cycle, so **only one phase in three is ever observable**, and a WSYNC kernel
