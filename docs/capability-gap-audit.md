@@ -1813,8 +1813,25 @@ regions `LvTab+0` / `LvTab+2`. **FIXED (next commit):** `solver.loc` now prints
 carrying a label; across the four bank ROMs, 104 locations checked. All 113 flat images
 byte-identical. `TestBankedReportNamesNoSourceLabel` walks the marshalled report for any
 key ending in `loc`, so a location field added later is covered without anyone remembering.
-Negative control: the old `loc` fails it, naming `bank 0 LvTab+2`. A per-bank line map is
-recoverable (bank = listing offset >> 12) and is the real repair; filed, not done.
+Negative control: the old `loc` fails it, naming `bank 0 LvTab+2`. **★BUILT 2026-07-30 — `srcmap.BankMap`.** The listing's address column is the
+physical ROM offset, so `bank = offset>>12` and `addr = $F000 | (offset & $0FFF)` recover per-bank source
+lines exactly. **Labels do not come from the symbol table at all** — its addresses are RORG'd and interleave
+the banks — they come from the SOURCE FILE: a label defined on line L appears in the listing on line L, and
+that row carries the offset, which carries the bank. Measured: `banked_game` resolves **87 addresses across
+2 banks** (bank 0: 64, bank 1: 23) with 12 labels placed; `litmus_bank_f4` resolves 102 across 8 banks.
+`bank 0 $F017` is now `bank 0 NextFrame+4 (banked_game.asm:44)`, and `bank 1 $F000` is
+`bank 1 B1Work (banked_game.asm:110)` — a label the flat map could never have reached. A label further than
+one page from the address is dropped and the line printed alone (measured: `$FF86` sits in a trampoline with
+no label of its own and was reported as `LvTab+3949`).
+**`@lines` / `@amax` now work on a banked image too, and they were broken for EVERY bank, not just 1..n:**
+bank 0's listing rows are below `$1000` and the flat parse discards them as TIA equates, so an address lookup
+missed in both directions and every banked region was silently budgeted at one scanline. No banked ROM in the
+corpus carries an annotation, so nothing in the reports changed — hence
+`TestBankedImageReadsLineAnnotations`, which writes `@lines 3` onto a copy and measures the KRow region's
+budget going **76 → 228**. `TestBankedReportNamesItsOwnBanksLabels` replaces the interim "never print a
+label" rule with "never print another bank's label", checked against `BankMap.LabelBank` over 104 locations
+(44 of them now named). All 114 flat images byte-identical. Negative control: restoring the flat lookup
+reproduces `bank 0 LvTab+2`.
 
 ### Three more from the audit re-measurement: an off-by-one in a litmus, a stale figure, a false sentence (2026-07-30)
 
