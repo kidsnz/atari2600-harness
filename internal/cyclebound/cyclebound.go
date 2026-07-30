@@ -1756,23 +1756,29 @@ func (s *solver) foldHit(at site) bool { _, ok := s.folds[at]; return ok }
 
 // loc resolves a code site to "Label+off (file:line)".
 //
-// On a BANKED image it resolves only bank 0, and that is a limitation with a measured
-// cause rather than an oversight: DASM's listing address column is the PHYSICAL ROM
-// OFFSET, not the RORG'd address (litmus_bank's listing shows `0f00 ad f9 ff lda
-// $FFF9` for bank 0 and `1f03 a9 b1 lda #$B1` for bank 1), and srcmap.Parse drops
-// every row below $1000 — so bank 0's line numbers are dropped entirely and banks
-// 1..n's offsets are stored as if they were CPU addresses. Attributing a bank-1 site
-// to whatever bank-0 label precedes that address would be a confidently wrong
-// location, so on a banked image a non-zero bank prints as "bank N $FFxx" and nothing
-// else. Report.SourceAnnotations says this out loud.
+// On a BANKED image NO bank gets a source location, and that is a limitation with a
+// measured cause rather than an oversight.
+//
+// DASM's listing address column is the PHYSICAL ROM OFFSET, not the RORG'd address
+// (litmus_bank's listing shows `0f00 ad f9 ff lda $FFF9` for bank 0 and `1f03 a9 b1
+// lda #$B1` for bank 1), and srcmap.Parse drops every row below $1000 — so bank 0's
+// line numbers are dropped entirely and banks 1..n's offsets are stored as if they
+// were CPU addresses. That much this comment always said, and it concluded bank 0
+// could still be resolved safely. That conclusion was WRONG, because it reasoned
+// about line numbers and the LABEL list is built differently: labels come from the
+// symbol dump, where every bank's labels carry their RORG'd $F0xx address, so the
+// banks' labels are interleaved in one list and "the last label at or before this
+// address" can belong to either. Measured on roms/techniques/banked_game.asm: two
+// BANK 0 regions were reported at `LvTab+0` and `LvTab+2`, and LvTab is a bank 1
+// table 4K away in the image. A confidently wrong location is worse than none — the
+// author goes and reads correct code looking for a fault that is not there.
+//
+// So on a banked image every site prints as "bank N $FFxx" and nothing else.
+// Report.SourceAnnotations says this out loud. The real repair is a per-bank line
+// map, which is recoverable because the listing offset carries the bank
+// (bank = offset >> 12); filed, not built.
 func (s *solver) loc(at site) string {
 	if s.banked {
-		if at.bank != 0 {
-			return siteDesc(at, true)
-		}
-		if l := s.sm.Locate(at.addr); l != "" {
-			return fmt.Sprintf("bank 0 %s", l)
-		}
 		return siteDesc(at, true)
 	}
 	return s.sm.Locate(at.addr)

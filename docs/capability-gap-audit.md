@@ -1701,10 +1701,15 @@ dump, where every bank's labels carry their RORG'd $F0xx address, so the two ban
 interleaved in one list and "the last label at or before this address" can be either bank's.
 The existing `solver.loc` comment reasoned that bank 0 is safe because DASM's listing rows
 for it are dropped; that is true of LINE NUMBERS and false of LABELS. Lint now prints
-`bank N $FFxx` for every bank on a banked image. **The prover has the same hole and it fires
-on a corpus ROM**: `cyclebound -asm roms/techniques/banked_game.asm` labels two bank-0
-regions `LvTab+0` / `LvTab+2`. Fixed separately. A per-bank line map is recoverable
-(bank = listing offset >> 12) and is the real repair; filed, not done.
+`bank N $FFxx` for every bank on a banked image. **The prover had the same hole and it fired
+on a corpus ROM**: `cyclebound -asm roms/techniques/banked_game.asm` labelled two bank-0
+regions `LvTab+0` / `LvTab+2`. **FIXED (next commit):** `solver.loc` now prints
+`bank N $FFxx` for every bank on a banked image. Measured on banked_game, 8 locations, 0
+carrying a label; across the four bank ROMs, 104 locations checked. All 113 flat images
+byte-identical. `TestBankedReportNamesNoSourceLabel` walks the marshalled report for any
+key ending in `loc`, so a location field added later is covered without anyone remembering.
+Negative control: the old `loc` fails it, naming `bank 0 LvTab+2`. A per-bank line map is
+recoverable (bank = listing offset >> 12) and is the real repair; filed, not done.
 
 ### Three more from the audit re-measurement: an off-by-one in a litmus, a stale figure, a false sentence (2026-07-30)
 

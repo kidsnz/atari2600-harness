@@ -1,7 +1,10 @@
 package cyclebound
 
 import (
+	"encoding/json"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -637,4 +640,85 @@ func TestCrossBankReturnIsRefused(t *testing.T) {
 			t.Errorf("%s: 0 regions; the guard may have cut the analysis off entirely", asm)
 		}
 	}
+}
+
+// collectLocs walks a marshalled report and returns every value under a key ending
+// in "loc". Going through the JSON rather than named fields is deliberate: a new
+// location field added later is covered without anyone remembering to add it here.
+func collectLocs(t *testing.T, rep *Report) []string {
+	t.Helper()
+	b, err := json.Marshal(rep)
+	if err != nil {
+		t.Fatalf("marshal report: %v", err)
+	}
+	var root any
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatalf("unmarshal report: %v", err)
+	}
+	var out []string
+	var walk func(any)
+	walk = func(n any) {
+		switch v := n.(type) {
+		case map[string]any:
+			for k, x := range v {
+				if s, ok := x.(string); ok && strings.HasSuffix(k, "loc") && s != "" {
+					out = append(out, s)
+					continue
+				}
+				walk(x)
+			}
+		case []any:
+			for _, x := range v {
+				walk(x)
+			}
+		}
+	}
+	walk(root)
+	return out
+}
+
+// TestBankedReportNamesNoSourceLabel locks the location rule for bank-switched
+// images: every site prints as "bank N $FFxx" and never as a source label.
+//
+// The hole this closes was live on a corpus ROM. srcmap's label list comes from the
+// symbol dump, where every bank's labels carry their RORG'd $F0xx address, so the
+// banks' labels interleave and "the last label at or before this address" can belong
+// to either bank. Measured on banked_game.asm before the fix: two BANK 0 regions were
+// reported at "LvTab+0" and "LvTab+2", and LvTab is a bank 1 table 4K away. The
+// earlier reasoning ("bank 0 is safe, DASM's listing rows for it are dropped") holds
+// for LINE NUMBERS and not for labels.
+//
+// A wrong location is worse than none, so the test bans labels outright rather than
+// checking they name the right bank.
+func TestBankedReportNamesNoSourceLabel(t *testing.T) {
+	bankedLoc := regexp.MustCompile(`^bank \d+ \$[0-9A-F]{4}$`)
+	roms := []string{
+		"../../roms/techniques/banked_game.asm",
+		"../../roms/litmus/litmus_bank.asm",
+		"../../roms/litmus/litmus_bank_f6.asm",
+		"../../roms/litmus/litmus_bank_f4.asm",
+	}
+	total := 0
+	for _, asm := range roms {
+		if _, err := os.Stat(asm); err != nil {
+			t.Skipf("%s not present (%v)", asm, err)
+		}
+		rep := mustProve(t, asm, 76)
+		if rep.Banks < 2 {
+			t.Fatalf("%s: expected a banked report, got banks=%d", filepath.Base(asm), rep.Banks)
+		}
+		locs := collectLocs(t, rep)
+		if len(locs) == 0 {
+			t.Errorf("%s: no locations at all — this test would pass while proving nothing",
+				filepath.Base(asm))
+		}
+		total += len(locs)
+		for _, l := range locs {
+			if !bankedLoc.MatchString(l) {
+				t.Errorf("%s: location %q carries a source label; on a banked image srcmap cannot "+
+					"tell the banks apart, so this can name the wrong bank's code", filepath.Base(asm), l)
+			}
+		}
+	}
+	t.Logf("checked %d locations across %d bank-switched ROMs", total, len(roms))
 }
