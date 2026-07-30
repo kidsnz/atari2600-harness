@@ -1764,6 +1764,42 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The same sweep on `switchEdges`: 4 refusal branches had no witness, one of them a repaired one (2026-07-30)
+
+Applying the witness method to the next soundness function. Counting which branch of
+`switchEdges` each instruction takes, over 123 ROMs and all four entry points:
+
+| branch | hits |
+|---|---:|
+| not a banked cartridge | 1,912,675 |
+| instruction touches no memory | 88,981 |
+| access reaches no hotspot | 46,852 |
+| edges produced | 6,755 |
+| the instruction's own bytes span a hotspot | 108 |
+| access target unresolvable | 13 |
+| **`jmp`/`jsr` transfers control INTO a hotspot** | **0** |
+| **hotspot symbol does not name a bank** | **0** |
+| **target bank outside the analysed set** | **0** |
+| **landing address wraps past `$FFFF`** | **0** |
+
+All four unexercised branches are REFUSALS, and that is precisely why an outcome gate cannot see
+them: a branch that never fires produces no wrong number, it produces a **missing refusal**.
+
+The first of them matters most because **it is a branch SD-8b judged unsound and repaired.** Gopher2600
+classifies `jmp`/`jsr` as Subroutine/Flow rather than Read, so a check driven off an instruction's
+data access never looks at them and `jmp $FFF9` slipped past. The fix has been in the tree since —
+and had **never once run**. `roms/litmus/litmus_bank_jmphotspot.asm` plants `jmp $FFF9` in a visible
+kernel region of bank 0 of an F8 cartridge; the branch now fires 5 times and the region is refused
+by name: *"the jmp at bank 0 $F04D transfers control to BANK1 ($1FF9), whose instruction fetch
+selects another bank"*. `TestJmpIntoHotspotIsRefused` requires the refusal to mention the operator,
+the symbol, the address and the reason, so it cannot degrade into a generic unbounded region.
+Negative control: removing the `jmp`/`jsr` case — i.e. the state before SD-8b — makes the refusal
+disappear entirely. All 124 other ROMs byte-identical.
+
+The remaining three (symbol not naming a bank, bank outside the analysed set, landing wrapping past
+`$FFFF`) need cartridges this corpus does not contain — Parker Bros `B0S0` symbols, M-Network `RAM0`
+— and are **recorded as unwitnessed rather than assumed correct**.
+
 ### Why the page-cross bug survived a passing gate: the branch had NO witness (2026-07-30)
 
 `TestProvenWorstIsNeverExceededOnCorpus` compares proven against measured on **228 regions
