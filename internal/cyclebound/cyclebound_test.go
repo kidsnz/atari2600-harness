@@ -336,9 +336,10 @@ func TestProveNoWSYNCNotCertified(t *testing.T) {
 func TestBankedImageHandledByEveryEntryPoint(t *testing.T) {
 	const asm = "../../roms/techniques/banked_game.asm"
 
-	// Prove analyses a banked image per bank (it refuses the switching regions and
-	// gates certification on them). The other three still model a flat address
-	// space, so for them the only honest answer is to decline by name.
+	// Prove and Lint analyse a banked image per bank (Prove refuses the switching
+	// regions and gates certification on them; Lint surveys the merged program and
+	// walks straight lines only inside a bank). The other two still model a flat
+	// address space, so for them the only honest answer is to decline by name.
 	rep := mustProve(t, asm, 76)
 	if rep.Certified {
 		t.Error("Prove certified a bank-switched cartridge")
@@ -349,18 +350,16 @@ func TestBankedImageHandledByEveryEntryPoint(t *testing.T) {
 		t.Errorf("BeamIntervals did not decline; it reported %d regions of beam windows for a "+
 			"program that does not exist", len(br.Regions))
 	}
-	if ws, err := Lint(asm); err != nil {
-		t.Errorf("Lint: %v", err)
-	} else {
-		declined := false
-		for _, w := range ws {
-			if w.Rule == "not-analysed" {
-				declined = true
-			}
-		}
-		if !declined {
-			t.Errorf("Lint did not decline; %d warnings, and silence from a linter reads as clean", len(ws))
-		}
+	// Lint used to belong with the decliners. It now reads every bank, so the thing
+	// to hold it to is coverage: silence from a linter reads as clean, and it is only
+	// allowed to be silent about a program it actually decoded.
+	if res, err := LintDetail(asm); err != nil {
+		t.Errorf("LintDetail: %v", err)
+	} else if res.Declined != "" {
+		t.Errorf("Lint declined a cartridge it can read per bank: %s", res.Declined)
+	} else if res.Banks != 2 || res.PerBank[0] == 0 || res.PerBank[1] == 0 {
+		t.Errorf("Lint must read every bank before staying silent, got banks=%d per-bank=%v",
+			res.Banks, res.PerBank)
 	}
 	if du, err := DefUse(asm, 76); err != nil {
 		t.Errorf("DefUse: %v", err)

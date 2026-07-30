@@ -381,7 +381,8 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
   `hmxx-without-hmove` (value-aware: only provably non-zero staged motion warns; a `lda #0; sta HMPx` clear or an
   unknown value stays silent), `hmove-hazard` (HMxx/HMCLR write starts <24cy after HMOVE on a straight-line path;
   the `sta HMOVE; ds 12; sta HMCLR` idiom at exactly 24cy is safe). **Measured: 0 false positives on all 31
-  technique kernels** (first sweep's 6 hits were two detector gaps — missed indexed `sta HMP0,x` stores, and a
+  technique kernels** (**2026-07-30**: still 0, and the denominator is now genuinely 31 — it had
+  drifted to 30 analysed + 1 declined, see the per-bank linting entry below) (first sweep's 6 hits were two detector gaps — missed indexed `sta HMP0,x` stores, and a
   benign zero-clear — both fixed; a latent hazard false-negative in the cycle accounting also fixed). Litmus
   `lint_r1/_r2/_r3` + `lint_clean`; `TestLint*` lock both directions + the corpus guard. Pure Go, CLI only (no
   MCP/reconnect). **A single batched MCP exposure (AT-5) remains.**
@@ -1657,6 +1658,53 @@ the cross-bank edge semantics are taken from `mapper_atari.go` and applied to ev
 return an empty unit list with no decline reason; `determineBound`'s predecessor scan reads
 `absStates[pred].transfer(pred)` where an absent entry is the zero State whose ranges read as exact `[0,0]`
 rather than Top; (the skip finding is closed above).
+
+### The timing linter had ZERO coverage of every bank-switched cartridge (2026-07-30)
+
+Found by re-measuring AT-1's "0 false positives on all 31 technique kernels". The claim
+survives, but the denominator had quietly become 30: `banked_game.asm` is answered with a
+`not-analysed` refusal, and **0 of its 133 instructions were ever read**. The refusal is
+honest, and it was also the whole story for any 8K+ ROM — an authoring aid with no coverage
+at all of the cartridge size a real game reaches.
+
+`cyclebound.Prove` had already gained the per-bank pipeline (SD-8/SD-11). `Lint` had not, so
+two tools disagreed about the same ROM. Lint now runs the SAME path —
+`analysisUnits` -> `decodeUnits` -> `switchModel` -> `computeStates` — which is why all 113
+flat images produce byte-identical output: a flat ROM is the one-unit case.
+
+Two rules needed care, in opposite directions:
+
+- **R1/R2 must survey the UNION of banks.** Both ask "is HMxx/HMOVE used ANYWHERE", and the
+  answer can live in another bank. `lint_bank_split` is the fixture: HMP0 staged in bank 0,
+  HMOVE strobed in bank 1 — correct code. Measured with the survey artificially restricted:
+  bank 0 alone reports `hmxx-without-hmove`, bank 1 alone reports `hmove-without-hmxx`. Both
+  false. The merged survey is silent.
+- **R3 must NOT cross a bank.** The straight-line walk follows fall-through addresses; after
+  a hotspot access the next fetch comes from the other bank, so it now stops at any
+  instruction `switchEdges` says can switch.
+
+| ROM | before | after |
+|---|---|---|
+| `banked_game` (corpus) | not-analysed, **0 instructions** | silent, **134** (bank0 67 / bank1 67) |
+| `lint_bank_hazard` (trap in BANK 1) | not-analysed, 0 instructions | **`hmove-hazard` at bank 1 $F00D**, 149 read |
+| `lint_bank_split` (correct, split) | not-analysed, 0 instructions | silent, 138 read |
+
+`timinglint` now prints its own denominator on every run ("read N instructions across B
+bank(s): bank 0: x, bank 1: y") because "no timing warnings" over a program that was never
+decoded is indistinguishable from a clean bill of health — which is precisely what it used
+to print. `LintResult` carries the counts. Negative control: restoring the old decline fails
+both new tests by name.
+
+**A second defect fell out of the fixture.** The first bank-0 warning printed
+`bank 0 LvTab+10` — `LvTab` is a BANK 1 label. srcmap's label list comes from the symbol
+dump, where every bank's labels carry their RORG'd $F0xx address, so the two banks are
+interleaved in one list and "the last label at or before this address" can be either bank's.
+The existing `solver.loc` comment reasoned that bank 0 is safe because DASM's listing rows
+for it are dropped; that is true of LINE NUMBERS and false of LABELS. Lint now prints
+`bank N $FFxx` for every bank on a banked image. **The prover has the same hole and it fires
+on a corpus ROM**: `cyclebound -asm roms/techniques/banked_game.asm` labels two bank-0
+regions `LvTab+0` / `LvTab+2`. Fixed separately. A per-bank line map is recoverable
+(bank = listing offset >> 12) and is the real repair; filed, not done.
 
 ### Three more from the audit re-measurement: an off-by-one in a litmus, a stale figure, a false sentence (2026-07-30)
 

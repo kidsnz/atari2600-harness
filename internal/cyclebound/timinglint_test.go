@@ -3,6 +3,7 @@ package cyclebound
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -18,11 +19,16 @@ func hasRule(ws []LintWarning, rule string) bool {
 
 func mustLint(t *testing.T, asm string) []LintWarning {
 	t.Helper()
-	ws, err := Lint(asm)
+	return mustLintDetail(t, asm).Warnings
+}
+
+func mustLintDetail(t *testing.T, asm string) LintResult {
+	t.Helper()
+	r, err := LintDetail(asm)
 	if err != nil {
-		t.Fatalf("Lint(%s): %v", asm, err)
+		t.Fatalf("LintDetail(%s): %v", asm, err)
 	}
-	return ws
+	return r
 }
 
 // TestLintTrapsFire locks the POSITIVE direction: each planted-trap fixture emits
@@ -68,23 +74,21 @@ func TestLintNoFalsePositivesOnTechniques(t *testing.T) {
 	if err != nil {
 		t.Skipf("techniques corpus not present (%v) — covered by the manual sweep", err)
 	}
-	n, skipped := 0, 0
+	n, declined, banked, instrs := 0, 0, 0, 0
 	for _, e := range ents {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".asm" {
 			continue
 		}
 		n++
 		asm := filepath.Join(dir, e.Name())
-		ws := mustLint(t, asm)
+		res := mustLintDetail(t, asm)
 		// A refusal is not a timing claim. "not-analysed" says the ROM was never
 		// decoded, which is the opposite of asserting something wrong about it —
 		// counting it as a false positive would push the linter back towards
 		// staying silent about programs it cannot read.
 		var timing []LintWarning
-		declined := false
-		for _, w := range ws {
+		for _, w := range res.Warnings {
 			if w.Rule == "not-analysed" {
-				declined = true
 				continue
 			}
 			timing = append(timing, w)
@@ -92,8 +96,23 @@ func TestLintNoFalsePositivesOnTechniques(t *testing.T) {
 		if len(timing) != 0 {
 			t.Errorf("FALSE POSITIVE on known-good %s: %+v", e.Name(), timing)
 		}
-		if declined {
-			skipped++
+		if res.Declined != "" {
+			declined++
+			continue
+		}
+		// Claiming a ROM was analysed while decoding nothing is the exact shape of a
+		// silent all-clear, so it is an error rather than a quiet zero.
+		if res.Instructions == 0 {
+			t.Errorf("%s: reported as analysed but decoded 0 instructions", e.Name())
+		}
+		instrs += res.Instructions
+		if res.Banks > 1 {
+			banked++
+			for b, c := range res.PerBank {
+				if c == 0 {
+					t.Errorf("%s: bank %d decoded 0 instructions — that bank is unlinted", e.Name(), b)
+				}
+			}
 		}
 	}
 	if n == 0 {
@@ -101,10 +120,66 @@ func TestLintNoFalsePositivesOnTechniques(t *testing.T) {
 	}
 	// Report the denominator. A clean sweep over a corpus that was silently mostly
 	// skipped is how a check passes while proving nothing.
-	t.Logf("linted %d technique kernels with zero timing false positives; %d were DECLINED "+
-		"(bank-switched) and are not covered by that claim", n-skipped, skipped)
-	if skipped == 0 {
-		t.Error("no ROM in the corpus was declined; banked_game.asm is an 8K F8 cartridge, so a " +
-			"linter that analysed all 31 is reading a program that does not exist in at least one")
+	t.Logf("linted %d technique kernels / %d instructions with zero timing false positives; "+
+		"%d were bank-switched (read per bank), %d DECLINED", n-declined, instrs, banked, declined)
+	if banked == 0 {
+		t.Error("no ROM in the corpus was linted as more than one bank; banked_game.asm is an 8K F8 " +
+			"cartridge, so the linter has either gone back to declining it outright or is reading it " +
+			"as a flat image — a program that does not exist")
+	}
+}
+
+// TestLintReadsBothBanks is the bank-coverage pair. Both fixtures are 8K F8
+// cartridges built from banked_game.asm, and on the previous linter BOTH produced
+// the same single "not-analysed" warning with zero instructions decoded — the trap
+// in one and the correctness of the other were equally invisible.
+//
+// lint_bank_hazard plants an HMOVE hazard in BANK 1 (positive: must be found there).
+// lint_bank_split puts a CORRECT motion's two halves in different banks — HMP0 staged
+// in bank 0, HMOVE strobed in bank 1 (negative: R1 and R2 both ask "is it used
+// ANYWHERE", so a per-bank survey would report two warnings and both would be false).
+func TestLintReadsBothBanks(t *testing.T) {
+	const (
+		hazard = "../../roms/litmus/lint_bank_hazard.asm"
+		split  = "../../roms/litmus/lint_bank_split.asm"
+	)
+	for _, asm := range []string{hazard, split} {
+		if _, err := os.Stat(asm); err != nil {
+			t.Skipf("fixture %s not present (%v)", asm, err)
+		}
+	}
+
+	haz := mustLintDetail(t, hazard)
+	if haz.Declined != "" {
+		t.Fatalf("hazard fixture declined: %s", haz.Declined)
+	}
+	if haz.Banks != 2 || haz.PerBank[0] == 0 || haz.PerBank[1] == 0 {
+		t.Fatalf("hazard fixture: expected 2 banks both decoded, got banks=%d per-bank=%v",
+			haz.Banks, haz.PerBank)
+	}
+	if !hasRule(haz.Warnings, "hmove-hazard") {
+		t.Errorf("planted bank-1 hazard not found: %+v", haz.Warnings)
+	}
+	for _, w := range haz.Warnings {
+		if w.Rule != "hmove-hazard" {
+			t.Errorf("unexpected extra rule %q on the hazard fixture (only hmove-hazard intended)", w.Rule)
+		}
+		// The location must name the bank it is in. Pointing at a bank-0 label would
+		// send the author to a line that does not contain the fault.
+		if w.Rule == "hmove-hazard" && !strings.Contains(w.Loc, "bank 1") {
+			t.Errorf("hazard reported at %q — a bank-1 fault must say which bank", w.Loc)
+		}
+	}
+
+	spl := mustLintDetail(t, split)
+	if spl.Declined != "" {
+		t.Fatalf("split fixture declined: %s", spl.Declined)
+	}
+	if spl.Banks != 2 || spl.PerBank[0] == 0 || spl.PerBank[1] == 0 {
+		t.Fatalf("split fixture: expected 2 banks both decoded, got banks=%d per-bank=%v",
+			spl.Banks, spl.PerBank)
+	}
+	if len(spl.Warnings) != 0 {
+		t.Errorf("motion split across banks is correct and must be silent, got %+v", spl.Warnings)
 	}
 }

@@ -81,54 +81,109 @@ func storedReg(in Instr, s State) (ValueRange, bool) {
 
 func isHMxx(reg uint16) bool { return reg >= regHMP0 && reg <= regHMBL }
 
+// LintResult is a lint run plus the DENOMINATOR it covered. A linter that prints
+// "no timing warnings" tells the author nothing about how much of the program it
+// actually read, and the difference is not hypothetical: on an 8K cartridge this
+// package used to read 0 instructions and say exactly that. Banks and Instructions
+// are what was decoded and surveyed; Declined, when set, means nothing was.
+type LintResult struct {
+	Warnings     []LintWarning `json:"warnings"`
+	Banks        int           `json:"banks"`              // analysis units (1 for a flat image)
+	Instructions int           `json:"instructions"`       // decoded across all banks
+	PerBank      map[int]int   `json:"per_bank"`           // bank number -> instructions decoded
+	Declined     string        `json:"declined,omitempty"` // non-empty: the ROM was not analysed at all
+}
+
 // Lint assembles asmPath and returns timing-lint warnings (proactive, static).
 func Lint(asmPath string) ([]LintWarning, error) {
+	r, err := LintDetail(asmPath)
+	if err != nil {
+		return nil, err
+	}
+	return r.Warnings, nil
+}
+
+// LintDetail is Lint plus the coverage the run achieved.
+func LintDetail(asmPath string) (LintResult, error) {
 	bin := build.BinPathFor(asmPath)
 	out, lst, sym, err := build.AssembleWithListing(asmPath, bin)
 	if err != nil {
-		return nil, fmt.Errorf("assemble %s failed:\n%s", asmPath, out)
+		return LintResult{}, fmt.Errorf("assemble %s failed:\n%s", asmPath, out)
 	}
 	sm := srcmap.Parse(lst, sym, asmPath)
 	rom, err := os.ReadFile(bin)
 	if err != nil {
-		return nil, err
+		return LintResult{}, err
 	}
 	if len(rom) < 6 || len(rom) > 0x10000 {
-		return nil, fmt.Errorf("unexpected ROM size %d", len(rom))
+		return LintResult{}, fmt.Errorf("unexpected ROM size %d", len(rom))
 	}
-	p := newProgram(rom)
-	// A linter that stays silent on a program it never decoded reads as "clean".
-	// This built its own program literal and did not even set `banked`, so on a
-	// bank-switched cartridge it decoded whichever bank the flat fold happened to
-	// land in and reported zero warnings about the rest.
-	if why := p.declineBanked(bin); why != "" {
-		return []LintWarning{{
+	// A bank-switched cartridge is linted ONE BANK AT A TIME and then surveyed as one
+	// merged program keyed on (bank, address) — the same pipeline the prover runs, so
+	// the two tools read the same program. Before this, the linter took the earlier
+	// `declineBanked` exit and analysed NOTHING on an 8K+ cartridge: measured on
+	// banked_game.asm, 0 of 133 instructions were read and the only output was the
+	// refusal, i.e. every 8K game had zero static timing coverage.
+	//
+	// A flat ROM has exactly one unit and goes down an identical path, which is why
+	// all 30 flat kernels' warnings are unchanged.
+	units, decline := analysisUnits(rom, bin)
+	if decline != "" {
+		return LintResult{Declined: decline, Warnings: []LintWarning{{
 			Rule: "not-analysed",
 			Loc:  filepath.Base(asmPath),
-			Msg:  why,
+			Msg:  decline,
 			Hint: "no timing warning below should be read as an all-clear for this ROM",
-		}}, nil
+		}}}, nil
 	}
-	instrs := map[site]Instr{}
-	var entries []site
-	for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
-		lo, _ := p.byteAt(va)
-		hi, _ := p.byteAt(va + 1)
-		if t := uint16(lo) | uint16(hi)<<8; t >= p.base {
-			p.decodeInto(instrs, t)
-			entries = append(entries, site{p.bank, t})
+	decodes, instrs, entries, _ := decodeUnits(units)
+	perBank := map[int]int{}
+	for _, d := range decodes {
+		perBank[d.bank] = len(d.instrs)
+	}
+
+	sw := switchModel{banked: len(units) > 1, banks: map[int]bool{}}
+	if sw.banked {
+		sw.hotspots = units[0].hotspots
+		for _, u := range units {
+			sw.banks[u.bank] = true
 		}
 	}
 	// Abstract-interpret so R2 can tell a real staged motion from a defensive
-	// `lda #0; sta HMP0` clear (the latter must not warn). The decline above means this
-	// only ever runs on a flat image, so there is no switch model to carry.
-	sw := switchModel{}
-	states, _ := computeStates(instrs, entries, p.byteAtBank, sw, nil)
+	// `lda #0; sta HMP0` clear (the latter must not warn). On a banked image the
+	// landing sites of a switch this analysis does not model are forced to Top, exactly
+	// as the prover does — an unknown value never warns, so widening can only silence.
+	widen, _ := unmodelledLandings(instrs, sw)
+	states, _ := computeStates(instrs, entries, romByBank(decodes), sw, widen)
 
-	loc := func(a site) string { return sm.Locate(a.addr) }
+	// On a banked image NO bank gets a source location — not even bank 0.
+	//
+	// DASM's listing address column is the PHYSICAL ROM OFFSET, so bank 0's rows sit
+	// below $1000 and srcmap.Parse drops them; that much was already known. What is
+	// NOT true is the follow-on assumption that bank 0 therefore falls back safely:
+	// the LABEL table comes from the symbol dump, where every bank's labels carry
+	// their RORG'd $F0xx address, so the two banks' labels are interleaved in one
+	// list and "the last label at or before this address" can be either bank's.
+	// Measured on lint_bank_split: a warning at BANK 0 $F00A resolved to
+	// "LvTab+10" — LvTab is a bank 1 label, 4K away in the image. A wrong file
+	// location is worse than none, because the author goes and reads correct code.
+	//
+	// A per-bank line map is recoverable (bank = listing offset >> 12) and is filed
+	// as a follow-up; until it exists, a banked site prints as "bank N $FFxx".
+	banked := sw.banked
+	loc := func(a site) string {
+		if banked {
+			return siteDesc(a, true)
+		}
+		return sm.Locate(a.addr)
+	}
 	var w []LintWarning
 
-	// Survey TIA motion usage across the whole program.
+	// Survey TIA motion usage across the whole program — every bank at once, which is
+	// what R1 and R2 require to stay false-positive-free on a banked cartridge. Both
+	// ask an "is it EVER" question, and the answer can live in another bank: a kernel
+	// that strobes HMOVE in bank 1 while staging HMxx in bank 0 is correct, and a
+	// per-bank survey would warn on it twice.
 	var hmoves []site
 	sawHMOVE, sawHMxxAny := false, false
 	hmxxNonzero, haveHmxxNonzero := site{}, false // first HMxx store proven to stage a NON-zero value
@@ -179,7 +234,7 @@ func Lint(asmPath string) ([]LintWarning, error) {
 	// of an HMOVE on a straight-line path leaves motion undefined (Stella PG). The
 	// proactive sibling of the runtime VV-10 detector.
 	for _, h := range hmoves {
-		if hazAddr, after, hit := straightHMOVEHazard(instrs, h); hit {
+		if hazAddr, after, hit := straightHMOVEHazard(instrs, h, sw, states); hit {
 			w = append(w, LintWarning{
 				Rule: "hmove-hazard", Loc: loc(hazAddr),
 				Msg:  fmt.Sprintf("HMxx/HMCLR written ~%d CPU cycles after this HMOVE (<24) — motion becomes undefined", after),
@@ -187,20 +242,29 @@ func Lint(asmPath string) ([]LintWarning, error) {
 			})
 		}
 	}
-	return w, nil
+	return LintResult{Warnings: w, Banks: len(units), Instructions: len(instrs), PerBank: perBank}, nil
 }
 
 // straightHMOVEHazard walks the straight-line path after an HMOVE at addr, summing
 // CPU cycles, and reports the address of the first HMxx/HMCLR write reached within
 // <24 cycles (the hazard window). Stops at any branch/jump/WSYNC (can't continue
 // statically) — staying silent there rather than risk a false positive.
-func straightHMOVEHazard(instrs map[site]Instr, at site) (hazAddr site, after int, hit bool) {
+//
+// On a banked cartridge it also stops at any instruction that CAN cross banks. The
+// walk follows fall-through addresses inside one bank; after a hotspot access the
+// next fetch comes from the OTHER bank, so the bytes at the following address in this
+// one are not the instruction that executes. Counting their cycles would measure a
+// gap along a path the hardware never takes, in either direction.
+func straightHMOVEHazard(instrs map[site]Instr, at site, sw switchModel, states map[site]State) (hazAddr site, after int, hit bool) {
 	cyc := 0 // CPU cycles elapsed from the end of HMOVE to the START of `in`
 	a := instrs[at].nextSite()
 	for {
 		in, ok := instrs[a]
 		if !ok || in.isWSYNC() {
 			return site{}, 0, false // a WSYNC safely closes the window
+		}
+		if edges, keep, refusal := sw.switchEdges(in, states[a]); len(edges) > 0 || !keep || refusal != "" {
+			return site{}, 0, false // can cross banks — the straight line ends here
 		}
 		if in.Def.IsBranch() || in.Def.Operator == instructions.JMP ||
 			in.Def.Operator == instructions.JSR || in.Def.Operator == instructions.RTS {
