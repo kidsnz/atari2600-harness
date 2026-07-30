@@ -1764,6 +1764,34 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### "Hold the input, then read" does not measure a clamp — a second confident-constant trap (2026-07-30)
+
+Found while settling a disputed measurement, minutes after wiring the liveness check, and it is the
+same family: a number that is stable, plausible, and about something other than what was asked.
+
+Measuring where Outlaw's gunman stops when you hold RIGHT, the obvious method is to hold it for a long
+time and read the position. Held for 700 frames, `read_tia` returns `player0.hmoved_pixel = 7` — near
+the LEFT edge. Nothing errors. The reason is that 700 frames is ~12 seconds: the round ended and the
+gunman was returned to his start. **Waiting longer made the answer worse**, which is the opposite of
+the intuition the method rests on.
+
+The correct method is to sample and look for the plateau. Holding RIGHT and reading every 20 frames:
+
+    17  27  37  47  57  57  57  59  57  57  59  57  59  57  57  59  57  57  59  57
+
+10px per 20 frames (0.5px/frame, as documented), then a plateau at **57–59 oscillating ±1**. At that
+moment the drawn extent is **clk 63–66** (`decompose_row`, y_top 101); the left clamp is `ObjectX` 4.
+
+Two earlier readings of the same thing were 58 (right, but by luck — that run's round had not yet
+ended) and 66–67 with a drawn extent of clk 69–80, which **does not reproduce** under this procedure;
+the gap is ~6–9px in both observables, consistent with a different game variation or a different
+sprite. Both are recorded in `sandbox/studies/outlaw/spec.ja.md` rather than one being chosen.
+
+**The liveness check does not catch this one.** The program IS responding; the measurement is simply
+of a later game state. Liveness answers "is it running", not "is it still in the situation you set
+up". That is a second question, and it needs the same treatment: sample the trajectory, do not trust a
+single late read.
+
 ### A stuck ROM returns a confident constant, and it fooled three measurements (2026-07-30)
 
 Not a gap that was filed — a gap that bit, three times, in one day, and the third time it bit the
