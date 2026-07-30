@@ -23,6 +23,18 @@ versions follow [Semantic Versioning](https://semver.org/).
   cover — the program is reacting the whole time; liveness answers "is it running", not "am I still in the
   situation I set up".
 
+### Changed
+- **`beamtrace` now returns every frame it traced, not just the first.** It traced `frames` frames,
+  advanced the emulator by all of them, and returned the EARLIEST one alone — measured over the wire:
+  `frames=4` starting at frame 5 left the machine at frame 9 and handed back frame 5. The discarded
+  frames were unreachable by any other route, because a second call advances the machine again, so
+  frame-to-frame comparison — flicker, multiplexed sprites, a first frame that is atypical after setup —
+  was impossible in a tool whose description promised the frames. Output is now `frames[]`, each entry a
+  `{frame, rows}` pair (was a single top-level `frame`/`rows`). Pass `scanline` to keep the payload narrow.
+  Witnessed by `TestBeamtraceReturnsEveryFrameItPaidFor`, which reads a register that provably changes
+  every frame (motion_xclamp stages HMP0 = 96, 64, 32 as P0 walks) so that N copies of one frame cannot
+  pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
+
 ### Fixed
 - **`spritey`'s description advertised half of what the tool returns.** Its multi-frame mode was documented
   as returning "the per-frame Y trajectory", but every `SpriteYSample` has carried `X` (HmovedPixel) since

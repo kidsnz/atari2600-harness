@@ -1287,10 +1287,23 @@ type BeamtraceIn struct {
 	Scanline *int `json:"scanline,omitempty" jsonschema:"scanline to report (omit = every scanline that has writes)"`
 	Frames   int  `json:"frames,omitempty" jsonschema:"frames to trace (default 1); ADVANCES the emulator"`
 }
+// BeamtraceFrame is one traced frame's timeline. Frames are reported separately
+// rather than merged because the interesting kernels differ BETWEEN frames —
+// flicker and multiplexed sprites alternate which object a write feeds, and the
+// first frame after a setup is routinely atypical.
+type BeamtraceFrame struct {
+	Frame int             `json:"frame"`
+	Rows  []beamtrace.Row `json:"rows"`
+}
 type BeamtraceOut struct {
-	Frame  int             `json:"frame"`
-	Rows   []beamtrace.Row `json:"rows"`
-	Coords Coords          `json:"coords"`
+	// Every traced frame, in order. Until 2026-07-30 this tool traced `frames`
+	// frames, advanced the emulator by all of them, and then returned only the
+	// EARLIEST — measured: frames=4 from frame 5 left the machine at frame 9 and
+	// handed back frame 5 alone. Frame-to-frame comparison cannot be recovered by
+	// calling twice, because each call advances the machine, so the discarded
+	// frames were unreachable by any other route.
+	Frames []BeamtraceFrame `json:"frames"`
+	Coords Coords           `json:"coords"`
 }
 
 // handleBeamtrace returns the write→visible-pixel timeline for the current ROM:
@@ -1311,20 +1324,19 @@ func handleBeamtrace(ctx context.Context, req *mcp.CallToolRequest, in Beamtrace
 	if err != nil {
 		return nil, BeamtraceOut{}, err
 	}
-	frs := beamtrace.Frames(ws)
-	if len(frs) == 0 {
-		return nil, BeamtraceOut{Coords: coordsOf(e)}, nil
-	}
-	frame := frs[0]
-	var rows []beamtrace.Row
-	if in.Scanline != nil {
-		rows = append(rows, beamtrace.Timeline(ws, frame, *in.Scanline))
-	} else {
-		for _, sl := range beamtrace.Scanlines(ws, frame) {
-			rows = append(rows, beamtrace.Timeline(ws, frame, sl))
+	out := BeamtraceOut{Coords: coordsOf(e)}
+	for _, frame := range beamtrace.Frames(ws) {
+		bf := BeamtraceFrame{Frame: frame}
+		if in.Scanline != nil {
+			bf.Rows = append(bf.Rows, beamtrace.Timeline(ws, frame, *in.Scanline))
+		} else {
+			for _, sl := range beamtrace.Scanlines(ws, frame) {
+				bf.Rows = append(bf.Rows, beamtrace.Timeline(ws, frame, sl))
+			}
 		}
+		out.Frames = append(out.Frames, bf)
 	}
-	return nil, BeamtraceOut{Frame: frame, Rows: rows, Coords: coordsOf(e)}, nil
+	return nil, out, nil
 }
 
 type BeamRaceIn struct {
@@ -1740,7 +1752,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "beam_intervals", Description: "PROVE where every TIA write lands on the scanline, on EVERY path — the forall sibling of beamtrace, which answers for one execution. Assembles asm_path and carries elapsed cycles as an interval through each WSYNC-to-WSYNC region, so each write comes back with the earliest and latest beam clock it can reach (same coordinates as read_row: HBLANK -68..-1, visible 0..159), plus exact=true when its position does not depend on the path at all. A WIDE window is a finding, not a gap: it means the write's position varies with the branch taken, which is a bug in a kernel meant to be cycle-exact; crosses_line marks the worse case where even the SCANLINE depends on the path. Reach for it whenever a colour or graphics register is written after a branch, when one column of one line looks wrong, or to confirm a positioning write is genuinely cycle-exact before building on it. Nothing else in the 2600 ecosystem computes this — the state of the art is hand-counting a single path. Declines a bank-switched image: beam windows are computed from a flat-address decode of one 4K fold, and a confidently wrong beam clock looks exactly like a right one."}, handleBeamIntervals)
 	mcp.AddTool(server, &mcp.Tool{Name: "prove_line_budget", Description: "Statically PROVE a kernel's per-scanline cycle budget over ALL reachable paths (∀) — the static sibling of assert_line_budget, which observes only one run (∃). Assembles asm_path, decodes from the reset/IRQ/NMI vectors, cuts the CFG at every STA WSYNC, and proves each WSYNC-to-WSYNC region's worst-case CPU cycles <= budget (default 76). Returns certified plus any over-budget regions (each with a cycle-by-cycle worst path + source location) and any regions it could not bound (unbounded loop / JSR / indirect JMP), reported honestly rather than passed. Run it BEFORE executing a kernel to catch a branch path that overruns only sometimes — the timing trap that rolls the screen on hardware while a lucky run looks fine. Handles a BANK-SWITCHED cartridge as one merged program keyed on (bank, address): an instruction whose data access reaches a bank-switch hotspot continues at the same address in the bank that hotspot's own mapper symbol names, so a WSYNC-to-WSYNC region that crosses banks gets a real proven worst case (measured: litmus_bank 54cy, _f6 72cy, _f4 128cy — each equal to what the emulator measures for the same interval). Still refused and counted in unmodelled_switches, which blocks certification: an instruction whose own bytes span a hotspot, a jmp/jsr INTO one, an unresolvable indirect access under a hotspot-bearing mapper, a hotspot symbol that does not name a bank, and any mapper whose banks are not the whole 4K window at $F000. On a banked image @lines/@amax cannot be read (DASM's listing addresses are physical ROM offsets there) and source_annotations says so."}, handleProveLineBudget)
 	mcp.AddTool(server, &mcp.Tool{Name: "trace_clocks", Description: "Execute the next N instructions and return each one's beam anatomy: PC, opcode, CPU cycles (WSYNC stalls visible as large counts), and start/end (scanline, color clock). Sub-instruction OBSERVATION granularity — the practical recovery of step_clock (Gopher2600 cannot suspend mid-instruction; see docs/mcp-tools.md)."}, handleTraceClocks)
-	mcp.AddTool(server, &mcp.Tool{Name: "beamtrace", Description: "Write→visible-pixel timeline (authoring aid): trace `frames` frames and return, per scanline, every TIA write with the beam clock it lands at, the register name/kind, the value, and the visible-pixel span [vis_from,vis_to) it governs (until the next write to the same register). Answers 'where on the line does this sta GRP0 actually paint?'. Omit `scanline` for all scanlines that have writes. ADVANCES the emulator `frames` frames — set up the state first."}, handleBeamtrace)
+	mcp.AddTool(server, &mcp.Tool{Name: "beamtrace", Description: "Write→visible-pixel timeline (authoring aid): trace `frames` frames and return EVERY traced frame separately, each with, per scanline, every TIA write — the beam clock it lands at, the register name/kind, the value, and the visible-pixel span [vis_from,vis_to) it governs (until the next write to the same register). Answers 'where on the line does this sta GRP0 actually paint?', and with frames>1 also 'does it paint the same place NEXT frame?' — flicker and multiplexed sprites alternate between frames, and the first frame after a setup is routinely atypical. Comparing frames needs one call with frames>1: a second call cannot see the same frames, because every call ADVANCES the emulator `frames` frames. Omit `scanline` for all scanlines that have writes (payload grows with frames × scanlines; pass `scanline` to keep it narrow). Set up the state first."}, handleBeamtrace)
 	mcp.AddTool(server, &mcp.Tool{Name: "beam_race", Description: "Advisory beam-race report (authoring aid): for every pixel-data write (GRP0/GRP1/ENAM0/ENAM1/ENABL) over `frames` frames, the controlled object's X and whether the write reached the beam in time (before_beam = clock<=X; otherwise that line draws the PREVIOUS value = one-line lag). FACTUAL, no verdict — a 'late' line may be an intended next-line pre-load; use scenario checks.no_beam_race when you can declare intent. ADVANCES the emulator `frames` frames."}, handleBeamRace)
 	mcp.AddTool(server, &mcp.Tool{Name: "spritepos", Description: "Forward sprite-position solver (authoring aid): given target X (0..159) return the SetXPos routine input, the div-15-coarse/HMOVE-fine decomposition, a paste-able snippet, and the position the hardware ACTUALLY reaches (achieved_x = HmovedPixel, measured by running a calibration kernel — exact=true when it equals the target). The X(N) offset is kernel-specific, so the answer is verified, not trusted. Self-contained: does not use or disturb the loaded ROM."}, handleSpritepos)
 	mcp.AddTool(server, &mcp.Tool{Name: "watch_ram", Description: "Run instruction-by-instruction until RAM[addr] CHANGES (returns old/new value and the PC of the writing instruction), bounded by max_frames. Granularity is per-instruction (Gopher2600 cannot suspend mid-instruction); same-value stores are invisible to change detection."}, handleWatchRAM)
