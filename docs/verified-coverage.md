@@ -14,7 +14,7 @@ Legend: **ROM** = `roms/litmus/<x>.asm` · **Scenario** = `roms/litmus/scenarios
 | RIOT timer: 1/cycle countdown, post-underflow $FF wrap, TIMINT D7 set, **INTIM read clears it** | `litmus_timer` | INTIM/TIMINT snapshots to RAM |
 | Address mirrors: RAM $0180↔$0080 (stack page), TIA $0049→COLUBK | `litmus_mirror` | RAM readback + rendered bg color |
 | PAL 312-line frame (3/45/228/36) | `litmus_pal` | `ntsc_frame_lines == 312` with `tv_spec: PAL` |
-| Cycle counting invariant (exec×3 == color clocks) | `litmus_cycles` | white-box test; 1 frame = 263×76 = 19988 |
+| Cycle counting invariant (exec×3 == color clocks) | `litmus_cycles` | white-box test; per-instruction `exec×3 == color clocks`, re-based each frame. **★2026-07-30:** the old note "1 frame = 263×76 = 19988" was wrong — this ROM emits no VSYNC, so its frame grows 263→290→319→**350** (engine cap) and rests there; see `TestCyclesLitmusHasNoStableFrameLength` |
 | Per-scanline budget guard (overrun → halt) | `litmus_overrun` | `over=true`, `line_cycles=152`; no false positive on smoke/frogger |
 
 ## Horizontal position

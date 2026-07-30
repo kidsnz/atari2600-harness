@@ -115,7 +115,7 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
   ```
   - **Verification basis**: on a WSYNC-free ROM (`roms/litmus/litmus_cycles.bin`), since the CPU never stalls, the invariant
     "executed cycles × 3 == color clocks advanced" holds exactly at instruction boundaries. Cross-checked in
-    `internal/emu/emu_cycles_test.go`. One frame = 263 lines × 76 cy = `TotalCycles 19988`.
+    `internal/emu/emu_cycles_test.go`. **★corrected 2026-07-30:** this used to read "one frame = 263 lines × 76 cy = `TotalCycles 19988`", which is not what the ROM does. `litmus_cycles` emits **no VSYNC** — that is the point, the CPU never stops — so the frame length is set by the engine, not the ROM. Measured over consecutive frames: **263 → 290 → 319 → 350 → 350 …**, resting at `specification.AbsoluteMaxScanlines` (350), ~26600 cycles (26598-26601, so not exactly lines×76 every frame). The invariant the test checks re-bases at each frame boundary and never depended on that figure. Pinned by `TestCyclesLitmusHasNoStableFrameLength`.
 
 ### 4. `read_ram`
 - In: `struct{}`
