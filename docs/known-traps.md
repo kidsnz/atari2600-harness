@@ -10,13 +10,13 @@ Detection column: **static** = a source-text linter can flag it · **runtime** =
 `breakif` / `trace_clocks` · **manual** = judgment / pixel compare.
 
 > **★coverage, measured 2026-07-30 — "static" says a linter COULD flag it, not that one does.** 10 rows below
-> are marked static; `scripts/check_traps.py` implements **6 detectors** covering: unstable illegal opcodes,
+> are marked static; `scripts/check_traps.py` implements **7 detectors** covering: unstable illegal opcodes,
 > `LAX #imm`, `NOP $00`/`BIT $00`, variables in the `$F8-$FF` stack-collision zone, missing `CLD`/`CLEAN_START`
-> (which is also the post-reset-undefined row), and **new today**, reads of a write-only TIA register.
-> Page-cross `+1` is handled by `cyclebound`'s abstract interpreter rather than here. Still **unimplemented**:
-> F8/F6/F4 random boot bank, read of a write-only cartridge hotspot / SuperChip write port, `STA` to ROM,
-> and bank-move page-cross misalignment. The parenthetical below calling `check_traps.py` "the future trap
-> linter" is stale — it exists and runs in CI on every push; what is future is those four rows.
+> (which is also the post-reset-undefined row), and **new today**, reads of a write-only TIA register and
+> **`STA` to ROM**. Page-cross `+1` is handled by `cyclebound`'s abstract interpreter rather than here. Still **unimplemented**:
+> F8/F6/F4 random boot bank, read of a write-only cartridge hotspot / SuperChip write port, and bank-move
+> page-cross misalignment. The parenthetical below calling `check_traps.py` "the future trap linter" is
+> stale — it exists and runs in CI on every push; what is future is those three rows.
 
 **New static trap (2026-07-30): reading a write-only TIA register.** The TIA answers reads only at
 `$00-$0D` (`CXM0P`..`INPT5`; verified in Gopher2600 `cpubus.go TIAReadRegisters`). Everything from `$0E` (PF1)
@@ -25,6 +25,15 @@ repeatable while real hardware does not. Measured false positives: **0 across 12
 (31 techniques + 92 litmus), and the detector is not merely silent — the same scan matches 509 read-operand
 pairs in that corpus, so it is looking at something. Bait-tested in `--selftest`; negative control: disabling
 the rule fails the selftest by name.
+
+**New static trap (2026-07-30): `STA` into cartridge ROM.** The write is discarded, so a program that treats a
+ROM address as storage reads back whatever was assembled there. Bank-switch hotspots and the SuperChip write
+port are the legitimate exceptions, and both are deliberate — so intent is **declared, not inferred**: a line
+carrying `@rom-write-ok` is allowed, anything else is an ERROR. Measured over 123 ROMs: exactly **2** stores
+into cartridge space exist, both in `litmus_6502`, both aiming at ROM on purpose to time `STA abs,X` across a
+page boundary (its own comment already said so). Those two lines now carry the declaration — comment-only, ROM
+hash `7c16b7f…` identical before and after — and the corpus is clean. Negative control: removing one
+declaration brings the ERROR back.
 
 > Provenance: every row cites the mined thread(s) it came from. Raw notes in `reference/atariage/<id>-*/notes.ja.md`.
 

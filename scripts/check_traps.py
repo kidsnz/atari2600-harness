@@ -39,6 +39,14 @@ TIA_WRITE_ONLY = {
     "VDELP1": 0x26, "VDELBL": 0x27, "RESMP0": 0x28, "RESMP1": 0x29, "HMOVE": 0x2A,
     "HMCLR": 0x2B, "CXCLR": 0x2C,
 }
+# カートリッジ空間（$1000-$1FFF と $F000-$FFFF ミラー）への書き込み。ROM は書けないので
+# 値は消える——バンク切替ホットスポットと SuperChip の書込ポートだけが例外で、どちらも
+# 「意図してやっている」もの。意図は推測できないので宣言させる: 行末に `@rom-write-ok`。
+# 実測 2026-07-30: roms/techniques + roms/litmus の 123 本で該当は 2 件だけ、どちらも
+# litmus_6502 が「STA abs,X はページ跨ぎでも 5cy 固定」を測るためにわざと ROM を狙った行で、
+# ソース側のコメントにもそう書いてある。だから既定を ERROR にしたうえで、その 2 行に宣言を付けた。
+STORE_OP = re.compile(r"\b(sta|stx|sty)\s+\$([0-9a-fA-F]{3,4})", re.I)
+
 READ_OP = re.compile(
     r"\b(lda|ldx|ldy|bit|cmp|cpx|cpy|adc|sbc|and|ora|eor)\s+(?!#)(\$?[0-9a-zA-Z_]+)", re.I)
 
@@ -67,6 +75,14 @@ def scan_text(asm):
         m = re.search(r"=\s*\$(f[89a-f])\b", low) or re.search(r"\bequ\s+\$(f[89a-f])\b", low)
         if m:
             warns.append((n, f"variable at $%s — JSR pushes onto the $0100/$00FF stack mirror and can clobber it (keep vars from $80)" % m.group(1).upper()))
+        # 6) ROM への書き込み（宣言が無いもの）〔known-traps C / 採掘 285759,204819〕
+        m = STORE_OP.search(code)
+        if m and "@rom-write-ok" not in raw:
+            a = int(m.group(2), 16)
+            if 0x1000 <= a <= 0x1FFF or 0xF000 <= a <= 0xFFFF:
+                errors.append((n, f"stores to ${a:04X}, which is cartridge ROM — the write is discarded. "
+                                  f"If it is a bank-switch hotspot or a SuperChip write port, say so with "
+                                  f"`; @rom-write-ok` so the intent is declared rather than guessed"))
         # 5) 書込専用 TIA レジスタの読み出し〔known-traps / Gopher2600 cpubus.TIAReadRegisters=$00-$0D〕
         #    誤検出ゼロを実測: roms/techniques + roms/litmus の 123 本で 0 件（読み系オペコードの
         #    マッチ自体は 509 件あるので、検出器が黙っているのではなく本当に無い）。
@@ -107,13 +123,14 @@ Start
         nop $00           ; bankswitch trap on 3F
 flag    = $ff             ; var in stack-collision zone
         lda GRP0          ; read of a write-only TIA register
+        sta $F123         ; write into cartridge ROM, undeclared
         ; (intentionally no CLD / CLEAN_START)
 """
 
 
 def selftest():
     errors, warns = scan_text(BAIT)
-    want = ["lxa", "LAX #imm", "bankswitch", "variable at $FF", "no CLD", "WRITE-ONLY TIA register"]
+    want = ["lxa", "LAX #imm", "bankswitch", "variable at $FF", "no CLD", "WRITE-ONLY TIA register", "cartridge ROM"]
     blob = " ".join(m for _, m in errors + warns)
     missing = [w for w in want if w not in blob]
     if missing:

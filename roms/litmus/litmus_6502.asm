@@ -63,13 +63,13 @@ Cont2:
         ; --- (4) STA abs,X 跨ぎ無/有（ROM 空間へ書く＝無害） ---
         lda #$80
         sta TIM1T
-        sta $F010,x         ; 同ページ (5cy 固定)
+        sta $F010,x         ; 同ページ (5cy 固定) @rom-write-ok（ROM を狙うのが目的＝書込は捨てられてよい）
         lda INTIM
         eor #$FF
         sta $95
         lda #$80
         sta TIM1T
-        sta $F0FB,x         ; 跨ぎ (5cy 固定のはず)
+        sta $F0FB,x         ; 跨ぎ (5cy 固定のはず) @rom-write-ok（同上）
         lda INTIM
         eor #$FF
         sta $96
