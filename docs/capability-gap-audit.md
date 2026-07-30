@@ -1662,8 +1662,23 @@ of its numbers did not survive.**
 
 **Still open from the same review, recorded rather than fixed** (each needs its own measurement):
 the cross-bank edge semantics are taken from `mapper_atari.go` and applied to every mapper (**= Stage 4, still
-open**); `analysisUnits` can return an empty unit list with no decline reason; (the skip finding is closed
-above).
+open**); (the other two are closed below).
+
+> **★CLOSED 2026-07-30 — the empty unit list, and the answer is "not reachable, and here is the proof".**
+> The concern was that `analysisUnits` could return an empty unit list with no decline reason, which every
+> caller reads as permission to proceed before finding nothing to analyse and reporting zero regions — and a
+> zero-region report reads as a clean one. **Measured: it cannot.** Deleting the dedicated `len(units) == 0`
+> guard and re-running shows the function still declines, through `len(units) != banks` (0 ≠ 2), only with a
+> vaguer reason. Since `analysisUnits` returns early for `banks <= 1`, there is no input where the count check
+> lets an empty list through. The dedicated guard is redundancy that buys a specific message, not the thing
+> standing between the caller and a silent empty analysis.
+>
+> What was genuinely missing is that **none of these guards had ever run**. They fire only on cartridge shapes
+> no ROM in this repo has — an empty bank, a 2K segment, a bank at a second origin, fewer banks readable than
+> reported — so they were untested code that could not be shown to work. The validation is now split out as
+> `unitsFromBanks(id, banks, contents, hotspots)`, a pure function over fabricated bank images, and
+> `TestUnitsFromBanksDeclinesByName` drives all five declines plus the accepting case (or a function that
+> refused everything would pass). Pure refactor: all 122 corpus ROMs byte-identical.
 
 > **★CLOSED 2026-07-30 — the absent abstract state.** The third item read: `determineBound`'s predecessor scan
 > passes `absStates[pred]` where an absent entry is the zero `State`, whose ranges are `Top=false, Lo=0, Hi=0`

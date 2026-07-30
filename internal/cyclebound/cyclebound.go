@@ -283,6 +283,14 @@ func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
 		return nil, fmt.Sprintf("cartridge is mapper %s with %d banks and its banks could not be "+
 			"read for analysis: %v", id, banks, err)
 	}
+	return unitsFromBanks(id, banks, contents, hotspots)
+}
+
+// unitsFromBanks turns the engine's bank images into analysis units, or declines by
+// name. Split out of analysisUnits so its guards can be exercised directly: every
+// one of them fires only on a cartridge shape no ROM in this repo has, so without a
+// test they are code that has never run and cannot be shown to work.
+func unitsFromBanks(id string, banks int, contents []emu.CartBank, hotspots map[uint16]string) ([]analysisUnit, string) {
 	var units []analysisUnit
 	for _, c := range contents {
 		if len(c.Data) == 0 {
