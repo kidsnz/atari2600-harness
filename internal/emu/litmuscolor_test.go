@@ -11,8 +11,14 @@ import "testing"
 // `setBackground(data.Value & 0xfe)` — so stepping the register by 1 changes the
 // COLOUR only every second line.
 //
-// Measured over the readable window (absolute scanlines 29..239, 211 rows): every row
-// is a single uniform run, and there are 95 distinct colours across them, not 211.
+// Measured over the readable window (absolute scanlines 29..242, 214 rows): every row
+// is a single uniform run, and there are 95 distinct colours across them, not 214 —
+// a ratio of 0.44, with 117 rows repeating the row above.
+//
+// ★The first version of this comment said "29..239, 211 rows". That was my measuring
+// loop stopping at 240, not the ROM: the visible window is 29..242 and ReadRow accepts
+// all of it. The conclusion (colour changes every second line) was unaffected, the
+// window was not. See TestRowCoordinateSystemIsOne, which now pins the window itself.
 // That halving is the fact an author needs: a vertical gradient driven by a counter
 // has at most 128 steps, and stepping by 1 wastes half of them.
 func TestLitmusColorSteppingIsEveryTwoLines(t *testing.T) {
@@ -31,7 +37,7 @@ func TestLitmusColorSteppingIsEveryTwoLines(t *testing.T) {
 
 	var cols []string
 	nonUniform := 0
-	for sl := 0; sl < 240; sl++ {
+	for sl := 0; sl < 300; sl++ { // 300, not 240: the window ends at 242 and a short loop under-counts it
 		runs, w, err := e.ReadRow(sl)
 		if err != nil || len(runs) == 0 {
 			continue

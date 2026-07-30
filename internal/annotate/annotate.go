@@ -13,8 +13,8 @@ import (
 	"sort"
 
 	"github.com/fogleman/gg"
-	"golang.org/x/image/font/basicfont"
 	xdraw "golang.org/x/image/draw"
+	"golang.org/x/image/font/basicfont"
 )
 
 // Marker は 1 オブジェクトの横位置マーカー。Clock は可視 0..159（HmovedPixel）。負なら描かない。
@@ -49,8 +49,17 @@ var (
 	// 半透明は setLine 側で dc.SetRGBA（非乗算 0..1）を使う。
 	gridMinorA = 30.0 / 255
 	gridMajorA = 70.0 / 255
-	labelCol  = color.RGBA{205, 215, 225, 255}
+	labelCol   = color.RGBA{205, 215, 225, 255}
 )
+
+// GridScanline は画像行 row に対してグリッドが描く y ラベル＝絶対 scanline を返す。
+// GridRow はその逆。この2つが read_row / decompose_row の引数規約の唯一の定義であり、
+// 「スクリーンショットで見えた y をそのまま渡せる」という約束はここ1か所に集約されている。
+// 以前は同じ式が Render と emu.ReadRow に別々に書かれていた（v1.4.0 で一度ズレて修正済み）。
+func GridScanline(visibleTop, row int) int { return visibleTop + row }
+
+// GridRow は GridScanline の逆変換。
+func GridRow(visibleTop, scanline int) int { return scanline - visibleTop }
 
 // Render は注釈付き画像を返す。scale は整数倍率（×3〜4 推奨）。visibleTop は
 // 縦ラベルを絶対 scanline で出すための起点（クロップ y=0 の絶対 scanline）。
@@ -97,7 +106,7 @@ func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.R
 		dc.Stroke()
 		if major && r != 0 { // r=0 は左上の clock ラベルと衝突するため省略
 			dc.SetColor(labelCol)
-			dc.DrawStringAnchored(fmt.Sprintf("%d", visibleTop+r), left-3, cy(r), 1, 0.5)
+			dc.DrawStringAnchored(fmt.Sprintf("%d", GridScanline(visibleTop, r)), left-3, cy(r), 1, 0.5)
 		}
 	}
 
@@ -149,7 +158,6 @@ func setLine(dc *gg.Context, major bool) {
 	}
 	dc.SetLineWidth(1)
 }
-
 
 // upscale は nearest-neighbor で整数倍拡大（ピクセルを鮮明に保つ）。
 func upscale(src *image.RGBA, scale int) *image.RGBA {

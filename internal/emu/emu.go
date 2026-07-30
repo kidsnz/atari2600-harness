@@ -1347,17 +1347,21 @@ type RowRun struct {
 	Hex   string `json:"hex"`   // 表示 RGB（RRGGBB）。背景か前景かは色で判定
 }
 
-// ReadRow は指定した可視 scanline（注釈グリッドの y と同座標、0 起点）の 1 ライン分の
+// ReadRow は指定した**絶対** scanline（注釈グリッドの y ラベルと同じ数）の 1 ライン分の
 // ピクセル色を、横方向に連長エンコード(RLE)して返す。playfield の点灯列や per-scanline 色を
 // 目視でなく数値で確かめるための土台。width は可視幅（通常 160）。
-// 注: グリッドの y ラベルは visibleTop + 画像行（annotate.Render と同じ式）。ここでも
-// visibleTop を引いて画像行へ変換する＝「グリッドで見えた y をそのまま渡せる」を守る
+//
+// 座標規約: 引数は「スクリーンショットで見えた y をそのまま」。グリッドの y ラベルは
+// annotate.GridScanline(visibleTop, 画像行) ＝ visibleTop + 画像行 なので、絶対 scanline であって
+// 0 起点ではない（旧コメントは「0 起点」と書いており、そこだけが誤り。実装は当時から正しい）。
+// 変換式は annotate.GridRow ただ1か所にある＝Render と食い違いようがない
 // （v1.4.0 修正: 以前はクロップ後の画像行を直接受けており、グリッドと ~visibleTop ずれていた）。
+// DecomposeRow も同じ絶対座標で、受け付ける範囲も同一（TestRowCoordinateSystemIsOne が実測で固定）。
 func (e *Emu) ReadRow(scanline int) (runs []RowRun, width int, err error) {
 	img, visibleTop := e.cap.snapshot()
 	w := img.Bounds().Dx()
 	h := img.Bounds().Dy()
-	row := scanline - visibleTop
+	row := annotate.GridRow(visibleTop, scanline)
 	if row < 0 || row >= h {
 		return nil, w, fmt.Errorf("scanline %d out of visible range %d..%d", scanline, visibleTop, visibleTop+h-1)
 	}
