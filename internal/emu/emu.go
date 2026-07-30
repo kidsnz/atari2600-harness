@@ -51,7 +51,7 @@ type Emu struct {
 	// AT-5: per-pixel の描画オブジェクト帰属（PF/P0/P1/M0/M1/BL/BG）。elemCB を毎カラー
 	// クロック呼び、GetLastSignal().Index を索引に Video.LastElement を記録する。
 	// 値は element+1（0=未記録）。elemCB=nil のとき VCS.Step(nil) と等価＝ゼロコスト。
-	elemBuf []uint8          // 索引 = signal.Index（フルフレーム 228×scanline 空間）
+	elemBuf []uint8 // 索引 = signal.Index（フルフレーム 228×scanline 空間）
 	// hmRipple / hmFlags は elemBuf と同じ索引で HMOVE 機構の状態を毎カラークロック記録する。
 	// 現在値の読み出しだけでは足りない：リップルはカラークロック単位で動くので、命令単位で
 	// 標本化すると値が飛び、実測で 16 値中 3 値しか見えず終了も一度も捕まらなかった。
@@ -61,7 +61,7 @@ type Emu struct {
 	// player/missile なら NUSIZ 複製のコピー番号、playfield なら PF0/1/2 のどれか。
 	// 0 は未記録の番兵で、格納値は実際の値 +1。
 	elemCtBuf []uint8
-	elemCB  func(bool) error // 事前確保クロージャ（stepInstr で毎回渡す。per-call alloc 回避）
+	elemCB    func(bool) error // 事前確保クロージャ（stepInstr で毎回渡す。per-call alloc 回避）
 
 	// フレーム内ウォッチ（StartFrameWatch / FrameWatch）。watching=false でゼロコスト。
 	watching bool
@@ -70,8 +70,8 @@ type Emu struct {
 	// 「このフレームで起きたか」しか言えず、「どこで起きたか」は命令が退役する頃には
 	// ビームが移動して失われている。nil の間はゼロコスト。
 	cxFirst map[video.CollisionEvent]CollisionSite
-	spLow    uint8                // SP が到達した最小値
-	spHigh   uint8                // SP が到達した最大値（低い値に「固定」なのか「途中で降りた」のかを区別する）
+	spLow   uint8 // SP が到達した最小値
+	spHigh  uint8 // SP が到達した最大値（低い値に「固定」なのか「途中で降りた」のかを区別する）
 }
 
 // EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。
@@ -591,8 +591,16 @@ const (
 )
 
 type HmoveState struct {
-	Latch  bool  `json:"latch"`  // HMOVE has been triggered on this scanline (cleared at line start)
-	Ripple uint8 `json:"ripple"` // counts 15 down to 0, then rests at 255 (= -1)
+	Latch bool `json:"latch"` // HMOVE has been triggered on this scanline (cleared at line start)
+	// Ripple is the counter's value AS SAMPLED once per colour clock. The engine
+	// loads it with 15, but that value is gone before the next sample point, so the
+	// series an observer actually sees is 14 -> 0 -> 255 (rest). Measured over 6
+	// frames on four HMOVE-using ROMs (litmus_hmove, hscroll, multicolor48,
+	// venetian): 15 appears exactly ONCE in each, while 14, 13, ... 1, 0 each appear
+	// once per HMOVE (28, 8, 28, 28). Waiting for Ripple == 15 to catch the start of
+	// a ripple therefore misses 27 of 28 of them. Nothing in this repo does that
+	// today; the comment is here so nothing starts.
+	Ripple uint8 `json:"ripple"` // sampled: 14 down to 0, then rests at 255 (= -1)
 	// RippleActive is the TIA's OWN definition of "the counter is running", not a
 	// test invented here. The obvious `Ripple != 255` is wrong at both ends: it
 	// calls the idle-but-not-yet-wrapped value 0 active, and it calls the cycle the
@@ -1693,8 +1701,8 @@ type LineWorst struct {
 	// 1行へ融合し、静的証明との突合が「半分を試験しながら合格」になる。今のコーパスは
 	// たまたまバンク間で同一アドレスを実行しないので露見しないが、それは ROM の配置
 	// が偶然そうであるだけで、計測器の正しさではない。
-	Bank      int  `json:"bank,omitempty"`
-	BankValid bool `json:"bank_valid,omitempty"`
+	Bank          int     `json:"bank,omitempty"`
+	BankValid     bool    `json:"bank_valid,omitempty"`
 	At            string  `json:"at,omitempty"`    // ソース位置（cmd/harness が srcmap で充填・emu は触らない）
 	Count         int     `json:"count"`           // 計測できた区間数
 	WorstCycles   int     `json:"worst_cycles"`    // 実測ワースト CPU サイクル（ビーム座標から厳密算出）
