@@ -2,7 +2,7 @@
 
 **This is the single entry point for making a ROM.** It activates the whole accumulated knowledge base in
 order, so nothing rots unused. The loop is self-strengthening: each production sharpens the rules/checks
-(compounding). Rule: [[feedback-authoring-loop-system]] / [[knowledge-activation-architecture]]. Goal:
+(compounding). Rule: [[knowledge-activation-architecture]]. Goal:
 [[project-roadmap-to-pong-capstone]].
 
 ## How a veteran builds (the mined pro workflow — A–E)

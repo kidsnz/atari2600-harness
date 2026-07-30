@@ -4,7 +4,7 @@ A catalog of the Atari 2600 traps mined from AtariAge that **do not show up as a
 emulator run** but corrupt the result on real hardware (or in a stricter emulator). Past Pong attempts died
 on exactly this class of bug ("unverified timing / positioning"). This is the **pre-flight checklist** the
 authoring loop runs before shipping a kernel, and the **spec for `scripts/check_traps.py`** (the future
-trap linter, [[feedback-authoring-loop-system]]).
+trap linter, [[knowledge-activation-architecture]]).
 
 Detection column: **static** = a source-text linter can flag it · **runtime** = needs a sim assert /
 `breakif` / `trace_clocks` · **manual** = judgment / pixel compare.
