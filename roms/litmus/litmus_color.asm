@@ -4,7 +4,12 @@
 ;
 ; 手法: 可視 192 ラインのループで毎ライン `stx COLUBK`（x = 下りカウンタ 191..0）。
 ;       各ラインが異なる単色背景になる。playfield は未使用＝各 read_row は全幅 160 の単一 run。
-; 期待: read_row を複数 scanline で呼ぶと、背景 hex が**ライン毎に違い**かつ**行内は均一**。
+; ★訂正 2026-07-30（実測）: 「各ラインが異なる単色背景になる」は誤り。TIA は COLUBK の
+;   **ビット0を捨てる**（Gopher2600 video.go: setBackground(data.Value & 0xfe)）ので、
+;   カウンタを1ずつ動かしても色は**2ラインごとにしか変わらない**。実測＝可視 211 行に対して
+;   distinct 95 色。縦グラデは最大128段であり、1ずつ刻むと半分を捨てることになる。
+;   固定＝internal/emu.TestLitmusColorSteppingIsEveryTwoLines。
+; 期待: read_row を複数 scanline で呼ぶと、背景 hex が**2ラインごとに変わり**かつ**行内は均一**。
 ;       具体的には COLUBK = (192 − 可視scanline) 付近の値に対応した色。
 
         processor 6502

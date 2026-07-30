@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """check_wiring.py — 知識の「持ち腐れ」を構造的に防ぐ配線チェック。
 
+検査は2本立て:
+  ① docs/*.md が入口（CLAUDE.md routing / authoring-protocol.md）から辿れるか。
+  ② roms/litmus/*.asm が「回帰の網」に入っているか＝シナリオ or コード/テストから参照されているか。
+
+②の理由（2026-07-30 実測）: litmus は 91 本あり、42 本にシナリオが無い。うち 40 本は Go テストが
+直接使っているので健全だが、**2 本（cb_roll / litmus_color）はどこからも参照されていなかった**。
+cb_roll はその間に主張が腐った——「cb_clean と画素完全一致」と書いてあったが実測では 192 行中 1 行違う。
+検証用 ROM が誰にも実行されないのは、検証していないのと同じ。
+
 ルール（[[knowledge-activation-architecture]]）：harness の知識は**入口から辿れて初めて機能する**。
 `docs/*.md`（公開・英語）が **CLAUDE.md の routing** か **docs/authoring-protocol.md（制作の背骨）** の
 どちらかから参照されていなければ「孤立 doc ＝発火しない持ち腐れ予備軍」とみなして CI を落とす。
@@ -19,6 +28,46 @@ HARNESS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__
 ENTRYPOINTS = ["CLAUDE.md", os.path.join("docs", "authoring-protocol.md")]
 # 入口自身・索引/履歴系は対象外（参照する側）。
 SKIP = {"authoring-protocol.md", "mining-digest.md", "provenance.md"}
+
+
+def litmus_orphans():
+    """回帰の網の外にいる litmus ROM を返す。網＝シナリオ or コード/テスト/スクリプトからの参照。"""
+    lit_dir = os.path.join(HARNESS, "roms", "litmus")
+    if not os.path.isdir(lit_dir):
+        return [], 0, 0, 0
+
+    # 参照側テキストを一度だけ集める（ROM 自身と CHANGELOG は除く＝履歴は「使っている」ではない）。
+    # THIS FILE IS EXCLUDED, and the reason is a defect it had for ten minutes: the
+    # docstring above names cb_roll and litmus_color as examples, the scan read every
+    # *.py including this one, and both ROMs came back "referenced". A checker that
+    # satisfies itself by explaining what it checks reports 0 orphans forever.
+    me = os.path.abspath(__file__)
+    refs = ""
+    for pat in ("**/*.go", "**/*.py", "**/*.sh", "**/*.json"):
+        for f in glob.glob(os.path.join(HARNESS, pat), recursive=True):
+            if os.path.abspath(f) == me:
+                continue
+            if os.sep + "roms" + os.sep + "litmus" + os.sep in f and not f.endswith(".json"):
+                continue
+            try:
+                refs += open(f, encoding="utf-8", errors="ignore").read()
+            except OSError:
+                pass
+
+    orphans, via_scenario, via_code = [], 0, 0
+    asms = sorted(glob.glob(os.path.join(lit_dir, "*.asm")))
+    for f in asms:
+        base = os.path.basename(f)[:-4]
+        short = base[len("litmus_"):] if base.startswith("litmus_") else base
+        if os.path.isfile(os.path.join(lit_dir, "scenarios", base + ".json")) or \
+           os.path.isfile(os.path.join(lit_dir, "scenarios", short + ".json")):
+            via_scenario += 1
+            continue
+        if base in refs:
+            via_code += 1
+            continue
+        orphans.append("roms/litmus/" + base + ".asm")
+    return orphans, len(asms), via_scenario, via_code
 
 
 def main():
@@ -45,7 +94,19 @@ def main():
         print("\nWire each into CLAUDE.md's routing table (or link from docs/authoring-protocol.md) so the")
         print("knowledge actually fires at authoring time. (rule: knowledge-activation-architecture)")
         sys.exit(1)
+    lit, total, via_scenario, via_code = litmus_orphans()
+    if lit:
+        print("LITMUS ORPHANS — these verification ROMs are run by nothing (no scenario, no test, no tool):")
+        for o in lit:
+            print("  ✗", o)
+        print("\nA litmus nobody runs is not verification. Give it a scenario in roms/litmus/scenarios/,")
+        print("or a Go test that names it. Measured cost of skipping this: cb_roll sat unreferenced and its")
+        print("header's claim (\"pixel-identical to cb_clean\") drifted to false — 1 of 192 rows differ.")
+        sys.exit(1)
+
     print("wiring OK — every docs/*.md is reachable from an entrypoint (no orphaned knowledge).")
+    print(f"litmus OK — {total} ROMs in the regression net: {via_scenario} via scenario, "
+          f"{via_code} via a test or tool, 0 orphaned.")
 
 
 if __name__ == "__main__":
