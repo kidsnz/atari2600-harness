@@ -1,11 +1,19 @@
-; cb_roll — INVISIBILITY demo: a striped background plus ONE heavy line per frame
-; that eats a 2nd scanline (262 -> 263 lines). NOTE: this is NOT visible — the
-; TV's auto-sync absorbs a one-line slip, so cb_roll and cb_clean render
-; pixel-identically (verified 2026-06-17). That is the whole point: a small
-; per-scanline overrun is unseeable, so you cannot catch it by eye — only the
-; numbers differ. VV-2 (prove_line_budget) flags this heavy line as over-budget
-; statically over ALL paths, which is exactly why a static prover is needed.
-; Pair with cb_clean (no heavy line) to confirm they look the same. Self-contained.
+; cb_roll — NEAR-INVISIBILITY demo: a striped background plus ONE heavy line per
+; frame that eats a 2nd scanline (262 -> 263 lines).
+;
+; ★RE-MEASURED 2026-07-30. This header used to say cb_roll and cb_clean render
+; "pixel-identically". They do not, and the true number is a better argument than
+; the false one: of the 192 visible scanlines, EXACTLY ONE differs — scanline 133,
+; where the stolen line duplicates the stripe above it ($060606 where cb_clean has
+; $380774). Everything else, including the frame's total visible content, is
+; identical. The TV's auto-sync absorbs the one-line slip so the picture does not
+; roll; what it leaves behind is a single doubled stripe in 192.
+;
+; That is the whole point: one row in 192 is not something you catch by eye, while
+; the numbers differ unambiguously (263 vs 262 scanlines). VV-2
+; (prove_line_budget) flags this heavy line as over-budget statically over ALL
+; paths, which is exactly why a static prover is needed. Pinned by
+; internal/emu.TestCbRollIsOneRowFromCbClean. Pair with cb_clean. Self-contained.
 
         processor 6502
 

@@ -203,9 +203,13 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   **unbounded**, not over-estimated into a false violation; a ROM with no reachable `STA WSYNC` (bank-switched
   display loop) is reported unbounded, never vacuously certified. Tightening the remaining loop idioms
   (constant-propagation to bound divide-by-15) and infeasible-path exclusion is **VV-14** territory. **Limit /
-  why this prover exists:** a *small* per-scanline overrun (one heavy line = 262→263 scanlines) is **visually
-  invisible** — the TV's auto-sync absorbs a one-line slip, so `cb_roll` (over) and `cb_clean` (clean) look
-  pixel-identical (verified 2026-06-17). Visual checking is unfit for this class of defect; only the numbers
+  why this prover exists:** a *small* per-scanline overrun (one heavy line = 262→263 scanlines) is
+  **all but invisible** — the TV's auto-sync absorbs the one-line slip so the picture does not roll.
+  **★re-measured 2026-07-30:** the older claim here was that `cb_roll` and `cb_clean` are *pixel-identical*,
+  and they are not: of 192 visible scanlines **exactly one differs** (scanline 133, where the stolen line
+  duplicates the stripe above it — `$060606` against `$380774`). One row in 192 is not something anyone
+  catches by eye, while 263 against 262 is unambiguous, so the true number argues for the prover better than
+  the false one did. Pinned by `internal/emu.TestCbRollIsOneRowFromCbClean`. Visual checking is unfit for this class of defect; only the numbers
   differ — the unseen overrun is exactly VV-2's territory. **Green-ification (2-line kernels) ✅ mechanism done
   (v1.89.0):** a `; @lines N` note on the source line that opens a WSYNC region sets that region's budget to
   N*76, so a legitimate 2-line kernel (~152cy between WSYNCs: multicolor48 / score6 / tia_pcm / exerciser) is
