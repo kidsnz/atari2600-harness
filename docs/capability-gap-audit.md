@@ -1795,6 +1795,32 @@ Two were re-verified by hand before any were acted on, because a sweep that trus
 same failure one level up: `read_row`'s tag at `main.go:575`/`:607` and `assert_line_budget`'s
 `lines * 76` at `emu.go:1683` were both read directly. Both hold.
 
+**The sweep's own denominator was wrong — 38 of 41.** The shard list came from grepping `mcp.AddTool` in
+`main.go`, and `save_state` / `restore_state` / `probe_ram_semantics` are registered from
+`tools_state.go`, so three tools were never looked at while the write-up said "all 38". Swept by hand
+afterwards: **clean**. `probe_ram_semantics` rejects anything outside `$80-$FF` with a named error rather
+than probing it silently (`ramprobe.go:105`), its `top` really is by effect size (`sort.SliceStable` on
+`MaxChanged`, `ramprobe.go:149`), and `restore_state` errors with the list of saved slots when the slot is
+missing. Recording the miscount rather than quietly fixing the number: a coverage claim whose denominator
+was never checked is the same defect this whole section is about — `timinglint`'s "0 false positives on all
+31 kernels" was true of 30.
+
+**`breakif` turned out to be worse than the finding said, and only measurement showed it.** The report was
+"the advertised range 0-227 does not exist". Driving the built server found the real shape: the halt
+condition was an *equality* on the beam clock, and observations only happen at instruction boundaries — the
+CPU advances 3 colour clocks per cycle, so **one phase in three is observable at all**, and on a WSYNC
+kernel a visible scanline is observed at **7 clocks, every one inside HBLANK**. The entire visible region
+0..159 was unreachable. So the tool did not merely have a wrong range: for most positions a caller could
+name, it ran to `max_frames` and returned `halted=false` — indistinguishable from "not yet". Fixed to halt
+at or past the target, with out-of-range now an error.
+
+**Status: 7 of 8 fixed** (`spritey`, `read_row`/`decompose_row`, `beamtrace`, `breakif`, `step_scanline`,
+`assert_line_budget`, `read_audio`, `analyze_image`). **Open: `beam_intervals`** — `clockAt`
+(`beaminterval.go:109`) folds modulo 228, so a window running past the end of the line returns
+`min_clock > max_clock` while `crosses_line` stays false. That one is not a description fix: the honest
+repair is to set `crosses_line` when the fold happens, which touches a prover whose soundness is graded
+7117/7117, so it needs its own measurement first.
+
 **The shape worth keeping.** Six of the eight are `misleads-into-wrong-measurement` and two are
 `hides-an-existing-capability`, and the second kind cost real time this week: two separate attempts to
 measure a horizontal trajectory were hand-rolled against the wrong tool because the right one did not say
