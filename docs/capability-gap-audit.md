@@ -1661,8 +1661,35 @@ of its numbers did not survive.**
    analysed as flat.
 
 **Still open from the same review, recorded rather than fixed** (each needs its own measurement):
-the cross-bank edge semantics are taken from `mapper_atari.go` and applied to every mapper (**= Stage 4, still
-open**); (the other two are closed below).
+(all three are closed below).
+
+> **★CLOSED 2026-07-30 — Stage 4: the edge model is now named per mapper.** The cross-bank edge this package
+> models is Atari's — *the access selects the bank its hotspot SYMBOL names, PC is untouched, the next fetch is
+> the following address in that bank* — and it was applied to any cartridge that merely LOOKED like Atari's.
+> Every gate before it is **geometric** (bank count, 4K per bank, one origin at `$F000`, no mapped RAM), and
+> geometry says nothing about how a mapper picks its target bank.
+>
+> **WF8 is the measured proof, not a hypothetical.** It is 8K, two 4K banks at `$F000`, no RAM, and it publishes
+> `$1FF8:BANK0` / `$1FF9:BANK1` — it clears **every** geometric gate. Its actual switch
+> (`mapper_atari_wf8.go` `wf8.bankswitch`) responds **only to `$0FF8`** and takes the target from **data bus
+> bit 2**. So the old model would (a) invent an edge for `$1FF9`, an address that does nothing at all on that
+> cartridge, and (b) send `$1FF8` to bank 0 on the strength of a symbol when the hardware goes to bank 0 **or**
+> 1 depending on the value written. Both are edges the machine does not take, and a wrong edge can **shorten**
+> the longest path.
+>
+> `verifiedEdgeSemantics` now lists the IDs whose rule was READ in the engine source, and the value is the
+> evidence rather than a label — each cites the file and the `bankswitch` function: **F8, F6, F4, EF, BF, DF,
+> JANE** (JANE takes a `data` argument and does not read it). `knownDifferentEdgeSemantics` names **WF8/WFSC**
+> so the refusal says what is actually wrong instead of "unverified". Everything else declines with the list of
+> what has been checked. **Of the engine's 32 mapper IDs: 7 verified, 25 declined.**
+>
+> The property that survives an upstream release is that the DEFAULT is decline: a mapper added to Gopher2600
+> tomorrow is refused by name, not analysed under Atari's rule because nobody noticed.
+> `TestEdgeSemanticsAreNamedPerMapper` pins all 32 IDs, requires WF8's refusal to state its real reason,
+> requires every "verified" entry to cite a `.go` file and `bankswitch`, and fails if the table ever verifies
+> nothing or declines nothing. `TestCorpusBankROMsUseVerifiedMappers` drives the real path so the table is
+> exercised rather than merely present. All 122 corpus ROMs byte-identical. Negative control: restoring
+> accept-everything fails with 25 named mappers.
 
 > **★CLOSED 2026-07-30 — the empty unit list, and the answer is "not reachable, and here is the proof".**
 > The concern was that `analysisUnits` could return an empty unit list with no decline reason, which every

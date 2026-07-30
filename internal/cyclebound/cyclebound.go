@@ -268,6 +268,28 @@ func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
 	if banks <= 1 {
 		return flat, ""
 	}
+	// The cross-bank edge this package models — "the access selects the bank its
+	// hotspot SYMBOL names, and the next fetch happens at the following address in
+	// that bank" — is Atari's, read out of mapper_atari.go. Every gate up to here is
+	// GEOMETRIC (bank count, 4K, one origin, no mapped RAM), and geometry does not
+	// tell you how a mapper decides its target bank. A mapper can pass all of them
+	// and still switch by a different rule.
+	//
+	// Measured, and it is not hypothetical: WF8 is 8K, two 4K banks at $F000, no
+	// RAM, and publishes $1FF8:BANK0 / $1FF9:BANK1 — it clears every gate. Its actual
+	// bankswitch (mapper_atari_wf8.go) responds ONLY to $0FF8 and takes the target
+	// from DATA BUS BIT 2. So this analysis would (a) invent an edge for $1FF9, which
+	// does nothing at all on that cartridge, and (b) send $1FF8 to bank 0 on the
+	// strength of a symbol, when the hardware goes to bank 0 or 1 depending on the
+	// value being written. Both are edges the machine does not take, and a wrong edge
+	// can SHORTEN the longest path.
+	//
+	// So the mapper is named explicitly. An ID that is not in the table is declined
+	// as unverified rather than assumed to behave like Atari's — the point being that
+	// when the engine gains a mapper, this package says so instead of guessing.
+	if why := unverifiedEdgeSemantics(id); why != "" {
+		return nil, why
+	}
 	hotspots, published := e.BankSwitchHotspots()
 	if !published || len(hotspots) == 0 {
 		// The mapper's switch is not an address in cartridge space — it is driven by
@@ -336,6 +358,58 @@ func unitsFromBanks(id string, banks int, contents []emu.CartBank, hotspots map[
 			id, banks, len(units))
 	}
 	return units, ""
+}
+
+// verifiedEdgeSemantics lists the mapper IDs whose bank-switch rule was READ in the
+// engine's source and found to match the edge this package models: the hotspot
+// address alone selects the bank, the symbol names which one, and PC is untouched
+// so the next fetch is the following address in the new bank.
+//
+// The value is the evidence, not a label. Anything absent is declined.
+var verifiedEdgeSemantics = map[string]string{
+	"F8": "mapper_atari.go atari8k.bankswitch: $0FF8/$0FF9 -> bank 0/1, address only",
+	"F6": "mapper_atari.go atari16k.bankswitch: $0FF6-$0FF9 -> bank 0-3, address only",
+	"F4": "mapper_atari.go atari32k.bankswitch: $0FF4-$0FFB -> bank 0-7, address only",
+	"EF": "mapper_atari_ef.go ef.bankswitch: $0FE0-$0FEF -> addr & 0x0F, address only",
+	"BF": "mapper_atari_bf.go bf.bankswitch: $0F80-$0FBF -> addr - $0F80, address only",
+	"DF": "mapper_df.go df.bankswitch: $0FC0-$0FDF -> one bank per address, address only",
+	"JANE": "mapper_atari_jane.go jane.bankswitch: $0FF0/$0FF1/$0FF8/$0FF9 -> bank 0/1/2/3; " +
+		"it takes a data argument and does not read it",
+}
+
+// unverifiedEdgeSemantics returns a decline reason for any mapper whose switching
+// rule this package has not checked, and "" for the ones it has.
+func unverifiedEdgeSemantics(id string) string {
+	if _, ok := verifiedEdgeSemantics[id]; ok {
+		return ""
+	}
+	if why, ok := knownDifferentEdgeSemantics[id]; ok {
+		return fmt.Sprintf("cartridge is mapper %s, whose bank-switch rule is NOT the one this analysis "+
+			"models: %s. A cross-bank edge derived from the hotspot symbol would be an edge the "+
+			"hardware does not take", id, why)
+	}
+	return fmt.Sprintf("cartridge is mapper %s, which is not among the mappers whose bank-switch rule has "+
+		"been checked against the engine's source (%s). Passing the geometric tests says the banks are "+
+		"shaped like Atari's, not that the switch behaves like Atari's, so the edge model is not applied "+
+		"to it", id, verifiedEdgeSemanticsList())
+}
+
+// knownDifferentEdgeSemantics records mappers measured to break the model, so the
+// refusal can say what is actually wrong instead of "unverified".
+var knownDifferentEdgeSemantics = map[string]string{
+	"WF8": "mapper_atari_wf8.go wf8.bankswitch responds only to $0FF8 and takes the target bank from " +
+		"DATA BUS BIT 2, while it publishes $1FF8:BANK0 and $1FF9:BANK1 — so $1FF9 does nothing at all " +
+		"and $1FF8 goes to bank 0 or 1 depending on the value written",
+	"WFSC": "the superchip WF8; same data-bus target selection",
+}
+
+func verifiedEdgeSemanticsList() string {
+	ids := make([]string, 0, len(verifiedEdgeSemantics))
+	for id := range verifiedEdgeSemantics {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return strings.Join(ids, " ")
 }
 
 // switchModel is the single oracle for "can this instruction change the bank, and
