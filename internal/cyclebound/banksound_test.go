@@ -2,9 +2,11 @@ package cyclebound
 
 import (
 	"encoding/json"
+	"github.com/kidsnz/atari2600-harness/internal/srcmap"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -677,28 +679,29 @@ func collectLocs(t *testing.T, rep *Report) []string {
 	return out
 }
 
-// TestBankedReportNamesNoSourceLabel locks the location rule for bank-switched
-// images: every site prints as "bank N $FFxx" and never as a source label.
+// TestBankedReportNamesItsOwnBanksLabels locks the location rule for bank-switched
+// images: a location may name a label, and the label must belong to the bank the
+// site is in.
 //
-// The hole this closes was live on a corpus ROM. srcmap's label list comes from the
-// symbol dump, where every bank's labels carry their RORG'd $F0xx address, so the
-// banks' labels interleave and "the last label at or before this address" can belong
-// to either bank. Measured on banked_game.asm before the fix: two BANK 0 regions were
-// reported at "LvTab+0" and "LvTab+2", and LvTab is a bank 1 table 4K away. The
-// earlier reasoning ("bank 0 is safe, DASM's listing rows for it are dropped") holds
-// for LINE NUMBERS and not for labels.
-//
-// A wrong location is worse than none, so the test bans labels outright rather than
-// checking they name the right bank.
-func TestBankedReportNamesNoSourceLabel(t *testing.T) {
-	bankedLoc := regexp.MustCompile(`^bank \d+ \$[0-9A-F]{4}$`)
+// The hole this closes was live on a corpus ROM. srcmap's flat label list comes from
+// the symbol dump, where every bank's labels carry their RORG'd $F0xx address, so
+// the banks interleave and "the last label at or before this address" can belong to
+// either. Measured on banked_game.asm before the fix: two BANK 0 regions were
+// reported at "LvTab+0" and "LvTab+2", and LvTab is a bank 1 table 4K away. For a
+// while the answer was to print no label at all; srcmap.BankMap now recovers the
+// real one from the listing's physical offsets, so the rule is no longer "never a
+// label" but "never another bank's label".
+func TestBankedReportNamesItsOwnBanksLabels(t *testing.T) {
+	bareLoc := regexp.MustCompile(`^bank (\d+) \$[0-9A-F]{4}$`)
+	labelLoc := regexp.MustCompile(`^bank (\d+) ([A-Za-z_][A-Za-z0-9_]*)(\+\d+)? \(([^:]+):(\d+)\)$`)
+	lineOnlyLoc := regexp.MustCompile(`^bank (\d+) \(([^:]+):(\d+)\)$`)
 	roms := []string{
 		"../../roms/techniques/banked_game.asm",
 		"../../roms/litmus/litmus_bank.asm",
 		"../../roms/litmus/litmus_bank_f6.asm",
 		"../../roms/litmus/litmus_bank_f4.asm",
 	}
-	total := 0
+	total, named := 0, 0
 	for _, asm := range roms {
 		if _, err := os.Stat(asm); err != nil {
 			t.Skipf("%s not present (%v)", asm, err)
@@ -707,6 +710,13 @@ func TestBankedReportNamesNoSourceLabel(t *testing.T) {
 		if rep.Banks < 2 {
 			t.Fatalf("%s: expected a banked report, got banks=%d", filepath.Base(asm), rep.Banks)
 		}
+		bin := build.BinPathFor(asm)
+		_, lst, _, err := build.AssembleWithListing(asm, bin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bm := srcmap.ParseBanked(lst, asm, rep.Banks)
+
 		locs := collectLocs(t, rep)
 		if len(locs) == 0 {
 			t.Errorf("%s: no locations at all — this test would pass while proving nothing",
@@ -714,11 +724,35 @@ func TestBankedReportNamesNoSourceLabel(t *testing.T) {
 		}
 		total += len(locs)
 		for _, l := range locs {
-			if !bankedLoc.MatchString(l) {
-				t.Errorf("%s: location %q carries a source label; on a banked image srcmap cannot "+
-					"tell the banks apart, so this can name the wrong bank's code", filepath.Base(asm), l)
+			switch {
+			case bareLoc.MatchString(l), lineOnlyLoc.MatchString(l):
+				// no label claimed: nothing to get wrong
+			case labelLoc.MatchString(l):
+				g := labelLoc.FindStringSubmatch(l)
+				siteBank, _ := strconv.Atoi(g[1])
+				lb, ok := bm.LabelBank(g[2])
+				if !ok {
+					t.Errorf("%s: location %q names %q, which is not a label in this source",
+						filepath.Base(asm), l, g[2])
+					continue
+				}
+				if lb != siteBank {
+					t.Errorf("%s: location %q puts a BANK %d label on a bank %d site — this is the "+
+						"cross-bank mislabelling the per-bank map exists to prevent",
+						filepath.Base(asm), l, lb, siteBank)
+				}
+				named++
+			default:
+				t.Errorf("%s: location %q is in none of the three permitted shapes "+
+					"(bank N $XXXX / bank N Label+off (file:line) / bank N (file:line))",
+					filepath.Base(asm), l)
 			}
 		}
 	}
-	t.Logf("checked %d locations across %d bank-switched ROMs", total, len(roms))
+	if named == 0 {
+		t.Error("no location named a label across any bank ROM — the per-bank source map is resolving " +
+			"nothing and this test is only checking that bare addresses are bare")
+	}
+	t.Logf("checked %d locations across %d bank-switched ROMs; %d named a label, all in their own bank",
+		total, len(roms), named)
 }

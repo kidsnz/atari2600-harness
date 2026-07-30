@@ -97,6 +97,16 @@ func (in Instr) nextSite() site { return site{in.Bank, in.next()} }
 // whose own bytes touch a hotspot is refused outright (see switchModel.switchEdges).
 func (in Instr) branchSite() site { return site{in.Bank, in.branchTarget()} }
 
+// lineAt resolves a code site to a source line, using the per-bank map when the
+// image is banked and the flat one otherwise. Written once so the two annotation
+// readers cannot drift apart.
+func lineAt(sm *srcmap.Map, at site) (int, bool) {
+	if ln, ok := sm.LineBank(at.bank, at.addr); ok {
+		return ln, true
+	}
+	return sm.Line(at.addr)
+}
+
 // siteDesc renders a code site for a human. On a banked image the bank is part of
 // the identity and must be printed; on a flat image there is only one, so printing
 // "bank 0" would be noise — and would change the text of every existing report.
@@ -1892,6 +1902,13 @@ func (s *solver) foldHit(at site) bool { _, ok := s.folds[at]; return ok }
 // (bank = offset >> 12); filed, not built.
 func (s *solver) loc(at site) string {
 	if s.banked {
+		// The per-bank map keys on (bank, address) and takes its labels from the
+		// SOURCE file rather than the symbol table, so it cannot name another bank's
+		// code. When the listing has nothing at this site, the bare address is still
+		// the honest answer.
+		if l := s.sm.LocateBank(at.bank, at.addr); l != "" {
+			return l
+		}
 		return siteDesc(at, true)
 	}
 	return s.sm.Locate(at.addr)
@@ -2515,8 +2532,14 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	src, _ := os.ReadFile(asmPath)
 	srcLines := strings.Split(string(src), "\n")
 	atLinesRe := regexp.MustCompile(`@lines\s+(\d+)`)
-	regionLines := func(sa uint16) int {
-		ln, ok := sm.Line(sa)
+	// The lookup takes the SITE, not a bare address. On a banked image the flat line
+	// map holds bank 1's rows under their physical offsets ($1F03 for $FF03), so an
+	// address-only lookup misses every banked region and silently returns the default
+	// — measured before this: every region on a bank-switched kernel was budgeted at
+	// 1 scanline no matter what the source said, which is why litmus_bank_f4's
+	// genuinely 2-line crossing region was reported over budget.
+	regionLines := func(at site) int {
+		ln, ok := lineAt(sm, at)
 		if !ok {
 			return 1
 		}
@@ -2538,8 +2561,8 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	// that region's divide-loop accumulator, so a ÷N coarse-positioner whose input is
 	// a RAM byte (abstract range Top) can still be bounded. 0 = none.
 	atAmaxRe := regexp.MustCompile(`@amax\s+(\d+)`)
-	regionAmax := func(sa uint16) int {
-		ln, ok := sm.Line(sa)
+	regionAmax := func(at site) int {
+		ln, ok := lineAt(sm, at)
 		if !ok {
 			return 0
 		}
@@ -2581,6 +2604,13 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	// shows only its reset stub: measured, litmus_bank bank 1 decoded 4 instructions
 	// and the machine executed 4 OTHERS there ($FF03/$FF05/$FF07/$FF09), none of
 	// them among the 4 decoded — the residue this closes.
+	// Per-bank source lines. The listing's address column is the PHYSICAL ROM offset,
+	// so bank = offset>>12 recovers what a flat parse throws away; see srcmap.BankMap
+	// for why the labels come from the source rather than the symbol table.
+	if len(units) > 1 {
+		sm.AttachBanked(srcmap.ParseBanked(lst, asmPath, len(units)))
+	}
+
 	decodes, instrs, entries, seeds := decodeUnits(units)
 
 	sw := switchModel{banked: len(units) > 1, banks: map[int]bool{}}
@@ -2609,9 +2639,15 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		// crossing region really does span 2 scanlines (measured 128 cycles over 2 lines),
 		// and it is reported as a budget violation because the annotation that would
 		// declare those 2 lines cannot be read, not because the prover disagrees.
-		rep.SourceAnnotations = "unavailable: DASM's listing addresses are physical ROM offsets on a " +
-			"bank-switched image, so @lines and @amax are not resolvable and every region is budgeted " +
-			"at 1 scanline"
+		cov := sm.BankLineCoverage()
+		total := 0
+		for _, n := range cov {
+			total += n
+		}
+		rep.SourceAnnotations = fmt.Sprintf("per-bank: %d addresses resolved to source lines across %d bank(s) "+
+			"%v. DASM's listing address column is the PHYSICAL ROM OFFSET, so bank = offset>>12 recovers what a "+
+			"flat parse discards; labels come from the source file rather than the symbol table, whose RORG'd "+
+			"addresses interleave every bank. @lines and @amax are resolvable here", total, len(cov), cov)
 	}
 
 	// ONE abstract-interpretation fixpoint over the merged program. Cross-bank state
@@ -2644,7 +2680,7 @@ func Prove(asmPath string, budget int) (*Report, error) {
 
 	perBankRegions := map[int]int{}
 	for _, sa := range starts {
-		reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa.addr), regionAmax(sa.addr), sm, states, sw)
+		reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa), regionAmax(sa), sm, states, sw)
 		if sw.active() {
 			// Every switch this region can perform must have a modelled edge. The residue
 			// — an instruction fetched across a hotspot, a jmp/jsr into one, an

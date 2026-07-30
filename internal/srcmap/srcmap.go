@@ -31,6 +31,44 @@ type Map struct {
 	lines  map[uint16]int
 	labels []label           // アドレス昇順・ROM 域（$1000+）のみ＝Locate 用
 	syms   map[string]uint16 // 全シンボル（RAM equate 含む）＝Symbol 用（watch/patch のシンボル解決）
+	bank   *BankMap          // バンク切替イメージのときだけ非 nil（AttachBanked）
+}
+
+// AttachBanked gives this Map a per-bank companion. Callers that know the image is
+// bank-switched build one with ParseBanked and attach it here, so every existing
+// consumer keeps its signature and only the banked path changes.
+func (m *Map) AttachBanked(b *BankMap) {
+	if m != nil {
+		m.bank = b
+	}
+}
+
+// LocateBank renders a (bank, address) through the per-bank map, or "" when there is
+// none. It never falls back to the flat lookup: on a banked image the flat label list
+// interleaves every bank's labels and can name the wrong bank's code, which is the
+// whole reason BankMap exists.
+func (m *Map) LocateBank(bank int, addr uint16) string {
+	if m == nil || m.bank == nil {
+		return ""
+	}
+	return m.bank.Locate(bank, addr)
+}
+
+// LineBank resolves (bank, address) through the per-bank map. ok=false when the
+// image is not banked or the listing had nothing there, so a caller can fall back.
+func (m *Map) LineBank(bank int, addr uint16) (int, bool) {
+	if m == nil || m.bank == nil {
+		return 0, false
+	}
+	return m.bank.Line(bank, addr)
+}
+
+// BankLineCoverage reports how many addresses resolved per bank (empty when not banked).
+func (m *Map) BankLineCoverage() map[int]int {
+	if m == nil || m.bank == nil {
+		return map[int]int{}
+	}
+	return m.bank.Coverage()
 }
 
 type label struct {
