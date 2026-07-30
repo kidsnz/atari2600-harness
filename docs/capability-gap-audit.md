@@ -276,8 +276,15 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   runs the SAME image+prologue on the embedded Gopher2600 CPU (`cpu.NewCPU`) — **symmetric**, so both reach
   identical pre-instruction state by construction — and diffs registers/cycles/writes with P bits 4/5 masked.
   `cmd/cpucheck` sweeps seeded random vectors and exits 1 on any **unexpected** divergence. Empirically, all 256
-  opcodes agree across many seeds **except 11 illegal/unstable opcodes** (ANC/ALR/ARR/ANE/LXA/SH*/LAS), which form
-  a classified allow-list. Main build stays **CGO-free** (perfect6502 is an external binary, shelled out;
+  opcodes agree across many seeds **except 11 illegal/unstable opcodes** (ANC/ALR/ARR/ANE/SH*/TAS/LAS), which form
+  a classified allow-list. **★re-measured 2026-07-30: the count was right and the contents were not.** The list held
+  **12** entries and `cmd/cpucheck` never reported which of them actually fired, so an entry could silence an opcode
+  while catching nothing. Measured per entry: `$AB` (LXA/LAX #imm) was exercised **110 times across seeds 1-4 and
+  diverged 0 times** — Gopher2600 and the netlist agree on it — while the other 11 all fire. `$AB` removed (a real
+  engine bug there is now a failure, not a waved-through "known unstable"); cpucheck now prints
+  `diverged/tested` per entry plus an explicit `allow_list_never_diverged`;
+  `TestAllowListEntriesEarnTheirPlace` fails if any entry stops firing. Negative control: reinstating `$AB` fails
+  it by name. Main build stays **CGO-free** (perfect6502 is an external binary, shelled out;
   `scripts/install_perfect6502.sh` fetches the pinned clone + builds `bin/p6502step`). Self-tests: always-on
   differ-logic (planted-mutant, no binary) + gated silicon differential. FPGA/real-2600 = manual escalation only.
   **Src:** mist64/perfect6502 @ 09fc542 (MIT; measure.c register-injection idiom); visual6502 SYNC node 539.

@@ -9,9 +9,10 @@
 // decimal edges that the fixed Tom Harte corpus (VV-1) excludes.
 //
 // Requires bin/p6502step (scripts/install_perfect6502.sh). Exit codes:
-//   0  agreement (modulo expected divergences), or harness not built (note)
-//   1  at least one UNEXPECTED divergence (a Gopher bug or a harness artifact)
-//   2  usage / runtime error
+//
+//	0  agreement (modulo expected divergences), or harness not built (note)
+//	1  at least one UNEXPECTED divergence (a Gopher bug or a harness artifact)
+//	2  usage / runtime error
 package main
 
 import (
@@ -23,6 +24,12 @@ import (
 
 	"github.com/kidsnz/atari2600-harness/internal/cpudiff"
 )
+
+// mustClass names the allow-list class of an opcode known to be on it.
+func mustClass(op byte) string {
+	c, _ := cpudiff.ExpectedDivergence(op)
+	return c
+}
 
 func main() {
 	seed := flag.Int64("seed", 1, "PRNG seed (deterministic)")
@@ -58,10 +65,13 @@ func main() {
 
 	agreed := 0
 	expected := map[string]int{} // class -> count
+	expectedByOp := map[byte]int{}
+	testedByOp := map[byte]int{}
 	unexpectedByOp := map[byte]int{}
 	unexpected := 0
 	for i := range vs {
 		op := vs[i].Opcode()
+		testedByOp[op]++
 		gop, err := cpudiff.RunGopher(vs[i])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: gopher vector %d: %v\n", i, err)
@@ -78,6 +88,7 @@ func main() {
 		}
 		if class, ok := cpudiff.ExpectedDivergence(op); ok {
 			expected[class]++
+			expectedByOp[op]++
 			continue
 		}
 		unexpected++
@@ -94,6 +105,21 @@ func main() {
 	}
 	sort.Strings(unexpOps)
 
+	// Report the allow-list's own denominator. An entry that is permitted to diverge
+	// and never does is a hole with no witness: it silences a whole opcode, so a real
+	// engine bug there would be waved through under the label "known unstable". The
+	// counts say which entries earned their place in this run, and unexercised says
+	// which did not.
+	allowed, unexercised := cpudiff.ExpectedDivergenceOpcodes(), []string(nil)
+	var allowOps []string
+	for _, op := range allowed {
+		allowOps = append(allowOps, fmt.Sprintf("%02X:%s(%d/%d)", op,
+			mustClass(op), expectedByOp[op], testedByOp[op]))
+		if testedByOp[op] > 0 && expectedByOp[op] == 0 {
+			unexercised = append(unexercised, fmt.Sprintf("%02X:%s(0/%d)", op, mustClass(op), testedByOp[op]))
+		}
+	}
+
 	out := struct {
 		Seed         int64          `json:"seed"`
 		Vectors      int            `json:"vectors"`
@@ -102,7 +128,9 @@ func main() {
 		Expected     map[string]int `json:"expected_divergences"`
 		Unexpected   int            `json:"unexpected_divergences"`
 		UnexpectedBy []string       `json:"unexpected_opcodes,omitempty"`
-	}{*seed, *n, *set, agreed, expected, unexpected, unexpOps}
+		AllowList    []string       `json:"allow_list_diverged_over_tested"`
+		Unexercised  []string       `json:"allow_list_never_diverged,omitempty"`
+	}{*seed, *n, *set, agreed, expected, unexpected, unexpOps, allowOps, unexercised}
 	b, _ := json.MarshalIndent(out, "", "  ")
 	fmt.Println(string(b))
 
@@ -110,7 +138,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "FAIL: %d unexpected silicon divergences on opcodes %v\n", unexpected, unexpOps)
 		os.Exit(1)
 	}
-	fmt.Fprintf(os.Stderr, "OK: %d agreed, %d expected divergences, 0 unexpected\n", agreed, sum(expected))
+	if len(unexercised) > 0 {
+		fmt.Fprintf(os.Stderr, "NOTE: %d allow-list entries never diverged in this run and are silencing "+
+			"an opcode for nothing: %v\n", len(unexercised), unexercised)
+	}
+	fmt.Fprintf(os.Stderr, "OK: %d agreed, %d expected divergences (allow-list %d entries), 0 unexpected\n",
+		agreed, sum(expected), len(allowed))
 }
 
 func sum(m map[string]int) int {

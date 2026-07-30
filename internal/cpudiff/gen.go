@@ -1,5 +1,7 @@
 package cpudiff
 
+import "sort"
+
 import "math/rand"
 
 // GenVectors produces n deterministic random test vectors drawn from the given
@@ -31,7 +33,7 @@ func GenVectors(seed int64, n int, opcodes []byte) []Vector {
 		}
 		// seed a little zero-page and scratch data for memory-touching modes
 		for j := 0; j < 8; j++ {
-			m[uint16(rng.Intn(0x100))] = byte(rng.Intn(256))   // zero page
+			m[uint16(rng.Intn(0x100))] = byte(rng.Intn(256))        // zero page
 			m[uint16(0x0200+rng.Intn(0x100))] = byte(rng.Intn(256)) // scratch page
 		}
 		out[i] = Vector{
@@ -94,6 +96,17 @@ func IsHalt(op byte) bool { return jamOpcodes[op] }
 // opcode is an EXPECTED, classified divergence (returning the class name) rather
 // than a bug to investigate. Populated empirically — see TestSiliconAgreesDocumented
 // for the zero-divergence guarantee on legal opcodes.
+// ExpectedDivergenceOpcodes returns the allow-list in ascending opcode order, so a
+// caller can report which of its entries actually earned their place in a run.
+func ExpectedDivergenceOpcodes() []byte {
+	ops := make([]byte, 0, len(expectedDivergence))
+	for op := range expectedDivergence {
+		ops = append(ops, op)
+	}
+	sort.Slice(ops, func(i, j int) bool { return ops[i] < ops[j] })
+	return ops
+}
+
 func ExpectedDivergence(op byte) (string, bool) {
 	if c, ok := expectedDivergence[op]; ok {
 		return c, true
@@ -108,20 +121,27 @@ func ExpectedDivergence(op byte) (string, bool) {
 // classes, both of which the Tom Harte corpus (VV-1) likewise excludes:
 //
 //   - "unstable": magic-constant / analog opcodes whose result is not even
-//     deterministic on real hardware (ANE, LXA, and the SH* high-byte stores).
+//     deterministic on real hardware (ANE and the SH* high-byte stores).
+//
+// AN ENTRY MUST EARN ITS PLACE. LXA/LAX #imm ($AB) was on this list and did not:
+// measured across seeds 1-4, it was exercised 110 times and diverged ZERO times --
+// Gopher2600 and the netlist agree on it. Permitting a divergence that never happens
+// silences a whole opcode for nothing, so a real engine bug there would be waved
+// through under the label "known unstable". It is removed; if the two ever do
+// disagree on $AB the check now fails and a human decides, which is the point.
+// cmd/cpucheck reports diverged/tested per entry so this cannot drift back unnoticed.
 //   - "undocumented": illegal opcodes with model-dependent flag/result behavior
 //     (ANC, ALR, ARR, LAS).
 //
 // Any divergence OUTSIDE this set is treated as unexpected — a Gopher bug to
 // investigate or a harness artifact to fix — and fails the check.
 var expectedDivergence = map[byte]string{
-	0x8B: "unstable", // ANE / XAA
-	0xAB: "unstable", // LXA / LAX #imm
-	0x93: "unstable", // SHA (zp),Y
-	0x9F: "unstable", // SHA abs,Y
-	0x9E: "unstable", // SHX abs,Y
-	0x9C: "unstable", // SHY abs,X
-	0x9B: "unstable", // TAS / SHS abs,Y
+	0x8B: "unstable",     // ANE / XAA
+	0x93: "unstable",     // SHA (zp),Y
+	0x9F: "unstable",     // SHA abs,Y
+	0x9E: "unstable",     // SHX abs,Y
+	0x9C: "unstable",     // SHY abs,X
+	0x9B: "unstable",     // TAS / SHS abs,Y
 	0x0B: "undocumented", // ANC #imm
 	0x2B: "undocumented", // ANC #imm
 	0x4B: "undocumented", // ALR / ASR #imm

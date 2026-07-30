@@ -217,3 +217,60 @@ func TestSiliconDeterministic(t *testing.T) {
 
 // helper to keep fmt imported for ad-hoc debugging
 var _ = fmt.Sprintf
+
+// TestAllowListEntriesEarnTheirPlace is the other direction of
+// TestSiliconAllOpcodesClassified. That test asks "does anything diverge that is not
+// allowed"; this one asks "is anything allowed that never diverges".
+//
+// An allow-list entry that is exercised and never fires silences a whole opcode for
+// nothing: a genuine engine bug there would be waved through under the label "known
+// unstable", and no test in the suite could see it. That was live —
+// LXA/LAX #imm ($AB) was on the list, and across seeds 1-4 it was exercised 110 times
+// and diverged ZERO times. It was removed rather than kept as a comfortable
+// exception; if the netlist and Gopher2600 ever do disagree on $AB, that is now a
+// failure a human reads.
+//
+// The sweep is deterministic (seeded generator, deterministic engines), so this pins
+// a fact and not a probability.
+func TestAllowListEntriesEarnTheirPlace(t *testing.T) {
+	exe := skipNoP6502(t)
+	if testing.Short() {
+		t.Skip("skipping allow-list sweep in -short mode")
+	}
+	vs := GenVectors(1, 4000, AllOpcodes())
+	gop, sil := runBoth(t, exe, vs)
+
+	diverged, tested := map[byte]int{}, map[byte]int{}
+	for i := range vs {
+		op := vs[i].Opcode()
+		if _, ok := ExpectedDivergence(op); !ok {
+			continue
+		}
+		tested[op]++
+		if HaltEquivalent(gop[i].Status, sil[i].Status) {
+			continue
+		}
+		if len(Compare(gop[i], sil[i])) > 0 {
+			diverged[op]++
+		}
+	}
+
+	allowed := ExpectedDivergenceOpcodes()
+	if len(allowed) == 0 {
+		t.Fatal("allow-list is empty — this test would pass while checking nothing")
+	}
+	for _, op := range allowed {
+		if tested[op] == 0 {
+			t.Errorf("allow-listed opcode $%02X was never generated in %d vectors, so its entry is "+
+				"unverifiable here", op, len(vs))
+			continue
+		}
+		if diverged[op] == 0 {
+			class, _ := ExpectedDivergence(op)
+			t.Errorf("allow-listed opcode $%02X (%s) was exercised %d times and never diverged — the "+
+				"entry silences the opcode for nothing; remove it so a real divergence there fails",
+				op, class, tested[op])
+		}
+	}
+	t.Logf("allow-list: %d entries, all exercised and all diverging", len(allowed))
+}
