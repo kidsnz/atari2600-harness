@@ -9,6 +9,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`spritey` and `read_motion` now report `stillness`** — how far the object travelled on each axis over
+  the window they measured, and whether any RAM byte changed — so a measurement carries the evidence for
+  whether it measured anything. Travel of 0 is flagged as a **CONSTANT**, the shape behind both of this
+  week's bad measurements. Multi-frame only: `frames=1` has no window, and the tool will not advance the
+  machine to manufacture one. **The note deliberately draws no conclusion about the program, because the
+  first version did and was wrong** — it classified "no travel and no RAM change" as *STUCK: the program
+  is not running*, and measured before shipping, `litmus_pos` and `smoke` run a full kernel, draw their
+  sprite every frame and never write RAM after init, so a live ROM got a confident diagnosis of dead.
+  Whether a program REACTS cannot be established without injecting an input, which is why that question
+  stays with `set_input`. Three tests; negative controls: restoring the STUCK verdict, and reporting one
+  axis's travel into the other, each fail.
 - **`motion_xclamp` litmus + the witness for `spritey`'s multi-frame mode.** The mode returns a per-frame
   sample carrying BOTH X and Y and always has, but nothing ever checked that the X in those samples MOVES:
   a build reporting a constant X, or reporting one axis into the other, passed every test in this repo.
