@@ -1606,13 +1606,36 @@ the corpus runs, the review finds what the corpus never runs. Accepting a change
 here, pushing before the review returned — is how an unsound path ships. The review took 2h57m against my
 gate's few minutes, and it was the one that found this.
 
+**Three of the six are now closed (SD-11b), each measured rather than taken on the review's word — and one
+of its numbers did not survive.**
+
+1. **The convergence skips were real but smaller than reported.** The review counted "six `t.Skip` sites that
+   turn the machine gate off while CI stays green". Measured: **28 skip sites exist and only 2 fire today**,
+   both missing commercial ROMs (`VideoOlympics`, `Stampede`), not convergence. The structural point stands:
+   **5 sites skipped the whole assertion when the abstract-interpretation fixpoint failed to converge** — on
+   litmus ROMs written to converge, where a failure means the premise broke, not that the test is
+   inapplicable. All 5 are now `t.Fatal`. Negative control: forcing non-convergence makes **6 assertions
+   fail** where they previously passed in silence.
+2. **`HasSuperchip()` really is Atari-only.** `grep -rln "func.*HasSuperchip"` over the vendored cartridge
+   package returns `mapper_atari.go` and the dispatcher, nothing else, so every other mapper answers false
+   through the type assertion — while **3E+ and M-Network overlay cartridge RAM and set
+   `banking.Information.IsRAM`**. New `emu.MapsCartridgeRAM()` asks the engine's own flag across the whole
+   window (M-Network maps RAM into a SEGMENT, so a single-address sample answers differently depending on
+   where you ask) and additionally declines `3E`/`3E+`/`E7`/`AR` by ID, because those map RAM in only after a
+   switch and a boot-time look would answer "no" for a cartridge that maps RAM a frame later. Verified:
+   `F8SC` true, plain `F8` and `4K` false, golden **43 of 43 byte-identical**.
+3. **`analysisUnits` could return an empty unit list with no decline reason** — reachable when `CopyBanks`
+   yields nothing while `CartInfo` reports more than one bank. Every caller reads "no decline" as permission,
+   then finds nothing to analyse and reports zero regions, which the 0-region backstop turns into "not
+   certified" rather than "I was handed nothing". It now declines by name, and also declines when the
+   readable bank count differs from the reported one — analysing a subset would certify on whichever part
+   happened to be available.
+
 **Still open from the same review, recorded rather than fixed** (each needs its own measurement):
-`emu.HasSuperchip()` is implemented only by the Atari mapper, so the SD-8c guard may not fire on others; the
-cross-bank edge semantics are taken from `mapper_atari.go` and applied to every mapper; `analysisUnits` can
+the cross-bank edge semantics are taken from `mapper_atari.go` and applied to every mapper; `analysisUnits` can
 return an empty unit list with no decline reason; `determineBound`'s predecessor scan reads
 `absStates[pred].transfer(pred)` where an absent entry is the zero State whose ranges read as exact `[0,0]`
-rather than Top; and six `t.Skip` sites turn the proven-vs-measured gate off entirely on a single emulator
-construction failure while CI stays green.
+rather than Top; (the skip finding is closed above).
 
 ### RL-7c regressed from 2 cells to 1868 and nothing noticed (2026-07-29)
 
