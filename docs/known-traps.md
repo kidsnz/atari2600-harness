@@ -14,9 +14,10 @@ Detection column: **static** = a source-text linter can flag it · **runtime** =
 > `LAX #imm`, `NOP $00`/`BIT $00`, variables in the `$F8-$FF` stack-collision zone, missing `CLD`/`CLEAN_START`
 > (which is also the post-reset-undefined row), and **new today**, reads of a write-only TIA register and
 > **`STA` to ROM**. Page-cross `+1` is handled by `cyclebound`'s abstract interpreter rather than here. Still **unimplemented**:
-> F8/F6/F4 random boot bank, read of a write-only cartridge hotspot / SuperChip write port, and bank-move
-> page-cross misalignment. The parenthetical below calling `check_traps.py` "the future trap linter" is
-> stale — it exists and runs in CI on every push; what is future is those three rows.
+> F8/F6/F4 random boot bank and bank-move page-cross misalignment. **Read of a write-only cartridge
+> hotspot / SuperChip write port is NOT statically decidable** and its row is re-marked below.
+> The parenthetical below calling `check_traps.py` "the future trap linter" is stale — it exists and runs
+> in CI on every push; what is future is those two rows.
 
 **New static trap (2026-07-30): reading a write-only TIA register.** The TIA answers reads only at
 `$00-$0D` (`CXM0P`..`INPT5`; verified in Gopher2600 `cpubus.go TIAReadRegisters`). Everything from `$0E` (PF1)
@@ -34,6 +35,16 @@ into cartridge space exist, both in `litmus_6502`, both aiming at ROM on purpose
 page boundary (its own comment already said so). Those two lines now carry the declaration — comment-only, ROM
 hash `7c16b7f…` identical before and after — and the corpus is clean. Negative control: removing one
 declaration brings the ERROR back.
+
+**Re-marked 2026-07-30: read of a write-only hotspot / SuperChip write port is not static.** What makes a
+read of `$F000-$F07F` a trap is the cartridge MAPPING RAM there, and the mapper is not in the `.asm`
+text — the same source line is ordinary code on a plain 4K image. Measured over the 123 ROMs the trap
+linter scans: exactly **one** maps cartridge RAM (`litmus_superchip`), and the only source line reading
+into that range (`litmus_6502.asm:52`, `lda $F010,x`) belongs to a plain 4K ROM where it is legitimate.
+A naive static rule would score **1 false positive and 0 true positives**. The check belongs at ROM level,
+where `emu.MapsCartridgeRAM` answers first; filed, not built. `internal/emu.TestCartridgeRAMIsRareAndNamed`
+guards the premise — it fails if a second ROM starts mapping RAM (the trap becomes reachable and this row
+needs re-deciding) or if `litmus_superchip` stops (cyclebound's SD-8c decline loses its witness).
 
 > Provenance: every row cites the mined thread(s) it came from. Raw notes in `reference/atariage/<id>-*/notes.ja.md`.
 
@@ -75,7 +86,7 @@ declaration brings the ERROR back.
 |---|---|---|---|
 | **F8/F6/F4 boot in a random bank** | every bank's reset entry must `JMP` to a common init in bank 0 | static (check each bank start) | 194935, 293970, 261488 |
 | `NOP $00` / `BIT $00` as a skip on 3F/X07 carts | triggers an unintended bankswitch → use `NOP $80` / `.byte $2C` on a safe address | static (grep `nop $00`/`bit $00`) | 139089 |
-| **read of a write-only hotspot / SuperChip write-port** | undefined on HW (varies by console) → never read it | static/manual | 169114, 285759, 204819, 111536 |
+| **read of a write-only hotspot / SuperChip write-port** | undefined on HW (varies by console) → never read it | **runtime/ROM-level** (was static/manual — see below) | 169114, 285759, 204819, 111536 |
 | **STA to ROM** | no R/W line to the cart → bus contention, never persists; RAM is `$80–$FF` only | static | 148390, 62852, 293816 |
 | bank-move misaligns code → page-cross | split heavy moves across frames / `ALIGN 256` | static (ALIGN) | 307854, 339019, 133720 |
 | variable placed at `$FF` | `JSR` push lands on `$0100` mirror and clobbers it → keep vars in `seg.u` from `$80` | static (var ≥ $FB warn) | 302998, 301766, 290790 |
