@@ -76,7 +76,63 @@ FM_DESC = re.compile(r"^description:\s*\S", re.M)
 FM_TYPE = re.compile(r"^\s*type:\s*(user|feedback|project|reference)\s*$", re.M)
 
 
+def inbound(stem, files, index_text, repo):
+    """stem を指している箇所を数えて返す。MEMORY.md の索引行（全ファイルが必ず1本持つ）は除く。
+
+    2026-07-30 の実測でこれが要ると分かった: あるメモリの被参照を「正本1ファイルの1行」と
+    報告して archive しようとしたが、実際は 3 箇所から参照されていた。統合の前に**全数を機械で
+    数える**のでなければ、張り忘れた参照が宙に浮く。
+    """
+    hits = []
+    pats = [re.compile(r"\[\[" + re.escape(stem) + r"\]\]"),
+            re.compile(r"\(" + re.escape(stem) + r"\.md\)")]
+    srcs = [(os.path.join(MEM, f), "memory/" + f) for f in files if f[:-3] != stem]
+    srcs.append((os.path.join(repo, "CLAUDE.md"), "harness/CLAUDE.md"))
+    for base, _, fs in os.walk(os.path.join(repo, "docs")):
+        for x in fs:
+            if x.endswith(".md"):
+                srcs.append((os.path.join(base, x), os.path.relpath(os.path.join(base, x), repo)))
+    for path, label in srcs:
+        try:
+            body = open(path, encoding="utf-8").read()
+        except OSError:
+            continue
+        n = sum(len(pat.findall(body)) for pat in pats)
+        if n:
+            hits.append(f"{label}x{n}" if n > 1 else label)
+    # 索引は「本文中の相互参照」だけ数える（項目行は全ファイルが持つので情報量ゼロ）
+    body = index_text
+    n = sum(len(pat.findall(body)) for pat in pats) - len(INDEX_ENTRY(stem + ".md").findall(body))
+    if n > 0:
+        hits.append(f"MEMORY.md(prose)x{n}")
+    return hits
+
+
+def report():
+    """統合候補を選ぶための表。被参照0＝落とせる可能性がある、というだけで、
+    固有情報が無いことは別途1本ずつ確かめる必要がある（数を目標にしない）。"""
+    files = sorted(f for f in os.listdir(MEM) if f.endswith(".md") and f != "MEMORY.md")
+    index = open(os.path.join(MEM, "MEMORY.md"), encoding="utf-8").read()
+    repo = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    rows = []
+    for f in files:
+        lines = open(os.path.join(MEM, f), encoding="utf-8").read().count("\n") + 1
+        rows.append((len(inbound(f[:-3], files, index, repo)), lines, f,
+                     inbound(f[:-3], files, index, repo)))
+    rows.sort()
+    print(f"{'refs':>4} {'lines':>5}  file")
+    for n, lines, f, hits in rows:
+        mark = "  ← 被参照0" if n == 0 else ""
+        print(f"{n:>4} {lines:>5}  {f}{mark}")
+        if hits:
+            print(f"            {', '.join(hits)}")
+    print(f"\n{len(files)} files; {sum(1 for r in rows if r[0]==0)} with no inbound reference")
+    return 0
+
+
 def main():
+    if "--report" in sys.argv:
+        return report()
     if not os.path.isdir(MEM):
         print(f"memory not present ({MEM}) — skipped")
         return 0
