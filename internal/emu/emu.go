@@ -1182,6 +1182,43 @@ func (e *Emu) CartInfo() (id string, banks int) {
 // decision — which is exactly why the analysis has to ask rather than infer.
 func (e *Emu) HasSuperchip() bool { return e.VCS.Mem.Cart.HasSuperchip() }
 
+// MapsCartridgeRAM reports whether ANY bank of this cartridge is RAM rather than
+// image bytes, asking the mapper's own banking information rather than a
+// mapper-specific method.
+//
+// HasSuperchip is not enough and the gap is measured: only `mapper_atari.go`
+// implements it (`grep -rln "func.*HasSuperchip" Gopher2600/.../cartridge/` returns
+// that file and the dispatcher, nothing else), so every other mapper answers false
+// through the type assertion. 3E+ and M-Network both overlay cartridge RAM and
+// both set `banking.Information.IsRAM` — the flag the engine itself uses — so that
+// is what this asks.
+//
+// It matters for the same reason the superchip guard does: bytes executed or read
+// from cartridge RAM are not in the image, so folding them into a value range
+// bounds a loop on data the hardware never holds.
+func (e *Emu) MapsCartridgeRAM() (bool, error) {
+	if e.VCS.Mem.Cart.HasSuperchip() {
+		return true, nil
+	}
+	// Sample the whole cartridge window rather than one address: M-Network maps its
+	// RAM into a SEGMENT, so whether GetBank reports IsRAM depends on where you ask.
+	for a := memorymap.OriginCart; a <= memorymap.MemtopCart; a += 0x40 {
+		if e.VCS.Mem.Cart.GetBank(a).IsRAM {
+			return true, nil
+		}
+	}
+	// A sample taken now only sees the CURRENT configuration, and these families map
+	// RAM in only after a switch — so a boot-time look would answer "no" for a
+	// cartridge that maps RAM a frame later. Where the answer cannot be established
+	// statically, say yes: the cost is refusing an analysis, and the cost of the
+	// other error is folding RAM into a proven value range.
+	switch e.VCS.Mem.Cart.ID() {
+	case "3E", "3E+", "E7", "AR":
+		return true, nil
+	}
+	return false, nil
+}
+
 // CartBank is one bank of a cartridge as the engine hands it over for static
 // analysis: the bytes, and the origins in the 4K window this bank may be mapped
 // to. A 2K image answers TWICE inside that window, so Origins has two entries for

@@ -21,8 +21,15 @@ import (
 func TestUninitReadPair(t *testing.T) {
 	bait := defUseOf(t, "../../roms/litmus/litmus_uninit_read.asm")
 	clean := defUseOf(t, "../../roms/litmus/litmus_uninit_clean.asm")
+	// Not a skip. These two litmus ROMs are small and were written to converge; if
+	// the fixpoint stops at its iteration cap on them, the premise of every
+	// assertion below has broken and the suite must SAY so. A skip here turns the
+	// whole uninitialised-read gate off while CI stays green — the same "refusal
+	// that is not real" shape this package spent a day removing from its own tools.
 	if !bait.Converged || !clean.Converged {
-		t.Skip("fixpoint did not converge")
+		t.Fatalf("the abstract-interpretation fixpoint did not converge on the litmus pair "+
+			"(bait=%v clean=%v); these ROMs are small and are supposed to converge, so this is a "+
+			"broken premise, not a reason to skip", bait.Converged, clean.Converged)
 	}
 
 	if len(bait.UninitReads) != 1 {
@@ -45,7 +52,8 @@ func TestUninitReadPair(t *testing.T) {
 func TestSweepExcludesIndexZero(t *testing.T) {
 	r := defUseOf(t, "../../roms/litmus/litmus_uninit_read.asm")
 	if !r.Converged {
-		t.Skip("fixpoint did not converge")
+		t.Fatal("the fixpoint did not converge on this litmus; it is small and is supposed to, so " +
+			"the premise has broken rather than the test being inapplicable")
 	}
 	may, _ := r.mayWriteAddrs()
 	if !may[0x003F] {

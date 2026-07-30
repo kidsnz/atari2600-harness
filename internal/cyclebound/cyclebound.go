@@ -250,8 +250,18 @@ func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
 	// worst case — so folding a RAM address produces a narrow, confident, wrong
 	// number in the forbidden direction. Measured hole: this function accepted any
 	// mapper with banks > 1 that published hotspots and never asked.
-	if e.HasSuperchip() {
-		return nil, fmt.Sprintf("cartridge is mapper %s with superchip RAM overlaid on $F000-$F0FF; "+
+	// Ask "does this cartridge map RAM into the window", not "is it a superchip".
+	// Measured: HasSuperchip is implemented only by mapper_atari.go, so every other
+	// mapper answers false through the type assertion — while 3E+ and M-Network both
+	// overlay cartridge RAM and set banking.Information.IsRAM. Asking the narrower
+	// question left those unguarded.
+	mapsRAM, ramErr := e.MapsCartridgeRAM()
+	if ramErr != nil {
+		return nil, fmt.Sprintf("cartridge banks could not be enumerated to check for mapped RAM (%v); "+
+			"declining rather than folding bytes that may not be image", ramErr)
+	}
+	if mapsRAM {
+		return nil, fmt.Sprintf("cartridge is mapper %s and maps RAM into the cartridge window; "+
 			"the image is not what the CPU reads there, so folding those bytes into a value range "+
 			"would bound a loop on data the hardware never holds", id)
 	}
@@ -301,6 +311,21 @@ func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
 				id, banks, c.Number, c.Origins, memorymap.OriginCartFxxx)
 		}
 		units = append(units, analysisUnit{bank: c.Number, prog: newBankProgram(c.Data, c.Number), hotspots: hotspots})
+	}
+	// An empty unit list with no reason is the worst possible answer: every caller
+	// reads "no decline" as permission to proceed, then finds nothing to analyse and
+	// reports zero regions — which the 0-region backstop turns into "not certified"
+	// rather than into "I was handed nothing". Reachable if CopyBanks returns an
+	// empty slice while CartInfo reports banks > 1.
+	if len(units) == 0 {
+		return nil, fmt.Sprintf("cartridge is mapper %s reporting %d banks, but no bank could be turned "+
+			"into an analysable image; declining rather than returning an empty analysis that would "+
+			"read as a clean one", id, banks)
+	}
+	if len(units) != banks {
+		return nil, fmt.Sprintf("cartridge is mapper %s reports %d banks but %d were readable; "+
+			"analysing a subset would certify on the part that happened to be available",
+			id, banks, len(units))
 	}
 	return units, ""
 }

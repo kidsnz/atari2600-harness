@@ -50,7 +50,9 @@ func TestDefUseMayWriteContainsObservedWrites(t *testing.T) {
 		t.Run(shortName(asm), func(t *testing.T) {
 			r := defUseOf(t, asm)
 			if !r.Converged {
-				t.Skip("fixpoint did not converge; the may-set is not a claim here")
+				t.Fatalf("%s: the fixpoint did not converge, so the may-set below is not a claim — "+
+					"reported as a failure rather than skipped, because a soundness sweep that "+
+					"silently covers nothing is worse than one that is absent", asm)
 			}
 			may, hasUnbounded := r.mayWriteAddrs()
 
@@ -148,7 +150,8 @@ func TestDefUseMayWriteContainsObservedWrites(t *testing.T) {
 func TestDefUseNoFalseReadBeforeWriteOnInitialisedCell(t *testing.T) {
 	r := defUseOf(t, "../../roms/litmus/motion_glide.asm")
 	if !r.Converged {
-		t.Skip("fixpoint did not converge")
+		t.Fatal("the fixpoint did not converge; every assertion below rests on the states it " +
+			"produces, so this is a broken premise, not a reason to pass quietly")
 	}
 	// The ROM clears RAM at reset and then reads $80 (posY) after storing to it.
 	// Whatever the analysis says about $80, it must not be nonsense: an address
@@ -176,7 +179,8 @@ func TestDefUseNoFalseReadBeforeWriteOnInitialisedCell(t *testing.T) {
 func TestDefUseResolvesKnownIndexedStore(t *testing.T) {
 	r := defUseOf(t, "../../roms/litmus/litmus_indexed_tia.asm")
 	if !r.Converged {
-		t.Skip("fixpoint did not converge")
+		t.Fatal("the fixpoint did not converge; every assertion below rests on the states it " +
+			"produces, so this is a broken premise, not a reason to pass quietly")
 	}
 	may, _ := r.mayWriteAddrs()
 	if !may[0x0009] {

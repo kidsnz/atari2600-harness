@@ -31,7 +31,11 @@ func TestSuperchipImageIsDeclinedByName(t *testing.T) {
 			"and the emulator cannot disagree about which machine is described; got %q",
 			rep.BankedDeclined)
 	}
-	if !strings.Contains(rep.BankedDeclined, "superchip") {
+	// The wording generalised when the guard did: the question is no longer "is this
+	// a superchip" but "does this cartridge map RAM into the window", because
+	// HasSuperchip is implemented only by the Atari mapper while 3E+ and M-Network
+	// also overlay RAM. The decline must still say WHY.
+	if !strings.Contains(rep.BankedDeclined, "maps RAM into the cartridge window") {
 		t.Errorf("the decline must say WHY, not just that it declined; got %q", rep.BankedDeclined)
 	}
 	if rep.Certified {
