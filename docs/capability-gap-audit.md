@@ -1764,6 +1764,47 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The sweep on `determineBound`: 4 branches unwitnessed, and one of them cannot be reached (2026-07-30)
+
+Third function through the witness method. Branch hits over 123 ROMs:
+
+| branch | hits |
+|---|---:|
+| `dec:` enter (dex/dey latch) | 51 |
+| `div:` enter (sbc-divide latch) | 31 |
+| `dec:` no dex/dey in body -> 0 | 21 |
+| `div:` unknown predecessor -> discard inferred range | 19 |
+| `div:` BOUNDED | 16 |
+| `div:` unbounded -> 0 | 15 |
+| **`div:` address-PROXY fallback** | **9** |
+| `div:` `@amax` annotation used | 1 |
+| **`dec:` successor refusal -> 0** | **0** |
+| **`dec:` unknown predecessor -> 0** | **0** |
+| **`div:` body not the canonical `sbc #const` -> 0** | **0** |
+| **latch is neither BCS/BCC nor BNE/BPL -> 0** | **0** |
+
+All four zeroes are REFUSALS (return 0 = stay unbounded), the conservative direction, so none of
+them can under-approximate by firing wrongly — only by failing to fire.
+
+**One of them is provably unreachable through the route it was written for.** A fixture was built to
+witness `dec: successor refusal` — a banked cartridge with `lda ($90),y` (an unresolvable target on a
+hotspot cartridge) immediately before a `dex`/`bne` loop header. Measured: the branch still ran 0
+times, because the **region** is refused first, at collection time: *"region contains an access at
+bank 0 $F04F whose target cannot be resolved, and this cartridge has bank-switch hotspots"*. The
+coarser guard always fires before the finer one. That is not a defect — the outcome is the same
+refusal — but it means the inner guard is **unverifiable and probably redundant**, and the fixture
+was deleted rather than kept as a ROM that proves nothing.
+
+**`dec: unknown predecessor -> 0` is the one worth flagging.** It is the guard SD-11a added after
+finding that the predecessor scan silently skipped predecessors it could not bound, and like the
+`jmp`/`jsr` case above it **has never once run**. Unlike the successor-refusal branch, no attempt has
+yet shown it unreachable — it is simply unwitnessed. Filed.
+
+**`div:` address-PROXY fallback fires 9 times.** That is the heuristic SD-9 removed from the dex/dey
+path for producing a fortyfold under-approximation, still live on the divide path — gated to one bank
+and counted, not trusted. It has witnesses, so it is not in the class above, but it is the remaining
+place where an address stands in for execution order.
+
 ### The same sweep on `switchEdges`: 4 refusal branches had no witness, one of them a repaired one (2026-07-30)
 
 Applying the witness method to the next soundness function. Counting which branch of
