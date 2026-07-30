@@ -49,7 +49,21 @@ own authoring loop**, not the editor. The G work stands on its own; M references
 - **Gap:** only needed for speech/music games — not core to graphics-first authoring.
 
 ## Tier 3 — polish
-- **G5:** mid-line HMOVE / RESP pipeline = *observed* via `trace_clocks`, not litmus-locked.
+- **G5 ✅ RE-MEASURED 2026-07-30 — the entry was stale; both halves have been litmus-locked for some time,
+  and locking them turned out to be the easy part.** `litmus_resp_edge` + `scenarios/resp_edge.json` (golden
+  frame) pins the RESBL-vs-RESPx double-strobe rule — RESBL re-issues START (two balls on one line, clocks 38
+  and 140) while RESPx does not until the next 160-clock wrap (one player, clock 107). `litmus_hmove_mid` +
+  `scenarios/hmove_mid.json` pins mid-line HMOVE.
+  **What the re-measurement found:** hmove_mid's four asserts read as a four-entry table (55, 60, 60, 60) and
+  they are not one — three of the values coincide **for two different reasons**. Measured per frame by counting
+  HMOVE latches: the control frame latches **once** (scanline 1) and sits at 60; the other three latch
+  **twice** (scanline 1 and the mid-line strobe on scanline 136), and of those three **only one moves the
+  object** (to 55). So a mid-line HMOVE with HM=0 shifts at one of the three strobe positions this ROM tries
+  and does nothing at the other two — and the position asserts cannot tell "the strobe fired and did nothing"
+  from "the strobe never fired", which is the fixture's entire subject.
+  `TestHmoveMidStrobesAllFireButOnlyOneShifts` counts the strobes, so a regression that stops emitting them
+  fails there even though every scenario assert would still pass. Negative control: hiding the mid-line latch
+  reports "0 frames carried a mid-line strobe, expected 3".
 - **G6 ✅ MEASURED AND HANDLED (2026-07-30):** oracle sub-frame phase offset for per-frame-mutating RAM.
   **"Run N frames and dump RAM" does not name a moment, and the oracles pick different ones.** New fixture
   `roms/litmus/litmus_framephase.asm` bumps a separate counter at three points in one frame — `$80` just after
