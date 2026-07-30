@@ -1764,6 +1764,46 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### `foldLoops`, and a PATTERN: fine-grained refusals are shadowed by coarser ones (2026-07-30)
+
+Fourth function through the witness method. Branch hits over 123 ROMs:
+
+| branch | hits |
+|---|---:|
+| no back edge (not a loop) | 845 |
+| WSYNC inside the loop body | 11 |
+| multiple back edges (nested/complex) | 5 |
+| branch inside the loop body | 1 |
+| **bank switch inside the loop body** | **0** |
+| **loop body leaves the latch's bank** | **0** |
+| **loop body leaves the region** | **0** |
+| **misaligned loop body** | **0** |
+
+All four zeroes are refusals — they decline to fold, which leaves the region unbounded. Conservative,
+so they cannot under-approximate by firing wrongly, only by failing to fire.
+
+**Two construction attempts at the most valuable one, both blocked by a DIFFERENT earlier guard.**
+`bank switch inside loop body` was added for bank support and says, correctly, that the second
+iteration does not execute the same bytes. A fixture put `lda $FFF9` inside a `dex`/`bne` loop in
+bank 0 of an F8 cartridge:
+
+1. First attempt — the loop shared a region with the existing kernel loop, so `foldLoops` refused with
+   **"multiple back-edges"** before it ever walked the body.
+2. Second attempt — the loop was isolated between two fresh `sta WSYNC`s (and the kernel's row count
+   reduced by two to keep the frame length). The region then came back **"no WSYNC reached from region
+   start"**: the cross-bank edge sends the walk into bank 1, where it finds no WSYNC. Still 0.
+
+**This is the same shape as the `determineBound` finding above**, where `dec: successor refusal` proved
+unreachable because the region is refused at collection time. Two functions, three refusal branches,
+all shadowed by a coarser guard that fires first. Not a defect — the outcome is the same refusal — but
+it means these branches are **unverifiable, and plausibly dead code**. Worth a deliberate pass later to
+decide whether the fine-grained checks earn their place or should be deleted in favour of the coarse
+ones they duplicate.
+
+The fixture was deleted rather than kept. It exercised only branches that already had witnesses
+(`multiple back-edges`, `no WSYNC reached`), and a witness that does not witness what its name claims
+is worse than none: it reads as coverage.
+
 ### The sweep on `determineBound`: 4 branches unwitnessed, and one of them cannot be reached (2026-07-30)
 
 Third function through the witness method. Branch hits over 123 ROMs:
