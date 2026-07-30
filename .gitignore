@@ -64,3 +64,6 @@
 /vismatch
 /behavmatch
 /ramtrace
+
+# agent worktrees (created by background subagents; never part of the repo)
+.claude/
