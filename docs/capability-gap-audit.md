@@ -1764,6 +1764,45 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The display-miss predicates swept: 3 unwitnessed branches, all conservative — and a fixture that misses its own hazard (2026-07-30)
+
+Next function through the witness method, chosen because it sits on the **precise** side: `storeMissesDisplay`
+/ `pushMissesDisplay` / `indexedStoreMissesDisplay` decide whether a region can be classified BLANK and
+skipped, so a wrong "misses the display" drops a region's cost — an under-approximation, the direction this
+package forbids. Branch hits over 129 ROMs:
+
+| branch | hits | side |
+|---|---:|---|
+| `store abs: TIA but not $00/$01 -> MISSES` | 1146 | precise |
+| `store abs: not TIA -> MISSES` | 411 | precise |
+| `store abs: IS display -> touches` | 361 | conservative |
+| `store: delegate to indexed` | 55 | — |
+| `idx: no state -> touches` | 18 | conservative |
+| `idx: unknown range -> touches` | 17 | conservative |
+| `idx: proved -> MISSES` | 17 | precise |
+| `idx: reaches display -> touches` | 3 | conservative |
+| `push: proved -> MISSES` | 1–2 | precise |
+| **`push: unknown SP -> touches`** | **0** | conservative |
+| **`push: SP reaches display -> touches`** | **0** | conservative |
+| **`idx: indirect -> touches`** | **0** | conservative |
+
+**All three unwitnessed branches are refusals.** They can only fail by refusing too much — classifying a
+genuinely blank region as display-touching, which costs precision and never soundness. That is the safe
+side, and unlike the `pagePenalty` sweep (where the one real defect sat on the single unwitnessed *precise*
+branch) there is no precise branch without a witness here. No change made.
+
+**The finding worth acting on is a fixture gap.** `pushMissesDisplay` is reached by exactly ONE ROM in the
+corpus — `roms/techniques/rts_dispatch.asm` — and **`litmus_stack_trick` reaches it 0 times**. That ROM
+exists because a program can aim SP at the TIA and turn a `PHA` into a register write, which is the entire
+reason this predicate is not just "every push touches the display". The hazard has a fixture and the
+predicate has a witness, and they are not the same ROM: nothing in the corpus exercises the branch where
+**SP actually can reach $0100/$0101**. Filed — the fixture to write is a kernel whose SP range covers the
+display registers at a push, inside a region that would otherwise be classified blank.
+
+*Measurement note:* two shell aggregations of the push count disagreed (1 vs 2) and the discrepancy was in
+the throwaway instrumentation, not in the harness; it was not chased because the count does not bear on the
+finding — one ROM, both refusal branches at zero. Recorded rather than smoothed over.
+
 ### `dec: unknown predecessor` witnessed at last — and it took two failed fixtures to get there (2026-07-30)
 
 The last branch left from the `determineBound` sweep. It had run **0 times across 123 ROMs**, and unlike
