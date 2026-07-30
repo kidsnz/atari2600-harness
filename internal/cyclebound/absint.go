@@ -942,8 +942,23 @@ func (in Instr) pagePenalty(s State) int {
 		return 1
 	}
 	base := int(in.Operand)
-	if (base+idx.Lo)>>8 != (base+idx.Hi)>>8 {
-		return 1 // the indexed access may cross a page
+	// The 6502 charges the extra cycle when the indexed TARGET lands in a different
+	// page from the BASE — not when the range of possible targets straddles a page
+	// boundary. The two are different questions and the old code asked the second
+	// one: it compared base+Lo against base+Hi, so a CONSTANT index (Lo == Hi)
+	// always compared equal and the penalty was never charged, however far the
+	// access reached.
+	//
+	// Measured on a fixture with `ldy #200` and four `lda Table,y` in one WSYNC
+	// region: at Table $F0F8 the target is $F1C0, a page beyond the base, and the
+	// prover reported the same worst case (35) as Table $F100 -> $F1C8, which stays
+	// in page $F1. Four reads, so four cycles the hardware spends and the proof did
+	// not — an UNDER-approximation, the one direction this package forbids.
+	//
+	// Crossing is monotonic in the index for a fixed base, so the worst case over
+	// [Lo, Hi] is decided by Hi alone.
+	if (base >> 8) != ((base + idx.Hi) >> 8) {
+		return 1 // the indexed access reaches into the next page
 	}
-	return 0 // provably within one page
+	return 0 // provably within the base's page
 }

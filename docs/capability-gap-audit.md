@@ -1764,7 +1764,7 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
-### OPEN: is the page-cross penalty resolved from the index range, or always charged? (2026-07-30)
+### RESOLVED: the page-cross penalty was never charged for a CONSTANT index — an under-approximation (2026-07-30)
 
 Raised while measuring the last of known-traps.md's named static traps, "bank-move misaligns
 code -> page-cross". The question turned out to be about the prover rather than about a linter,
@@ -1791,9 +1791,28 @@ SOUND (an over-approximation) but not what "precision" claims**. The alternative
 penalty is never charged, would be an under-approximation and the direction this package forbids,
 so the difference matters and the two are not distinguishable from the number alone.
 
-Not resolved here because the region carrying `max_worst` did not appear in `Report.Lines` under a
-`worst == max_worst` filter, so the per-instruction path was not read — the next step is to dump
-the worst path for that region and look at the `cyc` charged to each `lda Table,y`.
+**★RESOLVED by reading `absint.pagePenalty`.** It asked the wrong question:
+
+```go
+if (base+idx.Lo)>>8 != (base+idx.Hi)>>8 { return 1 }   // does the RANGE straddle a page?
+return 0
+```
+
+The 6502 charges its extra cycle when the indexed **target** lands in a different page from the
+**base** — not when the range of possible targets straddles a boundary. With a CONSTANT index
+`Lo == Hi`, so the old test always compared equal and returned **0**, however far the access
+reached. It was also wrong for any range lying wholly beyond the boundary. Both are
+**under-approximations**, the one direction this package forbids, and the same shape as SD-9.
+
+Fixed to `(base>>8) != ((base+idx.Hi)>>8)` — crossing is monotonic in the index for a fixed base,
+so the worst case over `[Lo, Hi]` is decided by `Hi` alone. Measured on the same ROM,
+`litmus_pagecross`: **FarRow 35 → 39** (four crossing reads, +1 each) with **NearRow unchanged at
+30**. **123 of 123 existing ROMs byte-identical** — the bug was real and had no witness in the
+corpus, which is exactly why `roms/litmus/litmus_pagecross.asm` is now permanent: it is the only
+thing that can catch it coming back. `TestConstantIndexPageCrossIsCharged` pins both numbers, and
+its comment warns against comparing NearRow with FarRow directly (same instructions, different
+addresses; they differed by 5 even before the fix, for unrelated reasons). Negative control:
+restoring the old condition reports `FarRow worst = 35, want 39`.
 
 **Separately measured and clean:** shifting each of the 31 technique kernels by 1, 2 and 3 bytes
 (`ds N` after the first `ORG`, verified to change the assembled image — three distinct SHA-1s at
