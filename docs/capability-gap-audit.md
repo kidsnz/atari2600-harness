@@ -1578,6 +1578,42 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### SD-11a — the cross-bank rekey shipped an under-approximation, found by review after it was pushed (2026-07-29)
+
+I verified SD-11 against the machine before accepting it — for every region the prover bounds, on all four
+bank ROMs, proven ≥ measured with **0 violations** — and pushed it. That verification was sound *for what the
+corpus exercises*. The adversarial pass then reported two `unsound` findings on cases the corpus does not
+contain, one of them a **regression this change introduced**. Confirmed by reading the code, not taken on
+report.
+
+**The defect.** A JSR records its return point as `ctx{ret: in.nextSite()}`, which stamps the **caller's**
+bank unconditionally. If the callee switches bank and returns WITHOUT switching back, the hardware resumes at
+that address in the **new** bank — different bytes, different cost — and costing the caller's bytes there is an
+under-approximation, the one direction this package forbids.
+
+No ROM in the corpus does it: every trampoline switches back before returning. So there was no witness, the
+machine gate could not see it, and my proven-≥-measured check passed while the hole was open. **That is the
+limit of grading against a corpus, stated plainly.**
+
+**Refused rather than modelled**, because following it properly means carrying the bank across the call, which
+is more than this stage does. The refusal names both banks. Verified: all four bank ROMs still prove and none
+trips the new guard (their trampolines do switch back), and the golden JSON is **43 of 43 byte-identical** —
+this touches nothing that was already working.
+
+**What this says about the process, which matters more than the fix.** The machine gate and the adversarial
+pass find different things and neither substitutes for the other: the gate proves the numbers agree on what
+the corpus runs, the review finds what the corpus never runs. Accepting a change on the gate alone — as I did
+here, pushing before the review returned — is how an unsound path ships. The review took 2h57m against my
+gate's few minutes, and it was the one that found this.
+
+**Still open from the same review, recorded rather than fixed** (each needs its own measurement):
+`emu.HasSuperchip()` is implemented only by the Atari mapper, so the SD-8c guard may not fire on others; the
+cross-bank edge semantics are taken from `mapper_atari.go` and applied to every mapper; `analysisUnits` can
+return an empty unit list with no decline reason; `determineBound`'s predecessor scan reads
+`absStates[pred].transfer(pred)` where an absent entry is the zero State whose ranges read as exact `[0,0]`
+rather than Top; and six `t.Skip` sites turn the proven-vs-measured gate off entirely on a single emulator
+construction failure while CI stays green.
+
 ### RL-7c regressed from 2 cells to 1868 and nothing noticed (2026-07-29)
 
 Found by re-measuring the audit's own numbers rather than by anything failing. RL-7c records

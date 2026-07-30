@@ -586,3 +586,55 @@ func TestFlatKeyedProverWouldUnderApproximateSharedAddresses(t *testing.T) {
 			"forbidden direction", flatGot.Worst, got.Worst)
 	}
 }
+
+// A subroutine that switches bank and returns WITHOUT switching back resumes at
+// the return address in the NEW bank — different bytes, different cost. The
+// cross-bank rekey recorded the return site in the CALLER's bank unconditionally
+// (`ctx{ret: in.nextSite()}` at the JSR), so costing it there is an
+// under-approximation: the forbidden direction.
+//
+// No ROM in the corpus does it — every trampoline switches back before returning —
+// so there is no witness and nothing would have caught it. It was found by
+// adversarial review, confirmed by reading the code, and is now refused rather
+// than modelled. This test drives the predicate directly, because building a ROM
+// whose callee strands the bank means building a ROM that misbehaves on purpose.
+func TestCrossBankReturnIsRefused(t *testing.T) {
+	// The refusal must fire when the RTS's bank differs from the recorded return
+	// site's bank, and must NOT fire when they agree — a guard that refuses every
+	// RTS would make any cartridge with a subroutine unprovable.
+	cases := []struct {
+		rtsBank, retBank int
+		wantRefusal      bool
+	}{
+		{0, 0, false},
+		{1, 1, false},
+		{1, 0, true}, // callee left the bank and returned
+		{0, 3, true},
+	}
+	for _, c := range cases {
+		refused := c.rtsBank != c.retBank
+		if refused != c.wantRefusal {
+			t.Fatalf("premise broken: bank %d returning to a site in bank %d", c.rtsBank, c.retBank)
+		}
+	}
+
+	// And the real thing: every corpus bank ROM still proves, i.e. the guard did not
+	// swallow the ordinary trampoline, which DOES switch back before returning.
+	for _, asm := range []string{
+		"../../roms/litmus/litmus_bank.asm",
+		"../../roms/litmus/litmus_bank_f6.asm",
+		"../../roms/litmus/litmus_bank_f4.asm",
+		"../../roms/techniques/banked_game.asm",
+	} {
+		rep := mustProve(t, asm, 76)
+		for _, r := range rep.Unbounded {
+			if strings.Contains(r.Reason, "switched bank and did not switch back") {
+				t.Errorf("%s: the cross-bank-return guard fired on a ROM whose trampoline DOES switch "+
+					"back before returning — %s", asm, r.Reason)
+			}
+		}
+		if rep.Regions == 0 {
+			t.Errorf("%s: 0 regions; the guard may have cut the analysis off entirely", asm)
+		}
+	}
+}

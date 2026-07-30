@@ -1268,6 +1268,27 @@ func (s *solver) longest(at site, c ctx) result {
 				s.unbReason = "RTS/RTI with no caller in context"
 				break
 			}
+			// The return site was recorded in the CALLER's bank. If the callee has
+			// switched bank and returns without switching back, the hardware resumes at
+			// that address in the NEW bank — different bytes, different cost — and
+			// costing the caller's bytes there is an under-approximation, the one
+			// direction this package forbids.
+			//
+			// No ROM in the corpus does it (every trampoline switches back before
+			// returning), so there is no witness and nothing would have caught it. Found
+			// by adversarial review of the cross-bank rekey, confirmed by reading the
+			// ctx the JSR builds at the call site: ctx{ret: in.nextSite()} stamps the
+			// caller's bank unconditionally.
+			//
+			// Refused rather than modelled: following it properly means tracking the
+			// bank across the call, which is more than this stage does.
+			if in.Bank != c.ret.bank {
+				s.unbounded = true
+				s.unbReason = fmt.Sprintf("RTS in bank %d returns to a site recorded in bank %d — the "+
+					"callee switched bank and did not switch back, so the bytes at the return address "+
+					"are not the ones costed", in.Bank, c.ret.bank)
+				break
+			}
 			sub := s.longest(c.ret, ctx{})
 			best = result{cyc: in.Def.Cycles + sub.cyc,
 				path: prepend(s.step(in.site(), in.Def.Cycles, 0), sub.path)}
