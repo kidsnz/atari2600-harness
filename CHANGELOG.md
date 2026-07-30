@@ -8,6 +8,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`motion_xclamp` litmus + the witness for `spritey`'s multi-frame mode.** The mode returns a per-frame
+  sample carrying BOTH X and Y and always has, but nothing ever checked that the X in those samples MOVES:
+  a build reporting a constant X, or reporting one axis into the other, passed every test in this repo.
+  The new ROM is the horizontal mirror of `motion_glide` (which moves Y and pins X) — P0 glides right
+  +2px/frame, CLAMPS, holds, and then the round ends and it snaps back to the start, all with a fixed Y
+  band. Measured: X 13→91 in +2 steps, plateau at 91 for 80 frames, reset to 11 at frame 121, Y fixed at
+  80–119, 262 scanlines. Two tests in `cmd/harness` pin it, and the reset half pins WHY the trajectory is
+  worth preferring: a single read at frame 130 returns 29 while the trajectory over the same span peaks at
+  91. That is the Outlaw failure (hold "right" 700 frames, read once, get x=7 near the LEFT edge because
+  the round had ended) reproduced with known constants. Negative controls: pinning X to a constant,
+  reporting Y into X, and letting Y drift with X each fail the tests. Note the trap liveness does NOT
+  cover — the program is reacting the whole time; liveness answers "is it running", not "am I still in the
+  situation I set up".
+
 ### Fixed
 - **`spritey`'s description advertised half of what the tool returns.** Its multi-frame mode was documented
   as returning "the per-frame Y trajectory", but every `SpriteYSample` has carried `X` (HmovedPixel) since
