@@ -23,9 +23,21 @@ import (
 //
 // What does reach it is the NOT-TAKEN edge of a branch whose condition is statically
 // known. That edge IS decoded — the decoder cannot prove which way a branch goes —
-// but the abstract interpreter proves it unreachable and marks the state invalid
-// (S5 pruning). An instruction with an invalid state that flows into the loop header
-// is exactly the case the guard is written for.
+// and then it gets NO abstract state at all: `absSuccessors` emits only edges whose
+// refined state is still valid, so a pruned edge's target is never pushed into the
+// state map. The guard fires on `!ok` (no entry), not on `!st.valid`.
+//
+// That distinction was measured, and it corrects the first write-up of this fixture,
+// which named the invalid-state route. Instrumenting the two conditions separately
+// over 129 ROMs: `!ok` fires once (here, at $F035) and `!st.valid` fires ZERO times
+// anywhere — pruned nodes never acquire a state to be invalid, so in this function
+// that condition is as unreachable as the sibling branch this fixture replaced.
+//
+// It also settles whether the guard could be relaxed. It could not: a missing entry
+// means EITHER proven-unreachable OR never-analysed, because a fixpoint that hits its
+// iteration cap leaves nodes unprocessed (`computeStatesWith` returns converged=false
+// and the work list non-empty). Skipping a missing predecessor would then drop a real
+// one and under-approximate the entry value — the one direction this package forbids.
 func TestUnboundedWhenAPredecessorHasNoAbstractState(t *testing.T) {
 	dead, err := Prove("../../roms/litmus/cb_deadpred.asm", DefaultBudget)
 	if err != nil {

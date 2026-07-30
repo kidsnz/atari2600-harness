@@ -15,7 +15,11 @@ versions follow [Semantic Versioning](https://semver.org/).
   by a `jmp` is never decoded, so it never becomes a predecessor at all (measured — the scan listed 9
   candidates and the dead address was not among them), and dead code placed in the region above the header
   is not seen because the scan is per-region. What reaches it is the **not-taken edge of a statically known
-  branch**: decoded, then proven unreachable by the abstract interpreter and marked invalid. The twins
+  branch**: decoded, and then given no abstract state at all, because `absSuccessors` emits only edges
+  whose refined state is still valid. Measured over 129 ROMs, the neighbouring `!st.valid` condition fires
+  **zero** times anywhere — pruned nodes never acquire a state to be invalid — and the missing-entry
+  condition cannot be relaxed, because a fixpoint that hits its iteration cap also leaves nodes with no
+  entry. The twins
   differ by that one edge, so the refusal is attributable — the dead one leaves its visible region
   unbounded, the twin bounds all 7 regions with a dearer worst (33 vs 17 cy). Negative control: removing
   the guard makes the dead ROM come back fully bounded.

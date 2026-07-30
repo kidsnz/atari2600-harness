@@ -1782,9 +1782,8 @@ to sit in, because "nothing reaches it" and "it is right" are different claims a
    attempt put the dead instruction one region too early.
 
 What reaches it is the **not-taken edge of a branch whose condition is statically known**. That edge IS
-decoded (the decoder cannot prove which way a branch goes), and then the abstract interpreter proves it
-unreachable and marks its state invalid (S5 pruning). `lda #0` / `beq` over a `ldy #200` that falls into
-the delay loop produced `WITNESS dec-unknown-pred at bank0 $F035 -> header $F037` on the first run.
+decoded (the decoder cannot prove which way a branch goes). `lda #0` / `beq` over a `ldy #200` that falls
+into the delay loop hit the guard at `bank0 $F035 -> header $F037` on the first run.
 
 Shipped as the twin pair `cb_deadpred` / `cb_deadpred_live`, differing by that one pruned edge and
 nothing else, so the refusal is attributable: the dead one leaves its visible region unbounded ("loop
@@ -1793,16 +1792,25 @@ which also proves the delay loop is really being counted there. Negative control
 (silently skipping the unknown predecessor — the pre-SD-11a behaviour) makes the dead ROM come back fully
 bounded, and the test says so.
 
-**Open, and deliberately not acted on: the guard may be over-conservative.** It refuses on `!ok ||
-!st.valid`, and those are not the same thing. `!ok` is no information and must refuse. `!st.valid` is
-produced by `refineBranch` to mark an edge **provably unreachable**, and a predecessor that cannot execute
-cannot contribute an entry value — skipping it would be sound and strictly more precise. `cb_deadpred`'s
-delay loop is a plain 4-iteration `dey`/`bne` that the prover gives up on for exactly this reason.
-The change was NOT made, because `State`'s zero value also has `valid == false`, so an entry that was
-never computed is indistinguishable from one that was pruned without first establishing how `absStates`
-is populated. Changing a prover whose soundness is graded 7117/7117 on an unverified assumption is the
-move this repo exists to prevent. Reproduction is `cb_deadpred`; the question to settle first is whether
-any node can hold a zero-value state.
+**RESOLVED, and the first write-up of it was wrong.** The open question was whether the guard is
+over-conservative: it refuses on `!ok || !st.valid`, and the hypothesis was that `!st.valid` marks a
+**provably unreachable** edge, which cannot contribute an entry value, so skipping it would be sound and
+more precise. Instrumenting the two conditions separately over 129 ROMs settles it, and against the
+hypothesis:
+
+- **`!st.valid` fires ZERO times anywhere, including in the fixture built to hit it.** A pruned edge never
+  acquires a state to be invalid: `absSuccessors` emits only edges whose refined state is still valid
+  (`if tk.valid` / `if nt.valid`), so the target is never pushed into the map at all. In this function
+  that condition is as unreachable as the sibling branch the fixture replaced.
+- **`!ok` is the live one** — one hit, `cb_deadpred` at `$F035` — and it is **not** "proven unreachable".
+  A missing entry means proven-unreachable OR **never analysed**: a fixpoint that hits its iteration cap
+  leaves work on the queue and returns `converged=false`, and those nodes have no entry either.
+
+So the refusal must stay. Relaxing it would drop a real predecessor whenever the fixpoint was capped, and
+under-approximate the entry value — the one direction this package forbids. **No change made, and the
+reason is now measured rather than assumed.** The earlier text in this section, which named the
+invalid-state route as the one the fixture takes, was corrected in place; the fixture and its twin are
+right, only the mechanism named for them was wrong.
 
 ### TD-* — All 38 MCP tool descriptions audited against their handlers: 8 disagree (2026-07-30)
 

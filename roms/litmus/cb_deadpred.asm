@@ -64,9 +64,12 @@ VB:     sta WSYNC
 ;     guard never saw it). The dead instruction is the NOT-TAKEN edge of a branch
 ;     whose condition is statically known, not code hopped over by a jmp: measured,
 ;     a jmp'd-over instruction is never decoded at all, so it never becomes a node
-;     and the guard cannot see it either. A pruned branch edge IS decoded, and the
-;     abstract interpreter marks its state invalid (S5 pruning) -- which is exactly
-;     the "predecessor we know nothing about" the guard is written for.
+;     and the guard cannot see it either. A pruned branch edge IS decoded, and then
+;     gets NO abstract state: absSuccessors emits only edges whose refined state is
+;     still valid, so the pruned target is never pushed into the state map. The guard
+;     therefore fires on "no entry", which is what "a predecessor we know nothing
+;     about" actually means here. Measured over 129 ROMs, the sibling condition
+;     (entry present but marked invalid) fires zero times anywhere.
         ldx #96
 Top:    sta WSYNC
         stx COLUBK
