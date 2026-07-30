@@ -24,6 +24,17 @@ versions follow [Semantic Versioning](https://semver.org/).
   situation I set up".
 
 ### Changed
+- **`breakif` now halts when the beam REACHES a position, instead of silently never halting.** It required
+  an exact `(scanline, clock)` match, and observations only happen at instruction boundaries: the CPU
+  advances 3 colour clocks per cycle, so **only one phase in three is ever observable**, and a WSYNC kernel
+  narrows it much further — measured on `motion_xclamp`, a visible scanline is observed at **7 clocks, every
+  one of them inside HBLANK**, so the whole visible region 0..159 could not be stopped on at all. Asking for
+  a position in the picture ran to `max_frames` and returned `halted=false` with no error, which is
+  indistinguishable from "not yet". It now stops at the first instruction boundary at or past the target
+  (measured: asking for clock 80 halts at 82), a position already passed in the current frame is caught on
+  the next frame, and an out-of-range clock is an **error** — the tag used to advertise "0-227" while the
+  coordinate system is HBLANK −68..−1 / visible 0..159, so 68 of the advertised values did not exist.
+  Three tests pin it; negative controls: restoring the equality match, and arming unconditionally, each fail.
 - **`beamtrace` now returns every frame it traced, not just the first.** It traced `frames` frames,
   advanced the emulator by all of them, and returned the EARLIEST one alone — measured over the wire:
   `frames=4` starting at frame 5 left the machine at frame 9 and handed back frame 5. The discarded

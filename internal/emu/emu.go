@@ -1604,22 +1604,53 @@ func (e *Emu) ReadCollisions() (Collisions, error) {
 	return decodeCollisions(r), nil
 }
 
-// RunUntilBeam は最大 maxFrames フレーム実行し、ビームが (scanline, clock) に達したら
+// beamPos はフレーム内のビーム位置を単調増加する 1 本の数直線に写す（HBLANK 先頭 = 0）。
+// clock の規約は Coords と同じ HBLANK −68..−1 / 可視 0..159（= 1 ライン 228 カラークロック）。
+func beamPos(scanline, clock int) int { return scanline*specification.ClksScanline + clock + specification.ClksHBlank }
+
+// RunUntilBeam は最大 maxFrames フレーム実行し、ビームが (scanline, clock) に**到達した**時点で
 // 早期停止する。条件で止まったとき halted=true（breakif の土台）。
+//
+// 「到達」は AT OR PAST であって完全一致ではない。一致にしていた当初の実装は、ほとんどの
+// (scanline, clock) で**永久に止まらない**（エラーも出さない）＝2026-07-30 に実測で判明した。理由は
+// 観測が命令境界でしか起きないこと: CPU は 1 サイクル 3 カラークロック進むので、観測される clock は
+// **3 つに 1 つの位相しか無い**。さらに WSYNC カーネルでは 1 ライン当たり数点しか観測されず、
+// motion_xclamp の可視ラインでは 7 点、いずれも HBLANK 内で、可視領域 0..159 は 1 点も観測されない。
+// つまり完全一致は「呼び手が指定したい値のほぼ全部」を静かに取りこぼしていた。
+//
+// 範囲外の指定は**黙って走り切らずにエラー**にする。旧タグは clock を 0-227 と称していたが、この
+// 座標系に 160..227 は存在しないので、その値を渡した呼び手は halted=false だけを受け取っていた。
 func (e *Emu) RunUntilBeam(maxFrames, scanline, clock int) (halted bool, err error) {
-	target := e.VCS.TV.GetCoords().Frame + maxFrames
+	if clock < -specification.ClksHBlank || clock >= specification.ClksVisible {
+		return false, fmt.Errorf("until_clock %d out of range %d..%d (HBLANK is negative; visible starts at 0)",
+			clock, -specification.ClksHBlank, specification.ClksVisible-1)
+	}
+	if scanline < 0 {
+		return false, fmt.Errorf("until_scanline %d out of range (must be >= 0)", scanline)
+	}
+	targetPos := beamPos(scanline, clock)
+	c := e.VCS.TV.GetCoords()
+	frameLimit := c.Frame + maxFrames
+	lastFrame := c.Frame
+	// このフレームで既に通り過ぎていたら、次のフレームまで待つ（さもないと「まだ来ていない位置」を
+	// 求めたつもりが、直前に過ぎた位置で即停止してしまう）。
+	armed := beamPos(c.Scanline, c.Clock) < targetPos
 	for {
 		if e.VCS.CPU.Jammed {
 			return false, nil
 		}
-		if e.VCS.TV.IsFrameNum(target) {
+		if e.VCS.TV.IsFrameNum(frameLimit) {
 			return false, nil // フレーム上限に到達（条件未成立）
 		}
 		if _, err := e.stepInstr(); err != nil {
 			return false, err
 		}
 		c := e.VCS.TV.GetCoords()
-		if c.Scanline == scanline && c.Clock == clock {
+		if c.Frame != lastFrame {
+			lastFrame = c.Frame
+			armed = true
+		}
+		if armed && beamPos(c.Scanline, c.Clock) >= targetPos {
 			return true, nil
 		}
 	}
