@@ -27,6 +27,21 @@ def strip_comment(line):
     return (line[:i] if i >= 0 else line)
 
 
+
+# TIA の「書込専用」レジスタ = $0E(PF1)-$2C(CXCLR)。読み出し側は $00-$0D しか無い
+# （Gopher2600 cpubus.go TIAReadRegisters は CXM0P..INPT5 の $00-$0D のみ）。そこを読むと
+# レジスタではなくバスの残留値が返る＝エミュレータでは「たまたま動く」典型。
+TIA_WRITE_ONLY = {
+    "PF1": 0x0E, "PF2": 0x0F, "RESP0": 0x10, "RESP1": 0x11, "RESM0": 0x12, "RESM1": 0x13,
+    "RESBL": 0x14, "AUDC0": 0x15, "AUDC1": 0x16, "AUDF0": 0x17, "AUDF1": 0x18, "AUDV0": 0x19,
+    "AUDV1": 0x1A, "GRP0": 0x1B, "GRP1": 0x1C, "ENAM0": 0x1D, "ENAM1": 0x1E, "ENABL": 0x1F,
+    "HMP0": 0x20, "HMP1": 0x21, "HMM0": 0x22, "HMM1": 0x23, "HMBL": 0x24, "VDELP0": 0x25,
+    "VDELP1": 0x26, "VDELBL": 0x27, "RESMP0": 0x28, "RESMP1": 0x29, "HMOVE": 0x2A,
+    "HMCLR": 0x2B, "CXCLR": 0x2C,
+}
+READ_OP = re.compile(
+    r"\b(lda|ldx|ldy|bit|cmp|cpx|cpy|adc|sbc|and|ora|eor)\s+(?!#)(\$?[0-9a-zA-Z_]+)", re.I)
+
 def scan_text(asm):
     """asm 文字列を検査して (errors, warns) の (行番号, メッセージ) リストを返す。"""
     errors, warns = [], []
@@ -52,6 +67,26 @@ def scan_text(asm):
         m = re.search(r"=\s*\$(f[89a-f])\b", low) or re.search(r"\bequ\s+\$(f[89a-f])\b", low)
         if m:
             warns.append((n, f"variable at $%s — JSR pushes onto the $0100/$00FF stack mirror and can clobber it (keep vars from $80)" % m.group(1).upper()))
+        # 5) 書込専用 TIA レジスタの読み出し〔known-traps / Gopher2600 cpubus.TIAReadRegisters=$00-$0D〕
+        #    誤検出ゼロを実測: roms/techniques + roms/litmus の 123 本で 0 件（読み系オペコードの
+        #    マッチ自体は 509 件あるので、検出器が黙っているのではなく本当に無い）。
+        m = READ_OP.search(code)
+        if m:
+            operand = m.group(2)
+            reg = None
+            if operand.upper() in TIA_WRITE_ONLY:
+                reg = operand.upper()
+            elif operand.startswith("$"):
+                try:
+                    v = int(operand[1:], 16)
+                except ValueError:
+                    v = -1
+                if 0x0E <= v <= 0x2C:
+                    reg = next((k for k, a in TIA_WRITE_ONLY.items() if a == v), "$%02X" % v)
+            if reg:
+                errors.append((n, f"reads {reg}, a WRITE-ONLY TIA register — the TIA answers reads only at "
+                                  f"$00-$0D (CXxx/INPTx); this returns bus residue, which an emulator may "
+                                  f"make look deterministic"))
     # 4) リセット初期化（CLD も CLEAN_START も無い）〔known-traps D / 採掘 261488,318346〕
     if not (has_cld or has_cleanstart):
         errors.append((0, "no CLD and no CLEAN_START — decimal flag / SP / RAM are undefined at power-up (BCD garbage, rolls)"))
@@ -71,13 +106,14 @@ Start
         lax #$ff          ; immediate LAX = unstable
         nop $00           ; bankswitch trap on 3F
 flag    = $ff             ; var in stack-collision zone
+        lda GRP0          ; read of a write-only TIA register
         ; (intentionally no CLD / CLEAN_START)
 """
 
 
 def selftest():
     errors, warns = scan_text(BAIT)
-    want = ["lxa", "LAX #imm", "bankswitch", "variable at $FF", "no CLD"]
+    want = ["lxa", "LAX #imm", "bankswitch", "variable at $FF", "no CLD", "WRITE-ONLY TIA register"]
     blob = " ".join(m for _, m in errors + warns)
     missing = [w for w in want if w not in blob]
     if missing:
