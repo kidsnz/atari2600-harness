@@ -9,6 +9,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`cb_deadpred` / `cb_deadpred_live` — the twin fixtures that finally witness `determineBound`'s
+  "a predecessor we know nothing about" refusal**, a guard that had run 0 times across 123 ROMs and had
+  never been shown unreachable either. Two fixtures failed first, and both are recorded: code hopped over
+  by a `jmp` is never decoded, so it never becomes a predecessor at all (measured — the scan listed 9
+  candidates and the dead address was not among them), and dead code placed in the region above the header
+  is not seen because the scan is per-region. What reaches it is the **not-taken edge of a statically known
+  branch**: decoded, then proven unreachable by the abstract interpreter and marked invalid. The twins
+  differ by that one edge, so the refusal is attributable — the dead one leaves its visible region
+  unbounded, the twin bounds all 7 regions with a dearer worst (33 vs 17 cy). Negative control: removing
+  the guard makes the dead ROM come back fully bounded.
 - **`spritey` and `read_motion` now report `stillness`** — how far the object travelled on each axis over
   the window they measured, and whether any RAM byte changed — so a measurement carries the evidence for
   whether it measured anything. Travel of 0 is flagged as a **CONSTANT**, the shape behind both of this

@@ -1,0 +1,104 @@
+; cb_deadpred — the fixture for determineBound's "a predecessor we know nothing
+; about" refusal, a guard that had never once run across 123 ROMs.
+;
+; The guard fires when an instruction that FLOWS INTO a loop header has no abstract
+; state. That happens when the instruction is unreachable: the fixpoint never visits
+; it, so it has no state, yet it is still decoded and still lands on the header. This
+; ROM builds exactly that shape and nothing else — the `jmp` hops over a dead
+; `ldx #200` which falls through into the counted loop below it.
+;
+; The refusal is the conservative direction: an unbounded loop costs the prover
+; precision, never soundness. What the fixture establishes is that the branch is
+; REACHABLE and behaves as written, which is the half its sibling
+; (`dec: successor refusal`) could not be given — that one is shadowed by a coarser
+; region-level guard that always fires first.
+;
+; Pairs with cb_clean, whose Top loop is the same counted loop with no dead
+; predecessor above it, so the difference in verdict is attributable.
+;
+; Self-contained (no vcs.h); NTSC 3/37/192/30 = 262.
+
+        processor 6502
+
+VSYNC   = $00
+VBLANK  = $01
+WSYNC   = $02
+COLUBK  = $09
+
+        org $F000
+
+Reset:
+        sei
+        cld
+        ldx #$FF
+        txs
+        lda #0
+Clr:    sta $00,x
+        dex
+        bne Clr
+
+Main:
+; --- VSYNC: 3 lines ---
+        lda #2
+        sta VSYNC
+        sta WSYNC
+        sta WSYNC
+        sta WSYNC
+        lda #0
+        sta VSYNC
+
+; --- VBLANK: 37 lines ---
+        lda #2
+        sta VBLANK
+        ldx #37
+VB:     sta WSYNC
+        dex
+        bne VB
+        lda #0
+        sta VBLANK
+
+; --- Visible top: 96 striped lines. Each line runs a WSYNC-FREE delay loop whose
+;     header is entered over a DEAD initialiser, so the dead instruction and the
+;     header sit in the SAME WSYNC-to-WSYNC region (the predecessor scan is
+;     per-region: a first attempt put the dead code in the region above and the
+;     guard never saw it). The dead instruction is the NOT-TAKEN edge of a branch
+;     whose condition is statically known, not code hopped over by a jmp: measured,
+;     a jmp'd-over instruction is never decoded at all, so it never becomes a node
+;     and the guard cannot see it either. A pruned branch edge IS decoded, and the
+;     abstract interpreter marks its state invalid (S5 pruning) -- which is exactly
+;     the "predecessor we know nothing about" the guard is written for.
+        ldx #96
+Top:    sta WSYNC
+        stx COLUBK
+        ldy #4
+        lda #0
+        beq Delay       ; Z is statically true here, so this branch ALWAYS taken
+
+Dead:                   ; the not-taken edge: decoded, but PROVABLY unreachable
+        ldy #200        ; ...and it flows straight into the delay-loop header
+Delay:  dey
+        bne Delay
+
+        dex
+        bne Top
+
+; --- Visible bottom: 96 striped lines (ordinary, for contrast) ---
+        ldx #96
+Bot:    sta WSYNC
+        stx COLUBK
+        dex
+        bne Bot
+
+; --- Overscan: 30 lines ---
+        lda #2
+        sta VBLANK
+        ldx #30
+OS:     sta WSYNC
+        dex
+        bne OS
+
+        jmp Main
+
+        org $FFFC
+        .word Reset
+        .word Reset

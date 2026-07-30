@@ -1764,6 +1764,46 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### `dec: unknown predecessor` witnessed at last — and it took two failed fixtures to get there (2026-07-30)
+
+The last branch left from the `determineBound` sweep. It had run **0 times across 123 ROMs**, and unlike
+its shadowed sibling (`dec: successor refusal`, which a coarser region-level guard always beats to the
+punch) nobody had shown it unreachable — it was simply unwitnessed, which is the worst state for a guard
+to sit in, because "nothing reaches it" and "it is right" are different claims and neither was made.
+
+**Two fixtures failed first, and both are findings.**
+
+1. *Code hopped over by a `jmp` never becomes a predecessor at all.* The decode follows flow, so an
+   unreachable instruction is never decoded, never enters the region's node map, and the scan cannot see
+   it. Measured by instrumenting the scan: it listed 9 candidates and the dead instruction's address was
+   not among them.
+2. *Dead code in the region ABOVE the header is not seen either.* The predecessor scan is per-region, and
+   the header of a WSYNC-free delay loop lives inside the region the preceding WSYNC opened — the first
+   attempt put the dead instruction one region too early.
+
+What reaches it is the **not-taken edge of a branch whose condition is statically known**. That edge IS
+decoded (the decoder cannot prove which way a branch goes), and then the abstract interpreter proves it
+unreachable and marks its state invalid (S5 pruning). `lda #0` / `beq` over a `ldy #200` that falls into
+the delay loop produced `WITNESS dec-unknown-pred at bank0 $F035 -> header $F037` on the first run.
+
+Shipped as the twin pair `cb_deadpred` / `cb_deadpred_live`, differing by that one pruned edge and
+nothing else, so the refusal is attributable: the dead one leaves its visible region unbounded ("loop
+bound unknown"), the twin comes back with all 7 regions bounded and a dearer worst region (33 vs 17 cy),
+which also proves the delay loop is really being counted there. Negative control: removing the guard
+(silently skipping the unknown predecessor — the pre-SD-11a behaviour) makes the dead ROM come back fully
+bounded, and the test says so.
+
+**Open, and deliberately not acted on: the guard may be over-conservative.** It refuses on `!ok ||
+!st.valid`, and those are not the same thing. `!ok` is no information and must refuse. `!st.valid` is
+produced by `refineBranch` to mark an edge **provably unreachable**, and a predecessor that cannot execute
+cannot contribute an entry value — skipping it would be sound and strictly more precise. `cb_deadpred`'s
+delay loop is a plain 4-iteration `dey`/`bne` that the prover gives up on for exactly this reason.
+The change was NOT made, because `State`'s zero value also has `valid == false`, so an entry that was
+never computed is indistinguishable from one that was pruned without first establishing how `absStates`
+is populated. Changing a prover whose soundness is graded 7117/7117 on an unverified assumption is the
+move this repo exists to prevent. Reproduction is `cb_deadpred`; the question to settle first is whether
+any node can hold a zero-value state.
+
 ### TD-* — All 38 MCP tool descriptions audited against their handlers: 8 disagree (2026-07-30)
 
 Three instances of "the tool's description does not match what the tool does" were found by hand in two
