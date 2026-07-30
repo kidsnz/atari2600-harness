@@ -1926,16 +1926,37 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		// the FALL-THROUGH predecessor's post-state instead (the value entering the
 		// loop from above). This is where 3A's AND-mask range and 3B's array-element
 		// range surface. Max over predecessors (sound). Unknown => 0 (stay unbounded).
+		// The comment above says "Unknown => 0 (stay unbounded)" and the code did not
+		// do that: a predecessor with no abstract state, or one whose A is Top, was
+		// SKIPPED, and the maximum was then taken over the predecessors that happened
+		// to be known. Skipping the unknown one is exactly how the maximum comes out
+		// too low — an under-approximation, the direction this package forbids, in the
+		// same function whose dex/dey path produced SD-9's fortyfold one.
 		amax := -1
+		unknownPred := false
 		for at, in := range nodes {
 			// Same-bank comparison: two addresses in different banks have no order.
 			if in.nextSite() == header && at != latch.site() && at.bank == header.bank && at.addr < header.addr {
-				if st, ok := absStates[at]; ok {
-					if ea := st.transfer(in).A; !ea.Top && ea.Hi > amax {
-						amax = ea.Hi
-					}
+				st, ok := absStates[at]
+				if !ok || !st.valid {
+					unknownPred = true
+					continue
+				}
+				ea := st.transfer(in).A
+				if ea.Top {
+					unknownPred = true
+					continue
+				}
+				if ea.Hi > amax {
+					amax = ea.Hi
 				}
 			}
+		}
+		if unknownPred {
+			// One predecessor we cannot bound makes the maximum over the others a lower
+			// bound, not an upper one. The @amax annotation below is the author's own
+			// declared ceiling and is still allowed to answer; an inferred range is not.
+			amax = -1
 		}
 		// Fallback: closest immediate `lda #imm` before the loop, IN THE SAME BANK.
 		// This is the address proxy SD-9 removed from the dex/dey path, still live here;

@@ -1,6 +1,7 @@
 package cyclebound
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
@@ -157,4 +158,68 @@ func TestCrossBankLoopBoundComesFromThePredecessorsState(t *testing.T) {
 	}
 	t.Logf("crossing region bank %d $%04X: proven %dcy, machine measured %dcy, %d cross-bank edge(s)",
 		crossing.Bank, crossing.Start, crossing.Worst, m, crossing.SwitchEdges)
+}
+
+// The divide-loop path of determineBound takes A's loop-entry ceiling as the
+// MAXIMUM over the header's predecessors. Its own comment promised "Unknown => 0
+// (stay unbounded)" and the code did not do it: a predecessor with no abstract
+// state, or one whose A is Top, was SKIPPED and the maximum taken over whichever
+// predecessors happened to be known.
+//
+// Skipping is not neutral. A maximum computed over a subset is a LOWER bound on
+// the real maximum, so the trip count comes out too small and the proven worst
+// case with it — an under-approximation, in the same function whose dex/dey path
+// produced SD-9's fortyfold one.
+//
+// The corpus cannot witness it (every divide loop here has fully-known
+// predecessors, and the fix left all 43 golden reports byte-identical), so the
+// guarantee is asserted where it lives: nothing the prover BOUNDS may sit below
+// what the machine measures, across every ROM that has a divide loop at all.
+func TestDivideLoopBoundsHoldAgainstTheMachine(t *testing.T) {
+	files, err := filepath.Glob("../../roms/techniques/*.asm")
+	if err != nil || len(files) == 0 {
+		t.Skip("technique corpus unavailable")
+	}
+	graded, regions := 0, 0
+	for _, asm := range files {
+		rep, err := Prove(asm, 76)
+		if err != nil || rep.BankedDeclined != "" {
+			continue
+		}
+		bin := build.BinPathFor(asm)
+		e, err := emu.New("NTSC")
+		if err != nil {
+			t.Fatalf("emulator unavailable: %v", err) // not a skip: the gate would cover nothing
+		}
+		if err := e.LoadROM(bin); err != nil {
+			continue
+		}
+		rows, _, err := e.ProfileLineWorst(4, nil)
+		if err != nil {
+			continue
+		}
+		meas := map[uint16]int{}
+		for _, r := range rows {
+			meas[r.StrobePC] = r.WorstCycles
+		}
+		graded++
+		for _, rg := range append(append([]Region{}, rep.Lines...), rep.BlankLines...) {
+			if !rg.Bounded {
+				continue
+			}
+			m, ok := meas[uint16(rg.Start)]
+			if !ok {
+				continue
+			}
+			regions++
+			if m > rg.Worst {
+				t.Errorf("%s %s: proven %d cycles, machine measured %d — an under-approximation on a "+
+					"BOUNDED region", filepath.Base(asm), rg.StartLoc, rg.Worst, m)
+			}
+		}
+	}
+	if graded == 0 || regions == 0 {
+		t.Fatalf("nothing graded (%d ROMs, %d regions) — the gate proves nothing", graded, regions)
+	}
+	t.Logf("%d bounded regions across %d ROMs, none below what the machine measured", regions, graded)
 }

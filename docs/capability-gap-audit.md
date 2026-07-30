@@ -1631,6 +1631,24 @@ of its numbers did not survive.**
    readable bank count differs from the reported one — analysing a subset would certify on whichever part
    happened to be available.
 
+**Two more closed (SD-11c), and one of the six was already handled.**
+
+4. **`determineBound`'s divide-loop path skipped predecessors it could not bound.** Its own comment promised
+   *"Unknown => 0 (stay unbounded)"* and the code did not do it: a predecessor with no abstract state, or one
+   whose `A` is `Top`, was **skipped**, and the ceiling taken as the maximum over whichever predecessors
+   happened to be known. Skipping is not neutral — a maximum over a subset is a **lower** bound on the real
+   maximum, so the trip count and the proven worst case both come out too small. Same function, same
+   direction, as SD-9's fortyfold under-approximation on the `dex`/`dey` path. An unknown predecessor now
+   forces the inferred range to be discarded (the author's `@amax` annotation may still answer; an inferred
+   range may not). **Golden 43 of 43 byte-identical** — no precision lost, only the unsound path removed.
+   Guarded by a new standing machine gate: **228 bounded regions across 31 ROMs, none below what the emulator
+   measured.**
+5. **The Atari-only cross-bank edge semantics were already guarded**, which measurement showed rather than
+   argument: `analysisUnits` declines any bank that is not 4K or whose `Origins` is anything but
+   `$F000` alone, so M-Network's 2K-at-two-origins layout cannot reach the edge model. Verified end to end —
+   `litmus_bank`/`f6`/`f4`/`banked_game` analysed, `litmus_superchip` declined by name, `litmus_lastline`
+   analysed as flat.
+
 **Still open from the same review, recorded rather than fixed** (each needs its own measurement):
 the cross-bank edge semantics are taken from `mapper_atari.go` and applied to every mapper; `analysisUnits` can
 return an empty unit list with no decline reason; `determineBound`'s predecessor scan reads
