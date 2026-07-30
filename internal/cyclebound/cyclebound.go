@@ -17,9 +17,22 @@
 // indirect JMP) is reported honestly as "unbounded — out of scope", never
 // silently passed.
 //
-// Scope (v1, stated honestly): single-bank flat 2K/4K kernels. Bank-switching,
-// JSR-into-subroutine timing, indirect JMP, and nested/multiple intra-line
-// loops are reported as unbounded rather than guessed.
+// Scope, stated as what the code does. A flat 2K/4K kernel is analysed as one
+// unit. A bank-switched cartridge is analysed as ONE MERGED program whose code
+// identity is (bank, address) — every bank occupies the same $F000-$FFFF window,
+// so a bare address cannot tell two banks apart (measured: litmus_bank_f4 has 1399
+// of 1427 decoded addresses claimed by 2+ banks). Cross-bank flow IS modelled for
+// the shape the hardware actually uses: an instruction whose DATA access reaches a
+// bank-switch hotspot continues at the same address in the bank that hotspot's own
+// mapper symbol names. Still refused, counted in UnmodelledSwitches and blocking
+// certification: an instruction whose OWN BYTES span a hotspot (the opcode comes
+// from the new bank, so the decoded instruction is not the one that executes), a
+// `jmp`/`jsr` INTO a hotspot, an access whose target cannot be resolved at all
+// under a hotspot-bearing mapper, a hotspot symbol that does not name a bank
+// ("B0S0", "RAM0"), a target bank outside the analysed set, and any mapper whose
+// banks are not the whole 4K window at $F000 (declined before analysis). Indirect
+// JMP and nested/multiple intra-line loops are reported as unbounded rather than
+// guessed.
 //
 // Provenance: implicit-path-enumeration / longest-path WCET — Li & Malik, "Performance
 // analysis of embedded software using implicit path enumeration", DAC 1995;
@@ -49,11 +62,58 @@ import (
 const DefaultBudget = 76
 
 // Instr is one statically decoded 6502 instruction.
+//
+// Bank is the bank whose bytes this instruction was decoded FROM. It is part of the
+// instruction's identity, not decoration: every bank of a bank-switched cartridge
+// is mapped into the same $F000-$FFFF window, so two banks routinely hold different
+// code at one address (measured on litmus_bank_f4: 1399 of 1427 decoded addresses
+// are claimed by 2 or more banks). Instr is never JSON-marshalled — only Region,
+// Step, Access and BeamWrite are — so the field does not appear in any output.
 type Instr struct {
+	Bank    int
 	Addr    uint16
 	Op      byte
 	Def     instructions.Definition
 	Operand uint16 // 1- or 2-byte operand, by Def.Bytes (little-endian for 3-byte)
+}
+
+// site is the CODE identity used as the map key everywhere in this package: which
+// bank, and where in it. It is comparable, so it is a legal map key.
+//
+// DATA addresses stay bare uint16 on purpose and the asymmetry is the whole point:
+// RAM $80-$FF, TIA/RIOT $00-$3F and the page-1 stack mirrors are NOT banked, so a
+// bank in a data key would split one physical cell into N keys and break the store
+// kill-set, the value domain and the def-use may-sets.
+type site struct {
+	bank int
+	addr uint16
+}
+
+func (in Instr) site() site     { return site{in.Bank, in.Addr} }
+func (in Instr) nextSite() site { return site{in.Bank, in.next()} }
+
+// branchSite is the taken destination of a relative branch. A branch cannot change
+// bank: the only cartridge access it performs is its own fetch, and an instruction
+// whose own bytes touch a hotspot is refused outright (see switchModel.switchEdges).
+func (in Instr) branchSite() site { return site{in.Bank, in.branchTarget()} }
+
+// siteDesc renders a code site for a human. On a banked image the bank is part of
+// the identity and must be printed; on a flat image there is only one, so printing
+// "bank 0" would be noise — and would change the text of every existing report.
+func siteDesc(s site, banked bool) string {
+	if banked {
+		return fmt.Sprintf("bank %d $%04X", s.bank, s.addr)
+	}
+	return fmt.Sprintf("$%04X", s.addr)
+}
+
+func sortSites(s []site) {
+	sort.Slice(s, func(i, j int) bool {
+		if s[i].bank != s[j].bank {
+			return s[i].bank < s[j].bank
+		}
+		return s[i].addr < s[j].addr
+	})
 }
 
 func (in Instr) size() uint16 {
@@ -105,6 +165,10 @@ type program struct {
 	rom  []byte
 	base uint16 // first ROM address = 0x10000 - len(rom) (0xF000 for 4K, 0xF800 for 2K)
 
+	// bank is the bank number this image IS. Every Instr decoded from it is stamped
+	// with it, which is the single point where bank identity enters the analysis.
+	bank int
+
 	// banked marks an image larger than the 4K the console can address at once,
 	// i.e. one that switches banks at run time. Everything in this package keys
 	// on a flat address, so on such an image the vectors, the decode and every
@@ -119,9 +183,16 @@ type program struct {
 	declined string
 }
 
-// newProgram wraps a flat cartridge image.
+// newProgram wraps a flat cartridge image (bank 0 — the only bank there is).
 func newProgram(rom []byte) *program {
 	return &program{rom: rom, base: uint16(0x10000 - len(rom)), banked: len(rom) > 4096}
+}
+
+// newBankProgram wraps ONE bank of a bank-switched cartridge as the self-contained
+// 4K image it is: its own length gives the mask, the address space gives the base,
+// and every instruction decoded from it is stamped with this bank number.
+func newBankProgram(rom []byte, bank int) *program {
+	return &program{rom: rom, base: uint16(0x10000 - len(rom)), bank: bank}
 }
 
 // cartInfo asks the engine what cartridge this image actually is: the mapper it
@@ -207,9 +278,168 @@ func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
 		if len(c.Data) == 0 {
 			return nil, fmt.Sprintf("cartridge is mapper %s: bank %d came back empty", id, c.Number)
 		}
-		units = append(units, analysisUnit{bank: c.Number, prog: newProgram(c.Data), hotspots: hotspots})
+		// The cross-bank control-flow edge this package models is "the SAME ADDRESS in
+		// the target bank". That sentence is only true when every bank is the whole 4K
+		// window at $F000, and the geometry has to be CHECKED rather than assumed,
+		// because a mapper exists that passes every other test and fails this one:
+		// M-Network publishes parseable BANK0..BANK6 hotspots (mapper_mnetwork.go
+		// HotspotBankSwitch) while its banks are 2K segments mapped at TWO different
+		// origins — $F000 for banks 0..n-2 and $F000+2048 for the last. "The same
+		// address in the target bank" is simply not where execution lands there. Under
+		// the decode-only stage a wrong seed merely over-decoded; now it would be a CFG
+		// edge the longest-path walk follows, and a wrong edge can SHORTEN the longest
+		// path, which is the one direction this package forbids.
+		if len(c.Data) != 4096 {
+			return nil, fmt.Sprintf("cartridge is mapper %s with %d banks, and bank %d is %d bytes rather "+
+				"than the whole 4K window; the cross-bank edge this analysis models is \"the same address "+
+				"in the target bank\", which is not true of a segmented mapper", id, banks, c.Number, len(c.Data))
+		}
+		if len(c.Origins) != 1 || c.Origins[0] != memorymap.OriginCartFxxx {
+			return nil, fmt.Sprintf("cartridge is mapper %s with %d banks, and bank %d maps at origin(s) %v "+
+				"rather than $%04X alone; the cross-bank edge this analysis models is \"the same address in "+
+				"the target bank\", which is not true when banks sit at different origins",
+				id, banks, c.Number, c.Origins, memorymap.OriginCartFxxx)
+		}
+		units = append(units, analysisUnit{bank: c.Number, prog: newBankProgram(c.Data, c.Number), hotspots: hotspots})
 	}
 	return units, ""
+}
+
+// switchModel is the single oracle for "can this instruction change the bank, and
+// if so where does the next fetch come from?".
+//
+// One function decides BOTH the control-flow edge and the refusal, for the same
+// reason collectRegion and collectFrom are one walker: two predicates would
+// eventually disagree, and a successor function that models a switch the refusal
+// does not guard is silently unsound in the direction that lies.
+type switchModel struct {
+	hotspots map[uint16]string // folded to the primary mirror by cartHotspotKey
+	banks    map[int]bool      // the bank numbers actually analysed
+	banked   bool
+}
+
+func (sw switchModel) active() bool { return sw.banked && len(sw.hotspots) > 0 }
+
+// switchEdges reports the cross-bank successors of in, whether the intra-bank
+// fall-through is still possible, and — when the switch it can perform is one this
+// analysis does not model — the refusal that must propagate to the whole region.
+//
+// THE EDGE. For an instruction whose DATA access reaches a hotspot the successor is
+// the SAME ADDRESS IN THE TARGET BANK: site{targetBank, in.next()}. That comes from
+// the engine, not from folklore: on a hotspot access the Atari mapper switches and
+// does not touch PC (Gopher2600 hardware/memory/cartridge/mapper_atari.go Read/Write
+// call bankswitch(addr) and then return cart.banks[cart.state.bank][addr]), and the
+// hotspot is matched on the 12-bit-folded address, which is what cartHotspotKey
+// reproduces. A READ switches exactly as a write does — `lda $FFF9` is the canonical
+// form. Measured on litmus_bank: bank0 $FF00 `ad f9 ff` (3 bytes) is followed by a
+// fetch at bank1 $FF03, and bank1 $FF09 `ad f8 ff` by bank0 $FF0C; the emulator
+// executes both landings.
+//
+// COST. The switching instruction is charged its ordinary cost and the edge is
+// charged nothing: the latch takes effect at the next fetch, so no cycle belongs to
+// the crossing.
+//
+// CERTAIN vs POSSIBLE. If every address the access can reach is a hotspot, the
+// switch is certain and the intra-bank fall-through is REPLACED (keep=false). If the
+// footprint also contains non-hotspot addresses (an unknown index reaches all 256),
+// the successors are every hotspot's landing site PLUS the fall-through.
+// Over-approximating the successor set raises the longest path and lowers the
+// beam-interval minimum, which is the safe direction for both consumers.
+//
+// ALL-OR-NOTHING. If ANY candidate cannot be resolved — an unparseable symbol
+// (Parker Bros "B0S0", M-Network "RAM0"), a bank outside the analysed set, or a
+// landing address that wraps past $FFFF — the WHOLE instruction is refused.
+// Modelling the resolvable candidates and dropping the rest would delete a
+// successor, and deleting a successor shortens the longest path.
+func (sw switchModel) switchEdges(in Instr, st State) (edges []site, keepFallThrough bool, refusal string) {
+	if !sw.active() {
+		return nil, true, ""
+	}
+	where := siteDesc(in.site(), sw.banked)
+	// The instruction's OWN bytes are fetched from the cartridge, so an opcode or
+	// operand byte sitting on a hotspot switches the bank mid-instruction: the opcode
+	// at the hotspot comes from the NEW bank, so the instruction decoded here is not
+	// the one that executes, and each further operand byte can select yet another
+	// bank. That is a measured authoring bug in this repo already (banked_game.asm
+	// records a reboot loop from putting `rts` on $FFF9); it is refused, never modelled.
+	for off := uint16(0); off < in.size(); off++ {
+		if ma, ok := cartHotspotKey(in.Addr + off); ok {
+			if sym, isHot := sw.hotspots[ma]; isHot {
+				return nil, true, fmt.Sprintf("region can switch banks: the instruction at %s is fetched "+
+					"across %s ($%04X), so the fetch itself selects another bank", where, sym, ma)
+			}
+		}
+	}
+	// A control transfer INTO a hotspot switches banks by a different mechanism:
+	// `jmp $1FF9` does not read $1FF9 as data, it sets PC there, and the instruction
+	// FETCH at that address is a cartridge read. Its successor would be
+	// site{targetBank, hotspotAddr} — an instruction that is itself fetched across a
+	// hotspot and so refuses under the rule above. Gopher2600 classifies jmp/jsr as
+	// Subroutine/Flow rather than Read, so a check driven off the data access alone
+	// never looks at them.
+	switch in.Def.Operator {
+	case instructions.JMP, instructions.JSR:
+		if in.Def.AddressingMode == instructions.Absolute {
+			if ma, ok := cartHotspotKey(in.Operand); ok {
+				if sym, isHot := sw.hotspots[ma]; isHot {
+					return nil, true, fmt.Sprintf("region can switch banks: the %v at %s transfers control to "+
+						"%s ($%04X), whose instruction fetch selects another bank — flow between banks "+
+						"is not modelled", in.Def.Operator, where, sym, ma)
+				}
+			}
+		}
+	}
+	acc, ok := accessOf(in, st)
+	if !ok {
+		return nil, true, "" // instruction touches no memory
+	}
+	if acc.Unbounded {
+		// Indirect ((ind),Y / (ind,X)): no address, therefore no symbol, therefore no
+		// bank. Measured on all four corpus bank ROMs: 0 such accesses, so refusing
+		// costs nothing there today — but it is still counted rather than assumed away.
+		return nil, true, fmt.Sprintf("region contains an access at %s whose target cannot be resolved, "+
+			"and this cartridge has bank-switch hotspots — it may therefore switch banks", where)
+	}
+	hot := 0
+	seen := map[site]bool{}
+	for _, a := range acc.Addrs {
+		ma, ok := cartHotspotKey(a)
+		if !ok {
+			continue
+		}
+		sym, isHot := sw.hotspots[ma]
+		if !isHot {
+			continue
+		}
+		hot++
+		tb, ok := hotspotTargetBank(sym)
+		if !ok {
+			return nil, true, fmt.Sprintf("region can switch banks: the access at %s reaches hotspot %s "+
+				"($%04X), whose symbol does not name a bank number, so the landing bank cannot be "+
+				"resolved", where, sym, ma)
+		}
+		if !sw.banks[tb] {
+			return nil, true, fmt.Sprintf("region can switch banks: the access at %s reaches %s ($%04X), "+
+				"which names bank %d — not among the %d banks analysed", where, sym, ma, tb, len(sw.banks))
+		}
+		if int(in.Addr)+int(in.size()) > 0xFFFF {
+			return nil, true, fmt.Sprintf("region can switch banks: the access at %s reaches %s ($%04X), "+
+				"but the following fetch address wraps past $FFFF and is not in cartridge space",
+				where, sym, ma)
+		}
+		land := site{tb, in.next()}
+		if !seen[land] {
+			seen[land] = true
+			edges = append(edges, land)
+		}
+	}
+	if hot == 0 {
+		return nil, true, ""
+	}
+	// Every address this access can reach is a hotspot => a switch definitely happens
+	// and the intra-bank fall-through cannot be executed.
+	sortSites(edges)
+	return edges, hot < len(acc.Addrs), ""
 }
 
 // cartHotspotKey folds a CPU address to the form the mapper keys its hotspot
@@ -279,8 +509,8 @@ type unitDecode struct {
 	bank     int
 	prog     *program
 	hotspots map[uint16]string
-	instrs   map[uint16]Instr
-	entries  []uint16
+	instrs   map[site]Instr
+	entries  []site
 	seeded   int // landing addresses seeded into this bank from another bank
 }
 
@@ -319,7 +549,7 @@ type seedOutcome struct {
 	// unresolvable counts instructions whose memory target could not be resolved at
 	// all under a hotspot-bearing mapper. Such an access MIGHT be a switch, but no
 	// symbol is reached, so no bank can be named and nothing can be seeded. The
-	// region containing it is still refused by hotspotRefusal.
+	// region containing it is still refused by residualSwitchRefusal.
 	unresolvable int
 }
 
@@ -335,8 +565,9 @@ type seedOutcome struct {
 // them the body reached from bank 0's `lda $FFF9` at $FF00 — and banked_game 1,
 // bank 1 $FF83.
 //
-// No map key changes, because the landing address is in the OTHER bank at the SAME
-// address and each bank is already decoded as its own flat 4K image.
+// The landing address is in the OTHER bank at the SAME address, and each bank is
+// decoded as its own self-contained 4K image; the merged map that the flow analysis
+// runs on is keyed on (bank, address), so nothing collides.
 //
 // Seeding is a fixpoint: seeding bank B can reveal a hotspot access in B that
 // seeds bank C. It is also STRICTLY ADDITIVE — it only ever hands more entry
@@ -347,27 +578,46 @@ type seedOutcome struct {
 // result, because the states are computed FROM the decode and would therefore be
 // circular here. Top over-approximates: an indexed access with an unknown index
 // contributes its whole 256-address footprint, so a hotspot inside that footprint
-// is seen. Over-seeding costs precision (extra decoded bytes); under-seeding would
-// leave executed code out of the decode, which is the direction that lies.
-func decodeUnits(units []analysisUnit) ([]unitDecode, seedOutcome) {
+// is seen. The DECODE also keeps the intra-bank fall-through of a switching
+// instruction, which the FLOW model drops as unexecutable: extra decoded bytes cost
+// only precision, while a missing decoded instruction would make the flow walk
+// refuse a region it could otherwise bound.
+//
+// The second and third returns are the MERGED decode and the merged VECTOR entry
+// list. Cross-bank landing sites are deliberately NOT in that entry list: seeding
+// them as fresh Top entries (which is what the per-bank stage did) would join Top
+// into the state at exactly the site the cross-bank edge is there to give a real
+// state to, and Top wins every join.
+func decodeUnits(units []analysisUnit) ([]unitDecode, map[site]Instr, []site, seedOutcome) {
 	decodes := make([]unitDecode, len(units))
 	byBank := map[int]int{}
+	merged := map[site]Instr{}
+	var vectorEntries []site
 	for i, u := range units {
 		instrs, entries := u.prog.decodeFromVectors()
 		decodes[i] = unitDecode{bank: u.bank, prog: u.prog, hotspots: u.hotspots, instrs: instrs, entries: entries}
 		byBank[u.bank] = i
+		vectorEntries = append(vectorEntries, entries...)
+	}
+	mergeInto := func() {
+		for i := range decodes {
+			for k, v := range decodes[i].instrs {
+				merged[k] = v
+			}
+		}
 	}
 	// A flat ROM has exactly one unit and no hotspots, so there is nothing to seed
 	// and it goes down a path identical to the one before this existed. That is why
 	// its JSON is byte-for-byte unchanged.
 	if len(units) < 2 {
-		return decodes, seedOutcome{}
+		mergeInto()
+		return decodes, merged, vectorEntries, seedOutcome{}
 	}
 
 	var out seedOutcome
-	seen := map[[2]int]bool{}    // (target bank, landing address) already seeded
-	badSym := map[string]bool{}  // hotspot symbols already reported unresolvable
-	badSite := map[[2]int]bool{} // (bank, pc) already counted as unresolvable
+	seen := map[site]bool{}     // (target bank, landing address) already seeded
+	badSym := map[string]bool{} // hotspot symbols already reported unresolvable
+	badSite := map[site]bool{}  // (bank, pc) already counted as unresolvable
 	for {
 		if out.rounds >= seedRoundCap {
 			out.capped = true
@@ -384,11 +634,11 @@ func decodeUnits(units []analysisUnit) ([]unitDecode, seedOutcome) {
 			// d.instrs when i is also the target bank, and ranging over a map being
 			// written to visits new keys unpredictably. The outer round loop is what
 			// picks anything up that this pass could not see.
-			addrs := make([]uint16, 0, len(d.instrs))
+			addrs := make([]site, 0, len(d.instrs))
 			for a := range d.instrs {
 				addrs = append(addrs, a)
 			}
-			sort.Slice(addrs, func(x, y int) bool { return addrs[x] < addrs[y] })
+			sortSites(addrs)
 			for _, a := range addrs {
 				in := d.instrs[a]
 				acc, ok := accessOf(in, topState())
@@ -426,9 +676,13 @@ func decodeUnits(units []analysisUnit) ([]unitDecode, seedOutcome) {
 					}
 					land := in.next()
 					if _, ok := decodes[j].prog.canon(land); !ok {
+						// The landing address is not in cartridge space (in.next() wrapped past
+						// $FFFF). Nothing can be decoded there — and switchEdges refuses the
+						// region for the same reason, so this skip cannot silently delete a
+						// successor from the flow model.
 						continue
 					}
-					key := [2]int{tb, int(land)}
+					key := site{tb, land}
 					if seen[key] {
 						continue
 					}
@@ -440,14 +694,14 @@ func decodeUnits(units []analysisUnit) ([]unitDecode, seedOutcome) {
 							"bank %d $%04X", d.bank, in.Addr, sym, ma, tb, land),
 					})
 					decodes[j].prog.decodeInto(decodes[j].instrs, land)
-					decodes[j].entries = append(decodes[j].entries, land)
+					decodes[j].entries = append(decodes[j].entries, key)
 					decodes[j].seeded++
 					added++
 				}
 				if acc.Unbounded {
 					// No address, therefore no symbol, therefore no bank to name. Counted,
-					// not guessed; hotspotRefusal still refuses the region it sits in.
-					if k := [2]int{d.bank, int(in.Addr)}; !badSite[k] {
+					// not guessed; residualSwitchRefusal refuses the region it sits in.
+					if k := in.site(); !badSite[k] {
 						badSite[k] = true
 						out.unresolvable++
 					}
@@ -459,102 +713,142 @@ func decodeUnits(units []analysisUnit) ([]unitDecode, seedOutcome) {
 		}
 	}
 	sort.Strings(out.unresolved)
-	return decodes, out
+	mergeInto()
+	return decodes, merged, vectorEntries, out
 }
 
-// hotspotRefusal reports why a region cannot be bounded because something in it
-// can switch banks, or "" when nothing in it can.
+// residualSwitchRefusal reports why a region cannot be bounded because it can
+// change bank in a way this analysis does NOT model, or "" when every switch it can
+// perform has a modelled edge.
 //
-// Cross-bank flow is not modelled yet, so an instruction that touches a hotspot
-// continues in a bank this analysis never looked at. Costing the bytes that
-// happen to follow in the CURRENT bank would produce a number about a path the
-// hardware does not take — worse than no number, because it looks like one.
+// It refuses only the residue — the instruction's own bytes spanning a hotspot, a
+// jmp/jsr INTO one, an unresolvable access target under a hotspot-bearing mapper, an
+// unparseable hotspot symbol, a target bank outside the analysed set, a landing
+// address outside cartridge space. Each of those verdicts comes from the SAME
+// switchEdges call the successor function uses, never from a second scan: a
+// successor function modelling a switch the refusal does not guard would be silently
+// unsound, and a refusal for a switch the successor function does model would be a
+// permanent false negative.
 //
-// A read switches just as a write does (`lda $FFF9` is the canonical form), so
-// this cannot key on stores. Addresses are folded through the engine's memory map
-// first, because $FFF9, $1FF9 and $3FF9 are the same hotspot.
-func hotspotRefusal(instrs map[uint16]Instr, start uint16, hotspots map[uint16]string, states map[uint16]State) string {
-	if len(hotspots) == 0 {
-		return ""
+// The scan order is the region's sites in (bank, address) order so the reported
+// reason is deterministic.
+func residualSwitchRefusal(instrs map[site]Instr, start site, sw switchModel, states map[site]State) (string, int) {
+	if !sw.active() {
+		return "", 0
 	}
 	s := &solver{
-		nodes: map[uint16]Instr{}, sinks: map[uint16]bool{}, folds: map[uint16]loopInfo{},
-		memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states,
+		nodes: map[site]Instr{}, sinks: map[site]bool{}, folds: map[site]loopInfo{},
+		memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states, sw: sw, banked: sw.banked,
 	}
 	// Collect, but scan whatever was collected even when collection FAILS. A
 	// collection that fails because flow left for an address the map does not hold
 	// is very often the bank switch itself, and returning early there swallowed
-	// every one of the control-transfer cases: a `jmp $1FF9` makes the walk leave
-	// the current bank, the walk reports it could not finish, and the switch that
-	// caused it went unreported.
+	// every one of the control-transfer cases.
 	_ = s.collectRegion(instrs, instrs[start])
 	if len(s.nodes) == 0 {
-		s.nodes = map[uint16]Instr{start: instrs[start]}
+		s.nodes = map[site]Instr{start: instrs[start]}
 	}
-	for _, in := range s.nodes {
-		st := states[in.Addr]
-		// A control transfer INTO a hotspot switches banks too, and by a different
-		// mechanism: `jmp $1FF9` does not read $1FF9 as data, it sets PC there, and
-		// the instruction FETCH at that address is a cartridge read, so the byte
-		// executed comes from the new bank. Gopher2600 classifies jmp/jsr as
-		// Subroutine/Flow rather than Read, so a check driven off the data access
-		// alone never looks at them — 33 of the three-byte opcodes are outside
-		// Read/Write. Missing it is the unsound direction: the region would not be
-		// refused, UnmodelledSwitches would not count it, and a cartridge that leaves
-		// for another bank could be certified.
-		switch in.Def.Operator {
-		case instructions.JMP, instructions.JSR:
-			if in.Def.AddressingMode == instructions.Absolute {
-				if ma, ok := cartHotspotKey(in.Operand); ok {
-					if sym, isHot := hotspots[ma]; isHot {
-						return fmt.Sprintf("region can switch banks: the %v at $%04X transfers control to "+
-							"%s ($%04X), whose instruction fetch selects another bank — flow between banks "+
-							"is not modelled", in.Def.Operator, in.Addr, sym, ma)
-					}
+	var at []site
+	for k := range s.nodes {
+		at = append(at, k)
+	}
+	sortSites(at)
+	edges := 0
+	for _, k := range at {
+		es, _, refusal := sw.switchEdges(s.nodes[k], states[k])
+		if refusal != "" {
+			return refusal, edges
+		}
+		edges += len(es)
+	}
+	return "", edges
+}
+
+// unmodelledLandings returns the code sites whose abstract state must be forced to
+// Top, plus the distinct reasons, because they are a possible landing point of a bank
+// switch switchEdges does NOT model.
+//
+// It exists because the abstract interpretation is a WHOLE-PROGRAM fixpoint while a
+// refusal is per-REGION. An unmodelled switch leaves its real landing site with an
+// incomplete set of incoming edges, and a join over an incomplete predecessor set is an
+// UNDER-approximation — a narrow, confident, wrong value range that could then bound a
+// loop in a DIFFERENT region that was never refused. Refusing the region that CONTAINS
+// the switch does not protect the region that contains its landing.
+//
+// The landing set is over-approximated deliberately, and per class:
+//   - an instruction whose own bytes span a hotspot: the opcode may come from the new
+//     bank, so neither the instruction nor its length is known. Every address in
+//     [addr, addr+3] of EVERY analysed bank is a possible next fetch.
+//   - a jmp/jsr INTO a hotspot: the fetch at the hotspot address itself, in any bank.
+//   - an unresolvable target, an unparseable symbol, a bank outside the set: the
+//     landing address is in.next() but the bank is unknown, so every analysed bank.
+//
+// The scan uses topState() rather than the computed states, for the same reason the
+// decode does: the states are computed from this decision, so using them would be
+// circular. topState over-approximates only the classes that depend on state at all
+// (an unresolvable indirect access), so it cannot MISS a refusal.
+func unmodelledLandings(instrs map[site]Instr, sw switchModel) ([]site, []string) {
+	if !sw.active() {
+		return nil, nil
+	}
+	var banks []int
+	for b := range sw.banks {
+		banks = append(banks, b)
+	}
+	sort.Ints(banks)
+	out := map[site]bool{}
+	reasons := map[string]bool{}
+	var at []site
+	for k := range instrs {
+		at = append(at, k)
+	}
+	sortSites(at)
+	for _, k := range at {
+		in := instrs[k]
+		_, _, refusal := sw.switchEdges(in, topState())
+		if refusal == "" {
+			continue
+		}
+		reasons[refusal] = true
+		var addrs []uint16
+		switch {
+		case in.Def.Operator == instructions.JMP || in.Def.Operator == instructions.JSR:
+			addrs = []uint16{in.Operand, in.next()}
+		default:
+			for off := 0; off <= 3; off++ {
+				addrs = append(addrs, in.Addr+uint16(off))
+			}
+		}
+		for _, b := range banks {
+			for _, a := range addrs {
+				if _, decoded := instrs[site{b, a}]; decoded {
+					out[site{b, a}] = true
 				}
 			}
 		}
-		// The instruction's OWN bytes are fetched from the cartridge, so an opcode or
-		// operand sitting on a hotspot switches the bank mid-instruction. That is a
-		// measured authoring bug in this repo already (banked_game.asm records a
-		// reboot loop from putting `rts` on $FFF9); it is refused, never modelled.
-		for off := uint16(0); off < in.size(); off++ {
-			if ma, ok := cartHotspotKey(in.Addr + off); ok {
-				if sym, isHot := hotspots[ma]; isHot {
-					return fmt.Sprintf("region can switch banks: the instruction at $%04X is fetched "+
-						"across %s ($%04X), so the fetch itself selects another bank", in.Addr, sym, ma)
-				}
-			}
-		}
-		acc, ok := accessOf(in, st)
-		if !ok {
-			continue // instruction touches no memory
-		}
-		for _, a := range acc.Addrs {
-			ma, ok := cartHotspotKey(a)
-			if !ok {
-				continue
-			}
-			if sym, ok := hotspots[ma]; ok {
-				return fmt.Sprintf("region can switch banks: the access at $%04X reaches %s ($%04X), "+
-					"and flow between banks is not modelled — the continuation is in a bank this "+
-					"analysis did not follow", in.Addr, sym, ma)
-			}
-		}
-		if acc.Unbounded {
-			return fmt.Sprintf("region contains an access at $%04X whose target cannot be resolved, "+
-				"and this cartridge has bank-switch hotspots — it may therefore switch banks", in.Addr)
-		}
 	}
-	return ""
+	var sites []site
+	for s := range out {
+		sites = append(sites, s)
+	}
+	sortSites(sites)
+	var rs []string
+	for r := range reasons {
+		rs = append(rs, r)
+	}
+	sort.Strings(rs)
+	return sites, rs
 }
 
 // DecodedAddrsPerBank returns, per bank, the set of addresses the decode reached.
 //
-// Exposed so the flat-uint16 key's central assumption can be MEASURED rather than
-// argued: if two banks decode code at the same address, one map keyed on the bare
-// address cannot hold both, and everything built on that map — the region set, the
-// abstract states, the source locations — silently describes whichever bank won.
+// Exposed so the composite (bank, address) key's justification stays a MEASUREMENT
+// rather than an argument: if two banks decode code at the same address, one map
+// keyed on the bare address cannot hold both, and everything built on that map — the
+// region set, the abstract states, the source locations — silently describes
+// whichever bank won. This is the measurement the site key rests on, and it must
+// keep being re-taken: if a corpus ever stops overlapping, it is this premise that
+// broke rather than the code.
 func DecodedAddrsPerBank(binPath string) (map[int]map[uint16]bool, error) {
 	rom, err := os.ReadFile(binPath)
 	if err != nil {
@@ -564,12 +858,12 @@ func DecodedAddrsPerBank(binPath string) (map[int]map[uint16]bool, error) {
 	if decline != "" {
 		return nil, fmt.Errorf("%s", decline)
 	}
-	decodes, _ := decodeUnits(units)
+	decodes, _, _, _ := decodeUnits(units)
 	out := map[int]map[uint16]bool{}
 	for _, d := range decodes {
 		set := map[uint16]bool{}
 		for a := range d.instrs {
-			set[a] = true
+			set[a.addr] = true
 		}
 		out[d.bank] = set
 	}
@@ -631,6 +925,16 @@ func (p *program) canon(addr uint16) (uint16, bool) {
 	return uint16(int(addr) & (len(p.rom) - 1)), true
 }
 
+// byteAtBank is byteAt in the shape the value domain wants (see State.romAt): a
+// single-bank program answers only for its own bank, so a stray request for another
+// one comes back as unreadable rather than as this bank's byte.
+func (p *program) byteAtBank(bank int, addr uint16) (byte, bool) {
+	if bank != p.bank {
+		return 0, false
+	}
+	return p.byteAt(addr)
+}
+
 func (p *program) byteAt(addr uint16) (byte, bool) {
 	off, ok := p.canon(addr)
 	if !ok || int(off) >= len(p.rom) {
@@ -641,9 +945,9 @@ func (p *program) byteAt(addr uint16) (byte, bool) {
 
 // decodeFromVectors decodes the program reachable from the reset, NMI and
 // IRQ/BRK vectors. Duplicate targets dedupe.
-func (p *program) decodeFromVectors() (map[uint16]Instr, []uint16) {
-	instrs := map[uint16]Instr{}
-	var entries []uint16
+func (p *program) decodeFromVectors() (map[site]Instr, []site) {
+	instrs := map[site]Instr{}
+	var entries []site
 	seen := map[uint16]bool{}
 	for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
 		lo, _ := p.byteAt(va)
@@ -654,7 +958,7 @@ func (p *program) decodeFromVectors() (map[uint16]Instr, []uint16) {
 		}
 		seen[t] = true
 		p.decodeInto(instrs, t)
-		entries = append(entries, t)
+		entries = append(entries, site{p.bank, t})
 	}
 	return instrs, entries
 }
@@ -664,7 +968,9 @@ func (p *program) decodeAt(addr uint16) (Instr, bool) {
 	if !ok {
 		return Instr{}, false
 	}
-	in := Instr{Addr: addr, Op: op, Def: instructions.Definitions[op]}
+	// This is the single point where bank identity enters the analysis: every
+	// instruction is stamped with the bank whose bytes it was read from.
+	in := Instr{Bank: p.bank, Addr: addr, Op: op, Def: instructions.Definitions[op]}
 	switch in.Def.Bytes {
 	case 2:
 		b1, _ := p.byteAt(addr + 1)
@@ -679,42 +985,69 @@ func (p *program) decodeAt(addr uint16) (Instr, bool) {
 
 // decodeInto walks the CFG from entry, decoding only reachable instructions
 // into instrs (recursive descent avoids misdecoding inline data tables).
-func (p *program) decodeInto(instrs map[uint16]Instr, entry uint16) {
-	work := []uint16{entry}
+//
+// entry stays a bare address because one program holds exactly ONE bank; routing a
+// cross-bank landing to the right program is decodeUnits' job.
+func (p *program) decodeInto(instrs map[site]Instr, entry uint16) {
+	work := []site{{p.bank, entry}}
 	for len(work) > 0 {
-		addr := work[len(work)-1]
+		at := work[len(work)-1]
 		work = work[:len(work)-1]
-		if _, seen := instrs[addr]; seen {
+		if _, seen := instrs[at]; seen {
 			continue
 		}
-		in, ok := p.decodeAt(addr)
+		in, ok := p.decodeAt(at.addr)
 		if !ok {
 			continue
 		}
-		instrs[addr] = in
+		instrs[at] = in
 		work = append(work, decodeSuccessors(in)...)
 	}
 }
 
-// decodeSuccessors lists addresses reachable for DECODING (JSR decodes both its
-// callee and its return point; an indirect JMP's target is unknown).
-func decodeSuccessors(in Instr) []uint16 {
+// decodeSuccessors lists the INTRA-BANK sites reachable for DECODING (JSR decodes
+// both its callee and its return point; an indirect JMP's target is unknown).
+// Cross-bank edges are switchModel's business — see successors.
+func decodeSuccessors(in Instr) []site {
 	d := in.Def
 	switch d.Operator {
 	case instructions.JMP:
 		if d.AddressingMode == instructions.Indirect {
 			return nil
 		}
-		return []uint16{in.Operand}
+		return []site{{in.Bank, in.Operand}}
 	case instructions.JSR:
-		return []uint16{in.Operand, in.next()}
+		return []site{{in.Bank, in.Operand}, in.nextSite()}
 	case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
 		return nil
 	}
 	if d.IsBranch() {
-		return []uint16{in.next(), in.branchTarget()}
+		return []site{in.nextSite(), in.branchSite()}
 	}
-	return []uint16{in.next()}
+	return []site{in.nextSite()}
+}
+
+// successors is the ONE successor function every flow walker in this package uses:
+// collectFrom, longest, absSuccessors, beamSuccessors, topoOrder, regionInstrs,
+// mustWrittenAt, reachableWithinCallee, displayPreserver and determineBound's
+// predecessor scan. A second walker that modelled the CFG slightly differently would
+// eventually disagree with the refusal, and the disagreement would be invisible.
+//
+// A non-empty second return means the flow model cannot follow this instruction and
+// the CALLER MUST REFUSE. It must never skip: silently dropping a successor shortens
+// the longest path, which is the one direction this package forbids.
+func successors(in Instr, st State, sw switchModel) ([]site, string) {
+	edges, keep, refusal := sw.switchEdges(in, st)
+	if refusal != "" {
+		return nil, refusal
+	}
+	if len(edges) == 0 {
+		return decodeSuccessors(in), ""
+	}
+	if !keep {
+		return edges, ""
+	}
+	return append(edges, decodeSuccessors(in)...), ""
 }
 
 // --- region model + worst-case (DAG longest-path) ---
@@ -723,9 +1056,15 @@ func decodeSuccessors(in Instr) []uint16 {
 // cycles it is charged.
 type Step struct {
 	Addr uint16 `json:"addr"`
-	Cyc  int    `json:"cyc"`
-	Loop int    `json:"loop,omitempty"` // iteration count if this step is a folded counted loop
-	Loc  string `json:"loc,omitempty"`  // srcmap "Label+off (file:line)" when available
+	// Bank names which bank's bytes this step executes. BankValid distinguishes
+	// "bank 0" from "not a banked image", the same pattern Region uses, so a flat
+	// ROM's JSON is unchanged. Without it a worst path that crosses banks prints two
+	// entirely different instructions as the same $FF03.
+	Bank      int    `json:"bank,omitempty"`
+	BankValid bool   `json:"bank_valid,omitempty"`
+	Cyc       int    `json:"cyc"`
+	Loop      int    `json:"loop,omitempty"` // iteration count if this step is a folded counted loop
+	Loc       string `json:"loc,omitempty"`  // srcmap "Label+off (file:line)" when available
 }
 
 // Region is one WSYNC-to-WSYNC interval and its proven worst case.
@@ -736,14 +1075,14 @@ type Region struct {
 	// Bank names which bank this region lives in. BankValid distinguishes "bank 0"
 	// from "not a banked image", so a flat ROM's JSON is unchanged (omitempty on a
 	// plain int would also hide a real bank 0).
-	Bank      int  `json:"bank,omitempty"`
-	BankValid bool `json:"bank_valid,omitempty"`
-	Worst    int    `json:"worst"`          // proven worst-case cycles from here to the next WSYNC
-	Budget   int    `json:"budget"`
-	Over     bool   `json:"over"`             // Worst > Budget
-	Bounded  bool   `json:"bounded"`          // false => could not prove (reported, not passed)
-	Reason   string `json:"reason,omitempty"` // why unbounded
-	Path     []Step `json:"path,omitempty"`   // worst-case breakdown (filled when Over)
+	Bank      int    `json:"bank,omitempty"`
+	BankValid bool   `json:"bank_valid,omitempty"`
+	Worst     int    `json:"worst"` // proven worst-case cycles from here to the next WSYNC
+	Budget    int    `json:"budget"`
+	Over      bool   `json:"over"`             // Worst > Budget
+	Bounded   bool   `json:"bounded"`          // false => could not prove (reported, not passed)
+	Reason    string `json:"reason,omitempty"` // why unbounded
+	Path      []Step `json:"path,omitempty"`   // worst-case breakdown (filled when Over)
 
 	// Conditional turns "cannot prove" into something a builder can act on.
 	// When the ONLY obstacle is a loop whose iteration count could not be
@@ -756,6 +1095,13 @@ type Region struct {
 	// counts towards Certified; discharging it means proving the bound elsewhere,
 	// asserting it at run time, or the author accepting it explicitly.
 	Conditional *Obligation `json:"conditional,omitempty"`
+
+	// SwitchEdges is how many MODELLED cross-bank control-flow edges this region's own
+	// subgraph contains. It is evidence, not decoration: a region reported as bounded on
+	// a bank-switched cartridge whose crossing this analysis was supposed to follow, yet
+	// which records no edge, is a visible bug rather than an invisible one. Always 0 on
+	// a flat image, so its JSON is unchanged.
+	SwitchEdges int `json:"switch_edges,omitempty"`
 }
 
 // Obligation is a conditional bound: the region is within budget provided the
@@ -778,7 +1124,7 @@ type loopInfo struct {
 	// target X. Measured consequence of getting this wrong: 20 observed TIA
 	// writes landed EARLIER than their "proven" earliest position.
 	minCost int
-	exit    uint16
+	exit    site
 	n       int
 }
 
@@ -793,18 +1139,38 @@ const (
 	black = 2
 )
 
-// lkey keys the longest-path memo/colour by (address, active return address). The
-// return address is the interprocedural call context (2A): 0 = no active call, so
-// the same subroutine address called from different sites is solved per-caller.
-type lkey struct{ addr, ret uint16 }
+// ctx is the interprocedural call context (2A): the site execution returns to when
+// the active subroutine's RTS retires, and whether a call is active at all.
+//
+// `active` is a separate bool rather than a zero-address sentinel because
+// (bank 0, $0000) is an address-shaped value: "no active call" must not be spelled
+// as an address, or a legitimate return site could be read as "top level".
+//
+// The return site is the CALLER's bank — the bank in which the JSR's own fetch
+// happened — not whichever bank is current when the RTS retires. litmus_bank does
+// exactly this (jsr in bank 0, a switch inside PingPong, the rts fetched back in
+// bank 0).
+type ctx struct {
+	ret    site
+	active bool
+}
+
+// lkey keys the longest-path memo/colour by (code site, call context), so the same
+// subroutine site called from different places is solved per-caller.
+type lkey struct {
+	at site
+	c  ctx
+}
 
 type solver struct {
-	nodes     map[uint16]Instr
-	sinks     map[uint16]bool
-	folds     map[uint16]loopInfo
+	nodes     map[site]Instr
+	sinks     map[site]bool
+	folds     map[site]loopInfo
 	memo      map[lkey]result
 	state     map[lkey]int
-	absStates map[uint16]State // S3: abstract state per address, for page-cross precision
+	absStates map[site]State // S3: abstract state per site, for page-cross precision
+	sw        switchModel    // the one cross-bank flow oracle
+	banked    bool           // print the bank in messages only when there is more than one
 	cyclic    bool
 	unbounded bool   // 2A: a path needs interprocedural support we don't model (nested call / RTS w/o caller)
 	unbReason string // why
@@ -820,11 +1186,11 @@ type solver struct {
 }
 
 type pendingLoop struct {
-	header       uint16
-	latch        Instr
+	header       site
+	latch        Instr // carries its own bank in Instr.Bank
 	bodyNoBranch int
 	pen          int
-	exit         uint16
+	exit         site
 }
 
 // costAt returns the loop's cycle cost for exactly n iterations.
@@ -839,25 +1205,28 @@ func prepend(s Step, rest []Step) []Step {
 	return append([]Step{s}, rest...)
 }
 
-func theSucc(in Instr) uint16 {
+// theSuccSites is the successor set of a straight-line (non-branch, non-call)
+// instruction. On a flat image that is exactly one site; on a banked image an
+// instruction that reaches a bank-switch hotspot continues in the target bank, and
+// an over-wide footprint can name several candidates plus the fall-through — so the
+// caller takes the MAXIMUM over them.
+func (s *solver) theSuccSites(in Instr) ([]site, string) {
 	if in.Def.Operator == instructions.JMP { // absolute (indirect was filtered out)
-		return in.Operand
+		return []site{{in.Bank, in.Operand}}, ""
 	}
-	return in.next()
+	return successors(in, s.absStates[in.site()], s.sw)
 }
 
-// longest returns the worst-case cycles (and breakdown) from addr to the next
-// WSYNC sink. It assumes the region subgraph is a DAG (loops already folded);
-// any remaining back-edge sets cyclic so the caller reports the region as
-// unbounded rather than returning a bogus number.
-// longest returns the worst-case cycles (and breakdown) from addr to the next
-// WSYNC sink, within call context ret (2A: the return address of the active
-// JSR, or 0 at top level). Memoised per (addr, ret). Anything we cannot bound
-// soundly (a back-edge, a nested call, or an RTS with no caller in context) sets
+// longest returns the worst-case cycles (and breakdown) from a code site to the next
+// WSYNC sink, within call context c (2A). It assumes the region subgraph is a DAG
+// (loops already folded); any remaining back-edge sets cyclic so the caller reports
+// the region as unbounded rather than returning a bogus number. Memoised per
+// (site, context). Anything we cannot bound soundly (a back-edge, a nested call, an
+// RTS with no caller in context, or a bank switch whose edge is not modelled) sets
 // s.cyclic / s.unbounded so the caller reports the region unbounded rather than
 // trusting a low number.
-func (s *solver) longest(addr, ret uint16) result {
-	k := lkey{addr, ret}
+func (s *solver) longest(at site, c ctx) result {
+	k := lkey{at, c}
 	if r, ok := s.memo[k]; ok {
 		return r
 	}
@@ -869,56 +1238,83 @@ func (s *solver) longest(addr, ret uint16) result {
 
 	var best result
 	switch {
-	case s.foldHit(addr):
-		lf := s.folds[addr]
-		sub := s.longest(lf.exit, ret)
+	case s.foldHit(at):
+		lf := s.folds[at]
+		sub := s.longest(lf.exit, c)
 		best = result{cyc: lf.cost + sub.cyc,
-			path: prepend(Step{Addr: addr, Cyc: lf.cost, Loop: lf.n, Loc: s.loc(addr)}, sub.path)}
+			path: prepend(s.step(at, lf.cost, lf.n), sub.path)}
 	default:
-		in := s.nodes[addr]
+		in := s.nodes[at]
 		switch {
-		case s.sinks[addr]:
-			best = result{cyc: in.Def.Cycles, path: []Step{{Addr: addr, Cyc: in.Def.Cycles, Loc: s.loc(addr)}}}
+		case s.sinks[at]:
+			best = result{cyc: in.Def.Cycles, path: []Step{s.step(at, in.Def.Cycles, 0)}}
 		case in.Def.Operator == instructions.JSR:
-			// 2A: follow into the callee with the return address threaded. Only one
-			// level deep — a call while a call is already active is not modeled.
-			if ret != 0 {
+			// 2A: follow into the callee with the return SITE threaded. Only one level
+			// deep — a call while a call is already active is not modeled. The callee and
+			// the return point are both in the JSR's own bank: its operand fetch already
+			// happened there, and a JSR into a hotspot is refused by switchEdges.
+			if c.active {
 				s.unbounded = true
 				s.unbReason = "nested subroutine call (single-level interprocedural only)"
 				break
 			}
-			sub := s.longest(in.Operand, in.next())
+			sub := s.longest(site{in.Bank, in.Operand}, ctx{ret: in.nextSite(), active: true})
 			best = result{cyc: in.Def.Cycles + sub.cyc,
-				path: prepend(Step{Addr: in.Addr, Cyc: in.Def.Cycles, Loc: s.loc(in.Addr)}, sub.path)}
+				path: prepend(s.step(in.site(), in.Def.Cycles, 0), sub.path)}
 		case in.Def.Operator == instructions.RTS || in.Def.Operator == instructions.RTI:
 			// 2A: return to the active call site; no caller in context => cannot bound.
-			if ret == 0 {
+			if !c.active {
 				s.unbounded = true
 				s.unbReason = "RTS/RTI with no caller in context"
 				break
 			}
-			sub := s.longest(ret, 0)
+			sub := s.longest(c.ret, ctx{})
 			best = result{cyc: in.Def.Cycles + sub.cyc,
-				path: prepend(Step{Addr: in.Addr, Cyc: in.Def.Cycles, Loc: s.loc(in.Addr)}, sub.path)}
+				path: prepend(s.step(in.site(), in.Def.Cycles, 0), sub.path)}
 		case in.Def.IsBranch():
-			nt := s.longest(in.next(), ret)
-			tk := s.longest(in.branchTarget(), ret)
+			nt := s.longest(in.nextSite(), c)
+			tk := s.longest(in.branchSite(), c)
 			pen := 1
+			// The page test stays flat address arithmetic: a branch cannot leave its bank,
+			// and the +1 is about which 256-byte page the two addresses sit in.
 			if (in.next() >> 8) != (in.branchTarget() >> 8) {
 				pen = 2 // taken branch crossing a page costs +2 total over base
 			}
 			ntTot := in.Def.Cycles + nt.cyc
 			tkTot := in.Def.Cycles + pen + tk.cyc
 			if tkTot >= ntTot {
-				best = result{cyc: tkTot, path: prepend(Step{Addr: in.Addr, Cyc: in.Def.Cycles + pen, Loc: s.loc(in.Addr)}, tk.path)}
+				best = result{cyc: tkTot, path: prepend(s.step(in.site(), in.Def.Cycles+pen, 0), tk.path)}
 			} else {
-				best = result{cyc: ntTot, path: prepend(Step{Addr: in.Addr, Cyc: in.Def.Cycles, Loc: s.loc(in.Addr)}, nt.path)}
+				best = result{cyc: ntTot, path: prepend(s.step(in.site(), in.Def.Cycles, 0), nt.path)}
 			}
 		default:
-			cost := in.baseCost() + in.pagePenalty(s.absStates[addr]) // S3: page penalty from the index range
-			sub := s.longest(theSucc(in), ret)
-			best = result{cyc: cost + sub.cyc,
-				path: prepend(Step{Addr: in.Addr, Cyc: cost, Loc: s.loc(in.Addr)}, sub.path)}
+			cost := in.baseCost() + in.pagePenalty(s.absStates[at]) // S3: page penalty from the index range
+			succ, refusal := s.theSuccSites(in)
+			if refusal != "" {
+				// The collect pass uses the same oracle, so reaching this means the region
+				// should already have been refused. Refuse rather than cost a path whose
+				// continuation is unknown.
+				s.unbounded = true
+				s.unbReason = refusal
+				break
+			}
+			// A switching instruction with an over-wide footprint has more than one
+			// possible continuation; the worst case is the maximum over them.
+			var bestSub result
+			haveSub := false
+			for _, nx := range succ {
+				sub := s.longest(nx, c)
+				if !haveSub || sub.cyc > bestSub.cyc {
+					bestSub, haveSub = sub, true
+				}
+			}
+			if !haveSub {
+				s.unbounded = true
+				s.unbReason = fmt.Sprintf("no successor for the instruction at %s", siteDesc(at, s.banked))
+				break
+			}
+			best = result{cyc: cost + bestSub.cyc,
+				path: prepend(s.step(in.site(), cost, 0), bestSub.path)}
 		}
 	}
 
@@ -927,45 +1323,51 @@ func (s *solver) longest(addr, ret uint16) result {
 	return best
 }
 
+// step builds one worst-path row, tagging the bank only on a banked image so a flat
+// ROM's JSON is unchanged.
+func (s *solver) step(at site, cyc, loop int) Step {
+	st := Step{Addr: at.addr, Cyc: cyc, Loop: loop, Loc: s.loc(at)}
+	if s.banked {
+		st.Bank, st.BankValid = at.bank, true
+	}
+	return st
+}
+
 // collectRegion walks the region subgraph from the instruction after start and
 // fills s.nodes / s.sinks. It returns "" on success or the reason the region
 // cannot be reasoned about. Shared with the beam-interval pass so both analyses
 // see the same subgraph — two collectors would eventually disagree, and the
 // disagreement would be invisible.
-func (s *solver) collectRegion(instrs map[uint16]Instr, start Instr) string {
-	return s.collectFrom(instrs, start.next())
+func (s *solver) collectRegion(instrs map[site]Instr, start Instr) string {
+	return s.collectFrom(instrs, start.nextSite())
 }
 
-// collectFrom walks the subgraph from one address, adding to whatever is already
+// collectFrom walks the subgraph from one site, adding to whatever is already
 // collected. Shared so a caller's continuation can be brought into the same
 // region without a second, subtly different walker.
-func (s *solver) collectFrom(instrs map[uint16]Instr, from uint16) string {
-	work := []uint16{from}
+func (s *solver) collectFrom(instrs map[site]Instr, from site) string {
+	work := []site{from}
 	for len(work) > 0 {
-		addr := work[len(work)-1]
+		at := work[len(work)-1]
 		work = work[:len(work)-1]
-		if _, ok := s.nodes[addr]; ok {
+		if _, ok := s.nodes[at]; ok {
 			continue
 		}
-		in, ok := instrs[addr]
+		in, ok := instrs[at]
 		if !ok {
-			return fmt.Sprintf("reaches undecoded address $%04X", addr)
+			// Naming the bank matters: a cross-bank hole would otherwise read as a
+			// same-bank one, and the author would look for the wrong bug.
+			return fmt.Sprintf("reaches undecoded address %s", siteDesc(at, s.banked))
 		}
-		s.nodes[addr] = in
+		s.nodes[at] = in
 		if in.isWSYNC() {
-			s.sinks[addr] = true
+			s.sinks[at] = true
 			continue
 		}
 		switch in.Def.Operator {
-		case instructions.JSR:
-			// 2A: follow the callee AND the return point; the callee's own WSYNC is a
-			// sink as usual, and longest() threads the return address. (Collection
-			// terminates via the seen-set; longest() guards against nesting.)
-			work = append(work, in.Operand, in.next())
-			continue
 		case instructions.RTS, instructions.RTI:
 			// 2A: a leaf for collection — the return target is the call context,
-			// resolved in longest() via the threaded return address.
+			// resolved in longest() via the threaded return site.
 			continue
 		case instructions.BRK:
 			return "BRK in region"
@@ -975,14 +1377,15 @@ func (s *solver) collectFrom(instrs map[uint16]Instr, from uint16) string {
 			if in.Def.AddressingMode == instructions.Indirect {
 				return "indirect JMP in region (target not statically known)"
 			}
-			work = append(work, in.Operand)
-			continue
 		}
-		if in.Def.IsBranch() {
-			work = append(work, in.next(), in.branchTarget())
-		} else {
-			work = append(work, in.next())
+		// One successor function for every walker. JSR contributes both its callee and
+		// its return point (the callee's own WSYNC is a sink as usual, and longest()
+		// threads the return site); collection terminates via the seen-set.
+		succ, refusal := successors(in, s.absStates[at], s.sw)
+		if refusal != "" {
+			return refusal
 		}
+		work = append(work, succ...)
 	}
 	return ""
 }
@@ -997,23 +1400,24 @@ func (s *solver) collectFrom(instrs map[uint16]Instr, from uint16) string {
 // shared_setxpos.asm fails twice because its whole positioning routine is built
 // that way.
 //
-// Each JSR contributes its return address as a candidate whenever the region
-// start is reachable from that JSR's target without first returning.
-func callContexts(instrs map[uint16]Instr, regionStart uint16) []uint16 {
-	var out []uint16
-	seenRet := map[uint16]bool{}
+// Each JSR contributes its return SITE as a candidate whenever the region start is
+// reachable from that JSR's target without first returning. The return site carries
+// the CALLER's bank, which is where the RTS's own fetch comes from.
+func callContexts(instrs map[site]Instr, regionStart site, sw switchModel) []site {
+	var out []site
+	seenRet := map[site]bool{}
 	for _, in := range instrs {
 		if in.Def.Operator != instructions.JSR {
 			continue
 		}
-		ret := in.next()
-		if seenRet[ret] || !reachableWithinCallee(instrs, in.Operand, regionStart) {
+		ret := in.nextSite()
+		if seenRet[ret] || !reachableWithinCallee(instrs, site{in.Bank, in.Operand}, regionStart, sw) {
 			continue
 		}
 		seenRet[ret] = true
 		out = append(out, ret)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	sortSites(out)
 	return out
 }
 
@@ -1034,10 +1438,13 @@ func callContexts(instrs map[uint16]Instr, regionStart uint16) []uint16 {
 // its object — resolvable at all. The second pass only ever ADDS a justified
 // fact, and the justification itself comes from a sound first-pass range, so the
 // fixpoint stays sound.
-func displayPreserver(instrs map[uint16]Instr, states map[uint16]State) func(uint16) bool {
-	memo := map[uint16]bool{}
-	var walk func(entry uint16, depth int, onStack map[uint16]bool) bool
-	walk = func(entry uint16, depth int, onStack map[uint16]bool) bool {
+// A callee that switches banks must be walked ACROSS the switch, or "provably cannot
+// write VSYNC/VBLANK" would be a claim about half the callee. The rule stays
+// one-sided: a switch whose edge cannot be followed answers false.
+func displayPreserver(instrs map[site]Instr, states map[site]State, sw switchModel) func(site) bool {
+	memo := map[site]bool{}
+	var walk func(entry site, depth int, onStack map[site]bool) bool
+	walk = func(entry site, depth int, onStack map[site]bool) bool {
 		if v, ok := memo[entry]; ok {
 			return v
 		}
@@ -1047,8 +1454,8 @@ func displayPreserver(instrs map[uint16]Instr, states map[uint16]State) func(uin
 		onStack[entry] = true
 		defer delete(onStack, entry)
 
-		seen := map[uint16]bool{entry: true}
-		work := []uint16{entry}
+		seen := map[site]bool{entry: true}
+		work := []site{entry}
 		for len(work) > 0 {
 			a := work[len(work)-1]
 			work = work[:len(work)-1]
@@ -1060,22 +1467,27 @@ func displayPreserver(instrs map[uint16]Instr, states map[uint16]State) func(uin
 			case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
 				continue
 			case instructions.PHA, instructions.PHP:
-				if !pushMissesDisplay(in, states) {
+				if !pushMissesDisplay(in, states[a]) {
 					memo[entry] = false
 					return false
 				}
 			case instructions.JSR:
-				if !walk(in.Operand, depth+1, onStack) {
+				if !walk(site{in.Bank, in.Operand}, depth+1, onStack) {
 					memo[entry] = false
 					return false
 				}
 			case instructions.STA, instructions.STX, instructions.STY:
-				if !storeMissesDisplay(in, states) {
+				if !storeMissesDisplay(in, states[a]) {
 					memo[entry] = false
 					return false
 				}
 			}
-			for _, nx := range decodeSuccessors(in) {
+			succ, refusal := successors(in, states[a], sw)
+			if refusal != "" {
+				memo[entry] = false
+				return false // an unfollowable switch: half the callee is unknown
+			}
+			for _, nx := range succ {
 				if !seen[nx] {
 					seen[nx] = true
 					work = append(work, nx)
@@ -1085,16 +1497,18 @@ func displayPreserver(instrs map[uint16]Instr, states map[uint16]State) func(uin
 		memo[entry] = true
 		return true
 	}
-	return func(entry uint16) bool { return walk(entry, 0, map[uint16]bool{}) }
+	return func(entry site) bool { return walk(entry, 0, map[site]bool{}) }
 }
 
 // storeMissesDisplay reports that this store provably cannot reach VSYNC ($00) or
 // VBLANK ($01). Only a non-indexed store to a statically known address qualifies,
 // and the address is folded through the engine's own memory map first so a write
 // via any TIA mirror is caught rather than compared as a raw number.
-func storeMissesDisplay(in Instr, states map[uint16]State) bool {
+// It takes the State at the instruction rather than the whole map: the map is keyed
+// on a code site now, and passing the map would make every caller re-derive the key.
+func storeMissesDisplay(in Instr, st State) bool {
 	if in.Def.AddressingMode != instructions.Absolute {
-		return indexedStoreMissesDisplay(in, states)
+		return indexedStoreMissesDisplay(in, st)
 	}
 	ma, area := memorymap.MapAddress(in.Operand, false)
 	if area != memorymap.TIA {
@@ -1113,9 +1527,8 @@ func storeMissesDisplay(in Instr, states map[uint16]State) bool {
 // display-touching would be sound but would drag every RTS-dispatch and every
 // ordinary subroutine call into the visible class. SP is tracked, so the question
 // is answerable: only an SP range that can reach $0100/$0101 counts.
-func pushMissesDisplay(in Instr, states map[uint16]State) bool {
-	st, ok := states[in.Addr]
-	if !ok || !st.valid || st.SP.Top || st.SP.Hi-st.SP.Lo > 255 {
+func pushMissesDisplay(in Instr, st State) bool {
+	if !st.valid || st.SP.Top || st.SP.Hi-st.SP.Lo > 255 {
 		return false
 	}
 	for sp := st.SP.Lo; sp <= st.SP.Hi; sp++ {
@@ -1130,14 +1543,13 @@ func pushMissesDisplay(in Instr, states map[uint16]State) bool {
 // indexedStoreMissesDisplay resolves `sta base,X` (or ,Y) through the index range
 // the previous pass proved, and reports that no address it can reach is VSYNC or
 // VBLANK. An unknown or unusably wide range answers false.
-func indexedStoreMissesDisplay(in Instr, states map[uint16]State) bool {
+func indexedStoreMissesDisplay(in Instr, st State) bool {
 	switch in.Def.AddressingMode {
 	case instructions.AbsoluteX, instructions.AbsoluteY:
 	default:
 		return false // indirect: no base to reason from
 	}
-	st, ok := states[in.Addr]
-	if !ok || !st.valid {
+	if !st.valid {
 		return false
 	}
 	idx := st.storeIndex(in)
@@ -1155,9 +1567,17 @@ func indexedStoreMissesDisplay(in Instr, states map[uint16]State) bool {
 
 // reachableWithinCallee reports whether target is reachable from entry without
 // passing through a return — i.e. whether it is part of that subroutine's body.
-func reachableWithinCallee(instrs map[uint16]Instr, entry, target uint16) bool {
-	seen := map[uint16]bool{entry: true}
-	work := []uint16{entry}
+//
+// It follows cross-bank edges. litmus_bank's PingPong is exactly a callee that
+// switches banks mid-body; without the edge the region start is not seen inside the
+// callee, the call context is dropped, and the region fails as "RTS with no caller in
+// context" instead of being bounded. Reachability is a MAY question, so an
+// unfollowable switch simply stops that branch of the walk — the answer can only be
+// too small, and too small means one fewer call context, which is the direction that
+// refuses rather than the one that flatters.
+func reachableWithinCallee(instrs map[site]Instr, entry, target site, sw switchModel) bool {
+	seen := map[site]bool{entry: true}
+	work := []site{entry}
 	for len(work) > 0 {
 		a := work[len(work)-1]
 		work = work[:len(work)-1]
@@ -1172,7 +1592,11 @@ func reachableWithinCallee(instrs map[uint16]Instr, entry, target uint16) bool {
 		case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
 			continue
 		}
-		for _, nx := range decodeSuccessors(in) {
+		succ, refusal := successors(in, topState(), sw)
+		if refusal != "" {
+			continue
+		}
+		for _, nx := range succ {
 			if !seen[nx] {
 				seen[nx] = true
 				work = append(work, nx)
@@ -1187,13 +1611,14 @@ func reachableWithinCallee(instrs map[uint16]Instr, entry, target uint16) bool {
 // context must succeed: a region provable from one call site and not from another
 // is not provable, and reporting the provable one would be choosing the
 // flattering answer.
-func analyzeRegionInContexts(instrs map[uint16]Instr, start Instr, budget, amaxHint int,
-	sm *srcmap.Map, states map[uint16]State, ctxs []uint16) *Region {
+func analyzeRegionInContexts(instrs map[site]Instr, start Instr, budget, amaxHint int,
+	sm *srcmap.Map, states map[site]State, sw switchModel, ctxs []site) *Region {
 	var worst *Region
 	for _, ret := range ctxs {
 		s := &solver{
-			nodes: map[uint16]Instr{}, sinks: map[uint16]bool{}, folds: map[uint16]loopInfo{},
+			nodes: map[site]Instr{}, sinks: map[site]bool{}, folds: map[site]loopInfo{},
 			memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states, sm: sm, amaxHint: amaxHint,
+			sw: sw, banked: sw.banked,
 		}
 		if msg := s.collectRegion(instrs, start); msg != "" {
 			return nil
@@ -1209,16 +1634,19 @@ func analyzeRegionInContexts(instrs map[uint16]Instr, start Instr, budget, amaxH
 		if msg := s.foldLoops(); msg != "" {
 			return nil
 		}
-		r := s.longest(start.next(), ret)
+		r := s.longest(start.nextSite(), ctx{ret: ret, active: true})
 		if s.cyclic || s.unbounded {
 			return nil
 		}
 		if worst == nil || r.cyc > worst.Worst {
 			reg := Region{
-				Start: start.Addr, StartLoc: sm.Locate(start.Addr), Budget: budget,
+				Start: start.Addr, StartLoc: s.loc(start.site()), Budget: budget,
 				Bounded: true, Kind: "visible", Worst: r.cyc, Over: r.cyc > budget,
 			}
-			if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
+			if sw.banked {
+				reg.Bank, reg.BankValid = start.Bank, true
+			}
+			if st, ok := states[start.site()]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
 				reg.Kind = "blank"
 			}
 			if reg.Over {
@@ -1247,11 +1675,11 @@ func (s *solver) solveObligation(start Instr, budget int) *Obligation {
 	worstAtBest := 0
 	for n := 1; n <= maxTrip; n++ {
 		// Fresh solver state per trial: memo and colouring are per-solve.
-		s.folds = map[uint16]loopInfo{pl.header: {cost: pl.costAt(n), minCost: pl.costAt(1), exit: pl.exit, n: n}}
+		s.folds = map[site]loopInfo{pl.header: {cost: pl.costAt(n), minCost: pl.costAt(1), exit: pl.exit, n: n}}
 		s.memo = map[lkey]result{}
 		s.state = map[lkey]int{}
 		s.cyclic, s.unbounded, s.unbReason = false, false, ""
-		r := s.longest(start.next(), 0)
+		r := s.longest(start.nextSite(), ctx{})
 		if s.cyclic || s.unbounded {
 			return nil // something else is wrong too; no clean obligation to state
 		}
@@ -1260,26 +1688,49 @@ func (s *solver) solveObligation(start Instr, budget int) *Obligation {
 		}
 		best, worstAtBest = n, r.cyc
 	}
+	where := siteDesc(pl.header, s.banked)
 	ob := &Obligation{
-		LoopHeader:    fmt.Sprintf("$%04X", pl.header),
+		LoopHeader:    where,
 		LoopLoc:       s.loc(pl.header),
 		MaxIterations: best,
 		WorstAtMax:    worstAtBest,
 		Budget:        budget,
 	}
 	if best == 0 {
-		ob.Statement = fmt.Sprintf("the region misses its %d-cycle budget even at one iteration of the loop at $%04X",
-			budget, pl.header)
+		ob.Statement = fmt.Sprintf("the region misses its %d-cycle budget even at one iteration of the loop at %s",
+			budget, where)
 	} else {
-		ob.Statement = fmt.Sprintf("within %d cycles provided the loop at $%04X runs at most %d time(s) (worst %d there)",
-			budget, pl.header, best, worstAtBest)
+		ob.Statement = fmt.Sprintf("within %d cycles provided the loop at %s runs at most %d time(s) (worst %d there)",
+			budget, where, best, worstAtBest)
 	}
 	return ob
 }
 
-func (s *solver) foldHit(addr uint16) bool { _, ok := s.folds[addr]; return ok }
+func (s *solver) foldHit(at site) bool { _, ok := s.folds[at]; return ok }
 
-func (s *solver) loc(addr uint16) string { return s.sm.Locate(addr) }
+// loc resolves a code site to "Label+off (file:line)".
+//
+// On a BANKED image it resolves only bank 0, and that is a limitation with a measured
+// cause rather than an oversight: DASM's listing address column is the PHYSICAL ROM
+// OFFSET, not the RORG'd address (litmus_bank's listing shows `0f00 ad f9 ff lda
+// $FFF9` for bank 0 and `1f03 a9 b1 lda #$B1` for bank 1), and srcmap.Parse drops
+// every row below $1000 — so bank 0's line numbers are dropped entirely and banks
+// 1..n's offsets are stored as if they were CPU addresses. Attributing a bank-1 site
+// to whatever bank-0 label precedes that address would be a confidently wrong
+// location, so on a banked image a non-zero bank prints as "bank N $FFxx" and nothing
+// else. Report.SourceAnnotations says this out loud.
+func (s *solver) loc(at site) string {
+	if s.banked {
+		if at.bank != 0 {
+			return siteDesc(at, true)
+		}
+		if l := s.sm.Locate(at.addr); l != "" {
+			return fmt.Sprintf("bank 0 %s", l)
+		}
+		return siteDesc(at, true)
+	}
+	return s.sm.Locate(at.addr)
+}
 
 // foldLoops finds a single simple counted loop in the region subgraph and folds
 // it into one synthetic node keyed by the loop header. Returns "" on success (or
@@ -1289,11 +1740,11 @@ func (s *solver) foldLoops() string {
 	var latches []Instr
 	for _, in := range s.nodes {
 		if in.Def.IsBranch() {
-			tgt := in.branchTarget()
+			tgt := in.branchSite() // a branch cannot leave its bank
 			// A backward branch to a WSYNC sink is the normal per-scanline loop
 			// returning to the next region — a region boundary, not an intra-line
 			// loop. Only branches back to a non-sink node are real loops to fold.
-			if _, ok := s.nodes[tgt]; ok && tgt <= in.Addr && !s.sinks[tgt] {
+			if _, ok := s.nodes[tgt]; ok && tgt.addr <= in.Addr && !s.sinks[tgt] {
 				latches = append(latches, in)
 			}
 		}
@@ -1305,16 +1756,22 @@ func (s *solver) foldLoops() string {
 		return "multiple back-edges (nested/complex loops) — not modeled in v1"
 	}
 	latch := latches[0]
-	header := latch.branchTarget()
+	header := latch.branchSite()
 
 	// Validate the body header..latch is a simple straight chain and sum its
 	// non-branch cost.
 	bodyNoBranch := 0
-	a := header
+	at := header
 	for {
-		in, ok := s.nodes[a]
+		in, ok := s.nodes[at]
 		if !ok {
 			return "loop body leaves the region"
+		}
+		if in.Bank != latch.Bank {
+			// Should be unreachable — the chain is followed by in.next() inside one bank —
+			// but a body in another bank would make the address comparisons below
+			// meaningless, so it is refused rather than assumed away.
+			return "loop body leaves the latch's bank"
 		}
 		if in.Addr == latch.Addr {
 			break
@@ -1325,22 +1782,29 @@ func (s *solver) foldLoops() string {
 		if in.Def.IsBranch() {
 			return "branch inside loop body — not a simple counted loop"
 		}
+		// A bank switch inside the body is a SOUNDNESS condition, not a precision one:
+		// the folded cost n*body + (n-1)*(latch+pen) + latch assumes every iteration
+		// executes the same bytes, and after a switch iteration 2 executes different
+		// bytes at the same addresses.
+		if es, keep, refusal := s.sw.switchEdges(in, s.absStates[at]); refusal != "" || len(es) > 0 || !keep {
+			return "bank switch inside loop body — the second iteration does not execute the same bytes"
+		}
 		bodyNoBranch += in.nodeCost()
-		a = in.next()
-		if a > latch.Addr {
+		at = in.nextSite()
+		if at.addr > latch.Addr {
 			return "misaligned loop body"
 		}
 	}
 
 	pen := 1
-	if (latch.next() >> 8) != (header >> 8) {
+	if (latch.next() >> 8) != (header.addr >> 8) {
 		pen = 2
 	}
-	n := determineBound(s.nodes, header, latch, s.absStates, s.amaxHint)
+	n := determineBound(s.nodes, header, latch, s.absStates, s.sw, s.amaxHint)
 	if n <= 0 {
 		// The body is fully understood; only the trip count is missing. Keep it so
 		// the caller can still answer "how many iterations fit the budget?".
-		s.pending = &pendingLoop{header: header, latch: latch, bodyNoBranch: bodyNoBranch, pen: pen, exit: latch.next()}
+		s.pending = &pendingLoop{header: header, latch: latch, bodyNoBranch: bodyNoBranch, pen: pen, exit: latch.nextSite()}
 		return "loop bound unknown (need a counted dex/dey or sbc-divide idiom with a proven range)"
 	}
 	// n iterations: n bodies, (n-1) taken branches back, 1 final not-taken exit.
@@ -1348,16 +1812,43 @@ func (s *solver) foldLoops() string {
 	// Fewest iterations: the back edge is a bne/bpl AFTER the body, so the body
 	// runs at least once and the branch then falls through.
 	minLoopCost := bodyNoBranch + latch.Def.Cycles
-	s.folds[header] = loopInfo{cost: loopCost, minCost: minLoopCost, exit: latch.next(), n: n}
+	s.folds[header] = loopInfo{cost: loopCost, minCost: minLoopCost, exit: latch.nextSite(), n: n}
 	return ""
 }
+
+// proxyFallbackHits counts how many times determineBound has fallen back to the
+// "closest `lda #imm` below the header" address proxy on the BCS/BCC divide path.
+//
+// It is a MEASUREMENT counter, not analysis state: the proxy is the same shape of
+// heuristic that under-approximated by 40x on the dex/dey path (SD-9), and the only
+// honest way to decide between deleting it and keeping it gated was to find out
+// whether anything in the corpus reaches it. Measured over all 31 technique ROMs, all
+// 12 cb_* litmus, litmus_bound_proxy and the four bank ROMs: 0 hits. It is kept
+// same-bank-gated with this counter so a future kernel that starts depending on it
+// becomes visible rather than silent.
+var proxyFallbackHits int
 
 // determineBound returns an iteration upper bound for the simple counted loop
 // header..latch, or 0 if undeterminable. Two idioms:
 //   - decrement-to-zero (ldx/ldy #N + dex/dey + bne/bpl), and
 //   - (2B) divide / sbc-counter (sec; A reduced by a constant; bcs/bcc),
 //     bounded from the proven range of A on entry to the loop header.
-func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absStates map[uint16]State, amaxHint int) int {
+//
+// MERGING TWO BANKS' INSTRUCTIONS INTO ONE NODE SET IS EXACTLY THE CONDITION THAT
+// BREAKS AN ADDRESS-ORDER HEURISTIC, which is what SD-9 was. Three consequences are
+// handled here explicitly:
+//   - the predecessor scan follows CROSS-BANK edges, and returns 0 unless the
+//     predecessor set is complete. Maximising over an incomplete predecessor set
+//     UNDER-approximates the entry value, hence the trip count, hence the worst case.
+//   - every address-order filter is a SAME-BANK comparison. Addresses in different
+//     banks have no order at all, so `addr < header` across banks compares two
+//     unrelated numbers.
+//   - the `lda #imm` fallback on the BCS/BCC path is the same "closest immediate
+//     below the header" proxy SD-9 deleted from the dex/dey path. Measured on this
+//     corpus with a counter (proxyFallbackHits): 0 ROMs reach it, so it is gated to
+//     the same bank rather than deleted, and the counter stays so a future ROM that
+//     starts relying on it is visible instead of silent.
+func determineBound(nodes map[site]Instr, header site, latch Instr, absStates map[site]State, sw switchModel, amaxHint int) int {
 	// 2B: divide-by-N coarse-positioning idiom — the body subtracts a constant from
 	// A and loops while no borrow (BCS) / while borrow (BCC). Max iterations =
 	// floor(Amax/const)+1 (with carry set); +1 more covers an unknown entry carry.
@@ -1365,9 +1856,9 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 	// range or non-constant subtrahend => 0 (stay unbounded, no false bound).
 	if latch.Def.Operator == instructions.BCS || latch.Def.Operator == instructions.BCC {
 		sub, nbody := 0, 0
-		a := header
+		at := header
 		for {
-			in, ok := nodes[a]
+			in, ok := nodes[at]
 			if !ok {
 				return 0
 			}
@@ -1378,7 +1869,7 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 			if in.Def.Operator == instructions.SBC && in.Def.AddressingMode == instructions.Immediate {
 				sub = int(in.Operand & 0xFF)
 			}
-			a = in.next()
+			at = in.nextSite()
 		}
 		// only the canonical single-instruction `sbc #const` body is modeled
 		if sub == 0 || nbody != 1 {
@@ -1390,24 +1881,30 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 		// loop from above). This is where 3A's AND-mask range and 3B's array-element
 		// range surface. Max over predecessors (sound). Unknown => 0 (stay unbounded).
 		amax := -1
-		for addr, in := range nodes {
-			if in.next() == header && addr != latch.Addr && int(addr) < int(header) {
-				if st, ok := absStates[addr]; ok {
+		for at, in := range nodes {
+			// Same-bank comparison: two addresses in different banks have no order.
+			if in.nextSite() == header && at != latch.site() && at.bank == header.bank && at.addr < header.addr {
+				if st, ok := absStates[at]; ok {
 					if ea := st.transfer(in).A; !ea.Top && ea.Hi > amax {
 						amax = ea.Hi
 					}
 				}
 			}
 		}
-		// fallback: closest immediate `lda #imm` before the loop (exact).
+		// Fallback: closest immediate `lda #imm` before the loop, IN THE SAME BANK.
+		// This is the address proxy SD-9 removed from the dex/dey path, still live here;
+		// it is gated to one bank and counted rather than trusted.
 		if amax < 0 {
 			bestAddr := -1
-			for addr, in := range nodes {
-				if int(addr) < int(header) && in.Def.Operator == instructions.LDA &&
-					in.Def.AddressingMode == instructions.Immediate && int(addr) > bestAddr {
-					bestAddr = int(addr)
+			for at, in := range nodes {
+				if at.bank == header.bank && at.addr < header.addr && in.Def.Operator == instructions.LDA &&
+					in.Def.AddressingMode == instructions.Immediate && int(at.addr) > bestAddr {
+					bestAddr = int(at.addr)
 					amax = int(in.Operand & 0xFF)
 				}
+			}
+			if amax >= 0 {
+				proxyFallbackHits++
 			}
 		}
 		if amax < 0 && amaxHint > 0 {
@@ -1422,9 +1919,9 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 		return 0
 	}
 	decX, decY := false, false
-	a := header
+	at := header
 	for {
-		in, ok := nodes[a]
+		in, ok := nodes[at]
 		if !ok {
 			return 0
 		}
@@ -1437,7 +1934,7 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 		case instructions.DEY:
 			decY = true
 		}
-		a = in.next()
+		at = in.nextSite()
 	}
 	if !decX && !decY {
 		return 0
@@ -1462,12 +1959,21 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 	// precision in exchange for the guarantee; a stated refusal is worth more than a
 	// number that can be wrong by 40x.
 	best := -1
-	for addr, in := range nodes {
-		if addr == latch.Addr {
+	for at, in := range nodes {
+		if at == latch.site() {
 			continue // the back-edge carries the DECREMENTED value, not the entry value
 		}
+		// Cross-bank successors included: a header entered from another bank would
+		// otherwise lose that predecessor, and maximising over an INCOMPLETE predecessor
+		// set under-approximates the entry value, hence the trip count, hence the worst
+		// case. An instruction whose successors cannot be determined at all makes the
+		// predecessor set unknowable, so the bound is refused.
+		succ, refusal := successors(in, absStates[at], sw)
+		if refusal != "" {
+			return 0
+		}
 		reaches := false
-		for _, nx := range decodeSuccessors(in) {
+		for _, nx := range succ {
 			if nx == header {
 				reaches = true
 				break
@@ -1476,7 +1982,7 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 		if !reaches {
 			continue
 		}
-		st, ok := absStates[addr]
+		st, ok := absStates[at]
 		if !ok || !st.valid {
 			return 0 // a predecessor we know nothing about: no bound
 		}
@@ -1508,15 +2014,17 @@ func determineBound(nodes map[uint16]Instr, header uint16, latch Instr, absState
 // AbsoluteX, so it returned no address at all and the region was skipped as blank
 // while containing a write to VBLANK. A push counts too — page 1 mirrors the
 // console's own addresses, so SP can aim a PHA at the display.
-func regionTouchesDisplay(nodes map[uint16]Instr, states map[uint16]State) bool {
-	for _, in := range nodes {
+// Because the region subgraph now crosses bank boundaries, a `sta VBLANK` on the far
+// side of a switch can no longer be missed when classifying a region blank.
+func regionTouchesDisplay(nodes map[site]Instr, states map[site]State) bool {
+	for at, in := range nodes {
 		switch in.Def.Operator {
 		case instructions.PHA, instructions.PHP:
-			if !pushMissesDisplay(in, states) {
+			if !pushMissesDisplay(in, states[at]) {
 				return true
 			}
 		case instructions.STA, instructions.STX, instructions.STY:
-			if !storeMissesDisplay(in, states) {
+			if !storeMissesDisplay(in, states[at]) {
 				return true
 			}
 		}
@@ -1527,17 +2035,23 @@ func regionTouchesDisplay(nodes map[uint16]Instr, states map[uint16]State) bool 
 // analyzeRegion proves the worst case of the WSYNC-to-WSYNC region opened by the
 // WSYNC store `start`. states gives the abstract state at each address, used to
 // classify the region's display interval (S1).
-func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, sm *srcmap.Map, states map[uint16]State) Region {
-	reg := Region{Start: start.Addr, StartLoc: sm.Locate(start.Addr), Budget: budget, Bounded: true, Kind: "visible"}
+func analyzeRegion(instrs map[site]Instr, start Instr, budget, amaxHint int, sm *srcmap.Map,
+	states map[site]State, sw switchModel) Region {
 	s := &solver{
-		nodes:     map[uint16]Instr{},
-		sinks:     map[uint16]bool{},
-		folds:     map[uint16]loopInfo{},
+		nodes:     map[site]Instr{},
+		sinks:     map[site]bool{},
+		folds:     map[site]loopInfo{},
 		memo:      map[lkey]result{},
 		state:     map[lkey]int{},
 		absStates: states, // S3: page-cross penalty resolved from tracked index ranges
 		sm:        sm,
 		amaxHint:  amaxHint,
+		sw:        sw,
+		banked:    sw.banked,
+	}
+	reg := Region{Start: start.Addr, StartLoc: s.loc(start.site()), Budget: budget, Bounded: true, Kind: "visible"}
+	if sw.banked {
+		reg.Bank, reg.BankValid = start.Bank, true
 	}
 
 	// Collect the region subgraph: from the instruction after `start`, follow the
@@ -1551,14 +2065,14 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 	// never stores to $00/$01 (so it can't turn the display on inside itself), it
 	// is not a visible-scanline timing risk — skip it soundly. Its only failure
 	// mode is total frame-line drift, which is a separate check (ntsc_frame_lines).
-	if st, ok := states[start.Addr]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
+	if st, ok := states[start.site()]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
 		reg.Kind = "blank"
 		// ①: fall through and STILL compute the worst-case. A blank (VSYNC/VBLANK/
 		// overscan) region > budget does not tear a visible line, but it adds a
 		// scanline (WSYNC halts to the next line) = frame-line drift / screen dip /
 		// roll. Previously this returned Worst=0, hiding it from the ∀ proof.
 	}
-	ctxs := callContexts(instrs, start.Addr)
+	ctxs := callContexts(instrs, start.site(), sw)
 	// A region inside a subroutine called from more than one place must be walked
 	// once PER CALL SITE, not as one merged graph. The flat walk follows the RTS
 	// to every return address, so it happily costs a path that enters from call
@@ -1577,7 +2091,7 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 	// where it does NOT help: with several call sites the flat walk reaches a sink
 	// easily, and answers confidently from a path that does not exist.
 	if len(ctxs) > 1 {
-		if r := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, ctxs); r != nil {
+		if r := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, sw, ctxs); r != nil {
 			return *r
 		}
 		// Unresolvable in some context: fall through to the flat walk, which is
@@ -1585,7 +2099,7 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 	}
 	if len(s.sinks) == 0 {
 		if len(ctxs) > 0 {
-			if r := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, ctxs); r != nil {
+			if r := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, sw, ctxs); r != nil {
 				return *r
 			}
 		}
@@ -1601,13 +2115,13 @@ func analyzeRegion(instrs map[uint16]Instr, start Instr, budget, amaxHint int, s
 		return reg
 	}
 
-	r := s.longest(start.next(), 0)
+	r := s.longest(start.nextSite(), ctx{})
 	if s.cyclic {
 		return unbounded("unbounded loop in region (no counted-loop bound found)")
 	}
 	if s.unbounded {
 		if len(ctxs) > 0 {
-			if rc := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, ctxs); rc != nil {
+			if rc := analyzeRegionInContexts(instrs, start, budget, amaxHint, sm, states, sw, ctxs); rc != nil {
 				return *rc
 			}
 		}
@@ -1731,7 +2245,68 @@ type Report struct {
 	// analysis does not follow. Before this counter existed, litmus_bank came back
 	// certified:true having analysed bank 0 of 2 — a true statement about a
 	// fragment presented as a verdict on the cartridge.
+	//
+	// Its MEANING is now narrower than it was: it counts regions refused because a
+	// switch they can perform is not modelled, not regions that merely contain a
+	// switch. ModelledSwitchEdges is the other half of the pair.
 	UnmodelledSwitches int `json:"unmodelled_switches,omitempty"`
+
+	// ModelledSwitchEdges is how many cross-bank control-flow edges the analysed
+	// regions actually followed. It sits beside UnmodelledSwitches so "0 refusals" can
+	// be told apart from "0 refusals because nothing was crossed": a bank-switched
+	// cartridge reported as certified with 0 modelled edges has not been checked
+	// across its banks, it has merely not been caught.
+	ModelledSwitchEdges int `json:"modelled_switch_edges,omitempty"`
+
+	// SwitchWidenedSites counts code sites whose abstract state was forced to Top
+	// because they are a possible landing point of a bank switch this analysis does not
+	// model, and SwitchWidenReasons names why.
+	//
+	// The reason is a soundness one and it is worth stating rather than inferring. The
+	// value domain is a WHOLE-PROGRAM fixpoint while a refusal is per-region, so an
+	// unmodelled switch leaves its real landing site with an incomplete set of incoming
+	// edges — and a join over an incomplete predecessor set UNDER-approximates, which is
+	// exactly the narrow-confident-wrong range that could bound a loop in some OTHER
+	// region that was never refused. Refusing the region that contains the switch does
+	// not protect the region that contains its landing, so the landing is widened.
+	//
+	// A non-zero count here does not by itself mean a region was refused: it can come
+	// from a decoded-but-never-executed byte sequence (the decode over-approximates on
+	// purpose). It means some precision was given up for a soundness reason, and it is
+	// reported so that a bound which quietly depends on the difference is visible.
+	SwitchWidenedSites int      `json:"switch_widened_sites,omitempty"`
+	SwitchWidenReasons []string `json:"switch_widen_reasons,omitempty"`
+
+	// SourceAnnotations says when `@lines` / `@amax` could not be read at all, with the
+	// reason. Both are looked up through the source map, and on a bank-switched image
+	// DASM's listing address column is the physical ROM offset rather than the RORG'd
+	// CPU address — so the lookup silently misses and every region is budgeted at one
+	// scanline. A region that legitimately spans two lines then reports as a violation,
+	// and the reader has to be told that is the annotation's absence rather than the
+	// prover's disagreement.
+	SourceAnnotations string `json:"source_annotations,omitempty"`
+}
+
+// romByBank builds the ROM-byte reader the value domain uses, routed BY BANK.
+//
+// Routing is not a nicety. romTableRange folds real cartridge bytes into an EXACT
+// value range and that range can bound a loop's trip count, so on a merged program a
+// single flat reader would fold whichever bank happened to be bound in the closure —
+// and a `lda table,x` in bank 1 would come out bounded by bank 0's table bytes. That
+// is a narrow, confident, wrong range feeding a worst case, which is the same failure
+// shape as reading a superchip's RAM window as ROM (SD-8c) on a different axis.
+func romByBank(decodes []unitDecode) func(bank int, addr uint16) (byte, bool) {
+	progs := make(map[int]*program, len(decodes))
+	for _, d := range decodes {
+		progs[d.bank] = d.prog
+	}
+	return func(bank int, addr uint16) (byte, bool) {
+		p, ok := progs[bank]
+		if !ok {
+			return 0, false
+		}
+		return p.byteAt(addr)
+	}
 }
 
 // Prove assembles asmPath, statically proves every WSYNC-to-WSYNC region's
@@ -1802,10 +2377,10 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	if len(rom) < 6 || len(rom) > 0x10000 {
 		return nil, fmt.Errorf("unexpected ROM size %d bytes", len(rom))
 	}
-	// A bank-switched cartridge is analysed ONE BANK AT A TIME. Each bank is a
-	// 4K image in its own right — same mask, same $F000 base, same vectors — so the
-	// existing pipeline runs over it unchanged; what does NOT hold is flow BETWEEN
-	// banks, and that is refused rather than guessed (see hotspotRefusal).
+	// A bank-switched cartridge is decoded one bank at a time and then analysed as ONE
+	// MERGED program keyed on (bank, address). Each bank is a 4K image in its own
+	// right — same mask, same $F000 base, its own vectors — so the decode runs over it
+	// unchanged; what the merge adds is flow BETWEEN banks (see switchModel).
 	//
 	// A flat ROM is simply the one-bank case and goes down the identical path, so
 	// its report is unchanged byte for byte.
@@ -1820,7 +2395,15 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	// shows only its reset stub: measured, litmus_bank bank 1 decoded 4 instructions
 	// and the machine executed 4 OTHERS there ($FF03/$FF05/$FF07/$FF09), none of
 	// them among the 4 decoded — the residue this closes.
-	decodes, seeds := decodeUnits(units)
+	decodes, instrs, entries, seeds := decodeUnits(units)
+
+	sw := switchModel{banked: len(units) > 1, banks: map[int]bool{}}
+	if sw.banked {
+		sw.hotspots = units[0].hotspots
+		for _, u := range units {
+			sw.banks[u.bank] = true
+		}
+	}
 
 	rep := &Report{Asm: filepath.Base(asmPath), Budget: budget, Converged: true}
 	if len(units) > 1 {
@@ -1830,75 +2413,108 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		rep.CrossBankSeedCapped = seeds.capped
 		rep.UnresolvedHotspots = seeds.unresolved
 		rep.UnresolvableSwitchAccesses = seeds.unresolvable
+		// srcmap keys line numbers on DASM's listing address column, which on a banked
+		// image is the PHYSICAL ROM OFFSET rather than the RORG'd CPU address. Measured
+		// on litmus_bank's listing: bank 0's rows read `0f00 ad f9 ff lda $FFF9` (below
+		// $1000, so Parse drops them) and bank 1's read `1f03 a9 b1 lda #$B1` (stored as
+		// if $1F03 were a CPU address). So `@lines` and `@amax`, which are looked up
+		// THROUGH that map, resolve for nothing on a bank-switched kernel — every region
+		// silently gets @lines 1. Saying so is the point of this field: litmus_bank_f4's
+		// crossing region really does span 2 scanlines (measured 128 cycles over 2 lines),
+		// and it is reported as a budget violation because the annotation that would
+		// declare those 2 lines cannot be read, not because the prover disagrees.
+		rep.SourceAnnotations = "unavailable: DASM's listing addresses are physical ROM offsets on a " +
+			"bank-switched image, so @lines and @amax are not resolvable and every region is budgeted " +
+			"at 1 scanline"
 	}
-	for _, u := range decodes {
-		p := u.prog
-		instrs, entries := u.instrs, u.entries
-		bc := BankCoverage{Bank: u.bank, Instructions: len(instrs), SeededEntries: u.seeded}
-		states, converged := computeStates(instrs, entries, p.byteAt) // S1+: VSYNC/VBLANK & value-range tracking (3D: ROM tables)
-		if !converged {
-			rep.Converged = false
-		}
 
-		var starts []uint16
-		for a, in := range instrs {
-			if in.isWSYNC() {
-				starts = append(starts, a)
+	// ONE abstract-interpretation fixpoint over the merged program. Cross-bank state
+	// FLOWS along the switch edge instead of the landing site being re-seeded with Top,
+	// which is strictly more precise and still sound — but only because romAt is routed
+	// by the instruction's own bank (see absint.romTableRange), or a `lda table,x` in
+	// bank 1 would be bounded by bank 0's table bytes.
+	//
+	// When some instruction can switch banks in a way switchEdges does NOT model, the
+	// incoming-edge set of its real landing site is incomplete, and a join over an
+	// incomplete predecessor set is an under-approximation. Those landing sites — and
+	// only those — are forced to Top (see unmodelledLandings).
+	widen, widenWhy := unmodelledLandings(instrs, sw)
+	rep.SwitchWidenedSites = len(widen)
+	rep.SwitchWidenReasons = widenWhy
+	states, converged := computeStates(instrs, entries, romByBank(decodes), sw, widen)
+	if !converged {
+		rep.Converged = false
+	}
+
+	// Region starts as sites, sorted by (bank, address) — the same order the previous
+	// per-bank loop produced, so the output ordering is unchanged.
+	var starts []site
+	for a, in := range instrs {
+		if in.isWSYNC() {
+			starts = append(starts, a)
+		}
+	}
+	sortSites(starts)
+
+	perBankRegions := map[int]int{}
+	for _, sa := range starts {
+		reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa.addr), regionAmax(sa.addr), sm, states, sw)
+		if sw.active() {
+			// Every switch this region can perform must have a modelled edge. The residue
+			// — an instruction fetched across a hotspot, a jmp/jsr into one, an
+			// unresolvable target — is refused and counted, because bounding it on the
+			// bytes that follow in THIS bank would be a number about a path the hardware
+			// does not take.
+			why, edges := residualSwitchRefusal(instrs, sa, sw, states)
+			reg.SwitchEdges = edges
+			if why != "" {
+				reg.Bounded = false
+				reg.Reason = why
+				reg.Worst, reg.Over, reg.Path = 0, false, nil
+				rep.UnmodelledSwitches++
+			} else {
+				rep.ModelledSwitchEdges += edges
 			}
 		}
-		sort.Slice(starts, func(i, j int) bool { return starts[i] < starts[j] })
-
-		for _, sa := range starts {
-			reg := analyzeRegion(instrs, instrs[sa], budget*regionLines(sa), regionAmax(sa), sm, states)
-			if len(units) > 1 {
-				reg.Bank = u.bank
-				reg.BankValid = true
-				// Cross-bank flow is not modelled, so a region that can touch a
-				// bank-switch hotspot continues somewhere this analysis never looked.
-				// Bounding it on the bytes that follow in THIS bank would be a number
-				// about a path the hardware does not take.
-				if why := hotspotRefusal(instrs, sa, u.hotspots, states); why != "" {
-					reg.Bounded = false
-					reg.Reason = why
-					reg.Worst, reg.Over, reg.Path = 0, false, nil
-					rep.UnmodelledSwitches++
-				}
-			}
-			bc.Regions++
-			rep.Regions++
-			if reg.Kind == "blank" {
-				// ①: a blank region no longer vanishes as worst=0. It is not a visible-line
-				// tear (so it stays OUT of Lines/MaxWorst/Violations/Certified for backward
-				// compatibility), but a blank region over its budget adds a scanline = roll,
-				// so surface it and feed the ③ roll_free ∀ verdict.
-				rep.Blank++
-				rep.BlankLines = append(rep.BlankLines, reg)
-				if !reg.Bounded {
-					rep.BlankUnbounded = append(rep.BlankUnbounded, reg)
-				} else {
-					if reg.Worst > rep.BlankMaxWorst {
-						rep.BlankMaxWorst = reg.Worst
-					}
-					if reg.Over {
-						rep.BlankOver = append(rep.BlankOver, reg)
-					}
-				}
-				continue
-			}
-			rep.Lines = append(rep.Lines, reg) // PONG-C3: keep EVERY visible region, passing or not
+		perBankRegions[sa.bank]++
+		rep.Regions++
+		if reg.Kind == "blank" {
+			// ①: a blank region no longer vanishes as worst=0. It is not a visible-line
+			// tear (so it stays OUT of Lines/MaxWorst/Violations/Certified for backward
+			// compatibility), but a blank region over its budget adds a scanline = roll,
+			// so surface it and feed the ③ roll_free ∀ verdict.
+			rep.Blank++
+			rep.BlankLines = append(rep.BlankLines, reg)
 			if !reg.Bounded {
-				rep.Unbounded = append(rep.Unbounded, reg)
-				continue
+				rep.BlankUnbounded = append(rep.BlankUnbounded, reg)
+			} else {
+				if reg.Worst > rep.BlankMaxWorst {
+					rep.BlankMaxWorst = reg.Worst
+				}
+				if reg.Over {
+					rep.BlankOver = append(rep.BlankOver, reg)
+				}
 			}
-			if reg.Worst > rep.MaxWorst {
-				rep.MaxWorst = reg.Worst
-			}
-			if reg.Over {
-				rep.Violations = append(rep.Violations, reg)
-			}
+			continue
 		}
-		if len(units) > 1 {
-			rep.BankCoverage = append(rep.BankCoverage, bc)
+		rep.Lines = append(rep.Lines, reg) // PONG-C3: keep EVERY visible region, passing or not
+		if !reg.Bounded {
+			rep.Unbounded = append(rep.Unbounded, reg)
+			continue
+		}
+		if reg.Worst > rep.MaxWorst {
+			rep.MaxWorst = reg.Worst
+		}
+		if reg.Over {
+			rep.Violations = append(rep.Violations, reg)
+		}
+	}
+	if len(units) > 1 {
+		for _, u := range decodes {
+			rep.BankCoverage = append(rep.BankCoverage, BankCoverage{
+				Bank: u.bank, Instructions: len(u.instrs), Regions: perBankRegions[u.bank],
+				SeededEntries: u.seeded,
+			})
 		}
 	}
 	if rep.Regions == 0 {

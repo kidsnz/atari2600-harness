@@ -23,7 +23,7 @@ func TestZZDenominator(t *testing.T) {
 			continue
 		}
 		p := &program{rom: rom, base: uint16(0x10000 - len(rom))}
-		instrs := map[uint16]Instr{}
+		instrs := map[site]Instr{}
 		for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
 			lo, _ := p.byteAt(va)
 			hi, _ := p.byteAt(va + 1)
@@ -51,7 +51,7 @@ func TestZZDenominator(t *testing.T) {
 		// instruction cannot be real code (the CPU proved that byte is an operand).
 		execSpan := map[uint16]bool{} // operand bytes of executed instructions
 		for a := range seen {
-			in, ok := instrs[a]
+			in, ok := instrs[site{0, a}]
 			if !ok {
 				continue
 			}
@@ -61,17 +61,17 @@ func TestZZDenominator(t *testing.T) {
 		}
 		notExec, phantom := 0, 0
 		for a := range instrs {
-			if seen[a] {
+			if seen[a.addr] {
 				continue
 			}
 			notExec++
-			if execSpan[a] {
+			if execSpan[a.addr] {
 				phantom++
 			}
 		}
 		execNotDecoded := 0
 		for a := range seen {
-			if _, ok := instrs[a]; !ok {
+			if _, ok := instrs[site{0, a}]; !ok {
 				execNotDecoded++
 			}
 		}

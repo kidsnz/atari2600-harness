@@ -302,9 +302,25 @@ func TestProveNoWSYNCNotCertified(t *testing.T) {
 		t.Error("per-bank analysis should now reach this ROM's kernel; 0 regions means it is still " +
 			"being skipped, just more politely")
 	}
-	if rep.UnmodelledSwitches == 0 {
-		t.Error("this ROM switches banks through $FFF8/$FFF9; a report that found no unmodelled " +
-			"switch is not seeing the hotspot at all")
+	// Its $FFF8/$FFF9 switch is now MODELLED, so the count that used to be required
+	// here must be 0 and the EDGE is what proves the hotspot is seen. Asserting the old
+	// count would be asserting that the feature was never built; asserting nothing would
+	// let a report that never noticed the hotspot pass.
+	if rep.UnmodelledSwitches != 0 {
+		t.Errorf("its switch is the modelled shape (a data access reaching a hotspot), so %d refusal(s) "+
+			"means the cross-bank edge is not being built: %+v", rep.UnmodelledSwitches, rep.Unbounded)
+	}
+	if rep.ModelledSwitchEdges == 0 {
+		t.Error("this ROM switches banks through $FFF8/$FFF9 and no region recorded a cross-bank edge; " +
+			"a report with neither a refusal nor an edge is not seeing the hotspot at all")
+	}
+	// It still must not certify, and now for a reason it states: one region's loop uses
+	// an iny/cpy idiom this prover does not bound, and another holds a WSYNC inside a
+	// loop body. Both are unrelated to bank switching and must not be swept up by it.
+	if len(rep.Unbounded) == 0 {
+		t.Error("banked_game has regions this prover cannot bound for reasons unrelated to banking " +
+			"(a loop bound it does not recognise, and a WSYNC inside a loop body); none reported " +
+			"means an honest refusal was lost")
 	}
 	// Per-bank coverage must be visible, or a bank barely decoded passes for one
 	// that was checked.

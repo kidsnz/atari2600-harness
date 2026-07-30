@@ -1,10 +1,9 @@
 package cyclebound
 
 import (
-	"path/filepath"
 	"fmt"
 	"os"
-	"sort"
+	"path/filepath"
 
 	"github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
 	"github.com/kidsnz/atari2600-harness/internal/build"
@@ -110,27 +109,29 @@ func Lint(asmPath string) ([]LintWarning, error) {
 			Hint: "no timing warning below should be read as an all-clear for this ROM",
 		}}, nil
 	}
-	instrs := map[uint16]Instr{}
-	var entries []uint16
+	instrs := map[site]Instr{}
+	var entries []site
 	for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
 		lo, _ := p.byteAt(va)
 		hi, _ := p.byteAt(va + 1)
 		if t := uint16(lo) | uint16(hi)<<8; t >= p.base {
 			p.decodeInto(instrs, t)
-			entries = append(entries, t)
+			entries = append(entries, site{p.bank, t})
 		}
 	}
 	// Abstract-interpret so R2 can tell a real staged motion from a defensive
-	// `lda #0; sta HMP0` clear (the latter must not warn).
-	states, _ := computeStates(instrs, entries, p.byteAt)
+	// `lda #0; sta HMP0` clear (the latter must not warn). The decline above means this
+	// only ever runs on a flat image, so there is no switch model to carry.
+	sw := switchModel{}
+	states, _ := computeStates(instrs, entries, p.byteAtBank, sw, nil)
 
-	loc := func(a uint16) string { return sm.Locate(a) }
+	loc := func(a site) string { return sm.Locate(a.addr) }
 	var w []LintWarning
 
 	// Survey TIA motion usage across the whole program.
-	var hmoves []uint16
+	var hmoves []site
 	sawHMOVE, sawHMxxAny := false, false
-	hmxxNonzero := uint16(0xFFFF) // first HMxx store proven to stage a NON-zero value
+	hmxxNonzero, haveHmxxNonzero := site{}, false // first HMxx store proven to stage a NON-zero value
 	for a, in := range instrs {
 		reg, ok := storeTIA(in)
 		if !ok {
@@ -145,12 +146,14 @@ func Lint(asmPath string) ([]LintWarning, error) {
 			// Provably non-zero staged motion? (value range excludes 0). A defensive
 			// clear (`lda #0; sta HMPx`) is provably 0 → never counted (no false warn);
 			// an unknown/computed value stays silent → conservative.
-			if v, ok := storedReg(in, states[a]); ok && !v.Top && v.Lo > 0 && a < hmxxNonzero {
-				hmxxNonzero = a
+			if v, ok := storedReg(in, states[a]); ok && !v.Top && v.Lo > 0 {
+				if !haveHmxxNonzero || a.addr < hmxxNonzero.addr {
+					hmxxNonzero, haveHmxxNonzero = a, true
+				}
 			}
 		}
 	}
-	sort.Slice(hmoves, func(i, j int) bool { return hmoves[i] < hmoves[j] })
+	sortSites(hmoves)
 
 	// R1: HMOVE strobed but no motion register is EVER set => HMOVE is a no-op
 	// (every object's fine adjust is 0). Almost always a forgotten HMxx setup.
@@ -164,7 +167,7 @@ func Lint(asmPath string) ([]LintWarning, error) {
 	// R2: a PROVABLY NON-ZERO motion is staged but HMOVE is NEVER strobed => the
 	// motion is computed but never applied. Only fires on motion proven non-zero
 	// (a `lda #0; sta HMPx` clear or an unknown value never warns).
-	if hmxxNonzero != 0xFFFF && !sawHMOVE {
+	if haveHmxxNonzero && !sawHMOVE {
 		w = append(w, LintWarning{
 			Rule: "hmxx-without-hmove", Loc: loc(hmxxNonzero),
 			Msg:  "a non-zero horizontal motion (HMxx) is staged but HMOVE is never strobed — the motion is never applied",
@@ -191,20 +194,20 @@ func Lint(asmPath string) ([]LintWarning, error) {
 // CPU cycles, and reports the address of the first HMxx/HMCLR write reached within
 // <24 cycles (the hazard window). Stops at any branch/jump/WSYNC (can't continue
 // statically) — staying silent there rather than risk a false positive.
-func straightHMOVEHazard(instrs map[uint16]Instr, addr uint16) (hazAddr uint16, after int, hit bool) {
+func straightHMOVEHazard(instrs map[site]Instr, at site) (hazAddr site, after int, hit bool) {
 	cyc := 0 // CPU cycles elapsed from the end of HMOVE to the START of `in`
-	a := instrs[addr].next()
+	a := instrs[at].nextSite()
 	for {
 		in, ok := instrs[a]
 		if !ok || in.isWSYNC() {
-			return 0, 0, false // a WSYNC safely closes the window
+			return site{}, 0, false // a WSYNC safely closes the window
 		}
 		if in.Def.IsBranch() || in.Def.Operator == instructions.JMP ||
 			in.Def.Operator == instructions.JSR || in.Def.Operator == instructions.RTS {
-			return 0, 0, false // can't follow statically — stay silent (no false positive)
+			return site{}, 0, false // can't follow statically — stay silent (no false positive)
 		}
 		if cyc >= 24 {
-			return 0, 0, false // this instruction starts at/after 24cy — out of the window
+			return site{}, 0, false // this instruction starts at/after 24cy — out of the window
 		}
 		// Evaluate at the START of `in`: the gap is the cycles BEFORE it, so the
 		// standard `sta HMOVE; ds 12 ($EA*12 = 24cy); sta HMCLR` idiom (HMCLR starts
@@ -213,6 +216,6 @@ func straightHMOVEHazard(instrs map[uint16]Instr, addr uint16) (hazAddr uint16, 
 			return a, cyc, true // hazard: HMxx/HMCLR write starts < 24cy after HMOVE
 		}
 		cyc += in.Def.Cycles
-		a = in.next()
+		a = in.nextSite()
 	}
 }

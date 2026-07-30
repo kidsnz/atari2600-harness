@@ -129,11 +129,11 @@ func TestAbsoluteStoreKeepsOtherCells(t *testing.T) {
 // certify anything. Anything less is a proof resting on values the analysis never
 // finished computing.
 func TestComputeStatesReportsConvergence(t *testing.T) {
-	instrs := map[uint16]Instr{
-		0xF000: mkAt(0xF000, 0xA9, 0x05), // lda #5
-		0xF002: mkAt(0xF002, 0x85, 0x8A), // sta $8A
+	instrs := map[site]Instr{
+		{0, 0xF000}: mkAt(0xF000, 0xA9, 0x05), // lda #5
+		{0, 0xF002}: mkAt(0xF002, 0x85, 0x8A), // sta $8A
 	}
-	_, converged := computeStates(instrs, []uint16{0xF000}, nil)
+	_, converged := computeStates(instrs, []site{{0, 0xF000}}, nil, switchModel{}, nil)
 	if !converged {
 		t.Error("a two-instruction straight line did not converge")
 	}

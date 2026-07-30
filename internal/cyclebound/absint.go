@@ -84,13 +84,31 @@ func oraImm(a ValueRange, m int) ValueRange {
 // `lda base,x` over the proven index range idx. The table bytes are constant and
 // in the binary, so this is exact: [min,max] over base+idx.Lo .. base+idx.Hi.
 // Unknown index, unreadable address, or an over-wide span ⇒ Top (sound).
-func romTableRange(romAt func(uint16) (byte, bool), base uint16, idx ValueRange) ValueRange {
+//
+// bank routes the read: on a bank-switched cartridge the same address holds different
+// bytes in different banks, so folding the wrong bank's table would produce a narrow,
+// confident, wrong range that then bounds a loop.
+//
+// A footprint containing a bank-switch HOTSPOT is Top, and the reason is the
+// hardware's: on a hotspot access the mapper switches FIRST and then returns the byte
+// from the NEW bank (Gopher2600 mapper_atari.go Read: bankswitch(addr) followed by
+// `return cart.banks[cart.state.bank][addr]`). Folding the current bank's byte there
+// would be exactly SD-8c's failure mode — a value the hardware never hands out —
+// moved from the RAM axis to the bank axis, and it feeds a loop trip count.
+func romTableRange(romAt func(int, uint16) (byte, bool), bank int, base uint16, idx ValueRange, sw switchModel) ValueRange {
 	if romAt == nil || idx.Top || idx.Hi-idx.Lo > 255 {
 		return vTop()
 	}
 	lo, hi := 256, -1
 	for i := idx.Lo; i <= idx.Hi; i++ {
-		b, ok := romAt(base + uint16(i))
+		if sw.active() {
+			if ma, ok := cartHotspotKey(base + uint16(i)); ok {
+				if _, isHot := sw.hotspots[ma]; isHot {
+					return vTop()
+				}
+			}
+		}
+		b, ok := romAt(bank, base+uint16(i))
 		if !ok {
 			return vTop()
 		}
@@ -159,16 +177,20 @@ type State struct {
 	// array/index is used (no per-array aliasing reasoning needed). Top = untracked
 	// (no recognized init), so indexed ZP loads stay Top = unbounded, as before.
 	ZPVal ValueRange
-	// romAt (3D) reads a cartridge ROM byte (nil outside Prove). Lets an indexed
-	// load from a ROM data table (`lda table,x`) return the table's actual value
-	// range over the proven index range — the data is constant and in the binary.
+	// romAt (3D) reads a cartridge ROM byte (nil outside Prove), routed BY BANK
+	// because the same address holds different bytes in different banks. Lets an
+	// indexed load from a ROM data table (`lda table,x`) return the table's actual
+	// value range over the proven index range — the data is constant and in the binary.
 	// Not part of state equality (it is a constant capability, not a value).
-	romAt func(uint16) (byte, bool)
-	// preservesDisplay reports whether the subroutine at the given entry address
+	romAt func(bank int, addr uint16) (byte, bool)
+	// preservesDisplay reports whether the subroutine at the given entry SITE
 	// provably cannot write VSYNC/VBLANK, so those bits survive a JSR to it. Like
 	// romAt it is a constant capability, not a value, and not part of equality.
-	preservesDisplay func(uint16) bool
-	valid            bool
+	preservesDisplay func(site) bool
+	// sw is the cross-bank switch oracle, carried so romTableRange can refuse to fold
+	// a byte sitting on a bank-switch hotspot. Also a constant capability, not a value.
+	sw    switchModel
+	valid bool
 }
 
 func botState() State { return State{} } // bottom: valid=false (unreachable)
@@ -215,6 +237,9 @@ func (s State) joinState(o State) State {
 	}
 	if r.preservesDisplay = s.preservesDisplay; r.preservesDisplay == nil {
 		r.preservesDisplay = o.preservesDisplay
+	}
+	if r.sw = s.sw; !r.sw.active() {
+		r.sw = o.sw
 	}
 	r.Mem = map[uint16]ValueRange{}
 	for k, v := range s.Mem {
@@ -465,12 +490,13 @@ func (s State) transfer(in Instr) State {
 				return s.ZPVal
 			}
 			// 3D: an indexed load from a ROM address is a data-table read → its actual
-			// value range over the proven index range (X for abs,X; Y for abs,Y).
+			// value range over the proven index range (X for abs,X; Y for abs,Y), read
+			// from THIS instruction's own bank.
 			idx := s.X
 			if d.AddressingMode == instructions.AbsoluteY {
 				idx = s.Y
 			}
-			return romTableRange(s.romAt, in.Operand, idx)
+			return romTableRange(s.romAt, in.Bank, in.Operand, idx, s.sw)
 		}
 		return vTop() // indirect ((ind,X)/(ind),Y) source value unknown
 	}
@@ -655,23 +681,29 @@ func (s State) refineBranch(in Instr) (taken, notTaken State) {
 	return
 }
 
-// absEdge is a CFG successor address paired with the abstract state on entry.
+// absEdge is a CFG successor SITE paired with the abstract state on entry.
 type absEdge struct {
-	addr  uint16
+	at    site
 	state State
 }
 
 // absSuccessors lists the CFG successors of in with the abstract state flowing to
 // each (branches refine the tested flag; a JSR's return point is reset to Top
 // since the callee's effect is not modeled).
-func absSuccessors(in Instr, st State) []absEdge {
+//
+// CROSS-BANK EDGES ARE INCLUDED, and omitting them would not merely lose precision:
+// on the merged program an unvisited landing site has NO entry in the state map, so
+// `states[at]` is the zero State (valid=false), which determineBound reads as "a
+// predecessor we know nothing about" and answers 0 — the region stays unbounded and
+// the whole exercise buys nothing.
+func absSuccessors(in Instr, st State, sw switchModel) []absEdge {
 	d := in.Def
 	switch d.Operator {
 	case instructions.JMP:
 		if d.AddressingMode == instructions.Indirect {
 			return nil
 		}
-		return []absEdge{{in.Operand, st}}
+		return []absEdge{{site{in.Bank, in.Operand}, st}}
 	case instructions.JSR:
 		// The callee's effect is not modeled, so the return point starts from Top —
 		// except for the display bits, which are kept when the callee provably
@@ -688,11 +720,12 @@ func absSuccessors(in Instr, st State) []absEdge {
 		// claim. Measured on a generated clone: one call site certified, the same
 		// kernel with two did not.
 		ret := topState()
-		if st.preservesDisplay != nil && st.preservesDisplay(in.Operand) {
+		if st.preservesDisplay != nil && st.preservesDisplay(site{in.Bank, in.Operand}) {
 			ret.VSync, ret.VBlank = st.VSync, st.VBlank
 		}
 		ret.preservesDisplay = st.preservesDisplay
-		return []absEdge{{in.Operand, st}, {in.next(), ret}}
+		ret.romAt, ret.sw = st.romAt, st.sw
+		return []absEdge{{site{in.Bank, in.Operand}, st}, {in.nextSite(), ret}}
 	case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
 		return nil
 	}
@@ -700,14 +733,30 @@ func absSuccessors(in Instr, st State) []absEdge {
 		tk, nt := st.refineBranch(in)
 		var es []absEdge
 		if tk.valid {
-			es = append(es, absEdge{in.branchTarget(), tk})
+			es = append(es, absEdge{in.branchSite(), tk})
 		}
 		if nt.valid {
-			es = append(es, absEdge{in.next(), nt})
+			es = append(es, absEdge{in.nextSite(), nt})
 		}
 		return es
 	}
-	return []absEdge{{in.next(), st.transfer(in)}}
+	// A straight-line instruction can still leave its bank: an access reaching a
+	// bank-switch hotspot continues at the same address in the target bank, and the
+	// post-state flows along that edge exactly as it would along a fall-through. An
+	// instruction whose switch is NOT modelled contributes no edge here, which is why
+	// Prove widens every site to Top when any such instruction exists (see
+	// anyUnmodelledSwitch) — an incomplete predecessor set would otherwise leave the
+	// real landing site with a state narrower than the machine's.
+	post := st.transfer(in)
+	succ, refusal := successors(in, st, sw)
+	if refusal != "" {
+		return nil
+	}
+	es := make([]absEdge, 0, len(succ))
+	for _, nx := range succ {
+		es = append(es, absEdge{nx, post})
+	}
+	return es
 }
 
 // zpInitRange returns the value every zero-page cell is known to hold at start:
@@ -715,7 +764,10 @@ func absSuccessors(in Instr, st State) []absEdge {
 // containing `sta $00,x`+`dex/dey`, with a `lda #0` present), else vTop(). Used to
 // seed State.ZPVal so indexed ZP loads are bounded ONLY when ZP is provably
 // initialised — otherwise they stay Top (unbounded), which is sound.
-func zpInitRange(instrs map[uint16]Instr) ValueRange {
+// Scanning the MERGED map is correct and strictly better than scanning one bank: the
+// RAM-clear sweep lives in bank 0 but the fact it establishes ("ZP is zero") is
+// program-wide, so a worker bank's states now inherit it.
+func zpInitRange(instrs map[site]Instr) ValueRange {
 	hasLdaZero := false
 	for _, in := range instrs {
 		if in.Def.Operator == instructions.LDA && in.Def.AddressingMode == instructions.Immediate && (in.Operand&0xFF) == 0 {
@@ -730,8 +782,8 @@ func zpInitRange(instrs map[uint16]Instr) ValueRange {
 		if latch.Def.Operator != instructions.BNE && latch.Def.Operator != instructions.BPL {
 			continue
 		}
-		hdr := latch.branchTarget()
-		if hdr > latch.Addr {
+		hdr := latch.branchSite()
+		if hdr.addr > latch.Addr {
 			continue // forward branch, not a loop latch
 		}
 		hasClear, hasDec := false, false
@@ -750,7 +802,7 @@ func zpInitRange(instrs map[uint16]Instr) ValueRange {
 			if in.Addr == latch.Addr {
 				break
 			}
-			a = in.next()
+			a = in.nextSite()
 		}
 		if hasClear && hasDec {
 			return vConst(0)
@@ -770,23 +822,45 @@ func zpInitRange(instrs map[uint16]Instr) ValueRange {
 // states that are UNDER-approximations. Consumers (bounds, page penalties, branch
 // refinement) treat their inputs as sound, so an unconverged result must never be
 // silently handed to them — a proof resting on it would be a proof of nothing.
-func computeStates(instrs map[uint16]Instr, entries []uint16, romAt func(uint16) (byte, bool)) (map[uint16]State, bool) {
-	st, ok := computeStatesWith(instrs, entries, romAt, nil)
+// widen lists sites that must be seeded to Top IN ADDITION to the entry points,
+// because an unmodelled bank switch can land on them: see Report.SwitchWidenedSites.
+func computeStates(instrs map[site]Instr, entries []site, romAt func(int, uint16) (byte, bool),
+	sw switchModel, widen []site) (map[site]State, bool) {
+	st, ok := computeStatesWith(instrs, entries, romAt, sw, widen, nil)
 	// Second pass: now that index ranges are known, a shared subroutine that picks
 	// its object with `sta RESP0,X` can be shown not to touch the display, so the
 	// display bits survive the call instead of being dropped at every return point.
-	st2, ok2 := computeStatesWith(instrs, entries, romAt, st)
+	st2, ok2 := computeStatesWith(instrs, entries, romAt, sw, widen, st)
 	if !ok2 {
 		return st, ok
 	}
 	return st2, ok2
 }
 
-func computeStatesWith(instrs map[uint16]Instr, entries []uint16, romAt func(uint16) (byte, bool), prev map[uint16]State) (map[uint16]State, bool) {
-	entryState := map[uint16]State{}
-	var work []uint16
-	inWork := map[uint16]bool{}
-	push := func(a uint16, s State) {
+// iterCap scales the fixpoint's safety cap with the program.
+//
+// The cap is a backstop against a non-terminating ascending chain, not a budget, and
+// a fixed one silently becomes a budget as the node set grows: a merged bank-switched
+// program is several times the size of any single bank (measured, litmus_bank_f4 merges
+// bank 0's 103 instructions with banks 1-7's 1362..1398 into 9873 sites, against
+// ~1.4k per bank before), and the fixpoint runs twice. A capped run returns
+// Converged=false and can certify nothing, so the cost of a cap that is too small is
+// a refusal — but a refusal for an arithmetic reason nobody asked about is still a
+// wrong answer to the question the caller posed.
+func iterCap(n int) int {
+	const base = 300000
+	if c := 200 * n; c > base {
+		return c
+	}
+	return base
+}
+
+func computeStatesWith(instrs map[site]Instr, entries []site, romAt func(int, uint16) (byte, bool),
+	sw switchModel, widen []site, prev map[site]State) (map[site]State, bool) {
+	entryState := map[site]State{}
+	var work []site
+	inWork := map[site]bool{}
+	push := func(a site, s State) {
 		old, ok := entryState[a]
 		merged := s
 		if ok {
@@ -801,30 +875,39 @@ func computeStatesWith(instrs map[uint16]Instr, entries []uint16, romAt func(uin
 		}
 	}
 	zpInit := zpInitRange(instrs) // 3B: seed ZP value range (0 if cleared, else Top)
-	preserves := displayPreserver(instrs, prev)
-	for _, e := range entries {
+	preserves := displayPreserver(instrs, prev, sw)
+	seedAt := func(e site) {
 		seed := topState()
 		seed.ZPVal = zpInit
 		seed.romAt = romAt // 3D: ROM-table reads
 		seed.preservesDisplay = preserves
+		seed.sw = sw
 		push(e, seed)
 	}
-	const maxIter = 300000
+	for _, e := range entries {
+		seedAt(e)
+	}
+	// A possible landing of an unmodelled switch has an incomplete incoming-edge set, so
+	// its state may not be narrower than Top.
+	for _, a := range widen {
+		seedAt(a)
+	}
+	maxIter := iterCap(len(instrs))
 	it := 0
 	for ; len(work) > 0 && it < maxIter; it++ {
-		addr := work[0]
+		at := work[0]
 		work = work[1:]
-		inWork[addr] = false
-		in, ok := instrs[addr]
+		inWork[at] = false
+		in, ok := instrs[at]
 		if !ok {
 			continue
 		}
-		st := entryState[addr]
+		st := entryState[at]
 		if !st.valid {
 			continue
 		}
-		for _, e := range absSuccessors(in, st) {
-			push(e.addr, e.state)
+		for _, e := range absSuccessors(in, st, sw) {
+			push(e.at, e.state)
 		}
 	}
 	return entryState, len(work) == 0 && it < maxIter

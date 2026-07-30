@@ -1187,6 +1187,174 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   reachable only across a switch — **measured: 5 such executed pairs, litmus_bank 4 + banked_game 1** — and
   (c) requires every seed whose SOURCE the machine executed to have a landing address the machine also
   executed, so a seed cannot be an invented edge.
+- **SD-11 — a WSYNC-to-WSYNC region that crosses a bank switch gets a real proven worst case. DONE
+  (v1.117.0), stage 3 of bank support.** SD-8 analysed each bank separately, SD-8b closed the DECODE over
+  switches, and SD-10 measured that a merged flat map is impossible. What was still missing was the FLOW: the
+  one region where a bank-switched kernel does all of its cross-bank work had no number at all, only a
+  refusal — and that region is the whole point of the cartridge.
+
+  **Measured before/after, with the machine beside the proof** (`emu.ProfileLineWorst(6, nil)`, rows keyed
+  `(bank, PC)`, `cross_frame_dropped = 5` on every ROM — one per frame boundary):
+
+  | ROM (mapper, banks) | crossing region | before | proven after | machine | after verdict |
+  |---|---|---|---|---|---|
+  | `litmus_bank` (F8, 2) | bank 0 `$F02B` `Vis+0` | REFUSED | **54** | **54** / 1 line, 1152 intervals | `certified:true` |
+  | `litmus_bank_f6` (F6, 4) | bank 0 `$F02B` | REFUSED | **72** | **72** / 1 line, 1152 | `certified:true` |
+  | `litmus_bank_f4` (F4, 8) | bank 0 `$F02B` | REFUSED | **128** | **128** / 2 lines, 1152 | violation at 76, `certified:false` |
+  | `banked_game` (F8, 2) | bank 0 `$F01B` `LvTab+2` | REFUSED (switch) | unbounded, NEW reason | 28 / 1 line, 6 | `certified:false` |
+
+  The three litmus kernels are deterministic, so the machine walks the single path the prover costs and the
+  assertion is **exact equality**, not merely proven >= measured. `litmus_bank_f4`'s eight-segment chain
+  really does spill into a second scanline (its source compensates with `ldx #29` instead of 30), so it comes
+  back as a **stated 128-cycle budget violation** rather than a refusal.
+
+  `UnmodelledSwitches` went **1 -> 0 on all four**, and the new `ModelledSwitchEdges` prints beside it
+  (2 / 4 / 8 / 2) because "0 refused" is also what a cartridge that crossed nothing reports.
+
+  **THE EDGE, from the engine rather than from folklore.** An instruction whose DATA access reaches a
+  bank-switch hotspot continues at the SAME ADDRESS IN THE TARGET BANK: the Atari mapper switches on the
+  access and does not touch PC (`Gopher2600/hardware/memory/cartridge/mapper_atari.go` runs
+  `bankswitch(addr)` and then `return cart.banks[cart.state.bank][addr]`), and the hotspot is matched on the
+  12-bit-folded address, which `cartHotspotKey` already reproduces. A READ switches exactly as a write does.
+  The switching instruction is charged its ordinary cost and the edge is charged nothing — the latch takes
+  effect at the next fetch, so no cycle belongs to the crossing. When the access is EXACT the intra-bank
+  fall-through is **REPLACED**, which is what makes 54/72/128 exact instead of merely safe: keeping it would
+  cost the `$EA` filler that follows in the current bank, which the hardware never fetches. A wide footprint
+  (unknown index) keeps the fall-through as well, which over-approximates in the safe direction.
+
+  **The composite key is now real.** `Instr` carries its bank, `site{bank, addr}` is the map key for the
+  decode, the region subgraph, the abstract states, the loop folds and the call contexts. `ctx{ret site;
+  active bool}` replaces the `ret == 0` sentinel — `(bank 0, $0000)` is an address-shaped value and "no
+  active call" must not be spelled as an address. DATA addresses stay flat, deliberately: RAM `$80-$FF`,
+  TIA/RIOT `$00-$3F` and the page-1 stack mirrors are not banked, so a bank in a data key would split one
+  physical cell into N and break the store kill-set, the value domain and the def-use may-sets.
+  `mustWrittenAt` makes the asymmetry explicit — outer key a code site, inner set flat data addresses.
+
+  **One oracle for both the edge and the refusal.** `switchModel.switchEdges` is the single decision point,
+  and `successors` is the single successor function every walker uses (collect, longest, the abstract
+  interpreter, the beam pass, `regionInstrs`, `mustWrittenAt`, `reachableWithinCallee`, `displayPreserver`,
+  `determineBound`'s predecessor scan). Two predicates would eventually disagree, and a successor function
+  modelling a switch the refusal does not guard is silently unsound. Every place the flow model cannot follow
+  an edge returns a REFUSAL rather than skipping: a dropped successor shortens the longest path.
+
+  **What stays refused** (counted in `UnmodelledSwitches`, still gating `Certified`): an instruction whose
+  OWN BYTES span a hotspot — the opcode at the hotspot comes from the NEW bank, so the instruction decoded
+  here is not the one that executes, and each further operand byte can select yet another bank; a `jmp`/`jsr`
+  INTO a hotspot; an access whose target cannot be resolved at all (measured **0 such accesses on all four
+  corpus bank ROMs**, so refusing costs nothing there today, and it is still counted rather than assumed
+  away); a hotspot symbol that does not name a bank (`B0S0`, `RAM0`); a target bank outside the analysed set;
+  a landing address that wraps past `$FFFF`. **All-or-nothing**: if any candidate of a fan-out cannot be
+  resolved, the whole instruction is refused, because modelling the resolvable ones and dropping the rest
+  deletes a successor.
+
+  **The geometry is checked rather than assumed.** `analysisUnits` now reads `CartBank.Origins` (grep over the
+  package before this: **0 hits**) and declines unless every bank is `len(Data) == 4096` at `Origins ==
+  [$F000]`. M-Network is the trap that PARSES: `mapper_mnetwork.go` publishes `BANK0..BANK6` as
+  `HotspotBankSwitch`, so `hotspotTargetBank` accepts it, while its banks are 2K mapped at two different
+  origins — "the same address in the target bank" is simply false there. Under stage 2 a wrong seed only
+  over-decoded; under stage 3 it is a CFG edge the longest-path walk follows, and a wrong edge can SHORTEN
+  the longest path.
+
+  **`romTableRange` was unsound on two new axes at once and is fixed on both.** It is now routed by
+  `in.Bank`, because on a merged program a flat reader folds whichever bank happened to be bound and a
+  `lda table,x` in bank 1 would come out bounded by bank 0's table. And a footprint containing a hotspot is
+  `Top`, because the hardware switches FIRST and returns the TARGET bank's byte there. Both would produce a
+  narrow, confident, wrong value range feeding a loop's trip count — SD-8c's failure mode on the bank axis.
+
+  **SD-9's guarantee survives the bank boundary, and this was the top risk.** Merging two banks' instructions
+  into one node set is exactly the condition that breaks an address-order heuristic. Three fixes:
+  (a) `determineBound`'s predecessor scan follows cross-bank edges and returns 0 unless the predecessor set
+  is complete — maximising over an INCOMPLETE set under-approximates the entry value, hence the trip count,
+  hence the worst case; (b) both address-order filters on the BCS/BCC path became SAME-BANK comparisons,
+  since addresses in different banks have no order at all; (c) the `lda #imm` "closest immediate below the
+  header" proxy still live on that path — the twin of the one SD-9 deleted — is same-bank-gated and now
+  COUNTED. Measured with that counter over all 31 technique ROMs, all 12 `cb_*` litmus, `litmus_bound_proxy`
+  and every bank ROM: **0 hits**, so it is dead code kept visible rather than deleted blind.
+  (d) `foldLoops` refuses outright any loop whose BODY contains a switching instruction: the folded cost
+  `n*body + (n-1)*(latch+pen) + latch` assumes every iteration executes the same bytes, and after a switch
+  iteration 2 executes different bytes at the same addresses. That is a soundness condition, not precision.
+
+  **An unmodelled switch widens its possible LANDING sites, not just its own region.** The value domain is a
+  whole-program fixpoint while a refusal is per-region, so refusing the region that CONTAINS a switch does
+  nothing for the region that contains its LANDING — whose incoming-edge set is then incomplete, and a join
+  over an incomplete predecessor set under-approximates. `unmodelledLandings` forces those sites to `Top`,
+  per class (own bytes span a hotspot -> `[addr, addr+3]` in every analysed bank, since neither the
+  instruction nor its length is known; `jmp`/`jsr` into one -> the hotspot address in every bank; anything
+  unresolvable -> `in.next()` in every bank). Reported as `switch_widened_sites` + `switch_widen_reasons`.
+  Measured: **5 sites on `litmus_bank`, 5 on `banked_game`, 0 on `litmus_bank_f6`/`_f4`** — all five from
+  decoded-but-never-executed filler at bank 1 `$FFF6/$FFF8/$FFF9`, none inside any region's subgraph, which
+  is why the blank/visible classification of all four ROMs is unchanged. A first draft widened EVERY site
+  instead and that was measurably worse: `litmus_bank`'s two blank regions were reclassified visible.
+
+  **Merged fixpoint cost, measured** (the risk list's concern). Sites and wall-clock `Prove`:
+  `litmus_bank` **151 / 17 ms**, `litmus_bank_f6` **4171 / 24 ms**, `litmus_bank_f4` **9763 / 19 ms**,
+  `banked_game` **134 / 47 ms** — `converged:true` on all four, against ~1.4k per-bank sites before. The
+  iteration cap now scales with the program (`iterCap`, 300000 floor) rather than being a fixed number sized
+  for one bank; `Converged` still gates `Certified`, so a capped run certifies nothing.
+
+  **Three new litmus ROMs, each closing a hole no existing test could see.**
+  - `roms/litmus/litmus_bank_shared_addr.asm` — the corpus gap SD-8 named and SD-10 measured. Two banks
+    execute DIFFERENT code with DIFFERENT cycle costs at ONE address (`$FF10`: `lda #$A0` 2cy vs `inc $8C`
+    5cy; `$FF12`: `sta $8D` 3cy vs `lda #$B1` 2cy) inside a single WSYNC-to-WSYNC region. Measured: **38
+    executed `(bank,pc)` pairs over 35 distinct PCs** — the first ROM in this corpus where
+    `#(bank,pc) != #pc`, so the first that can catch a flat-keyed instrument at all. Proven **58** = machine
+    **58**. The executable negative control rebuilds the decode the way a flat-keyed prover would (one map
+    keyed on the bare address, later banks overwriting) and requires the answer to DIFFER; it does — the flat
+    fold cannot even bound the region.
+  - `roms/litmus/litmus_bank_bound.asm` — the cross-bank sibling of `litmus_bound_proxy`. A `dex`/`bne` loop
+    at bank 1 `$FF05` whose ONLY initialiser is `ldx #5` at bank 0 `$FF00`, so the header's only
+    non-back-edge predecessor is reachable ONLY across the switch. An intra-bank predecessor scan loses the
+    bound outright. Proven **70** = machine **70**.
+  - `roms/litmus/litmus_bank_unmodelled.asm` — the certification gate's witness. With the crossing modelled,
+    all four corpus bank ROMs report `unmodelled_switches: 0`, so the gate would pass **with the gate
+    deleted**. This cartridge's switch can never become modelled: `sta (ptr),y` resolves through a RAM
+    pointer, so no address, no symbol and no landing bank can ever be named. It reports
+    `unmodelled_switches: 1, certified: false` and its own test fails if that stops being true.
+
+    All three render 262 scanlines and are locked by scenarios (`bank_shared_addr.json`, `bank_bound.json`,
+    `bank_unmodelled.json`) so their planted premises cannot drift unnoticed.
+
+  **`DefUse` was fixed as well, in the direction SD-7 established.** `p.banked` used to suppress only the
+  uninitialised-read pass while MayWrite/Writes/Regions were still computed from the flat 8K fold. Measured
+  on `litmus_bank`: `may_write: []` beside the note — an empty may-write set for a cartridge that
+  demonstrably writes `$80/$81/$82`, empty only because the flat fold decodes almost nothing. That is the
+  same "saved by luck" shape SD-7 condemned in `Prove`, so it is now a real decline naming the mapper and
+  the bank count. `BeamIntervals` and `Lint` keep their existing declines rather than presenting
+  bank-0-only windows as the cartridge's.
+
+  **`srcmap` was WRONG on banked images, not merely absent, and the doc now says what the code does.** DASM's
+  listing address column is the PHYSICAL ROM OFFSET, not the RORG'd address (`litmus_bank`'s listing:
+  `0f00 ad f9 ff lda $FFF9` for bank 0, `1f03 a9 b1 lda #$B1` for bank 1), and `Parse` drops every row below
+  `$1000` — so bank 0's lines are dropped ENTIRELY and banks 1..n's offsets are stored as if they were CPU
+  addresses. Consequence, measured end to end: banked `start_loc` comes back `"Vis+0"` with no `(file:line)`
+  while flat `cb_clean` gives `"Main+8 (cb_clean.asm:33)"`, and therefore **`@lines` and `@amax` are INERT on
+  every bank-switched kernel**. Not fixed here (it needs the parser to track each segment's ORG/RORG pair and
+  key on `(offset/4096, offset%4096|base)`); instead it is STATED — new `Report.SourceAnnotations`, and
+  `solver.loc` refuses to attribute a bank-1 site to a bank-0 label, printing `bank 1 $FF03` instead. This is
+  load-bearing for `litmus_bank_f4`: its crossing region is over budget only for want of an `@lines 2` the
+  map cannot read.
+
+  **Golden diff, mandatory.** cyclebound JSON for all 31 `roms/techniques/*.asm`, all 12
+  `roms/litmus/cb_*.asm`, `litmus_bound_proxy` and `litmus_superchip`, before vs after: **44 of 44 FLAT ROMs
+  byte-identical**, and only the 4 bank-switched images changed. Every new JSON field is `omitempty` and
+  every bank flag stays false on a one-unit image; `TestFlatRomIsNotSeeded` now asserts that for
+  `Region.Bank/BankValid/SwitchEdges`, `Step.Bank/BankValid`, `ModelledSwitchEdges`, `SwitchWidenedSites` and
+  `SourceAnnotations`. `litmus_bound_proxy` still proves 1015 (the SD-9 lock); `litmus_superchip` is still
+  declined.
+
+  **What is NOT done, with the reason.**
+  - `banked_game`'s crossing region is still unbounded — but the refusal MOVED from "region can switch banks"
+    to "loop bound unknown", with a conditional obligation naming *the loop at bank 1 `$F00A`*. Its bank-1
+    level loader counts with `iny`/`cpy #8`/`bne`, a third trip-count idiom `determineBound` does not model.
+    Adding it is a new capability that could change flat-ROM output, so it was deliberately not done under a
+    change gated on a byte-identical flat golden diff. The plan predicted this region would come back bounded
+    and within budget; it does not, and the crossing itself IS followed (`switch_edges: 2`).
+  - `banked_game`'s other unbounded region (`KRow+0`, "WSYNC inside loop body") is untouched, as required.
+  - `BeamIntervals`, `Lint` and `StaticBranches` are converted to the site key but still analyse a FLAT fold,
+    so they decline (or, for `StaticBranches`, flag `banked=true`) rather than answering per bank.
+  - `foldLoops` still refuses a region with more than one back edge. Measured non-issue on this corpus (every
+    trampoline body is straight-line), but a real cross-bank kernel with a loop in each bank will hit it.
+  - `@lines`/`@amax` stay inert on banked images until `srcmap` tracks ORG/RORG (above).
 - **SD-10 — measured whether the flat key can hold two banks. It cannot.** Stage 1 kept a bare `uint16`
   code key workable by giving each bank its OWN decode map and never merging them. Cross-bank region analysis
   has to merge, so "can one flat map hold two banks?" decides whether a composite `(bank, addr)` key is

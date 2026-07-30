@@ -78,3 +78,83 @@ func TestLoopBoundIsNotAnAddressProxy(t *testing.T) {
 	}
 	t.Logf("proven %d cycles, machine measured %d (roll_free=%v)", worst, measured, rep.RollFree)
 }
+
+// The cross-bank sibling. Merging two banks' instructions into ONE node set is
+// precisely the condition that breaks any heuristic keyed on address order, so the
+// predecessor-based bound has to keep working when the counter's initialiser and the
+// loop it feeds are in DIFFERENT banks.
+//
+// litmus_bank_bound plants that: `ldx #5` in bank 0 at $FF02's predecessor, the
+// `dex`/`bne` loop at bank 1 $FF05, and no other initialiser anywhere. The header's
+// only non-back-edge predecessor is reachable ONLY across the switch, so:
+//
+//   - an intra-bank-only predecessor scan finds nothing but the back edge, leaves the
+//     predecessor set incomplete, and either under-approximates the entry value or
+//     returns 0 and loses the bound;
+//   - an address-order filter applied across banks compares bank 0's $FF02 with bank
+//     1's $FF05 as if they were one program.
+//
+// Both regressions are caught here: the region must be BOUNDED, and proven must be at
+// least measured. This kernel is deterministic, so the two must agree exactly.
+func TestCrossBankLoopBoundComesFromThePredecessorsState(t *testing.T) {
+	const asm = "../../roms/litmus/litmus_bank_bound.asm"
+	rep := mustProve(t, asm, 76)
+	if rep.Banks != 2 {
+		t.Fatalf("premise broken: want a 2-bank cartridge, got banks=%d", rep.Banks)
+	}
+	if rep.UnmodelledSwitches != 0 {
+		t.Fatalf("its switches are the modelled shape; %d were refused: %+v",
+			rep.UnmodelledSwitches, rep.Unbounded)
+	}
+
+	bin := build.BinPathFor(asm)
+	e, err := emu.New("NTSC")
+	if err != nil {
+		t.Skip("emulator unavailable")
+	}
+	if err := e.LoadROM(bin); err != nil {
+		t.Fatal(err)
+	}
+	rows, _, err := e.ProfileLineWorst(6, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	measured := map[site]int{}
+	for _, r := range rows {
+		measured[site{r.Bank, r.StrobePC}] = r.WorstCycles
+	}
+
+	// The crossing region is the one carrying cross-bank edges.
+	var crossing *Region
+	for i, r := range rep.Lines {
+		if r.SwitchEdges > 0 {
+			crossing = &rep.Lines[i]
+		}
+	}
+	if crossing == nil {
+		t.Fatal("no visible region recorded a cross-bank edge, so the loop's bank boundary is not " +
+			"being crossed and this ROM is no longer testing what it was built for")
+	}
+	m, ok := measured[site{crossing.Bank, crossing.Start}]
+	if !ok {
+		t.Fatalf("the machine never executed the crossing region at bank %d $%04X",
+			crossing.Bank, crossing.Start)
+	}
+	if !crossing.Bounded {
+		t.Fatalf("the crossing region is UNBOUNDED (%s) while the machine bounds it at %dcy — the "+
+			"loop's only initialiser is in the other bank, so a predecessor scan that does not cross "+
+			"banks loses it", crossing.Reason, m)
+	}
+	if crossing.Worst < m {
+		t.Fatalf("PROVEN %dcy is BELOW the measured %dcy at bank %d $%04X — an incomplete predecessor "+
+			"set under-approximates the counter's entry value, hence the trip count, hence the worst "+
+			"case. That is the one direction this package forbids.",
+			crossing.Worst, m, crossing.Bank, crossing.Start)
+	}
+	if crossing.Worst != m {
+		t.Errorf("proven %dcy vs measured %dcy at bank %d $%04X — this kernel is deterministic, so a "+
+			"gap means the path costed is not the path run", crossing.Worst, m, crossing.Bank, crossing.Start)
+	}
+	t.Logf("crossing region bank %d $%04X: proven %dcy, machine measured %dcy, %d cross-bank edge(s)",
+		crossing.Bank, crossing.Start, crossing.Worst, m, crossing.SwitchEdges)
+}

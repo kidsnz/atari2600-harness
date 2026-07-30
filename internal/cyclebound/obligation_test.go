@@ -66,16 +66,16 @@ func worstAtTrip(asmPath string, regionStart uint16, n int) (int, bool) {
 	if err != nil {
 		return 0, false
 	}
-	states, converged := computeStates(instrs, entries, p.byteAt)
+	states, converged := computeStates(instrs, entries, p.byteAtBank, switchModel{}, nil)
 	if !converged {
 		return 0, false
 	}
-	start, ok := instrs[regionStart]
+	start, ok := instrs[site{0, regionStart}]
 	if !ok {
 		return 0, false
 	}
 	s := &solver{
-		nodes: map[uint16]Instr{}, sinks: map[uint16]bool{}, folds: map[uint16]loopInfo{},
+		nodes: map[site]Instr{}, sinks: map[site]bool{}, folds: map[site]loopInfo{},
 		memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states, sm: sm,
 	}
 	if msg := s.collectRegion(instrs, start); msg != "" {
@@ -85,10 +85,10 @@ func worstAtTrip(asmPath string, regionStart uint16, n int) (int, bool) {
 		return 0, false // this region's loop was bounded, or it failed for another reason
 	}
 	pl := s.pending
-	s.folds = map[uint16]loopInfo{pl.header: {cost: pl.costAt(n), minCost: pl.costAt(1), exit: pl.exit, n: n}}
+	s.folds = map[site]loopInfo{pl.header: {cost: pl.costAt(n), minCost: pl.costAt(1), exit: pl.exit, n: n}}
 	s.memo = map[lkey]result{}
 	s.state = map[lkey]int{}
-	r := s.longest(start.next(), 0)
+	r := s.longest(start.nextSite(), ctx{})
 	if s.cyclic || s.unbounded {
 		return 0, false
 	}

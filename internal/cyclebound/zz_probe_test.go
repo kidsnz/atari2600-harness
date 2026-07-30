@@ -33,15 +33,15 @@ func (p *prog2) dec(addr uint16) (Instr, bool) {
 	return in, true
 }
 
-func (p *prog2) walk(m map[uint16]Instr, entry uint16) {
-	work := []uint16{entry}
+func (p *prog2) walk(m map[site]Instr, entry uint16) {
+	work := []site{{0, entry}}
 	for len(work) > 0 {
 		a := work[len(work)-1]
 		work = work[:len(work)-1]
 		if _, seen := m[a]; seen {
 			continue
 		}
-		in, _ := p.dec(a)
+		in, _ := p.dec(a.addr)
 		m[a] = in
 		work = append(work, decodeSuccessors(in)...)
 	}
@@ -63,7 +63,7 @@ func TestZZProbe(t *testing.T) {
 		}
 		// current behaviour
 		p := &program{rom: rom, base: uint16(0x10000 - len(rom))}
-		cur := map[uint16]Instr{}
+		cur := map[site]Instr{}
 		var vecs []uint16
 		for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
 			lo, _ := p.byteAt(va)
@@ -76,7 +76,7 @@ func TestZZProbe(t *testing.T) {
 		}
 		// proposed naive-mask behaviour
 		q := &prog2{rom: rom, mask: uint16(len(rom) - 1)}
-		fix := map[uint16]Instr{}
+		fix := map[site]Instr{}
 		for _, va := range []uint16{0xFFFC, 0xFFFA, 0xFFFE} {
 			lo, _ := q.at(va)
 			hi, _ := q.at(va + 1)
@@ -84,7 +84,7 @@ func TestZZProbe(t *testing.T) {
 		}
 		outside := 0
 		for a := range fix {
-			if a < 0x1000 || (a&0x1000) == 0 {
+			if a.addr < 0x1000 || (a.addr&0x1000) == 0 {
 				outside++
 			}
 		}

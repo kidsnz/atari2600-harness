@@ -79,6 +79,20 @@ func main() {
 		for _, u := range rep.UnresolvedHotspots {
 			fmt.Fprintf(os.Stderr, "   unresolved hotspot: %s\n", u)
 		}
+		// The modelled-edge count prints beside the refusal count so "0 refused" cannot be
+		// read as "the crossing was checked": a cartridge that crossed nothing reports 0 too.
+		fmt.Fprintf(os.Stderr, "   cross-bank flow: %d modelled edge(s), %d region(s) refused for a switch "+
+			"this analysis does not model\n", rep.ModelledSwitchEdges, rep.UnmodelledSwitches)
+		if rep.SwitchWidenedSites > 0 {
+			fmt.Fprintf(os.Stderr, "   %d site(s) forced to an unknown value state as a possible landing of "+
+				"an unmodelled switch\n", rep.SwitchWidenedSites)
+			for _, w := range rep.SwitchWidenReasons {
+				fmt.Fprintf(os.Stderr, "     because: %s\n", w)
+			}
+		}
+		if rep.SourceAnnotations != "" {
+			fmt.Fprintf(os.Stderr, "   source annotations %s\n", rep.SourceAnnotations)
+		}
 		if rep.UnresolvableSwitchAccesses > 0 {
 			// State the count and what it does NOT tell you. Claiming "the regions
 			// holding them are refused" asserts a coupling this line does not check,

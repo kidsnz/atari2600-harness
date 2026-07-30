@@ -1,0 +1,27 @@
+{
+  "rom": "roms/litmus/litmus_bank_shared_addr.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {
+      "at_frame": 2,
+      "field": "ram.0x8d",
+      "op": "==",
+      "value": 177
+    },
+    {
+      "at_frame": 2,
+      "field": "ram.0x8c",
+      "op": ">=",
+      "value": 4
+    },
+    {
+      "at_frame": 2,
+      "field": "bank.number",
+      "op": "==",
+      "value": 0
+    }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262
+  }
+}

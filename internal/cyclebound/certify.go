@@ -15,7 +15,7 @@ import (
 
 // ProverVersion identifies the proof method; bump on any change to the prover's
 // soundness-relevant logic so a certificate is tied to a specific prover.
-const ProverVersion = "cyclebound/2 (VV-2 abstract-interp WCET + @lines)"
+const ProverVersion = "cyclebound/3 (VV-2 abstract-interp WCET + @lines + cross-bank flow)"
 
 // LineDecl is a `@lines N` declaration the certificate relies on.
 type LineDecl struct {

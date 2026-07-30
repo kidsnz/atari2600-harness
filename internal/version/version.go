@@ -8,4 +8,4 @@ package version
 
 // Harness is the current harness version (SemVer). Bump it in the same commit as
 // the CHANGELOG entry and the git tag.
-const Harness = "1.114.0"
+const Harness = "1.117.0"

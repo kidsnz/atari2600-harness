@@ -2,7 +2,6 @@ package cyclebound
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
 	"github.com/kidsnz/atari2600-harness/internal/beamtrace"
@@ -142,17 +141,18 @@ func (e elapsed) plus(lo, hi int) elapsed {
 // instruction, forward from the WSYNC. It walks the SAME subgraph the prover
 // analyses (collectRegion + foldLoops), so a region the prover calls unbounded
 // is unbounded here too, for the same stated reason.
-func beamRegion(instrs map[uint16]Instr, start Instr, states map[uint16]State, sm *srcmap.Map) BeamRegion {
+func beamRegion(instrs map[site]Instr, start Instr, states map[site]State, sm *srcmap.Map, sw switchModel) BeamRegion {
 	br := BeamRegion{Start: hexAddr(start.Addr), Kind: "visible", Bounded: true}
 	if sm != nil {
 		br.StartLoc = sm.Locate(start.Addr)
 	}
-	if st, ok := states[start.Addr]; ok && st.displayOff() {
+	if st, ok := states[start.site()]; ok && st.displayOff() {
 		br.Kind = "blank"
 	}
 	s := &solver{
-		nodes: map[uint16]Instr{}, sinks: map[uint16]bool{}, folds: map[uint16]loopInfo{},
+		nodes: map[site]Instr{}, sinks: map[site]bool{}, folds: map[site]loopInfo{},
 		memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states, sm: sm,
+		sw: sw, banked: sw.banked,
 	}
 	fail := func(reason string) BeamRegion { br.Bounded, br.Reason = false, reason; return br }
 	if msg := s.collectRegion(instrs, start); msg != "" {
@@ -169,9 +169,9 @@ func beamRegion(instrs map[uint16]Instr, start Instr, states map[uint16]State, s
 	// folding means an instruction's elapsed time is not bounded, and the region
 	// is reported as such rather than given a number from the paths that happen
 	// to terminate.
-	before := map[uint16]elapsed{start.next(): {min: 0, max: 0, set: true}}
-	after := map[uint16]elapsed{}
-	order, cyclic := topoOrder(s, start.next())
+	before := map[site]elapsed{start.nextSite(): {min: 0, max: 0, set: true}}
+	after := map[site]elapsed{}
+	order, cyclic := topoOrder(s, start.nextSite())
 	if cyclic {
 		return fail("unbounded loop in region (no counted-loop bound found)")
 	}
@@ -193,7 +193,7 @@ func beamRegion(instrs map[uint16]Instr, start Instr, states map[uint16]State, s
 		if s.sinks[a] {
 			continue
 		}
-		for _, nx := range beamSuccessors(in) {
+		for _, nx := range beamSuccessors(in, states[a], sw) {
 			if _, known := s.nodes[nx]; !known {
 				continue
 			}
@@ -201,7 +201,7 @@ func beamRegion(instrs map[uint16]Instr, start Instr, states map[uint16]State, s
 		}
 	}
 
-	for _, a := range sortedKeysU16(after) {
+	for _, a := range sortedSites(after) {
 		in := s.nodes[a]
 		if _, folded := s.folds[a]; folded {
 			continue
@@ -224,7 +224,7 @@ func beamRegion(instrs map[uint16]Instr, start Instr, states map[uint16]State, s
 		e := after[a]
 		minAbs, maxAbs := 3*e.min, 3*e.max
 		w := BeamWrite{
-			PC: hexAddr(a), Reg: reg,
+			PC: hexAddr(a.addr), Reg: reg,
 			MinCyc: e.min, MaxCyc: e.max,
 			MinAbs: minAbs, MaxAbs: maxAbs,
 			MinClock: clockAt(e.min), MaxClock: clockAt(e.max),
@@ -232,7 +232,7 @@ func beamRegion(instrs map[uint16]Instr, start Instr, states map[uint16]State, s
 			CrossesLine: (minAbs+68)/228 != (maxAbs+68)/228,
 		}
 		if sm != nil {
-			w.Loc = sm.Locate(a)
+			w.Loc = sm.Locate(a.addr)
 		}
 		if !w.Exact {
 			br.PathVaries++
@@ -263,35 +263,42 @@ func instrCost(in Instr, st State) (lo, hi int) {
 	return lo, hi
 }
 
-func beamSuccessors(in Instr) []uint16 {
+// A missing edge here does not produce a wrong number, it produces a MISSING ROW: the
+// landing site never enters `before`, so every TIA write past the switch silently
+// vanishes from the report — an incomplete table that looks complete.
+func beamSuccessors(in Instr, st State, sw switchModel) []site {
 	switch in.Def.Operator {
 	case instructions.JSR:
-		return []uint16{in.Operand}
+		return []site{{in.Bank, in.Operand}}
 	case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
 		return nil
 	case instructions.JMP:
 		if in.Def.AddressingMode == instructions.Indirect {
 			return nil
 		}
-		return []uint16{in.Operand}
+		return []site{{in.Bank, in.Operand}}
 	}
 	if in.Def.IsBranch() {
-		return []uint16{in.next(), in.branchTarget()}
+		return []site{in.nextSite(), in.branchSite()}
 	}
-	return []uint16{in.next()}
+	succ, refusal := successors(in, st, sw)
+	if refusal != "" {
+		return nil
+	}
+	return succ
 }
 
 // topoOrder returns a topological order of the folded subgraph, or cyclic=true
 // if a back edge survived. Folded loop headers are single nodes.
-func topoOrder(s *solver, entry uint16) (order []uint16, cyclic bool) {
+func topoOrder(s *solver, entry site) (order []site, cyclic bool) {
 	const (
 		white = 0
 		gray  = 1
 		black = 2
 	)
-	color := map[uint16]int{}
-	var visit func(uint16)
-	visit = func(a uint16) {
+	color := map[site]int{}
+	var visit func(site)
+	visit = func(a site) {
 		if cyclic {
 			return
 		}
@@ -308,7 +315,7 @@ func topoOrder(s *solver, entry uint16) (order []uint16, cyclic bool) {
 				visit(lf.exit)
 			}
 		} else if in, ok := s.nodes[a]; ok && !s.sinks[a] {
-			for _, nx := range beamSuccessors(in) {
+			for _, nx := range beamSuccessors(in, s.absStates[a], s.sw) {
 				if _, known := s.nodes[nx]; known {
 					visit(nx)
 				}
@@ -350,12 +357,12 @@ func tiaTarget(in Instr, st State) (string, bool) {
 	return fmt.Sprintf("$%02X", a), true
 }
 
-func sortedKeysU16(m map[uint16]elapsed) []uint16 {
-	out := make([]uint16, 0, len(m))
+func sortedSites(m map[site]elapsed) []site {
+	out := make([]site, 0, len(m))
 	for k := range m {
 		out = append(out, k)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	sortSites(out)
 	return out
 }
 
@@ -369,18 +376,24 @@ func BeamIntervals(asmPath string) (*BeamReport, error) {
 	if p.declined != "" {
 		return &BeamReport{Asm: baseName(asmPath), BankedDeclined: p.declined}, nil
 	}
-	states, converged := computeStates(instrs, entries, p.byteAt)
+	// The decline above is the whole banked story here: beam windows are still computed
+	// from a flat-address decode of ONE 4K fold, so a bank-switched cartridge is refused
+	// rather than reported on. Lifting this onto the merged per-bank decode the prover
+	// now uses is a separate step; presenting bank-0-only windows as the cartridge's
+	// would be the "confidently wrong beam clock" this field exists to prevent.
+	sw := switchModel{}
+	states, converged := computeStates(instrs, entries, p.byteAtBank, sw, nil)
 	rep := &BeamReport{Asm: baseName(asmPath), Converged: converged}
 
-	var starts []uint16
+	var starts []site
 	for a, in := range instrs {
 		if in.isWSYNC() {
 			starts = append(starts, a)
 		}
 	}
-	sort.Slice(starts, func(i, j int) bool { return starts[i] < starts[j] })
+	sortSites(starts)
 	for _, sa := range starts {
-		br := beamRegion(instrs, instrs[sa], states, sm)
+		br := beamRegion(instrs, instrs[sa], states, sm, sw)
 		if br.Bounded {
 			rep.Bounded++
 		} else {

@@ -6,16 +6,20 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/build"
 )
 
-// Everything in this package keys code on a bare uint16. Stage 1 kept that
-// workable by giving each bank its OWN decode map and never merging them, and
-// cross-bank region analysis will have to merge — so the question "can one flat
-// map hold two banks?" decides whether a composite (bank, addr) key is optional
-// or mandatory. It is answerable by measurement rather than argument.
+// This is the measurement that JUSTIFIES the (bank, address) code key, and it is kept
+// so the justification stays a measurement rather than becoming a belief.
 //
-// Measured here, and the answer is not marginal: on the four-and-eight-bank ROMs
-// almost every decoded address is claimed by more than one bank, because each bank
-// is a 4K image occupying the same $F000-$FFFF window. A merged flat map would
-// silently keep whichever bank happened to be inserted last.
+// Cross-bank region analysis has to MERGE the per-bank decodes into one node set, so
+// "can one flat map hold two banks?" decided whether a composite key was optional or
+// mandatory. The answer is not marginal: on the four- and eight-bank ROMs almost every
+// decoded address is claimed by more than one bank, because each bank is a 4K image
+// occupying the same $F000-$FFFF window. A merged flat map keeps whichever bank was
+// inserted last — and the region set, the abstract states and the source locations all
+// sit on that map.
+//
+// If a corpus ever stops overlapping, it is this premise that broke rather than the
+// code; litmus_bank_shared_addr exists so the EXECUTED overlap is covered too, which
+// address overlap in the decode (an over-approximation) does not establish.
 func TestBanksShareDecodedAddresses(t *testing.T) {
 	cases := []struct {
 		asm      string

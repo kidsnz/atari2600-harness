@@ -244,11 +244,17 @@ type DefUseReport struct {
 	// planted case in litmus_uninit_read.asm still fires.
 	UninitReads []UninitRead `json:"uninit_reads,omitempty"`
 
-	// FlatBankOnly is set when the image is larger than the 4K the console can
-	// address at once. Every analysis here keys on a flat address, so on a
-	// bank-switched image it would be describing a program that does not exist —
-	// findings are withheld and this says why, rather than a plausible-looking
-	// answer being returned.
+	// FlatBankOnly is set when the cartridge switches banks. The def-use report is a
+	// WHOLE-CARTRIDGE claim keyed on a flat data address and reported per flat PC, and
+	// nothing here has been lifted onto the per-bank decode the prover uses — so the
+	// analysis is DECLINED outright and this says why.
+	//
+	// It used to suppress only the uninitialised-read pass while MayWrite, Writes and
+	// Regions were still computed from the flat 8K fold. Measured on litmus_bank, that
+	// produced `may_write: []` beside this note: an empty may-write set for a cartridge
+	// that demonstrably writes $80/$81/$82, empty only because the flat fold decodes
+	// almost nothing. That is precisely the "saved by luck" shape SD-7 found in Prove,
+	// and an empty set presented as an answer is worse than a refusal.
 	FlatBankOnly string `json:"flat_bank_only,omitempty"`
 
 	Regions []RegionDefUse `json:"regions,omitempty"`
@@ -288,10 +294,10 @@ func hexAddrs(in []uint16) []string {
 // instruction addresses reachable before the next WSYNC. The traversal follows
 // both branch edges, so what comes back is every instruction ANY path through
 // the region can execute — which is what a may-analysis needs.
-func regionInstrs(instrs map[uint16]Instr, start uint16) []uint16 {
-	seen := map[uint16]bool{start: true}
-	work := []uint16{start}
-	var out []uint16
+func regionInstrs(instrs map[site]Instr, start site, states map[site]State, sw switchModel) []site {
+	seen := map[site]bool{start: true}
+	work := []site{start}
+	var out []site
 	for len(work) > 0 {
 		a := work[len(work)-1]
 		work = work[:len(work)-1]
@@ -303,14 +309,18 @@ func regionInstrs(instrs map[uint16]Instr, start uint16) []uint16 {
 		if a != start && in.isWSYNC() {
 			continue // the next region begins here
 		}
-		for _, s := range decodeSuccessors(in) {
+		succ, refusal := successors(in, states[a], sw)
+		if refusal != "" {
+			continue
+		}
+		for _, s := range succ {
 			if !seen[s] {
 				seen[s] = true
 				work = append(work, s)
 			}
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	sortSites(out)
 	return out
 }
 
@@ -331,15 +341,15 @@ func regionInstrs(instrs map[uint16]Instr, start uint16) []uint16 {
 // Getting this backwards would claim a byte is initialised that the machine
 // never touched, which is the one direction a must-analysis may not be wrong in.
 type sweepInfo struct {
-	exit  uint16   // the loop's fall-through successor
-	addrs []uint16 // everything the loop has definitely written once it gets there
+	exit  site     // the loop's fall-through successor (a CODE site)
+	addrs []uint16 // everything the loop has definitely written once it gets there (DATA addresses)
 }
 
 // findSweeps locates counted sweep loops keyed by their latch (back-branch)
 // address. Anything it cannot fully account for is simply not reported, so a
 // missed sweep costs precision and never correctness.
-func findSweeps(instrs map[uint16]Instr, states map[uint16]State) map[uint16]sweepInfo {
-	out := map[uint16]sweepInfo{}
+func findSweeps(instrs map[site]Instr, states map[site]State, sw switchModel) map[site]sweepInfo {
+	out := map[site]sweepInfo{}
 	for la, latch := range instrs {
 		if !latch.Def.IsBranch() {
 			continue
@@ -348,8 +358,8 @@ func findSweeps(instrs map[uint16]Instr, states map[uint16]State) map[uint16]swe
 		if op != instructions.BNE && op != instructions.BPL {
 			continue
 		}
-		header := latch.branchTarget()
-		if header > la {
+		header := latch.branchSite()
+		if header.addr > la.addr {
 			continue // forward branch, not a loop latch
 		}
 		// Walk the body as a straight chain, noting which index register is
@@ -364,7 +374,7 @@ func findSweeps(instrs map[uint16]Instr, states map[uint16]State) map[uint16]swe
 				ok = false
 				break
 			}
-			if in.Addr == la {
+			if in.site() == la {
 				break
 			}
 			if in.Def.IsBranch() || in.isWSYNC() {
@@ -382,8 +392,8 @@ func findSweeps(instrs map[uint16]Instr, states map[uint16]State) map[uint16]swe
 					stores = append(stores, in)
 				}
 			}
-			a = in.next()
-			if a > la {
+			a = in.nextSite()
+			if a.bank != la.bank || a.addr > la.addr {
 				ok = false
 				break
 			}
@@ -391,7 +401,7 @@ func findSweeps(instrs map[uint16]Instr, states map[uint16]State) map[uint16]swe
 		if !ok || len(stores) == 0 || (!decX && !decY) || (decX && decY) {
 			continue
 		}
-		n := determineBound(instrs, header, latch, states, 0)
+		n := determineBound(instrs, header, latch, states, sw, 0)
 		if n <= 0 || n > 255 {
 			continue
 		}
@@ -425,7 +435,7 @@ func findSweeps(instrs map[uint16]Instr, states map[uint16]State) map[uint16]swe
 			continue
 		}
 		sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
-		out[la] = sweepInfo{exit: latch.next(), addrs: addrs}
+		out[la] = sweepInfo{exit: latch.nextSite(), addrs: addrs}
 	}
 	return out
 }
@@ -437,14 +447,20 @@ func findSweeps(instrs map[uint16]Instr, states map[uint16]State) map[uint16]swe
 //
 // A read of an address absent from that set is a read the region does not
 // guarantee to have initialised.
-func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []uint16, start uint16, stopAtWSYNC bool, sweeps map[uint16]sweepInfo) map[uint16]map[uint16]bool {
-	inRegion := map[uint16]bool{}
+// The OUTER key is a CODE site and the INNER set is flat DATA addresses. That
+// asymmetry is the whole distinction this change rests on: code identity needs the
+// bank because two banks hold different instructions at one address, while RAM,
+// TIA/RIOT and the page-1 stack mirrors are not banked at all, so a bank in a data key
+// would split one physical cell into N.
+func mustWrittenAt(instrs map[site]Instr, states map[site]State, region []site, start site,
+	stopAtWSYNC bool, sweeps map[site]sweepInfo, sw switchModel) map[site]map[uint16]bool {
+	inRegion := map[site]bool{}
 	for _, a := range region {
 		inRegion[a] = true
 	}
 	// nil means "not yet reached" (top of the must-lattice); an empty map means
 	// "reached, nothing guaranteed".
-	before := map[uint16]map[uint16]bool{start: {}}
+	before := map[site]map[uint16]bool{start: {}}
 
 	for changed, guard := true, 0; changed && guard < 100000; guard++ {
 		changed = false
@@ -465,7 +481,11 @@ func mustWrittenAt(instrs map[uint16]Instr, states map[uint16]State, region []ui
 			if stopAtWSYNC && in.isWSYNC() && a != start {
 				continue
 			}
-			for _, s := range decodeSuccessors(in) {
+			succ, refusal := successors(in, states[a], sw)
+			if refusal != "" {
+				continue
+			}
+			for _, s := range succ {
 				if !inRegion[s] {
 					continue
 				}
@@ -512,7 +532,12 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	states, converged := computeStates(instrs, entries, p.byteAt)
+	if p.declined != "" {
+		// A real refusal, not a note beside a computed-anyway answer. See FlatBankOnly.
+		return &DefUseReport{Asm: baseName(asmPath), FlatBankOnly: p.declined}, nil
+	}
+	sw := switchModel{} // a flat image has no banks and no hotspots
+	states, converged := computeStates(instrs, entries, p.byteAtBank, sw, nil)
 	rep := &DefUseReport{Asm: baseName(asmPath), Converged: converged}
 
 	mayW := map[uint16]bool{}
@@ -523,9 +548,9 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 		if !ok || (acc.Kind != AccessWrite && acc.Kind != AccessModify) {
 			continue
 		}
-		rep.Writes[hexAddr(a)] = acc
+		rep.Writes[hexAddr(a.addr)] = acc
 		if acc.Unbounded {
-			unbounded[a] = true
+			unbounded[a.addr] = true
 			continue
 		}
 		for _, t := range acc.Addrs {
@@ -537,18 +562,14 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 
 	// Whole-program must-write from the reset vector. Computed but not reported —
 	// see UninitReads for the measured reason.
-	if p.banked {
-		rep.FlatBankOnly = fmt.Sprintf("image is %d bytes; the console addresses 4K at a time, so this "+
-			"cartridge switches banks and a flat-address analysis does not describe it", len(p.rom))
-	}
-	sweeps := findSweeps(instrs, states)
-	if len(entries) > 0 && !p.banked {
-		all := make([]uint16, 0, len(instrs))
+	sweeps := findSweeps(instrs, states, sw)
+	if len(entries) > 0 {
+		all := make([]site, 0, len(instrs))
 		for a := range instrs {
 			all = append(all, a)
 		}
-		sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
-		must := mustWrittenAt(instrs, states, all, entries[0], false, sweeps)
+		sortSites(all)
+		must := mustWrittenAt(instrs, states, all, entries[0], false, sweeps, sw)
 		for _, a := range all {
 			acc, ok := accessOf(instrs[a], states[a])
 			if !ok || acc.Unbounded || (acc.Kind != AccessRead && acc.Kind != AccessModify) {
@@ -565,29 +586,29 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 				if m[t] {
 					continue
 				}
-				u := UninitRead{PC: hexAddr(a), Addr: hexAddr(t)}
+				u := UninitRead{PC: hexAddr(a.addr), Addr: hexAddr(t)}
 				if sm != nil {
-					u.Loc = sm.Locate(a)
+					u.Loc = sm.Locate(a.addr)
 				}
 				rep.UninitReads = append(rep.UninitReads, u)
 			}
 		}
 	}
 
-	var starts []uint16
+	var starts []site
 	for a, in := range instrs {
 		if in.isWSYNC() {
 			starts = append(starts, a)
 		}
 	}
-	sort.Slice(starts, func(i, j int) bool { return starts[i] < starts[j] })
+	sortSites(starts)
 
 	for _, sa := range starts {
-		region := regionInstrs(instrs, sa)
-		must := mustWrittenAt(instrs, states, region, sa, true, sweeps)
-		rd := RegionDefUse{Start: hexAddr(sa), Kind: "region"}
+		region := regionInstrs(instrs, sa, states, sw)
+		must := mustWrittenAt(instrs, states, region, sa, true, sweeps, sw)
+		rd := RegionDefUse{Start: hexAddr(sa.addr), Kind: "region"}
 		if sm != nil {
-			rd.StartLoc = sm.Locate(sa)
+			rd.StartLoc = sm.Locate(sa.addr)
 		}
 		if st, ok := states[sa]; ok && st.displayOff() {
 			rd.Kind = "blank"
@@ -615,17 +636,17 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 				f := get(t)
 				switch acc.Kind {
 				case AccessWrite:
-					f.Writers = append(f.Writers, hexAddr(a))
+					f.Writers = append(f.Writers, hexAddr(a.addr))
 				case AccessRead:
-					f.Readers = append(f.Readers, hexAddr(a))
+					f.Readers = append(f.Readers, hexAddr(a.addr))
 					if m, seen := must[a]; seen && !m[t] {
-						f.ReadBeforeWrite = append(f.ReadBeforeWrite, hexAddr(a))
+						f.ReadBeforeWrite = append(f.ReadBeforeWrite, hexAddr(a.addr))
 					}
 				case AccessModify:
-					f.Writers = append(f.Writers, hexAddr(a))
-					f.Readers = append(f.Readers, hexAddr(a))
+					f.Writers = append(f.Writers, hexAddr(a.addr))
+					f.Readers = append(f.Readers, hexAddr(a.addr))
 					if m, seen := must[a]; seen && !m[t] {
-						f.ReadBeforeWrite = append(f.ReadBeforeWrite, hexAddr(a))
+						f.ReadBeforeWrite = append(f.ReadBeforeWrite, hexAddr(a.addr))
 					}
 				}
 			}
@@ -659,7 +680,7 @@ func sortedAddrs(m map[uint16]bool) []uint16 {
 // the reset/NMI/IRQ vectors, the entry list, and the source map. Factored out of
 // Prove so def-use analyses the same program the prover does — two decoders
 // would eventually disagree, and the disagreement would be invisible.
-func loadProgram(asmPath string) (*program, map[uint16]Instr, []uint16, *srcmap.Map, error) {
+func loadProgram(asmPath string) (*program, map[site]Instr, []site, *srcmap.Map, error) {
 	bin := build.BinPathFor(asmPath)
 	out, lst, sym, err := build.AssembleWithListing(asmPath, bin)
 	if err != nil {
@@ -688,8 +709,14 @@ func baseName(p string) string { return filepath.Base(p) }
 
 // StaticBranches decodes a raw cartridge image from its vectors and returns every
 // branch instruction the control-flow graph reaches, ascending, plus whether the
-// image is bank-switched (in which case a flat decode does not describe it and
-// the set is not a denominator anyone should divide by).
+// image is bank-switched.
+//
+// On a bank-switched image the returned set is the FLAT FOLD — it is whatever the
+// last 4K of the file decodes to, not the cartridge's branches — and banked=true is
+// the caller's warning that the set is not a denominator anyone should divide by. The
+// signature stays []uint16 because its consumer (cmd/cover) divides a flat PC coverage
+// set by it; lifting it onto the per-bank decode means lifting the coverage recorder
+// first.
 //
 // It exists so a coverage report can be divided by the branches a program HAS
 // rather than by the ones a run happened to execute. Dividing by what was
@@ -707,7 +734,7 @@ func StaticBranches(romPath string) (branches []uint16, banked bool, err error) 
 	instrs, _ := p.decodeFromVectors()
 	for a, in := range instrs {
 		if in.Def.IsBranch() {
-			branches = append(branches, a)
+			branches = append(branches, a.addr)
 		}
 	}
 	sort.Slice(branches, func(i, j int) bool { return branches[i] < branches[j] })
