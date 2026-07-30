@@ -14,10 +14,10 @@ Detection column: **static** = a source-text linter can flag it · **runtime** =
 > `LAX #imm`, `NOP $00`/`BIT $00`, variables in the `$F8-$FF` stack-collision zone, missing `CLD`/`CLEAN_START`
 > (which is also the post-reset-undefined row), and **new today**, reads of a write-only TIA register and
 > **`STA` to ROM**. Page-cross `+1` is handled by `cyclebound`'s abstract interpreter rather than here. Still **unimplemented**:
-> F8/F6/F4 random boot bank and bank-move page-cross misalignment. **Read of a write-only cartridge
+> bank-move page-cross misalignment. **F8/F6/F4 random boot bank is now checked at ROM level** (see below). **Read of a write-only cartridge
 > hotspot / SuperChip write port is NOT statically decidable** and its row is re-marked below.
 > The parenthetical below calling `check_traps.py` "the future trap linter" is stale — it exists and runs
-> in CI on every push; what is future is those two rows.
+> in CI on every push; what is future is that one row.
 
 **New static trap (2026-07-30): reading a write-only TIA register.** The TIA answers reads only at
 `$00-$0D` (`CXM0P`..`INPT5`; verified in Gopher2600 `cpubus.go TIAReadRegisters`). Everything from `$0E` (PF1)
@@ -45,6 +45,17 @@ A naive static rule would score **1 false positive and 0 true positives**. The c
 where `emu.MapsCartridgeRAM` answers first; filed, not built. `internal/emu.TestCartridgeRAMIsRareAndNamed`
 guards the premise — it fails if a second ROM starts mapping RAM (the trap becomes reachable and this row
 needs re-deciding) or if `litmus_superchip` stops (cyclebound's SD-8c decline loses its witness).
+
+**Checked at ROM level 2026-07-30: F8/F6/F4 random boot bank.** The console's power-on bank is undefined, so a
+bank-switched cartridge must end up in the same place whichever bank it wakes in. This is decidable from the
+IMAGE (unlike the write-port row above): read each bank's reset vector at `$FFFC` and look for a bank-select
+hotspot in the stub. `internal/emu.TestEveryBankCanBeBootedInto` does it for every multi-bank ROM.
+**The obvious rule is wrong, and measuring caught it before the check shipped.** "Every bank's stub must
+select" flags `litmus_superchip`, which is correct — its bank 1 does `lda $FFF8` and jumps, and bank 0, the
+destination, has no reason to select itself. `banked_game` selects in both banks, which is merely redundant.
+So the rule is **at most ONE bank may omit the select**, and byte-identical banks are exempt outright.
+Measured: 10 multi-bank ROMs, all pass (9 select in every bank, `litmus_superchip` in 1 of 2). Negative
+controls: the too-strict rule fails `litmus_superchip` by name; blinding the hotspot scan fails all 10.
 
 > Provenance: every row cites the mined thread(s) it came from. Raw notes in `reference/atariage/<id>-*/notes.ja.md`.
 
