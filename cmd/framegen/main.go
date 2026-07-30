@@ -1854,11 +1854,24 @@ SetXPos:
 // routine's div-15 loop wraps the position anyway, so a value above 255 is not a
 // larger move, it is a source file that does not assemble.
 func clampInput(v int) int {
-	if v < 0 {
-		return 0
+	// WRAP, do not clamp. The div-15 routine positions modulo the 160-clock line, so
+	// an input below the reachable floor has an equivalent 160 higher — and clamping
+	// to 0 instead does not merely lose precision, it STALLS the calibration at a
+	// wrong position and then reports the residue as a cause "this tool has not
+	// measured".
+	//
+	// Measured cost of getting this wrong: litmus_nusiz_all went from 2 mismatched
+	// cells to 1868 when the clamp was introduced, because P1's target reset X of 4
+	// needs input -3 and the clamp pinned it at 0 (calibration stopped at
+	// "P1 7(want 4,d-3)"). The regression went unseen for the same reason it was
+	// possible: the corpus sweep globs roms/techniques/*.asm and this litmus lives in
+	// roms/litmus/, so the ROM added BECAUSE it lights axes nothing else does was
+	// outside the regression set.
+	for v < 0 {
+		v += 160
 	}
-	if v > 255 {
-		return 255
+	for v > 255 {
+		v -= 160
 	}
 	return v
 }

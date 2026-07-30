@@ -1578,6 +1578,75 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### RL-7c regressed from 2 cells to 1868 and nothing noticed (2026-07-29)
+
+Found by re-measuring the audit's own numbers rather than by anything failing. RL-7c records
+"2666 → 2 cells" on `litmus_nusiz_all` and builds a conclusion on it — that per-line NUSIZ replay works.
+That was true when written. **RL-8a then broke it to 1868 and the sentence stayed.**
+
+| framegen version | mismatched cells |
+|---|---|
+| pre-RL-7c | 2666 |
+| RL-7c | **2** |
+| RL-8a → today | **1868** |
+
+**Cause, measured:** RL-8a added `clampInput` to stop the position calibration walking out of the immediate
+operand's range. But the div-15 routine positions modulo the 160-clock line, so an input below the floor has
+an equivalent 160 higher — and clamping to 0 does not lose precision, it STALLS the calibration at the wrong
+position. P1's target reset X of 4 needs input −3; the clamp pinned it at 0 and calibration stopped at
+`P1 7(want 4,d-3)`. The clone then reported 1074 of P1's own cells as "a cause this tool has not measured".
+Fixed by wrapping instead of clamping: **1868 → 2**, P1 reaching X 4 on the first iteration with input 157.
+
+**Why it was invisible, which is the more important half.** The corpus regression sweep globs
+`roms/techniques/*.asm`. `litmus_nusiz_all` lives in `roms/litmus/`. **The ROM added because "it lights an
+axis nothing else does" was outside the regression set** — and `cmd/framegen` had no test file at all, so CI
+never ran it either. A number in prose, a conclusion on top, and nothing asserting it: the same shape as the
+`38/43` arity figure, in the same document, found the same way.
+
+**Fixed structurally**, not just corrected: `cmd/framegen/regress_test.go` is framegen's first test and pins
+the cell count and frame length for the ROMs that exercise the axes nothing else covers —
+`litmus_nusiz_all` (2), `litmus_objsizes` (2568, partial), `zone_multiplex` (0), `shared_setxpos` (16).
+Negative control: restoring the clamp makes it fail.
+
+Two things worth keeping from writing that test. Its first version expected `litmus_objsizes` to be
+pixel-exact **from assumption**, and the test caught it — measured, M0 and M1 match exactly (728/728,
+720/720) while the ball is not reproduced and the missiles are drawn on more lines than the target draws them
+(clone 1544 vs target 728). And the counts are pinned at their MEASURED values, not at hoped-for ones, so an
+improvement shows up as a failing test to be updated rather than passing silently.
+
+### The verification canon is outgrowing the attention it gets — trigger-bound, not scheduled (2026-07-29)
+
+The single source of truth for verification discipline is memory `feedback-verification-standard`. Its
+delivery is sound: `harness/CLAUDE.md` names it in iron rule 1 and is loaded in full every session,
+`MEMORY.md` lists it first among the four behavioural standards, and 17 other memory files link to it. It
+gets read.
+
+**Its size is the problem.** Measured today: **26.3 KB, 147 lines, 9 sections — and 4 of those sections,
+4321 characters or 35% of the file, were added in this one session.**
+
+**The honest part is what that growth means.** Those four sections are "distrust a refusal", "check the
+instrument twice", "an observable artefact can be correct while its surroundings are broken", and "re-measure
+a number before reporting it". **Every one was written AFTER being caught by it today, not before.** The file
+did not prevent them. So the growth is not evidence the canon is working — it is evidence that a 26 KB
+document is not what stops these mistakes. The tool output that carries its own denominator does
+(§"A RAM gate that compares one byte", §"The technique corpus is playfield-light").
+
+**Why this is filed here and not scheduled.** Reorganising the canon has the exact property this repo keeps
+finding fault with: **its effect cannot be measured.** A shorter file that prevents nothing is worse than a
+long one, and "the mistakes stopped" would be indistinguishable from "no such mistake came up". A scheduled
+tidy-up would also land in the 31%-completion bucket that undated TODOs go to — measured today, this audit's
+own items run at 43 of 53 done (81%) against 5 of 16 (31%) for the STATUS board's TODO list.
+
+**The trigger, so this is not "someday":** act on it the next time a mistake occurs that the canon ALREADY
+warned about. That is the missing evidence — today's four sections are all cases the canon did *not* cover, so
+they say nothing about whether a reader would have found the warning. One case of "it was written down and I
+still walked into it" turns this from a tidiness preference into a measured retrieval failure, and *that* is
+worth restructuring for.
+
+Related, and the same shape one level up: the durable fix for any of these is to move the check into a tool's
+output, where it cannot be forgotten. A ritual or a memory file is the net for what has not been moved yet —
+it should shrink as the tools absorb it, and a growing canon is a signal that absorption is lagging.
+
 ### A frame counter that WRAPS was not recognised as a clock — and it had been carrying 12 "resolved" bytes (2026-07-29)
 
 `ramtrace arity` finds the smallest feature set (self + input + companions) that determines each RAM byte's
