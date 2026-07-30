@@ -1061,7 +1061,38 @@ func decodeSuccessors(in Instr) []site {
 // A non-empty second return means the flow model cannot follow this instruction and
 // the CALLER MUST REFUSE. It must never skip: silently dropping a successor shortens
 // the longest path, which is the one direction this package forbids.
+// invalidStateAsTop counts how often successors was handed a state it could not
+// use. It is deliberately NOT surfaced in Report: adding a field would change every
+// flat ROM's JSON, and the number is a property of a whole sweep rather than of one
+// analysis. It exists so a test can assert the substitution still happens, since
+// nothing in the output distinguishes "the state was known" from "the state was
+// missing and we assumed the worst".
+var invalidStateAsTop int
+
 func successors(in Instr, st State, sw switchModel) ([]site, string) {
+	// A MISSING abstract state is not a state that says "everything is zero", but
+	// that is exactly what it used to mean here. Every call site indexes a map --
+	// `absStates[at]`, `states[a]` -- and a Go map miss yields the zero State, whose
+	// ValueRanges have Top=false, Lo=0, Hi=0: EXACT ZERO. accessOf then reads
+	// st.SP.konst() and st.X/st.Y from it, so a PHA is modelled as writing precisely
+	// $0100 and `lda table,x` as reading precisely `table`, and switchEdges decides
+	// whether the instruction reaches a bank-switch hotspot from that footprint.
+	// A narrower footprint can MISS a hotspot, which drops a cross-bank successor,
+	// which shortens the predecessor set determineBound maximises over -- an
+	// under-approximation, the one direction this package forbids.
+	//
+	// Measured over roms/techniques + roms/litmus (Prove + BeamIntervals + DefUse +
+	// Lint): 1,994,520 calls, 2,572 with no usable state, 212 of those on a
+	// bank-switched cartridge where the state is actually read, 124 of which still
+	// produced a concrete address, and 6 whose footprint genuinely differs from the
+	// sound answer. Six, not zero.
+	//
+	// A flat image is unaffected: switchEdges returns before touching st when the
+	// cartridge has no hotspots, which is why every flat ROM's output is unchanged.
+	if !st.valid {
+		invalidStateAsTop++
+		st = topState()
+	}
 	edges, keep, refusal := sw.switchEdges(in, st)
 	if refusal != "" {
 		return nil, refusal

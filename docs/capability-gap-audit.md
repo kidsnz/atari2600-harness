@@ -1661,10 +1661,32 @@ of its numbers did not survive.**
    analysed as flat.
 
 **Still open from the same review, recorded rather than fixed** (each needs its own measurement):
-the cross-bank edge semantics are taken from `mapper_atari.go` and applied to every mapper; `analysisUnits` can
-return an empty unit list with no decline reason; `determineBound`'s predecessor scan reads
-`absStates[pred].transfer(pred)` where an absent entry is the zero State whose ranges read as exact `[0,0]`
-rather than Top; (the skip finding is closed above).
+the cross-bank edge semantics are taken from `mapper_atari.go` and applied to every mapper (**= Stage 4, still
+open**); `analysisUnits` can return an empty unit list with no decline reason; (the skip finding is closed
+above).
+
+> **★CLOSED 2026-07-30 — the absent abstract state.** The third item read: `determineBound`'s predecessor scan
+> passes `absStates[pred]` where an absent entry is the zero `State`, whose ranges are `Top=false, Lo=0, Hi=0`
+> — **exact zero**, not unknown. It is worse than the entry suggested, because the same shape is at EVERY call
+> site: nine places index `absStates[at]` / `states[a]` and a Go map miss yields that zero state.
+> `accessOf` then reads `st.SP.konst()` and `st.X`/`st.Y` from it, so a `PHA` is modelled as writing precisely
+> `$0100` and `lda table,x` as reading precisely `table`, and `switchEdges` decides from that footprint whether
+> the instruction can reach a bank-switch hotspot. A narrower footprint MISSES a hotspot → drops a cross-bank
+> successor → shortens the predecessor set `determineBound` maximises over → under-approximates the trip count.
+> Forbidden direction.
+>
+> **Measured before fixing** (Prove + BeamIntervals + DefUse + Lint over `roms/techniques` + `roms/litmus`):
+> **1,994,520** `successors` calls · **2,572** with no usable state · **212** of those on a bank-switched
+> cartridge where the state is actually read · **124** still producing a concrete address · **6** whose
+> footprint genuinely differs from the sound answer. Six, not zero.
+>
+> Fixed at the funnel: `successors` substitutes `topState()` for any state that is not `valid`.
+> **No corpus output changes** — 113 flat and 6 banked images byte-identical — so this is a hole closed before
+> it bit, not a wrong number repaired, and that is precisely why it needed its own test.
+> `TestAbsentAbstractStateIsTopNotZero` builds `lda $1F00,X` against a 2-bank hotspot table and pins all three
+> readings: the zero state resolves to **1** address and **0** cross-bank edges, `Top` to **256** addresses and
+> **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
+> everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
 ### The timing linter had ZERO coverage of every bank-switched cartridge (2026-07-30)
 
