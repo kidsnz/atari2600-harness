@@ -1764,6 +1764,40 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### A stuck ROM returns a confident constant, and it fooled three measurements (2026-07-30)
+
+Not a gap that was filed — a gap that bit, three times, in one day, and the third time it bit the
+person writing the warning about it.
+
+Outlaw sits in attract mode after power-on. Held input changes nothing, and every position accessor
+keeps returning a **stable, plausible number**: `y_top` pinned at 101, `x` pinned at 7, for as many
+frames as you care to run. Nothing errors. **That is the shape of the failure — a confident constant —
+and it is the most dangerous shape a wrong measurement can take**, because it survives review: the
+number looks like a measurement, has no error attached, and does not vary.
+
+Three separate measurements of the gunman's movement were taken in this state today. The memory file
+for that ROM already said, in bold, "ALWAYS verify liveness first". It was read, and the trap was
+walked into anyway while acting on it.
+
+`emu.RespondsToInput(player, action, frames)` answers it as a question about BEHAVIOUR, so it needs no
+game-specific knowledge: run N frames with the input held, rewind to the same state, run N frames with
+nothing held, and compare RAM. Identical means the program did not react.
+
+**It is one-sided and says so.** `false` is strong — this input changed nothing. `true` is weak — an
+animating title screen also changes RAM. It is a reason to REFUSE a measurement, never to bless one.
+
+Witnessed on the ROM that caused the problem: before RESET it refuses ("changed no RAM byte at all"),
+and the same test then proves the trap is real rather than asserted by showing `ObjectYExtent` handing
+back an unchanged value across 30 frames of held input. After RESET it reports 3 changed bytes
+(`$A0 $DC $DE`). A second test pins that the check leaves the machine exactly where it found it — a
+helper that silently advances the emulator would be a trap of its own. Negative controls: removing the
+refusal makes attract mode read as live; removing the final restore is caught as "the check advanced
+the emulator it was asked about".
+
+**Still open:** nothing calls this yet. The tools that read positions (`spritey`, `read_motion`,
+`ObjectYExtent`) do not require it, so the trap remains available to the next caller. Wiring it into
+the measurement entry points, and exposing it over MCP, is the follow-up.
+
 ### The shadowed branches, decided: unit-witness the logic, keep the code, record the reachability gap (2026-07-30)
 
 Two refusal branches were shown to be unreachable through any ROM this project can build, because a
