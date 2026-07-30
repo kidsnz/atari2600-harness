@@ -2349,7 +2349,14 @@ func diagnose(cov []elemCoverage, tgt, clone [5]objFacts, blocks []writeBlock, f
 			}
 		}
 		if len(clauses) == 0 {
-			return "Every element is present and every object cell matches; the difference is in BG cells only."
+			// Reached only when nothing differs and nothing is over-drawn — i.e. the
+			// clone matches. Saying "the difference is in BG cells only" there asserts a
+			// difference that does not exist. Measured: no ROM in the 31-ROM corpus
+			// reaches it today, so this is a sentence with no witness rather than a
+			// visible defect; it is corrected instead of left as a trap for the first
+			// target that does reach it.
+			return "Every element matches and nothing is over-drawn; this diagnosis has no difference to " +
+				"explain, so any cell count reported above comes from somewhere this function does not model."
 		}
 	}
 	return "Measured: " + strings.Join(clauses, ". ") + "."

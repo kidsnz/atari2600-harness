@@ -924,6 +924,9 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   quantity had to be a *player* near the right edge (`roms/litmus/litmus_lastline.asm`). Fixed with a `sta
   WSYNC` before the cleanup; after it, line 240 carries no cleanup write and the clears land in the next
   line's HBLANK at clocks −53..−17. `Kern`'s worst drops **97 → 66**, and the region violation disappears.
+  *(Superseded, and left visible rather than rewritten: RL-8a added the missile and ball enables, so today
+  the same region measures **74** of 76 and still certifies. Re-measured 2026-07-30 — the 66 was true when
+  written and no longer is, which is precisely the shape of number this document keeps having to correct.)*
 
   **(b) Every clone ever generated was out of NTSC spec.** Measured across the 31-ROM corpus, the *pre-fix*
   generator emitted **267 scanlines on 30 ROMs and 268 on one — 262 on none of them**. Five to six lines
@@ -1654,6 +1657,28 @@ the cross-bank edge semantics are taken from `mapper_atari.go` and applied to ev
 return an empty unit list with no decline reason; `determineBound`'s predecessor scan reads
 `absStates[pred].transfer(pred)` where an absent entry is the zero State whose ranges read as exact `[0,0]`
 rather than Top; (the skip finding is closed above).
+
+### Three more from the audit re-measurement: an off-by-one in a litmus, a stale figure, a false sentence (2026-07-30)
+
+**1. `litmus_shift_base` and `litmus_shift_down8` ran 261 scanlines, not 262.** Both files' headers state
+`NTSC 3/37/192/30 = 262`. Counted from the source, the visible run is `40 + 24 + 127 = 191`, so the frame is
+**261** — confirmed independently by `cmd/scenario`'s `ntsc_frame_lines` on both ROMs. Fixed at the source
+(`ldx #(128-SHIFT)`), both now 262, and the ±8 shift detection they exist for still passes in all three
+directions.
+
+**Why it survived:** these two were the only litmus ROMs with no scenario file. `lastline`, `nusiz_all` and
+`objsizes` all carry `ntsc_frame_lines` checks; these did not, so nothing ever asked. Both now have one.
+That is the same shape as RL-7d — a ROM outside the regression net — found in the same sweep.
+
+**2. RL-7b's "Kern's worst drops 97 → 66" is stale.** Re-measured: the same region is **74** of 76 today and
+still certifies. 66 was true when written; RL-8a then added the missile and ball enables. The entry is
+annotated in place rather than rewritten, because the drift is the point.
+
+**3. framegen could print a difference that does not exist.** `diagnose` ends with *"Every element is present
+and every object cell matches; the difference is in BG cells only"* on the branch where nothing differs and
+nothing is over-drawn — i.e. where the clone matches. Measured: **no ROM in the 31-ROM corpus reaches it**, so
+it is a sentence with no witness rather than a visible defect. Corrected anyway, because the first target that
+does reach it would be told a difference exists and where it is not.
 
 ### RL-7c regressed from 2 cells to 1868 and nothing noticed (2026-07-29)
 

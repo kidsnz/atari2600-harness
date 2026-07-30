@@ -81,7 +81,10 @@ bar:    sta WSYNC
         sta PF1
         sta PF2
 
-        ldx #(127-SHIFT)
+        ; 128, not 127: the visible run is 40 + 24 + 128 = 192, and at 127 the frame
+        ; came out 261 lines while this file's own header claimed 3/37/192/30 = 262.
+        ; Measured with cmd/scenario's ntsc_frame_lines on both ROMs of the pair.
+        ldx #(128-SHIFT)
 bot:    sta WSYNC
         dex
         bne bot
