@@ -50,7 +50,23 @@ own authoring loop**, not the editor. The G work stands on its own; M references
 
 ## Tier 3 — polish
 - **G5:** mid-line HMOVE / RESP pipeline = *observed* via `trace_clocks`, not litmus-locked.
-- **G6:** oracle sub-frame phase offset for per-frame-mutating RAM.
+- **G6 ✅ MEASURED AND HANDLED (2026-07-30):** oracle sub-frame phase offset for per-frame-mutating RAM.
+  **"Run N frames and dump RAM" does not name a moment, and the oracles pick different ones.** New fixture
+  `roms/litmus/litmus_framephase.asm` bumps a separate counter at three points in one frame — `$80` just after
+  VSYNC, `$81` at the midpoint of the visible field, `$82` as the last instruction before the next VSYNC —
+  so the three values say *where* an oracle read them. **Measured at frames=10: Gopher2600 gives
+  `$80=10 $81=9 $82=9`** (it stops at the program's own frame boundary, just after VSYNC) **and MAME gives
+  `$80=10 $81=10 $82=9`** (its frame notifier fires after the visible midpoint). On a ROM where nothing is
+  wrong they disagree about `$81`, every time — and any game that updates a byte between those two moments
+  produces the same false dissent.
+  `oracle.ClassifyDiff(refN, refNext, other)` bounds the artefact with the reference oracle at N and N+1 and
+  splits the offsets into **real** and **sampling-phase**; both are returned, because a one-off in a counter is
+  also what a genuine engine bug looks like. `cmd/oraclevote` prints both counts.
+  **A second defect fell out of it:** with exactly TWO oracles a disagreement has no strict majority, so `Vote`
+  returned `ok=false` with an **empty** dissenters list — the tool exited 1 while naming neither the oracle nor
+  the offset, and two oracles (Gopher + MAME) is the normal case here. It now reports who differed and where.
+  Litmus: `real []`, `phase [1]` on the fixture; `smoke.bin` unanimous. Negative control: a classifier that
+  excuses any byte the reference moved mis-sorts offset 2 and loses offset 3.
 - **G7 — DONE (v1.116.0) for the collision half.** `watch_ram` traps a RAM change and names the instruction
   that made it; collisions had no equivalent. New `emu.WatchCollision` reports where each CXxx latch was
   FIRST set — beam scanline and clock in `read_row` coordinates, plus the PC executing at that colour clock.
