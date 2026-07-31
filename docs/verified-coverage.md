@@ -40,6 +40,8 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 | HMOVE comb: left 8px blanked on strobe-after-WSYNC lines even with HMxx=0 | `litmus_hmove_side` | `read_row`: strobe lines clock 0–7 black, others not |
 | Late HMOVE: mid-visible (~cyc 39) = no-op; line-end (~cyc 74) = left (HM+8) px, no comb | `litmus_hmove_side` | cumulative P0 drift −9px/strobe measured (emulator-verified; Stella cross-check pending) |
 
+| Horizontal trajectory over frames, a clamp, and a round reset (the "single late read" trap) | `motion_xclamp` | `spritey` multi-frame: X 13→91 by +2, plateau at 91, reset to 11 at frame 121, Y fixed 80–119 |
+
 ## Sprites (player graphics)
 | Behavior | ROM | Evidence |
 |---|---|---|
@@ -56,7 +58,8 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 ## Playfield
 | Behavior | ROM | Evidence |
 |---|---|---|
-| PF bit order (PF0 upper nibble / PF1 MSB-first / PF2 LSB-first) | `litmus_pf` | `read_row` per-column lit positions (2 sources agree) |
+| PF bit order (PF0 upper nibble / PF1 MSB-first / PF2 LSB-first) — **columns 0/4/12 only**, the leftmost bit of each register | `litmus_pf` | `read_row` per-column lit positions (2 sources agree) |
+| PF bit order — **ALL 20 columns**, plus the repeat rule and the half boundary at clock 80 | `litmus_pf_allcols` | 20 bands of 9 lines, band k lighting only column k; `DecomposeRow` shows `4k..4k+3` and `80+4k..80+4k+3`, nothing else |
 | Per-scanline background color | `litmus_color` | `read_row` distinct single color per line |
 | Asymmetric PF via double-write (windows per woodgrain) + per-pixel split on late writes | `litmus_pf_async` | left $AA / right $55 exact clocks; cyc-33 write → 5 old + 3 new bits |
 | CTRLPF: SCORE (left=COLUP0/right=COLUP1), priority D2 (player↔PF), ball width 1/2/4/8 | `litmus_ctrlpf` | per-band `read_row`; SCORE+PFP→COLUPF flagged for Stella |
@@ -68,6 +71,7 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 | Player0–Player1 (CXPPMM) — the pair Frogger uses | `litmus_collide_pp` | `read_collisions.p0_p1 == true` |
 | Missile0–Player0 (CXM0P) | `litmus_collide_mp` | `read_collisions.m0_p0 == true` |
 | **All 15 pairs** at once (overlap P0/P1/M0/M1/BL + PF) | `litmus_collide_all` | every `read_collisions` field true |
+| Latches are **sticky**, **CXCLR** clears them, and **HMCLR does NOT** (it clears the motion registers — a different thing) | `litmus_cxclr` | CXP0FB snapshotted to RAM at 3 points: `$82` collided → `$82` after HMCLR → `$02` after CXCLR |
 
 ## Input
 | Behavior | ROM | Evidence |
