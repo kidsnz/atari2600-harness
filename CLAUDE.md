@@ -127,6 +127,9 @@ math is approximate — never cite it for positions; use our calibrated X(N).
 
 **Collisions (CXxx)** — two latches in each D7/D6, sticky. `BIT CXxx` → `BMI`(D7)/`BVS`(D6).
 **CXCLR** = clear all collisions; **HMCLR** = clear the motion registers (a different thing).
+All four re-measured 2026-07-30 and machine-locked: the D7/D6 map by `TestDecodeCollisions`, and sticky /
+CXCLR-clears / **HMCLR-does-not** by `TestHmclearDoesNotClearCollisions` + `litmus_cxclr` (CXP0FB reads
+`$82` after the collision, `$82` still after HMCLR, `$02` after CXCLR).
 
 **playfield (bit order)** — 40 columns left→right, each 4 color clocks wide. **Two
 sources (ABB/falukropp) agree**, and all **20** column positions are re-measured at the pixel and

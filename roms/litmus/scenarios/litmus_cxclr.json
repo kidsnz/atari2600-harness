@@ -1,0 +1,9 @@
+{
+  "rom": "roms/litmus/litmus_cxclr.asm",
+  "checks": { "ntsc_frame_lines": 262 },
+  "asserts": [
+    {"at_frame": 4, "field": "ram.0x80", "op": "==", "value": 130},
+    {"at_frame": 4, "field": "ram.0x81", "op": "==", "value": 130},
+    {"at_frame": 4, "field": "ram.0x82", "op": "==", "value": 2}
+  ]
+}

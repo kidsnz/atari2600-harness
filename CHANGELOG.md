@@ -104,6 +104,15 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **The collision latches' three unlocked claims are now locked** (`litmus_cxclr` +
+  `TestHmclearDoesNotClearCollisions`). The D7/D6 map had a pure-function test; "sticky", "CXCLR clears"
+  and "**HMCLR does not**" did not — stickiness appeared only in a comment and the HMCLR distinction was
+  checked nowhere, which is the one a reader can actually get wrong, the names differing by two letters
+  while both read as "clear something". Measured: CXP0FB is `$82` after the collision, **`$82` still after
+  HMCLR**, `$02` after CXCLR. Negative control: swapping the two strobes in the ROM fails the test. The
+  fixture also records its own first failure — it lit `PF1` only and positioned P0 with a div-15 loop that
+  was never given a target value, so P0 missed the band and all three snapshots read "no collision"; the
+  playfield is now lit solid so the answer does not depend on positioning at all.
 - **The 6502 page-cross rules are now machine-locked** (`TestPageCrossPenaltyRules`, 11 cases). They were
   cited from 6502.org and never re-measured here, while `cyclebound`'s entire per-scanline proof rests on
   "stores never take the penalty" — and its page-cross costing was where a real under-approximation was
