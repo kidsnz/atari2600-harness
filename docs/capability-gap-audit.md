@@ -806,12 +806,25 @@ missed; `-genpf` gave the exact band positions that corrected a hand-model that 
 → byte-exact PF; matched-state measurement pinned bike top at abs sl176 vs a comment that mis-stated the
 offset by 13 lines. The tools do what they were built for: **numbers close holes the eye cannot.** Ranked:
 
-- **RL-5 — `behavmatch` warmup/frame-offset flag ★ top priority (critical gap).** `behavmatch` drives both
-  ROMs from frame 0, so a game with a **title screen that auto-advances to gameplay** (most commercial ROMs)
-  is measured on its TITLE screen, not gameplay — apples-to-oranges, every scenario reads MECHANIC DIFF
-  (observed live on Pizza Boy: target P0 Y=29-46 = title vs mine=gameplay). `vismatch` has `-target-frames`;
-  `behavmatch` has **no equivalent**. Fix: `-target-warmup N`/`-mine-warmup N` (run N frames, optionally with
-  RESET, before the scenario's scripted input). Size: S. 〔TOOL-EVAL V4 / idea #5〕
+- **RL-5 — `behavmatch` warmup/frame-offset flag — DONE, and this entry was the stale one (2026-07-30).**
+  The original text: `behavmatch` drives both ROMs from frame 0, so a game with a **title screen that
+  auto-advances to gameplay** (most commercial ROMs) is measured on its TITLE screen, not gameplay —
+  apples-to-oranges, every scenario reads MECHANIC DIFF (observed live on Pizza Boy: target P0 Y=29-46 =
+  title vs mine=gameplay). `vismatch` has `-target-frames`; `behavmatch` has "no equivalent".
+  **It has had one.** `-target-warmup N` / `-mine-warmup N` exist in `cmd/behavmatch`, with help text naming
+  the title-screen case. Verified by measurement rather than by reading the flag list, because a flag that
+  exists and does nothing looks identical from the outside: running Outlaw against **itself**, equal warmups
+  report `behaviour matches`; `-target-warmup 60 -mine-warmup 0` reports `behaviour differs` with
+  `P1 Y` and `M1 Y` at `**MECHANIC DIFF** [pos offset -99]`. The flag changes what is measured.
+  〔TOOL-EVAL V4 / idea #5〕
+
+  **Why this one is worth recording.** Every other RL-* item is marked DONE; the single entry that was not
+  is the single one that already was, and it was the one ranked ★ top priority — so it is what any reader
+  picks up first, which is exactly what happened when this was checked. A backlog that says a capability is
+  missing when it exists costs the same as a description that denies a capability the tool has
+  (`analyze_image`, fixed the same day): the reader does not go looking. Spot-checked the other direction
+  too — `-format pf012` (RL-1), `-target-until-gameplay` (RL-4) and `-export-scenarios` (RL-6) are all
+  present, so the DONE marks are not the failing side.
 - **RL-1 — `-genpf` full-width PF output mode — DONE.** `vismatch -genpf -format pf012` measures the
   playfield across the FULL line width and emits `PF0tab/PF1tab/PF2tab` as `ds N,$XX` runs, classifying the
   right half as repeat / reflect / asymmetric from the pixels (an asymmetric target also gets right-half
