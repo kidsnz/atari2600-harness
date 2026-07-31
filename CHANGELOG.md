@@ -112,6 +112,14 @@ versions follow [Semantic Versioning](https://semver.org/).
   docs commit on 2026-07-29 and had been contributing a meaningless green tick since. Deleted; the tree is
   now at 343/343 able to fail. The detector clears delegation (`helper(t, ...)`, `t.Run`) — verified against
   a delegating test that would otherwise have been a false positive.
+- **A temporary ROM patch silently patched the wrong bank of an 8K image.** `assert_line_budget`'s
+  `patch=` resolved an address to a file offset with `base = 0x10000 - len(rom)`, which puts an 8K
+  cartridge's base at **$E000** — an address the 2600 never fetches from — and then resolves every patch
+  into the SECOND bank: `$F123` became file offset `$1123`, inside the file, past the bounds check, with
+  the range in the error text quoted as "$E000-$FFFF". A measurement taken on a ROM patched in the bank
+  that was not running is worse than no measurement, because it is reported as one. Now **declined** with
+  a message that says why, the way `defuse` and `beam_intervals` decline banked images; flat 4K/2K images
+  are unaffected. Patching by bank is filed, not implemented — `PatchSpec` would need to carry one.
 - **`mutate -covered`'s "honest kill rate" mutated the wrong half of a banked ROM.** `CoveredOffsets`
   mapped an executed PC to a file offset with `addr & (len(rom)-1)`, which on an 8K image folds every
   `$Fxxx` into the LAST 4K image whichever bank actually ran. Measured before the fix: on the exerciser

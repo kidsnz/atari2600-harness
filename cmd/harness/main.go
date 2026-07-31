@@ -1005,6 +1005,20 @@ func applyTempPatch(e emuLike, patches []PatchSpec) (restore func(), err error) 
 	if err != nil {
 		return nil, fmt.Errorf("patch: read rom: %w", err)
 	}
+	// A bank-switched image cannot be patched by address. Both banks of an 8K
+	// cartridge decode $F000-$FFFF, so "$F123" names two bytes and nothing here says
+	// which. The old arithmetic — base = 0x10000 - len(rom) — put an 8K image's base
+	// at $E000, an address the 2600 never fetches from, and then silently resolved
+	// every patch into the SECOND bank: $F123 became file offset $1123, inside range,
+	// past the bounds check, with the error text describing the ROM as "$E000-$FFFF".
+	// A measurement taken on a ROM patched in the bank that was not running is worse
+	// than no measurement. defuse and beam_intervals decline banked images for the
+	// same reason; this declines rather than guessing, until PatchSpec carries a bank.
+	if len(rom) > 4096 {
+		return nil, fmt.Errorf("patch: %s is a %d-byte bank-switched image — both banks decode "+
+			"$F000-$FFFF, so an address alone does not identify a byte to patch (read_bank reports "+
+			"the current bank; patching by bank is not implemented)", filepath.Base(curROMPath), len(rom))
+	}
 	base := 0x10000 - len(rom) // 4K→$F000 / 2K→$F800
 	for _, p := range patches {
 		addr := p.Addr
