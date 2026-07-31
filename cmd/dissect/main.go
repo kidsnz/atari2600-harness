@@ -194,14 +194,13 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 	fmt.Fprintf(&rep, "dissect %s — runtime trace × ROM matching (%d frames, %d stores, %d streams)\n",
 		filepath.Base(rom), frames, len(stores), len(streams))
 	fmt.Fprintf(&rep, "%s\n", strings.Repeat("=", 70))
-	romOrg := 0x10000 - len(romBytes) // 末尾が $FFFF に当たる素朴な ORG（4K=$F000、2K=$F800）
-	banked := len(romBytes) > 4096    // F8/F6/F4: 4K バンクが $F000-$FFFF 窓に入る
+	banked := len(romBytes) > 4096 // F8/F6/F4: 4K バンクが $F000-$FFFF 窓に入る
+	addrOf := func(off int) int { return romAddrOf(len(romBytes), off) }
 	fmtRange := func(off, n int) string {
 		if !banked {
-			return fmt.Sprintf("ROM $%04X-$%04X", romOrg+off, romOrg+off+n-1)
+			return fmt.Sprintf("ROM $%04X-$%04X", addrOf(off), addrOf(off)+n-1)
 		}
-		bank, a := off/4096, 0xF000+off%4096
-		return fmt.Sprintf("ROM bank %d $%04X-$%04X", bank, a, a+n-1)
+		return fmt.Sprintf("ROM bank %d $%04X-$%04X", off/4096, addrOf(off), addrOf(off)+n-1)
 	}
 	if banked {
 		fmt.Fprintf(&rep, "(banked cart: %dK = %d banks of 4K; addresses below are bank-relative in the $F000-$FFFF window)\n",
@@ -295,7 +294,7 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 			ins := map[int][]string{} // 行番号 → 挿入コメント
 			hits := 0
 			for off, note := range annots {
-				addr := romOrg + off
+				addr := addrOf(off)
 				best := -1
 				for bi, l := range lbls { // distella 出力はアドレス昇順
 					if l.addr <= addr {
@@ -450,4 +449,24 @@ func transcribe(rom string, audioN int) (string, error) {
 		b.WriteString("\n")
 	}
 	return b.String(), nil
+}
+
+// romAddrOf maps a ROM file offset to the address the CPU sees that byte at.
+//
+// For a flat image that is the naive origin: the file's last byte is $FFFF, so a 4K
+// image starts at $F000 and a 2K one at $F800. For a BANK-SWITCHED image the naive
+// origin is not an address at all — an 8K cartridge would start at $E000, which the
+// 2600 never fetches from, because every 4K bank is mapped into the same
+// $F000-$FFFF window.
+//
+// This exists because the file had TWO copies of this mapping and only one of them
+// knew that. `fmtRange` handled banks; the step that matches an annotation to a
+// DiStella label by address did not, so on an 8K ROM every offset in bank 0 was
+// resolved to $Exxx, matched no label, and its annotation was dropped without a word.
+// One mapping, used by both.
+func romAddrOf(romLen, off int) int {
+	if romLen > 4096 { // F8/F6/F4: 4K banks, all in the $F000-$FFFF window
+		return 0xF000 + off%4096
+	}
+	return 0x10000 - romLen + off
 }

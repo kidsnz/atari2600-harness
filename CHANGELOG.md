@@ -112,6 +112,12 @@ versions follow [Semantic Versioning](https://semver.org/).
   docs commit on 2026-07-29 and had been contributing a meaningless green tick since. Deleted; the tree is
   now at 343/343 able to fail. The detector clears delegation (`helper(t, ...)`, `t.Run`) — verified against
   a delegating test that would otherwise have been a false positive.
+- **`cmd/dissect` carried two copies of the offset→address mapping and only one knew about banks.**
+  `fmtRange` used `off/4096` and `$F000 + off%4096`; the step that matches an annotation to a DiStella
+  label by address used the naive `0x10000 - len(rom) + off`, which on an 8K image resolves **every offset
+  in bank 0 to `$Exxx`** — an address the 2600 never fetches — so those annotations matched no label and
+  were dropped without a word. Both now call one `romAddrOf`, unit-tested across 4K/2K/8K/16K including the
+  boundary bytes of each bank; negative control: removing the bank branch fails it.
 - **A temporary ROM patch silently patched the wrong bank of an 8K image.** `assert_line_budget`'s
   `patch=` resolved an address to a file offset with `base = 0x10000 - len(rom)`, which puts an 8K
   cartridge's base at **$E000** — an address the 2600 never fetches from — and then resolves every patch
