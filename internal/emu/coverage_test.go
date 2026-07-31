@@ -6,10 +6,10 @@ import "testing"
 // 片側分岐の判定と「踏んでいないアドレス＝未踏」を固定する。決定的・ROM 非依存。
 func TestCoverageLogic(t *testing.T) {
 	c := newCoverage()
-	c.record(0x0100, false, false) // 非分岐
-	c.record(0x0200, true, true)   // 分岐: taken だけ → 片側
-	c.record(0x0300, true, false)  // 分岐: fall-through
-	c.record(0x0300, true, true)   // 同じ分岐の taken も → 両側踏破
+	c.record(0, 0x0100, false, false) // 非分岐
+	c.record(0, 0x0200, true, true)   // 分岐: taken だけ → 片側
+	c.record(0, 0x0300, true, false)  // 分岐: fall-through
+	c.record(0, 0x0300, true, true)   // 同じ分岐の taken も → 両側踏破
 
 	if c.PCCount() != 3 {
 		t.Fatalf("PCCount=%d want 3", c.PCCount())

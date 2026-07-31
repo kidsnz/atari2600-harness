@@ -104,6 +104,18 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **Coverage was bank-blind, and it flattered.** `internal/emu/coverage.go` keyed executed instructions,
+  branches and both edge sets on a bare address, but two banks of an 8K image decode the same addresses.
+  It failed in both directions at once: as a count it under-reported distinct executed instructions
+  (exerciser, 200k instructions: 319 pairs executed, `PCCount` reported **282**, 37 addresses run in BOTH
+  banks), and as a query `Seen(addr)` answered "covered" for the twin in the bank that never ran — the
+  flattering direction, which VV-3's coverage percentage and `mutate -covered`'s "honest kill rate" both
+  rest on. Now keyed on `(bank, address)`, with the fetch bank captured **before** the step (a hotspot
+  access changes the mapping as it completes, so asking afterwards attributes the switching instruction to
+  the bank it switched to). `Signature()` includes the bank too, so guided fuzzing on an 8K image can tell
+  the halves of an address apart. `Seen(addr)` deliberately keeps its meaning ("in SOME bank") and
+  `SeenIn(bank, addr)` is added beside it. **Flat ROMs are unaffected — `cmd/cover`'s whole JSON output is
+  byte-identical 5/5**; only banked images move (exerciser `pc_executed` 268 → 297).
 - **The prover's most important soundness check — "the machine never exceeds the proven worst case" — was
   bank-blind and ran on 31 ROMs.** It keyed proven regions on address alone while `LineWorst` has carried
   `Bank`/`BankValid` all along, so on an 8K image a region proven in one bank could be paired with a

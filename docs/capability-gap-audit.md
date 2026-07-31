@@ -1791,11 +1791,24 @@ for the twin instruction in the bank that never ran, which is the flattering dir
 matters, because VV-3's coverage percentage and `mutate -covered`'s "honest kill rate over executed code
 only" both rest on it.
 
-**Not fixed in this pass, deliberately.** The repair is to key on `(bank, addr)`, which changes the meaning
-of the exported `Seen(addr)` — today "seen at this address in any bank" — and that is consumed by
-`cmd/cover` and quoted through VV-3/VV-11 figures in the docs. A silent change of meaning in a number
-already published is the failure this section keeps recording, so it is filed with its measurement rather
-than slipped in. The fix is small in code and needs a decision about the API, not about the arithmetic.
+**FIXED, with the opinionated half left alone.** The worry was that keying on `(bank, addr)` changes the
+meaning of the exported `Seen(addr)` and of numbers already published. Measuring split that worry in two:
+on a **flat 4K image every bank is 0**, so the new key is a no-op there — verified by diffing `cmd/cover`'s
+entire JSON output before and after on five flat ROMs, **byte-identical 5/5**. Only banked images move, and
+there the old numbers were wrong.
+
+So the recorder now keys on `(bank, addr)` and `Seen(addr)` **keeps its meaning** — "executed at this
+address in SOME bank" — documented in place, with `SeenIn(bank, addr)` added beside it. Nothing published
+changes except on banked images: `cmd/cover`'s `pc_executed` on the exerciser goes **268 → 297**. The
+fetch bank is captured BEFORE the step, because a hotspot access changes the mapping as it completes and
+asking afterwards attributes the switching instruction to the bank it switched TO. `Signature()` includes
+the bank as well, so coverage-guided fuzzing on an 8K image can tell the two halves of an address apart
+instead of concluding it has seen everything.
+
+Witness: `TestCoverageDistinguishesTheSameAddressInTwoBanks` (319 pairs, 37 addresses in both banks) checks
+its own premise — it fails if the ROM stops exercising the collision — and asserts the flattering direction
+directly, that a twin in the bank which never ran does not read as covered. Negative control: forcing the
+bank back to 0 fails both assertions.
 
 ### `displayPreserver` swept: the precise answer fires 61 times and has never been graded (2026-07-30)
 

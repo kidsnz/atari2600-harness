@@ -142,6 +142,13 @@ func (e *Emu) AudioHash() string {
 // この規約で cpuCycles は「実行した命令サイクルの総和」になる（WSYNC の空転は含めない）。
 func (e *Emu) stepInstr() (executed bool, err error) {
 	ready := e.VCS.CPU.RdyFlg
+	// The bank the next instruction is FETCHED from, captured BEFORE the step. A
+	// hotspot access changes the mapping as it completes, so asking afterwards
+	// attributes the switching instruction itself to the bank it switched TO.
+	fetchBank := 0
+	if e.cov != nil && ready {
+		fetchBank = e.VCS.Mem.Cart.GetBank(e.VCS.CPU.PC.Value()).Number
+	}
 	if err := e.VCS.Step(e.elemCB); err != nil { // elemCB=nil のとき従来どおり（ゼロコスト）
 		return false, err
 	}
@@ -158,7 +165,7 @@ func (e *Emu) stepInstr() (executed bool, err error) {
 		lr := e.VCS.CPU.LastResult
 		e.cpuCycles += int64(lr.Cycles)
 		if e.cov != nil && lr.Defn != nil { // VV-3: 命令完了時だけ記録（nil=無効でゼロコスト）
-			e.cov.record(lr.Address, lr.Defn.IsBranch(), lr.BranchSuccess)
+			e.cov.record(fetchBank, lr.Address, lr.Defn.IsBranch(), lr.BranchSuccess)
 		}
 		return true, nil
 	}
