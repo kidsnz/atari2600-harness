@@ -1764,6 +1764,44 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### `displayPreserver` swept: the precise answer fires 61 times and has never been graded (2026-07-30)
+
+Same method, next function on the blank-classification path. `displayPreserver(entry)` answers "does this
+subroutine, and everything it calls, provably not touch VSYNC/VBLANK". A `true` makes the abstract
+interpreter **carry the display state across the JSR** (`absint.go:723`); a wrong `true` therefore keeps
+"display is off" alive past a routine that actually turned it on, and a later region can be classified
+BLANK and dropped from the budget check. Precise side, and the consequence is a deleted check rather than
+a loud failure.
+
+| branch | hits | side |
+|---|---:|---|
+| walk stops at a return | 87 | precise |
+| **`PRESERVES` — the answer itself** | **61** | **precise** |
+| a store touches the display -> NOT | 33 | conservative |
+| a callee does not preserve -> NOT | 6 | conservative |
+| unfollowable switch -> NOT | 2 | conservative |
+| **too deep / recursive -> NOT** | **0** | conservative |
+| **a push touches the display -> NOT** | **0** | conservative |
+
+Two unwitnessed, both refusals, so neither can under-approximate — the same shape as the display-miss
+sweep, and no change is called for. The `push touches` zero is the third place the push predicate turns
+out to be barely exercised; `cb_pushdisplay` does not cover it either, because its dangerous push is in a
+region rather than inside a `jsr`'d routine. Deliberately NOT fixed by adding a third fixture: colouring a
+conservative branch green is coverage theatre, and the sweep exists to find the opposite.
+
+**The finding is what the witnesses do not establish.** `PRESERVES` fires 61 times across the corpus, and
+`displayPreserver` / `preservesDisplay` appears in **no test in this repository** — grep over every
+`*_test.go` returns nothing. Its siblings are graded against the machine: `defuse` at 9055/9055 observed
+(pc,addr) pairs inside their predicted sets, `beam_intervals` at 7117/7117 observed writes inside their
+proven windows. This one has 61 executions and zero verdicts. A branch having witnesses says it is
+*reached*, not that it is *right*, and for the precise side that is the question that matters.
+
+**Filed, with the shape of the check.** Run each corpus ROM, record every write to VSYNC/VBLANK with the PC
+that made it, and for every subroutine entry `displayPreserver` declared preserving, assert no observed
+write lies inside that callee's body (`reachableWithinCallee` already answers "is this PC part of that
+subroutine"). That yields the same kind of number its siblings carry, and a violation would be a real
+under-approximation rather than an imprecision.
+
 ### The display-miss predicates swept: 3 unwitnessed branches, all conservative — and a fixture that misses its own hazard (2026-07-30)
 
 Next function through the witness method, chosen because it sits on the **precise** side: `storeMissesDisplay`
