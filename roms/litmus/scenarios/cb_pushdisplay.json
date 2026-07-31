@@ -1,0 +1,7 @@
+{
+  "rom": "roms/litmus/cb_pushdisplay.asm",
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "prove_line_budget": 76
+  }
+}

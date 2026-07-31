@@ -1791,13 +1791,24 @@ genuinely blank region as display-touching, which costs precision and never soun
 side, and unlike the `pagePenalty` sweep (where the one real defect sat on the single unwitnessed *precise*
 branch) there is no precise branch without a witness here. No change made.
 
-**The finding worth acting on is a fixture gap.** `pushMissesDisplay` is reached by exactly ONE ROM in the
+**RESOLVED — the fixture was written (`cb_pushdisplay` / `cb_pushsafe`).** Original finding: `pushMissesDisplay` is reached by exactly ONE ROM in the
 corpus — `roms/techniques/rts_dispatch.asm` — and **`litmus_stack_trick` reaches it 0 times**. That ROM
 exists because a program can aim SP at the TIA and turn a `PHA` into a register write, which is the entire
 reason this predicate is not just "every push touches the display". The hazard has a fixture and the
 predicate has a witness, and they are not the same ROM: nothing in the corpus exercises the branch where
-**SP actually can reach $0100/$0101**. Filed — the fixture to write is a kernel whose SP range covers the
-display registers at a push, inside a region that would otherwise be classified blank.
+**SP actually can reach $0100/$0101**. Written: `cb_pushdisplay` puts a `PHA` with **SP = 1** — so the write lands on `$0101`, VBLANK — inside an
+overscan region that has VBLANK already on and no display stores, i.e. a region that would otherwise be
+classified BLANK and have its cost skipped. `cb_pushsafe` is the same kernel with **one immediate changed**
+(`STACKTOP = $FF`, landing at `$01FF`, ordinary stack RAM). Measured: the danger ROM's region comes back
+`visible`, the twin's comes back `blank`, both at 16 cy, and the blank-region count differs by exactly one —
+the code is identical, only the verdict about it moved. The branch itself was confirmed directly rather than
+inferred from the classification: `reaches-display sp=1 ma=$01`. Negative controls: making every push safe,
+and making every push dangerous, each fail the test.
+
+**One fixture defect was caught before shipping.** The first version put the push in a region that ran on
+past `jmp Main` into the next frame's `sta VSYNC` — regions are WSYNC-to-WSYNC — so both twins were
+classified visible and the fixture proved nothing. Closing the region with a trailing `sta WSYNC` fixed it;
+the ROM comment records why that WSYNC is load-bearing.
 
 *Measurement note:* two shell aggregations of the push count disagreed (1 vs 2) and the discrepancy was in
 the throwaway instrumentation, not in the harness; it was not chased because the count does not bear on the

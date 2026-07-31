@@ -9,6 +9,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`cb_pushdisplay` / `cb_pushsafe` — the twin fixtures that witness `pushMissesDisplay`'s
+  "SP can reach the display" branch**, which had run 0 times across 129 ROMs. A `PHA` writes to `$0100|SP`
+  and page 1 mirrors the console's addresses, so a program that points SP at the bottom of the stack turns
+  a push into a VSYNC/VBLANK write — the Stack Trick, and the entire reason the prover tracks SP here
+  instead of calling every push display-touching. Nothing exercised the YES side: the one ROM that reached
+  the predicate took the "proved to miss" path, and `litmus_stack_trick` — written for this very hazard —
+  never reached it at all. The danger twin pushes with **SP = 1** (`$0101` = VBLANK) inside an overscan
+  region that would otherwise be classified BLANK and skipped; the safe twin changes **one immediate**
+  (`$01FF`, stack RAM). Measured: `visible` vs `blank`, both 16 cy, blank-region count differing by exactly
+  one. The branch was confirmed directly (`reaches-display sp=1 ma=$01`), not inferred. Negative controls:
+  every-push-safe and every-push-dangerous each fail the test. A fixture defect was caught before shipping —
+  the first version's region ran past `jmp Main` into the next frame's `sta VSYNC`, so both twins came back
+  visible and it proved nothing.
 - **`cb_deadpred` / `cb_deadpred_live` — the twin fixtures that finally witness `determineBound`'s
   "a predecessor we know nothing about" refusal**, a guard that had run 0 times across 123 ROMs and had
   never been shown unreachable either. Two fixtures failed first, and both are recorded: code hopped over
