@@ -1793,6 +1793,51 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The prover's reach on REAL games, measured for the first time — and the backlog was ranked on the wrong corpus (2026-07-30)
+
+The `.bin` entry point landed, so the prover was pointed at five commercial cartridges. Nothing here had
+ever been measured against code we did not write.
+
+| ROM | regions | bounded | unbounded | over budget |
+|---|---:|---:|---:|---:|
+| VideoOlympics (2K) | 8 | 3 | 5 | 1 |
+| Adventure | 14 | 8 | 6 | 1 |
+| Seaquest | 49 | 35 | 14 | 7 |
+| Chopper Command | 29 | **5** | **24** | 3 |
+| Empire Strikes Back | 61 | 32 | 29 | 10 |
+| **total** | **161** | **83** | **78** | 22 |
+
+All five converge. **52% of regions in real games are bounded**, against 14/31 kernels certified in our own
+corpus — a different kind of number, but the first honest one about commercial code.
+
+**The refusal reasons are ranked completely differently from ours, and that is the finding.**
+
+| reason | commercial | our corpus (recorded in SD-3) |
+|---|---:|---:|
+| multiple back-edges (nested/complex loops) | **21** | 2 |
+| WSYNC inside loop body | **20** | 2 |
+| branch inside loop body | **13** | 1 |
+| no WSYNC reached from region start | 9 | 5 |
+| BRK in region | 8 | — |
+| **loop bound unknown** | **5** | **15** |
+| nested subroutine call | 2 | — |
+
+SD-3's conditional-bounds work was chosen by measuring our own kernels, where *"loop bound unknown"* was 15
+of 29 refusals — "the dominant case", and it was, for us. On real games it is **5 of 78, six percent**, and
+the three reasons that dominate (multiple back-edges, WSYNC inside a loop, a branch inside a loop — 54 of
+78 between them) were ranked 2, 2 and 1 in our corpus and never worked on.
+
+That is the same defect this file keeps recording, one level up: not a wrong number, but a **denominator
+chosen from what was at hand**. A backlog ranked on fixtures optimises for fixtures.
+
+**Chopper Command is the outlier worth naming**: 5 of 29 regions bounded, 17%. Whatever it does, the prover
+mostly cannot follow it, and it is the cheapest available specimen for the three dominant reasons.
+
+**Not a claim: the 8 "BRK in region".** Commercial cartridges are unlikely to execute BRK; far more likely
+the decoder walked into data and read `$00`. That is a hypothesis — it would be settled by checking whether
+those addresses are reachable from the vectors by real flow, and it is exactly the kind of thing the
+casebook line needs answered anyway.
+
 ### A wrong number in "Constants you must never get wrong" (2026-07-30)
 
 `CLAUDE.md` is the only document loaded in full every session, and the section named "Constants you must
