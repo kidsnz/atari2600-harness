@@ -110,7 +110,8 @@ versions follow [Semantic Versioning](https://semver.org/).
   covers — on Chopper Command, RESET plus a dozen rounds of stick moved the executed count by **4
   instructions out of 2358**. What sitting there does not cover are the other game **variations**, behind
   SELECT: **Seaquest 51% → 60%** of its decoded instructions, Adventure 61% → 67%, Chopper Command
-  46% → 49%. The report now carries `drive`, because a coverage percentage is a property of a ROM **and a
+  46% → 49% — all four measured at the SAME driving budget, so they compare drivings rather than state a
+  ceiling; given more frames every ROM saturates near 68–78%. The report now carries `drive`, because a coverage percentage is a property of a ROM **and a
   driving**, and two numbers taken under different drivings are not comparable. Panel switches go through
   `SetPanel`, not `SetInput` — ignoring that error is how an earlier measurement "pressed" RESET without
   pressing anything.

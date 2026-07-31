@@ -1840,7 +1840,27 @@ never executed** in a 200k-instruction attract-mode run — and **one is**. So "
 falsified, and "all real" was never likely. Settling it needs flow reachability from the vectors, not more
 counting; recorded here so the next attempt starts from the distribution rather than from the total.
 
-**The bigger number the same probe produced: static decode reaches about twice what execution does.**
+**CORRECTED 2026-07-31 — "about twice" was my driving budget, not the ROMs.** The table below was taken at
+~200k instructions (≈130 frames). Re-measured against the budget itself, coverage **saturates at 68–78%**,
+not ~50%:
+
+| ROM | decoded | 150 frames | 600 frames | 2400 frames |
+|---|---:|---:|---:|---:|
+| Chopper Command | 2358 | 1175 (49%) | 1796 (76%) | 1849 (**78%**) |
+| Seaquest | 1656 | 992 (59%) | 1164 (70%) | 1208 (**72%**) |
+| Adventure | 1236 | 836 (67%) | 874 (70%) | 878 (**71%**) |
+| VideoOlympics | 644 | 341 (52%) | 438 (68%) | 438 (**68%**) |
+
+Going from 600 to 2400 frames buys 1–3 points, so 600 is already near saturation. The real statement is
+therefore **~22–32% of decoded code is never executed however you drive it**, which is a genuine limit on
+dynamic grading but is not the factor of two the first measurement suggested. The SELECT finding survives
+intact — at a fixed budget it is what moves Seaquest from 51% to 60% — because it was a comparison at equal
+budget rather than a claim about a ceiling.
+
+Fourth self-correction of the day, and the same cause each time: a number reported without the conditions
+that produced it. The original text follows, for the shape of the error.
+
+**(superseded) The bigger number the same probe produced: static decode reaches about twice what execution does.**
 
 | ROM | decoded | executed (200k instr, no input) | never executed |
 |---|---:|---:|---:|
@@ -1870,8 +1890,8 @@ what settled it.
 But the size of the gap matters for how this project grades itself. **Every soundness grading here is dynamic
 containment**: `defuse` at 32655/32655, `beam_intervals` at 19143/19143, "observed ≤ proven" at 896
 regions. Those check that what the machine DID falls inside what the analysis PREDICTED. On a commercial
-cartridge the machine does about half the decoded program, so such a grading would validate roughly half
-the static claims and say nothing about the rest. On our own kernels — small, driven by scenarios that
+cartridge the machine does **about 70–78%** of the decoded program at saturation (corrected above), so
+such a grading is silent about the remaining fifth to third of the static claims. On our own kernels — small, driven by scenarios that
 exercise them deliberately — the gap is much smaller, which is why it has never shown up. A grading that
 is ∃ over a corpus that is mostly unexercised is a weaker statement than its numerator suggests.
 
