@@ -1671,6 +1671,69 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### The mapper census, and two things it found: a whitelist nobody re-reads and a loader that panics (2026-07-31)
+
+G1 says advanced cartridges have "zero harness verification". Before building anything for that, the cheap
+question: **which mappers are actually in reach on this machine?** Every `.bin` under the umbrella was loaded
+through `emu.LoadROM` and its `CartInfo()` recorded — 542 files, 525 loaded, and the answer is not the one the
+backlog assumed:
+
+| mapper | images | e.g. |
+|---|---:|---|
+| 4K | 313 | the technique/litmus corpus |
+| 2K | 85 | za2600 world tiles |
+| F6 | 61 | litmus_bank_f6, 13-BankswitchingDemo |
+| F8 | 29 | exerciser, lint_bank_* |
+| F4SC | 12 | 2600_Indenture, CaveIn |
+| DPC+ | 7 | Scramble demo, scrolldemo |
+| 3E | 5 | DeathMerchant, DungeonStalker |
+| F4 | 4 | litmus_bank_f4 |
+| F8SC | 3 | litmus_superchip, defender |
+| **E0** | **3** | Montezuma's Revenge Trainer, Super Cobra, Swtagrc |
+| **FA** | **1** | Omega Race |
+| AR / F6SC | 1 each | |
+
+Two findings came out of running it, and neither was the thing being looked for.
+
+**1. Two images PANICKED the loader.** `hasSuperchip` (Gopher2600 `fingerprint.go`) compares `d[:0x80]`
+against `d[0x80:]` on every 4K window with no length check, so a file under 256 bytes is out of bounds by
+construction. A 12-byte `Combat.bin` and a 5-byte `skeleton_test.bin` — truncated downloads in
+`reference/disassemblies/bjars_site_archive/` — took it down. This is upstream code, but the blast radius is
+ours: `load_rom` and `assemble_and_load` take a path from the MCP caller, and `cmd/fieldtest -inbox` walks a
+directory the **user** drops files into. A panic there kills the server, not the call. Fixed with a length
+precheck (which can name the actual problem) plus a `recover` backstop (which covers faults not anticipated),
+each verified by disabling it alone. **The first test written for it was worthless** and the negative control
+said so: zero-filled files of the same sizes do not panic, they load, so the test proved the size check
+worked and proved nothing about the crash. The fixtures now carry the observed bytes.
+
+**2. The address-only whitelist had never been re-read.** `verifiedEdgeSemantics` is a claim about
+*someone else's source*, with a prose citation per entry, and Gopher2600 is a `replace` dependency that gets
+updated. Nothing checked that the cited file exists, the cited method exists, or that it still selects the
+bank from the address. WF8 is the standing proof the failure mode is real — it publishes `$1FF8:BANK0` /
+`$1FF9:BANK1` and takes the bank from **data bus bit 2** — and it was caught by hand. `edgesource_test.go`
+now parses the cited method with `go/ast` and requires that a whitelisted mapper never reads its data
+parameter, with the mirror assertion (recorded-as-data-driven mappers **must** read it) so the check cannot
+pass vacuously. AST, not grep: CBS quotes "data line D0" from the patent six times in comments.
+
+**And four mappers moved from "unchecked" to "measured different"** — the refusal was already correct, but
+it said "not among the checked mappers" when the truth is more useful:
+
+- **FA** — the whole switch sits inside `if data&0x01 == 0x01`. Address selects the bank; the data bus
+  decides whether it happens at all.
+- **FA2** — `$0FFB` is guarded by `len(banks) > 6`, so the published `$1FFB:BANK6` edge does not exist on a
+  6-bank image; `$0FF4` does NVRAM file I/O and switches nothing.
+- **E0** — not a bank switch. Three 1K **segments**, each mapped into its own quarter of the window; the
+  fourth quarter (`$0C00-$0FFF`, holding the hotspots and the vectors) is never assigned. A landing site of
+  (bank, same address) is wrong twice: three quarters do not move, and the quarter the switching instruction
+  lives in cannot.
+- **E7** — `$0FE7` maps RAM over ROM, `$0FE8-$0FEB` pick a 256-byte RAM block and leave the bank alone, and
+  `bank %= NumBanks()` makes the address-to-bank map depend on image size.
+
+**The transferable part:** the backlog entry was "add support for advanced cartridges". The census cost one
+sweep and said the local reach is 4 images across two exotic mappers — while the same sweep turned up a
+server-killing panic that no entry in this document had ever predicted. Measuring the ground before building
+on it keeps finding things that outrank what was being measured for.
+
 ### SD-11a — the cross-bank rekey shipped an under-approximation, found by review after it was pushed (2026-07-29)
 
 I verified SD-11 against the machine before accepting it — for every region the prover bounds, on all four

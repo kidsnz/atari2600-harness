@@ -411,6 +411,25 @@ var knownDifferentEdgeSemantics = map[string]string{
 		"DATA BUS BIT 2, while it publishes $1FF8:BANK0 and $1FF9:BANK1 — so $1FF9 does nothing at all " +
 		"and $1FF8 goes to bank 0 or 1 depending on the value written",
 	"WFSC": "the superchip WF8; same data-bus target selection",
+	"FA": "mapper_cbs.go cbs.bankswitch gates the whole switch on DATA BUS BIT 0 — it selects the bank from " +
+		"the address ($0FF8/$0FF9/$0FFA -> bank 0/1/2) but only inside `if data&0x01 == 0x01`, quoting the " +
+		"CBS patent's requirement that D0 be high. So `lda $1FF9` switches or does nothing depending on what " +
+		"happens to be on the bus, and an edge taken from the symbol alone would be taken unconditionally",
+	"FA2": "mapper_fa2.go fa2.bankswitch is address-selected ($0FF5-$0FFB -> bank 0-6) but two of its " +
+		"hotspots are not plain bank switches: $0FFB is guarded by `len(cart.banks) > 6`, so on a 6-bank " +
+		"image the published $1FFB:BANK6 edge is one the hardware does not take, and $0FF4 drives NVRAM " +
+		"save/load (file I/O) while changing no bank at all",
+	"E0": "mapper_parkerbros.go parkerBros.bankswitch does not switch a bank at all — it assigns one of " +
+		"THREE 1K SEGMENTS ($0FE0-$0FE7 -> segment 0, $0FE8-$0FEF -> segment 1, $0FF0-$0FF7 -> segment 2), " +
+		"and Access reads each quarter of the window through its own segment. The fourth quarter " +
+		"($0C00-$0FFF), which holds the hotspots and the vectors, is never assigned and cannot move. A " +
+		"landing site of (targetBank, same address) is therefore wrong twice over: three quarters of the " +
+		"window are unaffected, and the quarter the switching instruction lives in is fixed",
+	"E7": "mapper_mnetwork.go mnetwork.bankswitch spends most of its hotspot range on things that are not " +
+		"banks: $0FE7 maps 1K of RAM in place of ROM, $0FE8-$0FEB select which 256-byte RAM block appears " +
+		"in a window and leave the bank untouched, and the result is reduced by `bank %= NumBanks()` so the " +
+		"address-to-bank map depends on the image size (an 8K E7 folds the 16K addresses). Only $0FE0-$0FE6 " +
+		"behave like a bank select",
 }
 
 func verifiedEdgeSemanticsList() string {

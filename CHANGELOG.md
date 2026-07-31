@@ -9,6 +9,42 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`LoadROM` no longer dies on a truncated image — and 2 of the 542 `.bin` files on this machine
+  killed it.** Found by sweeping every image under the umbrella through the loader: a 12-byte
+  `Combat.bin` and a 5-byte `skeleton_test.bin`, both partial downloads in a mined reference archive,
+  **panicked** instead of failing to load. The fault is upstream — `hasSuperchip`
+  (Gopher2600 `fingerprint.go`) compares `d[:0x80]` against `d[0x80:]` on every 4K window with no
+  length check — but the consequence is ours: `load_rom` and `assemble_and_load` take a path from the
+  MCP caller and `cmd/fieldtest -inbox` walks a directory the **user** drops files into, so this ended
+  the server rather than one call. A truncated download is the most likely malformed input there is,
+  and it was the one input that could not be reported. Two layers, verified independently by disabling
+  each: a length precheck that can say what is wrong ("this file is 12 bytes"), and a `recover` backstop
+  for any other fault the fingerprinter can take on bytes it did not anticipate. **The first version of
+  the test proved nothing** — it wrote zero-filled files of the same sizes, and with the guard removed
+  those load fine instead of crashing; the fixtures now carry the observed bytes, which do panic.
+- **The edge-semantics whitelist is now re-read from the engine's source by a test, not by a human once.**
+  `verifiedEdgeSemantics` claims seven mappers select the bank from the address alone, each entry citing
+  the file and method where that was read — and nothing checked that the file exists, that the method
+  exists, or that it still reads that way. Gopher2600 is a `replace` dependency that gets updated. The
+  new gate parses the cited method out of the cited file with `go/ast` and requires that a mapper claimed
+  as address-only never reads its data-bus parameter; the mirror assertion requires that the mappers
+  recorded as data-driven **do** read it, so the check cannot pass by matching nothing (2 witnesses:
+  WF8, FA). AST rather than grep, because CBS quotes the patent's "data line D0" in a comment six times.
+  Negative controls: whitelisting FA fails it, and so does a citation to a method that does not exist.
+  What it proves is one failure mode — data-bus selection, the WF8 trap — not all of them.
+
+### Changed
+- **Four more mappers moved from "unchecked" to "checked, and here is how they differ"**
+  (`knownDifferentEdgeSemantics`), each read out of the engine's source: **FA** gates the entire switch
+  on data-bus bit 0 (the CBS patent's requirement), so `lda $1FF9` switches or does nothing depending on
+  what is on the bus; **FA2** guards `$0FFB` with `len(banks) > 6`, so the published `$1FFB:BANK6` edge
+  does not exist on a 6-bank image, and spends `$0FF4` on NVRAM file I/O; **E0** does not switch a bank
+  at all but assigns one of three 1K **segments**, leaving the fourth quarter — the one holding the
+  hotspots and the vectors — permanently fixed; **E7** spends four hotspots on RAM rather than banks and
+  reduces the result by `bank %= NumBanks()`, so its address-to-bank map depends on the image size.
+  The refusal was already correct for all four; now it says why. Not hypothetical: the same sweep counted
+  **E0 on 3 images and FA on 1** (Montezuma's Revenge Trainer, Super Cobra, Swtagrc, Omega Race).
+
 - **`cb_pushdisplay` / `cb_pushsafe` — the twin fixtures that witness `pushMissesDisplay`'s
   "SP can reach the display" branch**, which had run 0 times across 129 ROMs. A `PHA` writes to `$0100|SP`
   and page 1 mirrors the console's addresses, so a program that points SP at the bottom of the stack turns
