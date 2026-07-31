@@ -1768,6 +1768,26 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### A wrong number in "Constants you must never get wrong" (2026-07-30)
+
+`CLAUDE.md` is the only document loaded in full every session, and the section named "Constants you must
+never get wrong" carried one that was wrong — and contradicted itself while carrying it. The horizontal
+position paragraph said **"Leftmost X=2 (player 3)"** and, three lines later, **"leftmost X=3"**, both
+labelled hardware-verified.
+
+Measured rather than argued, with this repo's own instruments. `cmd/calibrate` sweeps `litmus_pos`'s DELAY
+and reports `12 -> 2`, `13 -> 3`, `14 -> 3` for player0's `ResetPixel` (slope 3.0000 px/CPU-cycle,
+R² = 1.000000 — the slope claim holds). Confirmed at the pixel, because the file's own iron rule says the
+verdict is the drawn position: at `DELAY=12`, `read_tia` gives `reset_pixel` = `hmoved_pixel` = 2 and
+`decompose_row` shows **P0 occupying clock 2..9**. A player draws from clock 2.
+
+The deeper error is the category, not the digit. Two sentences after stating a leftmost-X constant, the same
+paragraph warns that the offset constant is **kernel-specific** and that the verdict must be measured — and
+a leftmost reachable position is exactly that offset at its wrap. Stating it as a machine constant is the
+mistake the paragraph itself warns against. The line now records the measurement and says there is no such
+constant. The missile/ball figure was left alone and is marked as not re-measured, rather than corrected by
+analogy.
+
 ### The bank-blind address, closed: six instances in two syntaxes, and one place that already knew (2026-07-30)
 
 The sweep that started with two gradings ended at six, and the shape of the search mattered more than the

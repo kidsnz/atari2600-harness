@@ -94,12 +94,19 @@ Real games deviate, so don't hardcode "exactly 262" — handle as a range + warn
 sprite's `ResetPixel`/`HmovedPixel` = directly comparable. `Scanline` is a 0-based integer.
 
 **Horizontal position** — missile/ball `X = 3N − 55`, **player is +1px → `X = 3N − 54`**
-(N = CPU cycles from the sync point to the RESPx strobe). Leftmost X=2 (player 3).
+(N = CPU cycles from the sync point to the RESPx strobe).
 The offset is TIA's ~5-color-clock delay + HBLANK 68. Granularity 3px. Coarse adjust is divide-by-15
-(5-cycle loop). **litmus hardware-verified (v0.4.0):** slope 3px/CPU-cycle, coarse 15px/5cy, 160 wrap,
-leftmost X=3. But the formula's **offset constant is kernel-specific** (includes the prologue's cycle count)
+(5-cycle loop). **litmus-verified:** slope 3px/CPU-cycle (R²=1.000000), coarse 15px/5cy, 160 wrap.
+The formula's **offset constant is kernel-specific** (includes the prologue's cycle count)
 → don't hardcode the absolute N; make the final position verdict by measuring **`read_tia`'s `HmovedPixel`**
 (visible 0–159). When HMOVE hasn't fired, it equals `ResetPixel`.
+⚠️ **There is no "leftmost X" constant, and this line used to state one.** It read "Leftmost X=2 (player 3)"
+and "leftmost X=3" — two sentences after warning that the offset is kernel-specific, which is exactly what a
+leftmost position is. Re-measured 2026-07-30 on `litmus_pos` with `cmd/calibrate` and confirmed at the
+pixel: sweeping DELAY past the wrap, **a PLAYER draws from clock 2** (`DELAY=12` → `reset_pixel` 2,
+`hmoved_pixel` 2, `decompose_row` shows P0 occupying clock 2..9), then 3 at `DELAY=13` and 14. So the stated
+player minimum of 3 was wrong for this kernel, and "the leftmost" is a property of the positioning code, not
+of the machine. Measure it for the kernel you have. (The missile/ball figure was not re-measured.)
 
 **HMOVE** — upper nibble only, two's complement, **positive = left / negative = right**, range +7 to −8.
 Moves only at the HMOVE strobe. HMOVE is **right after WSYNC**. (All 16 nibbles hardware-verified in litmus
