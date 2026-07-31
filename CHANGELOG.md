@@ -104,6 +104,15 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **All 20 playfield columns are now verified, not 3** (`litmus_pf_allcols` +
+  `TestEveryPlayfieldColumnLandsWhereTheTableSays`). `CLAUDE.md` lists the column→register→bit map under
+  "constants you must never get wrong" and cited `litmus_pf`, which lights **columns 0, 4 and 12** — the
+  leftmost bit of each register, three of twenty positions and the three easiest. The new ROM draws the
+  whole map in one frame (20 bands of 9 scanlines, band k lighting only column k) so every entry is
+  checked, including that nothing else lights up — which is what catches a bit landing in the *wrong*
+  column rather than in none. Measured: all 20 land on `4k..4k+3` and repeat at `80+4k`, confirming the
+  repeat rule and the half boundary at clock 80 at the same time. **The table is correct.** Negative
+  control: reversing PF2's byte order fails 8 columns.
 - **The 16-nibble HMOVE table is now machine-locked** (`TestAllSixteenHmoveNibblesMoveByOnePixelEach`).
   `CLAUDE.md` lists it under "constants you must never get wrong" and cited a hand verification from
   **v0.4.0** — the existing HMOVE tests cover the ripple counter and the idle/unrecorded distinction, and

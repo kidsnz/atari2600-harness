@@ -126,8 +126,11 @@ math is approximate — never cite it for positions; use our calibrated X(N).
 **Collisions (CXxx)** — two latches in each D7/D6, sticky. `BIT CXxx` → `BMI`(D7)/`BVS`(D6).
 **CXCLR** = clear all collisions; **HMCLR** = clear the motion registers (a different thing).
 
-**playfield (bit order, hardware-verified v0.6.0)** — 40 columns left→right, each 4 color clocks wide. **Two
-sources (ABB/falukropp) agree + `read_row` measured.** `PF0` = upper nibble only, col0→D4..col3→D7 / `PF1` =
+**playfield (bit order)** — 40 columns left→right, each 4 color clocks wide. **Two
+sources (ABB/falukropp) agree**, and all **20** column positions are re-measured at the pixel and
+machine-locked by `TestEveryPlayfieldColumnLandsWhereTheTableSays` (`litmus_pf_allcols` lights one column
+per band, 20 bands in one frame). The older `litmus_pf` covers columns 0/4/12 only — the leftmost bit of
+each register, three of twenty. `PF0` = upper nibble only, col0→D4..col3→D7 / `PF1` =
 MSB first, col4→D7..col11→D0 / `PF2` = LSB first, col12→D0..col19→D7. Left half = clock 0–79, right half =
 80–159. `CTRLPF` D0: 0=repeat (right half copies left) / 1=reflect (mirror). Verify with `read_row` (numeric,
 not by eye).
