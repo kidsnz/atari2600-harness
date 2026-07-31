@@ -104,6 +104,14 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **The 16-nibble HMOVE table is now machine-locked** (`TestAllSixteenHmoveNibblesMoveByOnePixelEach`).
+  `CLAUDE.md` lists it under "constants you must never get wrong" and cited a hand verification from
+  **v0.4.0** — the existing HMOVE tests cover the ripple counter and the idle/unrecorded distinction, and
+  `litmus_hmove` has no scenario, so nothing had held the table true since. Re-measured: all 16 match
+  (`$70`=−7 … `$00`=0 … `$F0`=+1 … `$80`=+8), and the test asserts each nibble at the **drawn pixel** via
+  `DecomposeRow` as well as at `HmovedPixel`, so a readout that stops describing the picture fails too.
+  Negative controls: flipping the sign convention fails 7 nibbles; shifting `DecomposeRow`'s clock by one
+  fails the drawn-position half.
 - **`scripts/check_tests.py` — a gate on tests that cannot fail** (CI- and pre-push-gated, with a
   `--selftest`, like `check_traps`). A `func TestXxx` must either assert on `t` or hand `t` to a helper that
   does; anything else runs code and draws no conclusion, and `go test` will never say so. Measured when it
