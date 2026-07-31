@@ -178,6 +178,10 @@ round trip. Also return `png_path` in JSON.
 
 > **Anti-rot:** every `docs/*.md` must be reachable from this table or the authoring protocol — `scripts/check_wiring.py`
 > (CI-gated) fails on orphaned knowledge, so nothing accrued ever rots unused.
+> **Anti-vacuity:** every `func TestXxx` must be able to FAIL — assert on `t`, or hand `t` to a helper that does.
+> `scripts/check_tests.py` (CI-gated, with a `--selftest`) fails on a test with no failure path. It exists
+> because the extreme case of this project's recurring defect — a check that passes while covering nothing —
+> is a test that cannot fail at all, and one had been sitting in the suite since 2026-07-29.
 
 ## Repository layout (v0.22.0 spinoff, standalone repo)
 **This repo = the harness base only (general-purpose, reused across all games).** Game ROM artifacts are

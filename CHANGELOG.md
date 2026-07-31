@@ -104,6 +104,14 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **`scripts/check_tests.py` — a gate on tests that cannot fail** (CI- and pre-push-gated, with a
+  `--selftest`, like `check_traps`). A `func TestXxx` must either assert on `t` or hand `t` to a helper that
+  does; anything else runs code and draws no conclusion, and `go test` will never say so. Measured when it
+  was written: **344 test functions, exactly one with no failure path** — `TestZZProbe`, a scratch probe that
+  printed to stdout, asserted nothing, and referenced absolute paths outside the repo. It was swept into a
+  docs commit on 2026-07-29 and had been contributing a meaningless green tick since. Deleted; the tree is
+  now at 343/343 able to fail. The detector clears delegation (`helper(t, ...)`, `t.Run`) — verified against
+  a delegating test that would otherwise have been a false positive.
 - **Coverage was bank-blind, and it flattered.** `internal/emu/coverage.go` keyed executed instructions,
   branches and both edge sets on a bare address, but two banks of an 8K image decode the same addresses.
   It failed in both directions at once: as a count it under-reported distinct executed instructions
