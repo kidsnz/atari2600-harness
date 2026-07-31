@@ -22,6 +22,11 @@ func TestDefUseCorpusSoundness(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Skip("technique corpus unavailable")
 	}
+
+	for _, pat := range []string{"../../roms/litmus/*.asm", "../../roms/exerciser/*.asm"} {
+		more, _ := filepath.Glob(pat)
+		files = append(files, more...)
+	}
 	pairs, contained, undecoded := 0, 0, 0
 	var gaps []string
 

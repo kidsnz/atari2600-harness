@@ -104,6 +104,13 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **The two headline soundness gradings ran on 31 of ~129 ROMs, and extending them roughly tripled the
+  evidence for free.** `defuse`'s "9055/9055 observed (pc,addr) pairs inside their predicted sets" and
+  `beam_intervals`' "7117/7117 observed writes inside their proven window" were both measured over
+  `roms/techniques/*.asm` alone — a denominator neither number stated. Run over the whole corpus they read
+  **32655/32655** and **19143/19143**, still zero violations, costing 4.7s and 3.2s. The quoted figures in
+  `CLAUDE.md` now name their corpus. A side effect: `defuse`'s CFG-reach-gap report now also names
+  `litmus_6502.asm` (66 writes from instructions the decoder never reached), which had been invisible.
 - **The blank-classification grading ran on 32 of 129 ROMs, and two defects in the grading itself were
   what kept it there.** It is the one verdict in the package that can hide a real scanline tear, so its
   corpus matters. (1) Its `blank` map was keyed on a region's **address alone**, and an 8K image decodes the

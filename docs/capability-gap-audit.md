@@ -764,6 +764,10 @@ Recorded because three of these were previously mistaken for hard limits when th
   COLUBK, value `$C4`, clock `-11` — and the picture arbitrates. A push with SP unknown still drops the
   whole tracked map; with SP known it drops only the cell it wrote. Prover unchanged (14/31, zero diff);
   def-use containment 9053 -> 9055/9055; beam containment 7117/7117.
+  **(2026-07-30: both gradings ran on the 31 technique kernels only. Extended to the whole corpus — 128
+  images — they read 32655/32655 and 19143/19143, still zero violations, for 4.7s and 3.2s. Roughly 3x
+  the evidence at no cost, and the same 'denominator smaller than it looks' shape found three times that
+  day: timinglint at 0/133 instructions, 38 of 95 scenarios never run, blank grading on 32 of 129 ROMs.)**
   REMAINING here: JSR/RTS move SP by two but the pushed return address is not modelled as a write, and an
   interrupt would move SP without being seen at all.
 - **Self-modifying code is detectable even when not resolvable** — a store whose effective address lands in
