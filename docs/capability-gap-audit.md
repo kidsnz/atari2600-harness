@@ -1768,6 +1768,35 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The bank-blind address, closed: six instances in two syntaxes, and one place that already knew (2026-07-30)
+
+The sweep that started with two gradings ended at six, and the shape of the search mattered more than the
+search did.
+
+| # | site | what it did | found by |
+|---|---|---|---|
+| 1 | blank-classification grading | graded code from the other bank | `map[uint16]` scan |
+| 2 | "machine never exceeds the proof" | **the hiding direction** — a chance pairing that satisfies `observed <= proven` buries a real gap | `map[uint16]` scan |
+| 3 | `emu.Coverage` (all four sets) | count 12% low; `Seen()` wrong in the **flattering** direction | `map[uint16]` scan |
+| 4 | `mutate -covered` offsets | all 278 covered offsets in bank 1 on an 8K image — mutating the half that did not run | **expression** scan |
+| 5 | `assert_line_budget`'s `patch=` | silently rewrote bank 1; the bounds check passed | **expression** scan |
+| 6 | `dissect` annotation matching | bank 0 resolved to `$Exxx`, matched no label, annotations dropped in silence | **expression** scan |
+
+**The `map[uint16]` scan found none of 4–6.** Those write the same mistake as arithmetic — `addr & (len-1)`,
+`0x10000 - len(rom) + off` — and no key-shaped search reaches them. One sweep does not close a class; the
+FORM of the sweep has to change too, and that is the transferable lesson here rather than anything about
+banks.
+
+**One site already knew.** `internal/cyclebound`'s `program.canon` is correct because `newBankProgram` wraps
+each bank as the self-contained 4K image it is, and the flat path *declines* a banked image outright — with
+the reason recorded as a measurement in the struct comment: the flat model decoded 66 instructions from
+`banked_game` and "produced a confident finding about an address it had never decoded". That comment is why
+that site was not the seventh instance.
+
+**Not every one was fixed the same way.** Where the bank was recoverable, the code now keys on it (1, 2, 3,
+4, 6). Where an address genuinely cannot identify a byte and the API has nowhere to say which bank, it
+declines (5) rather than guessing — `PatchSpec` carrying a bank is filed, not invented.
+
 ### The bank-blind address key, third instance: coverage itself (2026-07-30)
 
 Two gradings were found keyed on a ROM address with no bank on the same day — the blank classification and
