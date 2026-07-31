@@ -104,6 +104,15 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **The 6502 page-cross rules are now machine-locked** (`TestPageCrossPenaltyRules`, 11 cases). They were
+  cited from 6502.org and never re-measured here, while `cyclebound`'s entire per-scanline proof rests on
+  "stores never take the penalty" — and its page-cross costing was where a real under-approximation was
+  found earlier the same day. Measured one instruction at a time through the silicon-differential harness:
+  STA abs,X is 5 crossing or not, STA (ind),Y is 6 either way, LDA abs,X 4→5 and LDA (ind),Y 5→6 on a
+  cross, branches 2 / 3 / 4. **All as documented.** The test also records a trap it fell into itself: a
+  FORWARD branch from `$F802` cannot cross a page at all (the largest offset `$7F` reaches `$F881`), so the
+  crossing case has to branch backwards — the first version asserted 4 cycles for a branch that never left
+  its page.
 - **All 20 playfield columns are now verified, not 3** (`litmus_pf_allcols` +
   `TestEveryPlayfieldColumnLandsWhereTheTableSays`). `CLAUDE.md` lists the column→register→bit map under
   "constants you must never get wrong" and cited `litmus_pf`, which lights **columns 0, 4 and 12** — the

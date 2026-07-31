@@ -117,9 +117,11 @@ the register, since "verified in v0.4.0" is a claim about a version and nothing 
 extends HBLANK by 8 clocks = the left-side 8px blank on HMOVE lines; mid-line HMOVE moves objects RIGHT
 ~1px/4CLK (Towers TIA_HW_Notes; documented, not yet litmus-verified — see `docs/fundamentals-audit.md`).
 
-**6502 timing/BCD (source: 6502.org)** — **stores never take page-cross penalties** (STA abs,X always 5,
-(ind),Y always 6) = kernel store timing is deterministic; reads take +1 on page cross; branches 2/+1
-taken/+1 page-cross. **NMOS decimal mode: only the C flag is valid** after ADC/SBC; D is unknown at
+**6502 timing/BCD (source: 6502.org; re-measured 2026-07-30)** — **stores never take page-cross penalties**
+(STA abs,X always 5, (ind),Y always 6) = kernel store timing is deterministic; reads take +1 on page cross
+(LDA abs,X 4→5, (ind),Y 5→6); branches 2 not-taken / 3 taken / 4 taken across a page. All eleven cases are
+machine-locked by `TestPageCrossPenaltyRules`. ⚠️ A forward branch from a given PC often **cannot** cross —
+from $F802 the largest offset $7F only reaches $F881 — so a crossing case must branch backwards. **NMOS decimal mode: only the C flag is valid** after ADC/SBC; D is unknown at
 power-up → `CLD` in init is mandatory. ⚠️ `reference/docs_atari/cycle_counting_guide.html`'s position
 math is approximate — never cite it for positions; use our calibrated X(N).
 
