@@ -24,6 +24,14 @@ func TestProvenWorstIsNeverExceededOnCorpus(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Skip("technique corpus unavailable")
 	}
+	// "on every kernel" was written above while this ran on the 31 technique ROMs,
+	// about a quarter of the images in the tree. The litmus and exerciser corpora
+	// are kernels too, and one of them is where the last two gradings found their
+	// defects.
+	for _, pat := range []string{"../../roms/litmus/*.asm", "../../roms/exerciser/*.asm"} {
+		more, _ := filepath.Glob(pat)
+		files = append(files, more...)
+	}
 	// No known exceptions. One was listed here — bitmap48's Krow, proven at 93
 	// cycles and apparently taking 911 — and the guard below caught its own
 	// obsolescence within the hour: the discrepancy was in the MEASURING
@@ -39,16 +47,31 @@ func TestProvenWorstIsNeverExceededOnCorpus(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		proven := map[uint16]Region{}
-		for _, r := range rep.Lines {
-			if r.Bounded {
-				proven[r.Start] = r
+		// Keyed on (bank, address). An 8K image decodes the SAME addresses in both
+		// banks, so an address-only key can pair a region proven in one bank with a
+		// measured row from the other. That direction matters here: an accidental
+		// pairing that happens to satisfy observed <= proven HIDES a real gap, which
+		// is the failure this test exists to catch. banked_game is in the corpus.
+		type key struct {
+			bank int
+			addr uint16
+		}
+		proven := map[key]Region{}
+		add := func(r Region) {
+			if !r.Bounded {
+				return
 			}
+			bk := 0
+			if r.BankValid {
+				bk = r.Bank
+			}
+			proven[key{bk, r.Start}] = r
+		}
+		for _, r := range rep.Lines {
+			add(r)
 		}
 		for _, r := range rep.BlankLines {
-			if r.Bounded {
-				proven[r.Start] = r
-			}
+			add(r)
 		}
 		if len(proven) == 0 {
 			continue
@@ -72,7 +95,11 @@ func TestProvenWorstIsNeverExceededOnCorpus(t *testing.T) {
 		}
 		roms++
 		for _, row := range rows {
-			p, ok := proven[row.StrobePC]
+			rowBank := 0
+			if row.BankValid {
+				rowBank = row.Bank
+			}
+			p, ok := proven[key{rowBank, row.StrobePC}]
 			if !ok || row.Count == 0 {
 				continue
 			}

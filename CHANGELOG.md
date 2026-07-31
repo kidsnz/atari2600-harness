@@ -104,6 +104,13 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **The prover's most important soundness check — "the machine never exceeds the proven worst case" — was
+  bank-blind and ran on 31 ROMs.** It keyed proven regions on address alone while `LineWorst` has carried
+  `Bank`/`BankValid` all along, so on an 8K image a region proven in one bank could be paired with a
+  measured row from the other. The dangerous direction is the quiet one: an accidental pairing that happens
+  to satisfy `observed <= proven` **hides** a real gap, which is the failure this test exists to catch, and
+  `banked_game` is in its corpus. Now keyed on `(bank, address)` and run over the whole tree:
+  **896 measured regions across 128 ROMs, no exceptions** (was 228 across 31), for 5.5s.
 - **The two headline soundness gradings ran on 31 of ~129 ROMs, and extending them roughly tripled the
   evidence for free.** `defuse`'s "9055/9055 observed (pc,addr) pairs inside their predicted sets" and
   `beam_intervals`' "7117/7117 observed writes inside their proven window" were both measured over
