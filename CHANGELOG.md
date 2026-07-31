@@ -104,6 +104,16 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **`cover -drive explore`** — cycles SELECT through the game variations, presses RESET, then rotates the
+  stick, instead of holding a fixed input. Added because of a measurement: a 2600 attract mode runs the
+  **game loop** with synthetic input, so a cartridge left alone already covers most of what playing it
+  covers — on Chopper Command, RESET plus a dozen rounds of stick moved the executed count by **4
+  instructions out of 2358**. What sitting there does not cover are the other game **variations**, behind
+  SELECT: **Seaquest 51% → 60%** of its decoded instructions, Adventure 61% → 67%, Chopper Command
+  46% → 49%. The report now carries `drive`, because a coverage percentage is a property of a ROM **and a
+  driving**, and two numbers taken under different drivings are not comparable. Panel switches go through
+  `SetPanel`, not `SetInput` — ignoring that error is how an earlier measurement "pressed" RESET without
+  pressing anything.
 - **`prove_line_budget` / `cyclebound.Prove` now accept a raw `.bin`** — the entry point that was missing.
   SD-0c taught the *decoder* to read real cartridges (Outlaw's 2K went from 0 instructions to **931**,
   Combat's from 0 to **838**), but nothing public took a raw image: `Prove` and `timinglint` assemble their
