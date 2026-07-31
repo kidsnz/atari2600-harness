@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"math/rand"
+	"os"
 	"sort"
 
 	"github.com/jetsetilly/gopher2600/cartridgeloader"
@@ -563,14 +564,55 @@ func (e *Emu) Annotated(scale int) *image.RGBA {
 	return annotate.Render(img, visTop, scale, e.Markers())
 }
 
-// LoadROM はファイルから ROM をロードして VCS にアタッチする。
-func (e *Emu) LoadROM(path string) error {
+// LoadROM loads a ROM image from a file and attaches it to the VCS.
+//
+// It also contains the process's only defence against a malformed image, because the
+// engine's fingerprinter does not have one. `hasSuperchip` (Gopher2600
+// hardware/memory/cartridge/fingerprint.go) slices every 4K window as `d[:0x80]` and
+// `d[0x80:]` without checking the length, so a file shorter than 128 bytes PANICS
+// instead of failing to load. Measured 2026-07-31 over the 542 .bin files under the
+// umbrella: 2 of them do it — a 12-byte `Combat.bin` and a 5-byte `skeleton_test.bin`,
+// both truncated downloads sitting in a mined reference archive.
+//
+// That matters here more than it would in a debugger: this package is driven by the
+// MCP server, whose `load_rom` and `assemble_and_load` take a path from the caller,
+// and by `cmd/fieldtest -inbox`, which walks a directory the USER drops files into. A
+// panic there does not fail one tool call, it kills the server and the session with it.
+// A truncated download is the single most likely malformed input, and it was the one
+// input that could not be reported.
+//
+// Two layers, because they answer different questions. The length precheck can say
+// what is actually wrong ("this file is 12 bytes"), which a recovered panic cannot.
+// The recover is the backstop for every other way the fingerprinter can fault on data
+// this function did not anticipate — it is upstream code reading attacker-shaped
+// bytes, and turning any fault into an error is strictly better than dying.
+func (e *Emu) LoadROM(path string) (err error) {
+	if fi, statErr := os.Stat(path); statErr == nil && !fi.IsDir() && fi.Size() < minCartBytes {
+		return fmt.Errorf("%s is %d bytes, which is not a cartridge image: the smallest 2600 "+
+			"cartridge is %d bytes, and the engine's superchip fingerprint reads the first %d of "+
+			"every bank unconditionally. Most likely a truncated or partial download",
+			path, fi.Size(), minCartBytes, minCartBytes)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("loading %s faulted inside the engine's cartridge fingerprint (%v); "+
+				"the image is malformed in a way the fingerprinter does not guard against", path, r)
+		}
+	}()
+
 	cartload, err := cartridgeloader.NewLoaderFromFilename(path, "AUTO", "AUTO", nil)
 	if err != nil {
 		return err
 	}
 	return setup.AttachCartridge(e.VCS, cartload, nil)
 }
+
+// minCartBytes is the shortest image the engine can fingerprint without reading past
+// the end of it: hasSuperchip compares d[:0x80] against d[0x80:] on every 4K window,
+// so anything under 256 bytes is out of bounds by construction. The smallest real
+// cartridge is 2048 bytes, so no genuine image is anywhere near this line.
+const minCartBytes = 0x100
 
 // Coords は現在のビーム位置（Frame/Scanline/Clock）を返す。横位置判定の出典。
 func (e *Emu) Coords() coords.TelevisionCoords {
