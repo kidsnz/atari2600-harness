@@ -104,6 +104,16 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **`emu.DisplayOff()` ignored VSYNC.** It read only `sig.VBlank`, while the prover's own `displayOff()` is
+  `VSync || VBlank` — and VSYNC blanks the picture as surely as VBLANK does. Measured while extending the
+  blank-classification grading past the technique corpus: **6730 "disagreements" appeared, every one on a
+  frame's VSYNC lines** in a ROM that raises VSYNC without also raising VBLANK. The prover was right and the
+  oracle was short a term. The error direction was false ALARMS, never missed detections, so nothing unsound
+  had shipped; what it had done was silently cap that grading to ROMs which happen to raise VBLANK during
+  VSYNC — the one verdict in the package that can hide a real scanline tear. Its only consumer is the
+  grading test, which still passes unchanged (144,568 executions across 32 ROMs, 0 disagreements). The
+  corpus extension is not shipped: 776 disagreements survive, and the evidence points at the oracle's
+  sampling point rather than the prover, but that is filed as a hypothesis with its numbers, not acted on.
 - **Four more descriptions made to match measured behaviour** (from the 38-tool sweep; no behaviour change).
   `step_scanline` said "CPU cycles consumed across that scanline" for a figure that **excludes WSYNC stall
   time** — measured 8 on twelve consecutive 76-cycle lines, so the remainder read as headroom that does not
