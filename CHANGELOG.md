@@ -8,6 +8,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-31
+
+**MAJOR, because two MCP tools changed what a caller gets back.** `CLAUDE.md` says this project follows
+SemVer and that MAJOR means 互換破壊, so the number is produced by the rule, not chosen: `beamtrace` changed
+the SHAPE of its result and `breakif` changed the MEANING of its stop condition, and a caller written against
+`1.117.0` is wrong about both. Neither is a mistake being undone — each is a capability that could not be
+reached through the old contract (four of five traced frames were unreturnable; the whole visible region was
+unstoppable). Everything else in this release is additive or a fix; `### Breaking` below is the complete list
+of incompatibilities, and both entries are restated with their measurements under `### Changed`.
+
+### Breaking
+- **`beamtrace` returns `frames[]`; there is no top-level `rows`.** The result was a single `{frame, rows}`
+  and is now `{frames: [{frame, rows}, ...]}`, one entry per traced frame. **A caller must change `rows` to
+  `frames[0].rows` and `frame` to `frames[0].frame`** — reading `rows` at the top level now finds nothing
+  there. Why it had to change: the tool traced `frames` frames and advanced the machine past all of them,
+  then returned the earliest one alone (measured over the wire: `frames=4` starting at frame 5 left the
+  machine at frame 9 and handed back frame 5), so the other frames were unreachable by any route. Pass
+  `scanline` to keep the larger payload narrow.
+- **`breakif` halts at or past the requested beam position, not on an exact match.** It now stops at the
+  first instruction boundary **at or past** `(until_scanline, until_clock)`, so a caller that relied on
+  "stops only on the exact value" now stops **earlier** — measured, asking for clock 80 halts at 82 — and
+  must read the returned `coords` instead of assuming them. Why it had to change: the machine is only
+  observed at instruction boundaries, the CPU advances 3 colour clocks per cycle so only one phase in three
+  is ever observable, and a WSYNC kernel narrows it much further — measured on `motion_xclamp`, a visible
+  scanline is observed at **7 clocks, every one of them inside HBLANK**, so the visible region 0..159 could
+  not be stopped inside at all. An exact-match request for a position in the picture ran to `max_frames` and
+  returned `halted=false` with no error, which is indistinguishable from "not yet". Second incompatibility in
+  the same tool: an out-of-range clock is now an **error**. The old tag advertised "0-227" while the
+  coordinate system is HBLANK −68..−1 / visible 0..159, so 68 of the advertised values did not exist; a
+  caller passing one of them used to get a silent never-halt and now gets a rejection.
+
 ### Added
 - **`LoadROM` no longer dies on a truncated image — and 2 of the 542 `.bin` files on this machine
   killed it.** Found by sweeping every image under the umbrella through the loader: a 12-byte
