@@ -8,6 +8,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **The prover stops calling a DAG a loop — and the first attempt at it published a bound BELOW the
+  machine, which the corpus gate caught.** `foldLoops` decided what a back edge was by ADDRESS ORDER: a
+  branch counted as one when its target sat at a lower address and was not a WSYNC sink. That is not
+  reachability, and a region whose graph is acyclic was refused as *"multiple back-edges"* for having no
+  edges back. Four regions across the corpus are exactly that, all commercial: Seaquest `$F1EC` (proven
+  59, machine 53), Chopper Command `$FA78` (74, 72) and `$FAEC` (103, 97 over two scanlines),
+  Barnstorming `$F3D4` (95).
+  **The order is the whole finding.** Running the longest-path walk FIRST and accepting whenever it met
+  no cycle bounded 49 regions — and 45 of them were bypassing legitimate refusals, because `foldLoops`
+  refuses for eight reasons and only one describes the graph. The other seven describe the loop BODY,
+  and a loop whose body holds a WSYNC is **invisible to the walk**: the WSYNC is a sink, so the walk
+  stops there and never traverses the edge back, leaving a subgraph that looks perfectly acyclic.
+  VideoOlympics `$F5CA` refuses for *"WSYNC inside loop body"*; the walk answered **148 cycles for an
+  interval the machine takes 163**, and `$F61F` did the same at 155. Folding first and overriding only
+  the back-edge refusal leaves exactly the 4 intended regions, 0 bounds lowered, 0 lost, and no region
+  reclassified. Witness: `litmus_dag_region.asm`, since all four real specimens are cartridges this repo
+  does not contain. Negative controls both ways — removing the override fails the witness on its own
+  premise check (0 multi-latch regions reached), widening it past the back-edge case fails the invariant
+  test (not one body-shape refusal survives in 31 ROMs).
+  **The gate caught this because it had been extended hours earlier.** VideoOlympics was only graded at
+  all because the commercial images were added to `TestProvenWorstIsNeverExceededOnCorpus` the same day;
+  before that the corpus was the corpus we happened to write, and a well-argued soundness claim would
+  have shipped an unsound bound.
+
+
 ### Fixed
 - **The cycle-budget prover under-approximated every `dex`/`dey` countdown latched by `BPL` by one whole
   iteration — proven 66 where the machine takes 75.** `determineBound` accepted `BNE` and `BPL` as the latch

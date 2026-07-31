@@ -1838,12 +1838,31 @@ func analyzeRegionInContexts(instrs map[site]Instr, start Instr, budget, amaxHin
 		if len(s.sinks) == 0 {
 			return nil
 		}
-		if msg := s.foldLoops(); msg != "" {
-			return nil
-		}
-		r := s.longest(start.nextSite(), ctx{ret: ret, active: true})
-		if s.cyclic || s.unbounded {
-			return nil
+		// Same order as the flat walk, and for the same measured reason: fold
+		// first, and let the DAG walk override only the back-edge refusal. See
+		// multipleBackEdges. Handling one call site and not the other would leave a
+		// region provable at top level and refused inside a subroutine, which is a
+		// split the caller cannot see.
+		var r result
+		msg := s.foldLoops()
+		if msg == multipleBackEdges {
+			s.resetSolve()
+			r = s.longest(start.nextSite(), ctx{ret: ret, active: true})
+			if s.cyclic || s.unbounded {
+				return nil
+			}
+			dagFirstAnswered++
+			if addressOrderLatches(s) > 1 {
+				dagFirstMultiLatch++
+			}
+		} else {
+			if msg != "" {
+				return nil
+			}
+			r = s.longest(start.nextSite(), ctx{ret: ret, active: true})
+			if s.cyclic || s.unbounded {
+				return nil
+			}
 		}
 		if worst == nil || r.cyc > worst.Worst {
 			reg := Region{
@@ -1952,10 +1971,128 @@ func (s *solver) loc(at site) string {
 	return s.sm.Locate(at.addr)
 }
 
+// dagFirst runs the longest-path walk over the UNFOLDED region subgraph and returns
+// its result when the walk finished without meeting a cycle. A nil answer means the
+// region needs loop modelling, and the solver is left reset so the caller can fold
+// and re-solve exactly as if this had never run.
+//
+// WHY IT RUNS FIRST. foldLoops decides what is a loop by ADDRESS ORDER: a branch
+// counts as a back edge when its target sits at a lower address than the branch and
+// is not a WSYNC sink. That is not reachability. A branch backwards to code that
+// cannot reach the branch again is not a back edge at all, and a region whose graph
+// is a perfectly good DAG was being refused as "multiple back-edges" for having no
+// edges back. Measured on the real cartridges: of 33 regions refused that way across
+// the corpus (in-tree kernels + 5 commercial images), 4 are acyclic — Seaquest $F1EC
+// (DAG 59, machine 53), Chopper Command $FA78 (74, machine 72) and $FAEC (103,
+// machine 97 over 2 scanlines), Barnstorming $F3D4 (95). Seaquest $F1EC reads
+// plainly: `$F1E8 bpl → $F1BB` and `$F1F6 beq → $F1E5` are both backward BRANCHES,
+// but $F1BB reaches only the WSYNC sinks $F1D3/$F1EC and $F1E5 reaches only sinks.
+// Nothing returns to either branch.
+//
+// SOUNDNESS.
+//  1. The DAG longest path over s.nodes is an upper bound on the cost of every
+//     reachable path, because collectFrom fills s.nodes through the SAME successor
+//     oracle longest walks and over-approximates the edge set. This is not a new
+//     claim: it is the machinery that produces every bounded region in the report
+//     today. What changes is only WHEN it is allowed to run.
+//  2. Folding exists solely to cut cycles. With no cycle there is nothing to cut, so
+//     trying the DAG first cannot lower a bound that folding would have produced —
+//     it can only produce a bound where there was a refusal.
+//  3. Cycle detection is delegated to longest's own gray-node colouring rather than
+//     to a second, independent notion of "back edge". collectRegion's comment warns
+//     that two collectors "would eventually disagree, and the disagreement would be
+//     invisible"; the address-order test IS that second, disagreeing notion, and
+//     those 4 regions are the measured disagreement. One notion of a cycle, used by
+//     the code that has to cost it.
+//
+// Anything the walk cannot bound for a NON-cycle reason (a nested call, an RTS with
+// no caller, an unmodelled switch edge) still answers nil, so the fold path and its
+// call-context fallbacks are reached unchanged.
+// multipleBackEdges is the ONE refusal the DAG walk is allowed to override, and it
+// is named rather than matched as a literal because the override has to be exact.
+//
+// foldLoops refuses for eight distinct reasons and only this one is about the shape
+// of the GRAPH; the other seven are about the loop BODY — it leaves the region, it
+// leaves the bank, it holds a WSYNC, it holds a branch, it switches banks, it is
+// misaligned, its trip count is unknown. A DAG answer says nothing about any of
+// those, and substituting one for them is unsound.
+//
+// Measured, and it is why this constant exists: an earlier version ran the DAG walk
+// BEFORE foldLoops and accepted whenever the walk met no cycle. VideoOlympics
+// $F5CA refuses for "WSYNC inside loop body", and that loop is INVISIBLE to the
+// walk — the WSYNC is a sink, so the walk stops there and never traverses the edge
+// back, leaving a subgraph that looks perfectly acyclic. The walk answered 148
+// cycles for an interval the machine takes 163, which the standing corpus gate
+// caught. $F61F did the same at 155 for "branch inside loop body". A bound below
+// the machine's is worse than no bound, so the refusal order is: fold first,
+// override only this.
+const multipleBackEdges = "multiple back-edges (nested/complex loops) — not modeled in v1"
+
+func (s *solver) dagFirst(start Instr) *result {
+	r := s.longest(start.nextSite(), ctx{})
+	if !s.cyclic && !s.unbounded {
+		dagFirstAnswered++
+		if addressOrderLatches(s) > 1 {
+			dagFirstMultiLatch++
+		}
+		return &r
+	}
+	s.resetSolve()
+	return nil
+}
+
+// resetSolve clears the per-solve memo, colouring and verdict so the same collected
+// subgraph can be solved again. solveObligation does exactly this between trip
+// counts; dagFirst does it after an attempt that met a cycle.
+func (s *solver) resetSolve() {
+	s.memo = map[lkey]result{}
+	s.state = map[lkey]int{}
+	s.cyclic, s.unbounded, s.unbReason = false, false, ""
+}
+
+// addressOrderLatches counts the branches foldLoops would treat as back edges. It is
+// a MEASUREMENT of the old, address-order notion of a loop, kept so a test can prove
+// its own premise: a region that the DAG answered while carrying two or more of these
+// is a region the `len(latches) > 1` guard refused before this change. Counting is
+// side-effect free — it does not fold anything.
+func addressOrderLatches(s *solver) int {
+	n := 0
+	for _, in := range s.nodes {
+		if !in.Def.IsBranch() {
+			continue
+		}
+		tgt := in.branchSite()
+		if _, ok := s.nodes[tgt]; ok && tgt.addr <= in.Addr && !s.sinks[tgt] {
+			n++
+		}
+	}
+	return n
+}
+
+// dagFirstAnswered / dagFirstMultiLatch census how often the DAG-first attempt
+// settles a region, and how often it settles one the address-order guard would have
+// refused outright.
+//
+// They are MEASUREMENT counters like proxyFallbackHits and bplTripCountAdjusted, not
+// analysis state. dagFirstAnswered is large and uninteresting on its own — most
+// regions have no loop at all and were always answered by this walk, just after a
+// fold pass that found nothing. dagFirstMultiLatch is the number that says whether
+// this change does anything: it counts regions carrying >= 2 address-order latches
+// and no cycle, which is exactly the set the "multiple back-edges" refusal used to
+// take. A test that reads it can say out loud when its fixture is the only witness.
+var (
+	dagFirstAnswered   int
+	dagFirstMultiLatch int
+)
+
 // foldLoops finds a single simple counted loop in the region subgraph and folds
 // it into one synthetic node keyed by the loop header. Returns "" on success (or
 // when there is no loop), or a reason string when a loop exists but can't be
 // bounded (so the region is reported unbounded).
+//
+// It runs only AFTER dagFirst has reported a cycle, so the address-order latch test
+// below is no longer the thing that decides whether a region has a loop at all — it
+// only picks WHICH branch to fold in a region already proven cyclic.
 func (s *solver) foldLoops() string {
 	var latches []Instr
 	for _, in := range s.nodes {
@@ -1973,7 +2110,7 @@ func (s *solver) foldLoops() string {
 		return ""
 	}
 	if len(latches) > 1 {
-		return "multiple back-edges (nested/complex loops) — not modeled in v1"
+		return multipleBackEdges
 	}
 	latch := latches[0]
 	header := latch.branchSite()
@@ -2402,7 +2539,23 @@ func analyzeRegion(instrs map[site]Instr, start Instr, budget, amaxHint int, sm 
 		}
 		return unbounded("no WSYNC reached from region start")
 	}
+	// DAG FIRST. Ask the longest-path walk for an answer BEFORE trying to fold, and
+	// fold only when the walk itself reports a cycle (see dagFirstAnswered).
+	// Fold FIRST, and let the DAG walk override exactly one refusal. See
+	// multipleBackEdges for why the order matters and what it cost to learn.
+	// foldLoops returns that message before it has folded anything, so the walk
+	// below still runs on the unfolded subgraph.
 	if msg := s.foldLoops(); msg != "" {
+		if msg == multipleBackEdges {
+			if r := s.dagFirst(start); r != nil {
+				reg.Worst = r.cyc
+				reg.Over = r.cyc > budget
+				if reg.Over {
+					reg.Path = r.path
+				}
+				return reg
+			}
+		}
 		reg = unbounded(msg)
 		// If the only thing missing was the trip count, the region's cost is still
 		// a known function of it, so the largest count that fits is computable.
