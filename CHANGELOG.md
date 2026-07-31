@@ -104,6 +104,17 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **`prove_line_budget` / `cyclebound.Prove` now accept a raw `.bin`** — the entry point that was missing.
+  SD-0c taught the *decoder* to read real cartridges (Outlaw's 2K went from 0 instructions to **931**,
+  Combat's from 0 to **838**), but nothing public took a raw image: `Prove` and `timinglint` assemble their
+  input, so every commercial ROM came back as *"Unknown Mnemonic"* — measured on Adventure, Seaquest,
+  Chopper Command, VideoOlympics and Empire Strikes Back. The capability existed and was unreachable, which
+  blocked the casebook line, where the ROMs are commercial by definition. Now measured on real cartridges:
+  **VideoOlympics 8 regions, Adventure 14, Seaquest 49, Chopper Command 29, all converged.** A raw image
+  loses only what SOURCE carries — `@lines`/`@amax` annotations and label locations — and `srcmap` is
+  nil-safe throughout for exactly that. **The `.asm` path is byte-identical** (6 ROMs including a banked
+  one, whole JSON output compared), and a test pins that the same ROM yields the same region count and
+  worst case through both routes.
 - **The collision latches' three unlocked claims are now locked** (`litmus_cxclr` +
   `TestHmclearDoesNotClearCollisions`). The D7/D6 map had a pure-function test; "sticky", "CXCLR clears"
   and "**HMCLR does not**" did not — stickiness appeared only in a comment and the HMCLR distinction was
