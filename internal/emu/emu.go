@@ -713,7 +713,17 @@ func (e *Emu) HmoveOnScanline(scanline int) (HmoveSpan, error) {
 // display is off, and that claim is only worth anything if the machine agrees.
 func (e *Emu) DisplayOff() bool {
 	sig := e.VCS.TV.GetLastSignal()
-	return sig.VBlank
+	// VSYNC blanks the picture as surely as VBLANK does, and reading only VBlank made
+	// this disagree with the prover, whose displayOff() is `VSync || VBlank`. Measured
+	// 2026-07-30 while extending the blank-classification grading past the technique
+	// corpus: 6730 "disagreements" appeared, every one of them on a frame's VSYNC lines
+	// in a ROM that sets VSYNC without also setting VBLANK (uninit_clean, uninit_trap,
+	// litmus_bound_proxy, exerciser). The prover was right and the oracle was short a
+	// term. The error direction was false ALARMS, never missed detections, so nothing
+	// unsound shipped — but it silently capped the corpus this grading could run on to
+	// ROMs that happen to raise VBLANK during VSYNC, which is not a property anyone had
+	// chosen.
+	return sig.VBlank || sig.VSync
 }
 
 // RunFrames は n フレーム実行する（条件停止なし）。stepInstr 経由で CPU サイクルを正しく累積する

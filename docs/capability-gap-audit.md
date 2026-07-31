@@ -1789,18 +1789,40 @@ out to be barely exercised; `cb_pushdisplay` does not cover it either, because i
 region rather than inside a `jsr`'d routine. Deliberately NOT fixed by adding a third fixture: colouring a
 conservative branch green is coverage theatre, and the sweep exists to find the opposite.
 
-**The finding is what the witnesses do not establish.** `PRESERVES` fires 61 times across the corpus, and
-`displayPreserver` / `preservesDisplay` appears in **no test in this repository** — grep over every
-`*_test.go` returns nothing. Its siblings are graded against the machine: `defuse` at 9055/9055 observed
-(pc,addr) pairs inside their predicted sets, `beam_intervals` at 7117/7117 observed writes inside their
-proven windows. This one has 61 executions and zero verdicts. A branch having witnesses says it is
-*reached*, not that it is *right*, and for the precise side that is the question that matters.
+**CORRECTION (same day, before building on it): "zero verdicts" was wrong.** The first version of this
+entry said `displayPreserver` has 61 executions and no verdict, on the strength of a grep showing it named
+in no test. The grep was right and the conclusion was not: its only consumer's OUTPUT is graded against the
+machine by `TestBlankClassificationAgreesWithTheMachine`, which runs each ROM and asserts that a region the
+prover called BLANK is never reached with the display on — **144,568 executions of blank-region entry points
+across 32 ROMs, 0 disagreements**, and it reports the 1 blank region never reached as explicitly not
+covered. A wrong `true` from `displayPreserver` carries "display off" past a routine that turned it on, and
+that shows up there. The function is unnamed in the tests; its consequence is not ungraded. Checking before
+extending is what caught this — the same move that corrected the `cb_deadpred` mechanism earlier today.
 
-**Filed, with the shape of the check.** Run each corpus ROM, record every write to VSYNC/VBLANK with the PC
-that made it, and for every subroutine entry `displayPreserver` declared preserving, assert no observed
-write lies inside that callee's body (`reachableWithinCallee` already answers "is this PC part of that
-subroutine"). That yields the same kind of number its siblings carry, and a violation would be a real
-under-approximation rather than an imprecision.
+**What IS missing is corpus, and trying to add it found an oracle defect.** The grading runs on
+`roms/techniques/*.asm` plus one litmus — 32 of the ~129 ROMs. Extending it to the litmus and exerciser
+corpora produced **6730 disagreements**, every one of them on a frame's VSYNC lines in a ROM that raises
+VSYNC without also raising VBLANK. The prover's `displayOff()` is `VSync || VBlank`; the oracle,
+`emu.DisplayOff()`, read **only** `sig.VBlank`. VSYNC blanks the picture as surely as VBLANK does, so the
+oracle was short a term — fixed, and the error direction was false ALARMS rather than missed detections, so
+nothing unsound had shipped. What it had done instead was silently cap this grading to ROMs that happen to
+raise VBLANK during VSYNC, a property nobody chose.
+
+**Still open: 776 residual disagreements, and the corpus extension is NOT shipped because of them.** After
+the fix they are confined to `litmus_bound_proxy` (336) and `exerciser` (440). Probed at the exact failing
+PCs, both sit **one instruction after** the store that turns the display off, and `GetLastSignal()` there
+still reports the pre-write pixel (`sig.VBlank=false sig.VSync=false` at `litmus_bound_proxy $F038`,
+scanline 228 clock −41, immediately after its `sta VBLANK`). The hypothesis is therefore a sampling-point
+problem in the oracle — the TV's last EMITTED signal lags the register write by a few colour clocks — and
+not a prover defect. **It is a hypothesis, not a result:** the register value at that instant was not read,
+because `ReadTIARegisters` does not expose VBLANK/VSYNC. Until that is settled the corpus stays at 32 ROMs
+rather than shipping a red test or a weakened assertion. Next step: expose the VBLANK/VSYNC register state
+and re-probe; if the registers say blanked while the signal does not, move the oracle to the registers and
+extend the corpus (144,568 → 446,497 executions, 32 → 128 ROMs).
+
+**Also filed, unchanged:** a direct grading of the predicate rather than its consequence — record every
+write to VSYNC/VBLANK with its PC, and for every entry declared preserving, assert no observed write lies
+inside that callee's body (`reachableWithinCallee` already answers the containment question).
 
 ### The display-miss predicates swept: 3 unwitnessed branches, all conservative — and a fixture that misses its own hazard (2026-07-30)
 
