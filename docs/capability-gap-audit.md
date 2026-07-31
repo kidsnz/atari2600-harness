@@ -772,6 +772,17 @@ Recorded because three of these were previously mistaken for hard limits when th
   interrupt would move SP without being seen at all.
 - **Self-modifying code is detectable even when not resolvable** — a store whose effective address lands in
   decoded code space is a fact, not a guess. Correct terminal state is "region suspended", never a guess.
+  **Scoped by measurement 2026-07-30, and not built yet — deliberately.** Ran `DefUse`'s may-write set
+  against the cartridge window over the whole corpus: **133 ROMs, 0 that write into it.** Building the
+  detector now would add a branch with no witness, which is what every sweep this week has penalised, so
+  the detector and its planted fixture have to be built together — a ROM that stores into its own decoded
+  code space, twinned with one that does not, in the pattern `cb_deadpred`/`cb_pushdisplay` use.
+  **And there is a precondition nobody had stated.** The ROMs where this actually matters are commercial
+  images, not our own kernels — and the static tools cannot read one: `Prove` and `timinglint` ASSEMBLE
+  their input, so a raw `.bin` comes back as "Unknown Mnemonic" (measured on Adventure, Seaquest, Chopper
+  Command, VideoOlympics, Empire Strikes Back). Whatever SD-0c added for raw images is not reachable from
+  those entry points. Until a `.bin` can be analysed, a self-modification detector could only ever run on
+  code we wrote, which is the code least likely to do it.
 - **Conditional bounds — DONE for the dominant case.** Measured first: of 29 unbounded regions across the
   technique corpus, **15 fail for one reason — "loop bound unknown"**. The body of such a loop is fully
   understood; only its trip count is missing, so the region's cost is still a known function of it and the
