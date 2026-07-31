@@ -30,13 +30,13 @@ func TestStaticBranchSetContainsObserved(t *testing.T) {
 			t.Logf("assemble %s: %s", asm, out)
 			continue
 		}
-		static, banked, err := StaticBranches(bin)
+		static, banked, err := StaticBranchSites(bin)
 		if err != nil {
 			continue
 		}
-		set := map[uint16]bool{}
-		for _, a := range static {
-			set[a] = true
+		set := map[CodeSite]bool{}
+		for _, s := range static {
+			set[s] = true
 		}
 
 		e, err := emu.New("NTSC")
@@ -54,10 +54,10 @@ func TestStaticBranchSetContainsObserved(t *testing.T) {
 			continue
 		}
 		roms++
-		var missing []uint16
-		for _, a := range e.Coverage().BranchAddrs() {
-			if !set[a] {
-				missing = append(missing, a)
+		var missing []CodeSite
+		for _, s := range e.Coverage().BranchSites() {
+			if !set[(CodeSite{Bank: s[0], Addr: uint16(s[1])})] {
+				missing = append(missing, CodeSite{Bank: s[0], Addr: uint16(s[1])})
 			}
 		}
 		if len(missing) == 0 {
@@ -67,9 +67,13 @@ func TestStaticBranchSetContainsObserved(t *testing.T) {
 		if !banked {
 			// Not bank-switched, so the decoder should have reached this code. Report
 			// it rather than letting it quietly shrink the denominator.
+			addrs := make([]uint16, len(missing))
+			for i, s := range missing {
+				addrs[i] = s.Addr
+			}
 			t.Logf("%s: %d executed branches were never decoded (%v) — the denominator is "+
 				"too small here and coverage is an over-estimate",
-				filepath.Base(asm), len(missing), hexAddrs(missing))
+				filepath.Base(asm), len(missing), hexAddrs(addrs))
 		}
 	}
 	if roms == 0 {
@@ -89,13 +93,13 @@ func TestStaticCoverageIsNeverHigherThanObserved(t *testing.T) {
 		if _, err := build.Assemble(asm, bin); err != nil {
 			continue
 		}
-		static, banked, err := StaticBranches(bin)
+		static, banked, err := StaticBranchSites(bin)
 		if err != nil || banked || len(static) == 0 {
 			continue
 		}
-		set := map[uint16]bool{}
-		for _, a := range static {
-			set[a] = true
+		set := map[CodeSite]bool{}
+		for _, s := range static {
+			set[s] = true
 		}
 		e, err := emu.New("NTSC")
 		if err != nil {
@@ -113,8 +117,8 @@ func TestStaticCoverageIsNeverHigherThanObserved(t *testing.T) {
 		}
 		cov := e.Coverage()
 		complete := true
-		for _, a := range cov.BranchAddrs() {
-			if !set[a] {
+		for _, s := range cov.BranchSites() {
+			if !set[(CodeSite{Bank: s[0], Addr: uint16(s[1])})] {
 				complete = false
 			}
 		}

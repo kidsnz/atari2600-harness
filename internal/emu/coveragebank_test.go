@@ -40,11 +40,15 @@ func TestCoverageDistinguishesTheSameAddressInTwoBanks(t *testing.T) {
 	}
 
 	shared := 0
-	var sampleAddr uint16
+	var sampleAddr, sharedAddr uint16
+	var sharedBanks map[int]bool
 	var ranIn, didNotRun int
 	for addr, banks := range perAddr {
 		if len(banks) > 1 {
 			shared++
+			if sharedAddr == 0 {
+				sharedAddr, sharedBanks = addr, banks
+			}
 			continue
 		}
 		// An address executed in exactly one bank: the OTHER bank's twin must not
@@ -73,8 +77,20 @@ func TestCoverageDistinguishesTheSameAddressInTwoBanks(t *testing.T) {
 			t.Errorf("$%04X never ran in bank %d, but SeenIn reports it covered — this is the "+
 				"flattering direction the address-only key had", sampleAddr, didNotRun)
 		}
-		if !e.Coverage().Seen(sampleAddr) {
-			t.Errorf("Seen(addr) must stay 'covered in SOME bank' for compatibility")
+	}
+	if sharedAddr != 0 {
+		// The bank-blind Seen(addr) — "covered in SOME bank" — used to be asserted
+		// here. It was deleted on 2026-07-31 with its last consumer, cmd/cover's
+		// unreached-branch loop, where "some bank" was the flattering answer. The
+		// property it stood for survives as an explicit disjunction over the banks
+		// and is checked here at full resolution instead: an address the machine ran
+		// in BOTH banks must read as covered in both, not just in whichever one the
+		// merged map happened to keep.
+		for b := range sharedBanks {
+			if !e.Coverage().SeenIn(b, sharedAddr) {
+				t.Errorf("$%04X executed in bank %d but SeenIn says otherwise — the recorder dropped "+
+					"one of the two instructions that share this address", sharedAddr, b)
+			}
 		}
 	}
 	t.Logf("%d distinct (bank,pc) pairs, %d addresses executed in BOTH banks, PCCount=%d",

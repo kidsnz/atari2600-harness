@@ -30,11 +30,6 @@ type Coverage struct {
 	brTaken  map[covKey]bool // 分岐命令→taken エッジを踏んだ
 	brNot    map[covKey]bool // 分岐命令→fall-through エッジを踏んだ
 	branches map[covKey]bool // 分岐命令と判明したもの（全体集合）
-
-	// addrSeen keeps the bank-less view alive for Seen(addr), whose meaning is
-	// "executed at this address in SOME bank". Kept separate rather than derived,
-	// so the legacy query stays O(1) and its meaning stays visible in one place.
-	addrSeen map[uint16]bool
 }
 
 func newCoverage() *Coverage {
@@ -43,7 +38,6 @@ func newCoverage() *Coverage {
 		brTaken:  map[covKey]bool{},
 		brNot:    map[covKey]bool{},
 		branches: map[covKey]bool{},
-		addrSeen: map[uint16]bool{},
 	}
 }
 
@@ -54,7 +48,6 @@ func newCoverage() *Coverage {
 func (c *Coverage) record(bank int, addr uint16, isBranch, taken bool) {
 	k := covKey{bank, addr}
 	c.pcSeen[k] = true
-	c.addrSeen[addr] = true
 	if isBranch {
 		c.branches[k] = true
 		if taken {
@@ -68,11 +61,19 @@ func (c *Coverage) record(bank int, addr uint16, isBranch, taken bool) {
 // PCCount は踏んだ相異なる命令数（バンク込み）。
 func (c *Coverage) PCCount() int { return len(c.pcSeen) }
 
-// Seen はそのアドレスの命令を **いずれかのバンクで** 実行したか（未踏＝デッドコードの候補）。
-// バンクを問うなら SeenIn を使うこと。フラット 4K では両者は同じ。
-func (c *Coverage) Seen(addr uint16) bool { return c.addrSeen[addr] }
-
-// SeenIn はその (バンク, アドレス) の命令を実行したか。8K 以上でのみ Seen と差が出る。
+// SeenIn はその (バンク, アドレス) の命令を実行したか。これが唯一の「踏んだか」問い合わせ。
+//
+// A bank-blind Seen(addr) — "executed at this address in SOME bank" — used to sit
+// beside this one and was deleted 2026-07-31. It had exactly one shipped consumer,
+// cmd/cover's unreached-branch loop, and there it answered in the flattering
+// direction: a branch that ran only in the OTHER bank read as covered. Measured
+// against the bank-aware static branch set at -frames 120 -warmup 2, 80 branches
+// across the corpus were called covered which a (bank, address) comparison calls
+// unreached — Pressure Cooker 35, Vanguard 19, exerciser 16, Aquaventure 9,
+// banked_game 1, and 0 on litmus_bank/_f6/_f4, which are too small to collide.
+// On flat 4K images the two queries are identical by construction: Chopper Command
+// and Seaquest both measured 0, and cmd/cover's whole JSON output on them is
+// byte-for-byte unchanged.
 func (c *Coverage) SeenIn(bank int, addr uint16) bool { return c.pcSeen[covKey{bank, addr}] }
 
 // BranchCount は分岐命令として観測した数（バンク込み）。
@@ -92,26 +93,56 @@ func dedupeAddrs(keys map[covKey]bool) []uint16 {
 	return out
 }
 
-// BranchAddrs は分岐命令として観測したアドレスを昇順で返す。静的に復号した分岐集合と
-// 突き合わせるための観測側＝これに含まれて静的側に無いものは「デコーダが到達していない
-// コード」であり、分母が小さすぎる合図になる。同じアドレスが両バンクで分岐なら 1 回だけ出る。
-func (c *Coverage) BranchAddrs() []uint16 { return dedupeAddrs(c.branches) }
+// sortedSites は (bank,addr) 集合を (バンク, アドレス) 昇順の対の列にする。
+func sortedSites(keys map[covKey]bool) [][2]int {
+	out := make([][2]int, 0, len(keys))
+	for k := range keys {
+		out = append(out, [2]int{k.bank, int(k.addr)})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i][0] != out[j][0] {
+			return out[i][0] < out[j][0]
+		}
+		return out[i][1] < out[j][1]
+	})
+	return out
+}
+
+// BranchSites is every instruction observed to BE a branch, as (bank, address)
+// pairs ascending. It is the observed side of the coverage report: a site in here
+// and not in the static decode is code the decoder never reached, which means the
+// static denominator is too small.
+//
+// It replaced BranchAddrs() []uint16 on 2026-07-31, because the static side it is
+// compared against is now keyed on (bank, address) and a bare address cannot be
+// looked up in that set at all. This is not a number that moved: measured over the
+// corpus at -frames 120, dedupeAddrs merged observed branch sites on exactly one
+// image (exerciser, 14 sites to 13 addresses) and the executed-but-undecoded count
+// came out identical under either keying — 0 everywhere except Aquaventure, which
+// reports 14 both ways. It is the comparison that was impossible, not the answer
+// that was wrong, and the merge becomes wrong the moment a run enters one branch
+// address in two banks. There is no bank-blind branch query left.
+func (c *Coverage) BranchSites() [][2]int { return sortedSites(c.branches) }
 
 // EdgeCount は踏んだ分岐エッジの総数（最大 = BranchCount*2＝両方向踏破）。
 func (c *Coverage) EdgeCount() int { return len(c.brTaken) + len(c.brNot) }
 
-// OneSidedBranches は片側エッジしか踏んでいない分岐アドレスを昇順で返す
+// OneSidedBranchSites は片側エッジしか踏んでいない分岐を (バンク, アドレス) 昇順で返す
 // （taken だけ／not だけ＝その分岐の裏側がテストされていないサイン）。
-// バンク切替イメージでは「どれかのバンクで片側」＝報告する。片側性は所見なので、
-// 潰すなら見落とす側ではなく報告する側に潰す。
-func (c *Coverage) OneSidedBranches() []uint16 {
+//
+// Bank-aware since 2026-07-31. The address-only OneSidedBranches() it replaced
+// reported "one-sided in SOME bank", which merged a fully exercised branch in one
+// bank with a half-exercised twin in another and named neither — and it put an
+// address-only list in the same JSON object as a bank-qualified unreached list,
+// where the two read as comparable sets and are not.
+func (c *Coverage) OneSidedBranchSites() [][2]int {
 	oneSided := map[covKey]bool{}
 	for k := range c.branches {
 		if c.brTaken[k] != c.brNot[k] { // ちょうど片方だけ true
 			oneSided[k] = true
 		}
 	}
-	return dedupeAddrs(oneSided)
+	return sortedSites(oneSided)
 }
 
 // Signature は coverage-guided fuzz のフィードバック用に、踏んだ「カバレッジ標識」を比較可能な
@@ -139,19 +170,7 @@ func (c *Coverage) Signature() map[uint64]bool {
 // 変換したい呼び手はこちらを使うこと: アドレスだけでは 8K イメージのどちらの 4K 面かが決まらず、
 // `addr & (len(rom)-1)` は $Fxxx を必ず上位面に畳む。実測 2026-07-30、その畳み方で exerciser の
 // 覆われたオフセット 278 個は全部が上位 4K に落ち、バンク 0 のバイトは 1 つも選ばれなかった。
-func (c *Coverage) SeenSites() [][2]int {
-	out := make([][2]int, 0, len(c.pcSeen))
-	for k := range c.pcSeen {
-		out = append(out, [2]int{k.bank, int(k.addr)})
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i][0] != out[j][0] {
-			return out[i][0] < out[j][0]
-		}
-		return out[i][1] < out[j][1]
-	})
-	return out
-}
+func (c *Coverage) SeenSites() [][2]int { return sortedSites(c.pcSeen) }
 
 // SeenPCs は踏んだ命令アドレスを昇順で返す（dump 用）。
 func (c *Coverage) SeenPCs() []uint16 { return dedupeAddrs(c.pcSeen) }
@@ -163,5 +182,4 @@ func (c *Coverage) Reset() {
 	c.brTaken = map[covKey]bool{}
 	c.brNot = map[covKey]bool{}
 	c.branches = map[covKey]bool{}
-	c.addrSeen = map[uint16]bool{}
 }

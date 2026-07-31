@@ -748,22 +748,43 @@ func loadProgram(asmPath string) (*program, map[site]Instr, []site, *srcmap.Map,
 
 func baseName(p string) string { return filepath.Base(p) }
 
-// StaticBranches decodes a raw cartridge image from its vectors and returns every
-// branch instruction the control-flow graph reaches, ascending, plus whether the
-// image is bank-switched.
+// CodeSite is a statically decoded instruction's identity outside this package:
+// which bank, and where in it. It is the exported shape of the unexported `site`
+// key, and it exists because an address alone is not an instruction on a
+// bank-switched cartridge — every bank is mapped into the same $F000-$FFFF window,
+// so two banks routinely hold different code at one number.
+type CodeSite struct {
+	Bank int
+	Addr uint16
+}
+
+// StaticBranchSites decodes a raw cartridge image and returns every branch
+// instruction the control-flow graph reaches, as (bank, address) pairs ascending,
+// plus whether the image is bank-switched.
 //
-// On a bank-switched image the returned set is the FLAT FOLD — it is whatever the
-// last 4K of the file decodes to, not the cartridge's branches — and banked=true is
-// the caller's warning that the set is not a denominator anyone should divide by. The
-// signature stays []uint16 because its consumer (cmd/cover) divides a flat PC coverage
-// set by it; lifting it onto the per-bank decode means lifting the coverage recorder
-// first.
+// It routes through analysisUnits + decodeUnits — one self-contained 4K program per
+// bank, closed over the cross-bank landings a switch creates — which is the same
+// decode timinglint and the prover run on. It replaced StaticBranches() []uint16 on
+// 2026-07-31. That one built newProgram(rom) over the whole file, a flat fold at
+// base = 0x10000 - len(rom): an 8K image was modelled as $E000-$FFFF, an address
+// space the console does not have, and then the bank was thrown away again by
+// appending only a.addr. Its own comment said the result was "not the cartridge's
+// branches"; nothing downstream could act on that, because the only thing it
+// returned was the number it had just admitted was wrong. Measured on Vanguard, the
+// flat fold found 420 branch addresses where the per-bank decode finds 939 sites;
+// on litmus_bank the flat fold found 0, so cmd/cover divided by nothing and printed
+// edge_coverage 0.0 for a ROM whose three executed branches it had just listed.
+//
+// A declined cartridge is an ERROR, not an empty set. analysisUnits refuses an image
+// whose bytes are not what the CPU reads (a superchip maps 128 bytes of RAM over
+// $F000-$F0FF) or whose mapper switches by a rule this package has not read. Handing
+// such a caller `nil, nil` would let a refusal be divided by.
 //
 // It exists so a coverage report can be divided by the branches a program HAS
 // rather than by the ones a run happened to execute. Dividing by what was
 // observed makes an unreached branch vanish from the arithmetic entirely, so the
 // percentage rises as the test gets worse.
-func StaticBranches(romPath string) (branches []uint16, banked bool, err error) {
+func StaticBranchSites(romPath string) (branches []CodeSite, banked bool, err error) {
 	rom, err := os.ReadFile(romPath)
 	if err != nil {
 		return nil, false, err
@@ -771,15 +792,23 @@ func StaticBranches(romPath string) (branches []uint16, banked bool, err error) 
 	if len(rom) < 6 || len(rom) > 0x10000 {
 		return nil, false, fmt.Errorf("unexpected ROM size %d bytes", len(rom))
 	}
-	p := newProgram(rom)
-	instrs, _ := p.decodeFromVectors()
+	units, decline := analysisUnits(rom, romPath)
+	if decline != "" {
+		return nil, false, fmt.Errorf("%s", decline)
+	}
+	_, instrs, _, _ := decodeUnits(units)
 	for a, in := range instrs {
 		if in.Def.IsBranch() {
-			branches = append(branches, a.addr)
+			branches = append(branches, CodeSite{Bank: a.bank, Addr: a.addr})
 		}
 	}
-	sort.Slice(branches, func(i, j int) bool { return branches[i] < branches[j] })
-	return branches, p.banked, nil
+	sort.Slice(branches, func(i, j int) bool {
+		if branches[i].Bank != branches[j].Bank {
+			return branches[i].Bank < branches[j].Bank
+		}
+		return branches[i].Addr < branches[j].Addr
+	})
+	return branches, len(units) > 1, nil
 }
 
 // setOf turns a slice of addresses into the set sortedAddrs expects.

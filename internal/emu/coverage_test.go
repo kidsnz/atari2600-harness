@@ -20,15 +20,20 @@ func TestCoverageLogic(t *testing.T) {
 	if c.EdgeCount() != 3 { // {0x200 taken, 0x300 taken, 0x300 not}
 		t.Fatalf("EdgeCount=%d want 3", c.EdgeCount())
 	}
-	if !c.Seen(0x0100) {
-		t.Fatalf("0x0100 should be seen")
+	if !c.SeenIn(0, 0x0100) {
+		t.Fatalf("bank 0 $0100 should be seen")
 	}
-	if c.Seen(0x0999) { // planted: 記録していないアドレスは未踏
+	if c.SeenIn(0, 0x0999) { // planted: 記録していないアドレスは未踏
 		t.Fatalf("0x0999 was never recorded, must read as uncovered")
 	}
-	os := c.OneSidedBranches()
-	if len(os) != 1 || os[0] != 0x0200 {
-		t.Fatalf("OneSidedBranches=%v want [0x0200] (0x0300 is two-sided)", os)
+	// 記録したのはバンク 0 だけ＝バンク 1 の同アドレスは別の命令で、未踏。
+	// 旧 Seen(addr) はここで covered と答えていた（削除の理由そのもの）。
+	if c.SeenIn(1, 0x0100) {
+		t.Fatalf("bank 1 $0100 was never recorded; a bank-blind lookup calls it covered and must not")
+	}
+	os := c.OneSidedBranchSites()
+	if len(os) != 1 || os[0] != [2]int{0, 0x0200} {
+		t.Fatalf("OneSidedBranchSites=%v want [{0 0x0200}] (0x0300 is two-sided)", os)
 	}
 }
 
@@ -49,7 +54,7 @@ func TestCoverageThroughRun(t *testing.T) {
 	if cov == nil || cov.PCCount() == 0 {
 		t.Fatalf("expected non-empty coverage after running, got %+v", cov)
 	}
-	if cov.Seen(0x0000) { // RAM/データ域＝命令として実行されない＝未踏のはず
+	if cov.SeenIn(0, 0x0000) { // RAM/データ域＝命令として実行されない＝未踏のはず
 		t.Fatalf("0x0000 is not an executed instruction address; must be uncovered")
 	}
 	// 健全性: 踏んだエッジ数は分岐数の 2 倍を超えない。片側分岐は分岐集合の部分集合。

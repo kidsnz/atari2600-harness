@@ -38,18 +38,28 @@ type report struct {
 	// kernels: divtable reported 100% edge coverage with 12 of its 17 branches
 	// never executed; maze, hscroll and multicolor48 also read 100% with a third
 	// of their branches unreached.
-	BranchesStatic   int `json:"branches_static"`
-	BranchesObserved int `json:"branches_observed"`
-	EdgesExercised   int `json:"edges_exercised"`
+	//
+	// Both are counted per (bank, address). A branch is an instruction, and an
+	// instruction on a bank-switched cartridge is identified by the bank it was
+	// fetched from as well as by where it sits: every bank is mapped into the same
+	// $F000-$FFFF window, so one address holds different code in different banks.
+	//
+	// BranchesStatic and EdgeCoverage are POINTERS so that a refused decode marshals
+	// as null. A refusal is not a denominator of zero; see StaticRefused.
+	BranchesStatic   *int `json:"branches_static"`
+	BranchesObserved int  `json:"branches_observed"`
+	EdgesExercised   int  `json:"edges_exercised"`
 
 	// EdgeCoverage divides by the static denominator. EdgeCoverageObserved is the
 	// old, flattering number, kept alongside so the difference is visible rather
 	// than silently corrected.
-	EdgeCoverage         float64 `json:"edge_coverage"`
-	EdgeCoverageObserved float64 `json:"edge_coverage_observed"`
+	EdgeCoverage         *float64 `json:"edge_coverage"`
+	EdgeCoverageObserved float64  `json:"edge_coverage_observed"`
 
 	// UnreachedBranches are branches the program has and this run never executed —
-	// the actionable half of the report.
+	// the actionable half of the report. On a bank-switched image each entry names
+	// its bank ("bank 1 0x1234"), because the same address in the other bank is a
+	// different branch and may well have run.
 	UnreachedBranches []string `json:"unreached_branches"`
 	OneSided          []string `json:"one_sided_branches"` // executed, but only one edge taken
 
@@ -60,7 +70,14 @@ type report struct {
 	// loud rather than leaving to be inferred from a percentage above 100.
 	ExecutedButUndecoded []string `json:"executed_but_undecoded,omitempty"`
 	DecoderIncomplete    bool     `json:"decoder_incomplete"`
-	Note                 string   `json:"note,omitempty"`
+
+	// StaticRefused is why the cartridge was not decoded at all — a superchip maps
+	// RAM over the bottom page so the image is not what the CPU reads there, and a
+	// mapper whose switch rule this harness has not read cannot be given bank edges.
+	// When it is set there is no static side to the report and the fields above are
+	// null, which is a refusal a reader cannot mistake for a measurement of 0.
+	StaticRefused string `json:"static_refused,omitempty"`
+	Note          string `json:"note,omitempty"`
 
 	// Drive records HOW the ROM was driven. A coverage percentage is not a property
 	// of a ROM, it is a property of a ROM and a driving, and two numbers taken under
@@ -116,28 +133,52 @@ func main() {
 		fail(err)
 	}
 
-	cov := e.Coverage()
-	one := cov.OneSidedBranches()
+	rep := buildReport(*rom, *frames, *warmup, *drive, e.Coverage())
+	b, _ := json.MarshalIndent(rep, "", "  ")
+	fmt.Println(string(b))
+}
+
+// siteLabel renders a branch for a human. On a banked image the bank is part of
+// the branch's identity and must be printed; on a flat image there is only one, so
+// printing "bank 0" would be noise — and would change the text of every existing
+// report on the 4K cartridges that are most of the corpus.
+func siteLabel(bank int, addr uint16, banked bool) string {
+	if banked {
+		return fmt.Sprintf("bank %d 0x%04X", bank, addr)
+	}
+	return fmt.Sprintf("0x%04X", addr)
+}
+
+// buildReport compares a finished run's coverage against the branches the program
+// statically has. Split out of main so the comparison can be tested: a report that
+// is only ever produced by a process cannot be asserted on, and this is the one
+// place where the (bank, address) identity has to hold on both sides at once.
+func buildReport(romPath string, frames, warmup int, drive string, cov *emu.Coverage) report {
+	staticBr, banked, sErr := cyclebound.StaticBranchSites(romPath)
+
+	one := cov.OneSidedBranchSites()
 	oneHex := make([]string, len(one))
-	for i, a := range one {
-		oneHex[i] = fmt.Sprintf("0x%04X", a)
+	for i, s := range one {
+		oneHex[i] = siteLabel(s[0], uint16(s[1]), banked)
 	}
 
-	staticBr, banked, sErr := cyclebound.StaticBranches(*rom)
-	staticSet := map[uint16]bool{}
-	for _, a := range staticBr {
-		staticSet[a] = true
+	staticSet := map[cyclebound.CodeSite]bool{}
+	for _, s := range staticBr {
+		staticSet[s] = true
 	}
 	var unreached []string
-	for _, a := range staticBr {
-		if !cov.Seen(a) {
-			unreached = append(unreached, fmt.Sprintf("0x%04X", a))
+	for _, s := range staticBr {
+		// SeenIn, not a bank-blind lookup: on an 8K image the twin of this branch in
+		// the other bank is a different instruction, and asking "did this address run
+		// anywhere" answers yes for code that never executed.
+		if !cov.SeenIn(s.Bank, s.Addr) {
+			unreached = append(unreached, siteLabel(s.Bank, s.Addr, banked))
 		}
 	}
 	var undecoded []string
-	for _, a := range cov.BranchAddrs() {
-		if !staticSet[a] {
-			undecoded = append(undecoded, fmt.Sprintf("0x%04X", a))
+	for _, s := range cov.BranchSites() {
+		if !staticSet[(cyclebound.CodeSite{Bank: s[0], Addr: uint16(s[1])})] {
+			undecoded = append(undecoded, siteLabel(s[0], uint16(s[1]), banked))
 		}
 	}
 
@@ -145,39 +186,45 @@ func main() {
 	if cov.BranchCount() > 0 {
 		obsCov = float64(cov.EdgeCount()) / float64(cov.BranchCount()*2)
 	}
-	statCov := 0.0
-	if len(staticBr) > 0 {
-		statCov = float64(cov.EdgeCount()) / float64(len(staticBr)*2)
-	}
 	rep := report{
-		Rom:                  *rom,
-		Frames:               *frames,
-		Drive:                *drive,
+		Rom:                  romPath,
+		Frames:               frames,
+		Drive:                drive,
 		PCExecuted:           cov.PCCount(),
-		BranchesStatic:       len(staticBr),
 		BranchesObserved:     cov.BranchCount(),
 		EdgesExercised:       cov.EdgeCount(),
-		EdgeCoverage:         statCov,
 		EdgeCoverageObserved: obsCov,
 		UnreachedBranches:    unreached,
 		OneSided:             oneHex,
 		ExecutedButUndecoded: undecoded,
-		DecoderIncomplete:    banked || len(undecoded) > 0 || sErr != nil,
+		DecoderIncomplete:    len(undecoded) > 0 || sErr != nil,
 	}
-	switch {
-	case sErr != nil:
-		rep.Note = "the cartridge could not be decoded (" + sErr.Error() + "); edge_coverage has no denominator"
-	case banked:
-		rep.Note = "bank-switched image: a flat decode does not describe it, so branches_static is incomplete and edge_coverage is an over-estimate"
-	case len(undecoded) > 0:
-		rep.Note = "some executed branches were never decoded (flow from the vectors cannot follow a bank switch or a computed dispatch), so branches_static is too small and edge_coverage is an over-estimate"
+	if sErr != nil {
+		// Refused, so there is no static side at all. Leaving the pointers nil is the
+		// point: branches_static: 0 and edge_coverage: 0.0 are numbers, and a number is
+		// something a reader averages, plots and compares. A refusal is none of those.
+		rep.StaticRefused = sErr.Error()
+		rep.Note = "the cartridge was not decoded, so branches_static, unreached_branches and " +
+			"edge_coverage are null rather than 0 — see static_refused for why"
+	} else {
+		n := len(staticBr)
+		statCov := 0.0
+		if n > 0 {
+			statCov = float64(cov.EdgeCount()) / float64(n*2)
+		}
+		rep.BranchesStatic = &n
+		rep.EdgeCoverage = &statCov
+		if len(undecoded) > 0 {
+			rep.Note = "some executed branches were never decoded (flow from the vectors cannot follow " +
+				"a computed dispatch, and a bank switch is followed only where the mapper's rule is " +
+				"modelled), so branches_static is too small and edge_coverage is an over-estimate"
+		}
 	}
-	if *warmup > 0 {
-		rep.Note = strings.TrimSpace(rep.Note + " | recording starts after " + fmt.Sprint(*warmup) +
+	if warmup > 0 {
+		rep.Note = strings.TrimSpace(rep.Note + " | recording starts after " + fmt.Sprint(warmup) +
 			" warm-up frame(s), so branches only reached during boot count as unreached")
 	}
-	b, _ := json.MarshalIndent(rep, "", "  ")
-	fmt.Println(string(b))
+	return rep
 }
 
 func fail(err error) {
