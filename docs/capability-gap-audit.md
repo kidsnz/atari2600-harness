@@ -781,13 +781,21 @@ Recorded because three of these were previously mistaken for hard limits when th
   day: timinglint at 0/133 instructions, 38 of 95 scenarios never run, blank grading on 32 of 129 ROMs.)**
   REMAINING here: JSR/RTS move SP by two but the pushed return address is not modelled as a write, and an
   interrupt would move SP without being seen at all.
-- **Self-modifying code is detectable even when not resolvable** — a store whose effective address lands in
-  decoded code space is a fact, not a guess. Correct terminal state is "region suspended", never a guess.
-  **Scoped by measurement 2026-07-30, and not built yet — deliberately.** Ran `DefUse`'s may-write set
-  against the cartridge window over the whole corpus: **133 ROMs, 0 that write into it.** Building the
-  detector now would add a branch with no witness, which is what every sweep this week has penalised, so
-  the detector and its planted fixture have to be built together — a ROM that stores into its own decoded
-  code space, twinned with one that does not, in the pattern `cb_deadpred`/`cb_pushdisplay` use.
+- **Self-modifying code is detectable even when not resolvable — DONE (detection half, 2026-07-31).**
+  `defuse` now reports `writes_into_code`: every reachable write whose target set intersects addresses the
+  decoder read as INSTRUCTIONS, with the writer's PC and source location. Each entry carries `exact`,
+  because an exact store into code is a **fact** and a may-set that merely reaches code is a
+  **possibility** — an indexed store spans up to 256 addresses and a 4K image is mostly code, so collapsing
+  the two would drown the first in the second.
+  **Built with its fixture, because the corpus had no witness.** Measured first: 133 ROMs, **0** that write
+  into the cartridge window at all. So `litmus_smc` plants one (`sta Target`, where `Target` is a decoded,
+  executed instruction) and `litmus_smc_clean` is the same kernel with that one operand aimed at RAM. On
+  the machine the planted store does nothing — cartridge ROM is read-only, a 4K image has no hotspots — so
+  both ROMs run identically; the fact being reported is true whether or not the hardware honours the write,
+  and it is the fact that would matter on a cartridge with RAM. Measured after: **123 analysable ROMs
+  including four commercial cartridges, exactly one report — the planted one.** No commercial ROM in the
+  set writes into its own code. The test gates both halves: the planted ROM must report exactly one exact
+  entry, and every other ROM must report none.
   **The precondition nobody had stated — now cleared for `Prove`.** The ROMs where this matters are
   commercial images, not our own kernels, and the static tools could not read one: `Prove` and `timinglint`
   ASSEMBLE their input, so a raw `.bin` came back as "Unknown Mnemonic" (measured on Adventure, Seaquest,

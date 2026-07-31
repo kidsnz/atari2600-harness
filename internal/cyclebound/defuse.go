@@ -257,7 +257,35 @@ type DefUseReport struct {
 	// and an empty set presented as an answer is worse than a refusal.
 	FlatBankOnly string `json:"flat_bank_only,omitempty"`
 
+	// WritesIntoCode is every reachable write whose target set intersects addresses the
+	// decoder read as INSTRUCTIONS. On this machine a store into the cartridge window
+	// does nothing at all — ROM is read-only — so a hit means one of three things, and
+	// the report deliberately does not choose between them: the program self-modifies
+	// (only possible with cartridge RAM), the decoder walked into data and called it
+	// code, or the store's index range is wide and merely REACHES code addresses.
+	//
+	// The distinction that matters is carried per entry: an `exact` store into decoded
+	// code is a fact, a may-set that includes code addresses is a possibility. Reporting
+	// them as one number would drown the first in the second — an indexed store spans up
+	// to 256 addresses and a 4K image is mostly code, so overlaps are cheap.
+	//
+	// Measured before this existed: 133 ROMs in the corpus, ZERO that write into the
+	// cartridge window at all. So this ships with a planted fixture rather than with a
+	// corpus witness, because a detector whose branch nothing reaches is not a check.
+	WritesIntoCode []CodeWrite `json:"writes_into_code,omitempty"`
+
 	Regions []RegionDefUse `json:"regions,omitempty"`
+}
+
+// CodeWrite is one write whose target lands on an address the decoder read as an
+// instruction.
+type CodeWrite struct {
+	PC      string   `json:"pc"`
+	Loc     string   `json:"loc,omitempty"`
+	Targets []string `json:"targets"`
+	// Exact separates "this store writes there" from "this store's range includes
+	// there". Only the first is a fact about the program.
+	Exact bool `json:"exact"`
 }
 
 // UninitRead is one read that no path from reset guarantees was written first.
@@ -553,10 +581,23 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 			unbounded[a.addr] = true
 			continue
 		}
+		var intoCode []uint16
 		for _, t := range acc.Addrs {
 			mayW[t] = true
+			if _, isCode := instrs[site{a.bank, t}]; isCode {
+				intoCode = append(intoCode, t)
+			}
+		}
+		if len(intoCode) > 0 {
+			rep.WritesIntoCode = append(rep.WritesIntoCode, CodeWrite{
+				PC: hexAddr(a.addr), Loc: sm.Locate(a.addr),
+				Targets: hexAddrs(sortedAddrs(setOf(intoCode))), Exact: acc.Exact,
+			})
 		}
 	}
+	sort.Slice(rep.WritesIntoCode, func(i, j int) bool {
+		return rep.WritesIntoCode[i].PC < rep.WritesIntoCode[j].PC
+	})
 	rep.MayWrite = hexAddrs(sortedAddrs(mayW))
 	rep.UnboundedWriters = hexAddrs(sortedAddrs(unbounded))
 
@@ -739,4 +780,13 @@ func StaticBranches(romPath string) (branches []uint16, banked bool, err error) 
 	}
 	sort.Slice(branches, func(i, j int) bool { return branches[i] < branches[j] })
 	return branches, p.banked, nil
+}
+
+// setOf turns a slice of addresses into the set sortedAddrs expects.
+func setOf(as []uint16) map[uint16]bool {
+	m := make(map[uint16]bool, len(as))
+	for _, a := range as {
+		m[a] = true
+	}
+	return m
 }

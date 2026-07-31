@@ -1,0 +1,4 @@
+{
+  "rom": "roms/litmus/litmus_smc_clean.asm",
+  "checks": { "ntsc_frame_lines": 262 }
+}

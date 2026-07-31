@@ -104,6 +104,16 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **`defuse` reports `writes_into_code`** — SD-3's "a store landing in decoded code space is a fact, not a
+  guess". Every reachable write whose target set intersects addresses the decoder read as INSTRUCTIONS,
+  with the writer's PC and source location. Each entry carries `exact`, because an exact store into code is
+  a **fact** while a may-set that merely reaches code is a **possibility** — an indexed store spans up to
+  256 addresses and a 4K image is mostly code, so collapsing the two would drown the first in the second.
+  **Shipped with a planted fixture rather than a corpus witness, deliberately**: measured first, 133 ROMs
+  and **zero** that write into the cartridge window at all, and a detector whose branch nothing reaches is
+  not a check. `litmus_smc` plants one; `litmus_smc_clean` aims the same store at RAM. Measured after:
+  **123 analysable ROMs including four commercial cartridges, exactly one report — the planted one.** The
+  test gates both halves. Negative control: aiming the planted store at RAM fails it.
 - **`cover -drive explore`** — cycles SELECT through the game variations, presses RESET, then rotates the
   stick, instead of holding a fixed input. Added because of a measurement: a 2600 attract mode runs the
   **game loop** with synthetic input, so a cartridge left alone already covers most of what playing it
