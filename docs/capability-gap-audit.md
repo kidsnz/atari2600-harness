@@ -606,6 +606,12 @@ recording before the items:
   source, never the sound denominator.
 
 ### SD-0 — Soundness and honesty repairs (blocking; do before anything is built on top)
+> **All five closed as of 2026-07-31.** Two of them were closed in the code and left open here — SD-0d was
+> implemented and never marked, SD-0c's REMAINING was satisfied by the bank-aware coverage key. That is the
+> **second** time in two days a backlog entry outlived its work: RL-5, ranked ★ top priority, had shipped
+> too. An entry that says something is undone costs what a description denying a capability costs — the
+> reader does not go looking, or worse, goes and rebuilds it. Checking existence before starting is cheap;
+> both were settled by one grep and one measurement.
 - **SD-0a `applyStore` has no kill-set.** `internal/cyclebound/absint.go:336-369`: `storeAddr` returns a
   location only for Absolute mode, so `sta $80,x` and `sta ($90),y` leave previously-tracked `State.Mem`
   cells intact and a later absolute load reads a stale constant. That range reaches `refineBranch`,
@@ -622,12 +628,17 @@ recording before the items:
   real cartridges: **Outlaw 2K went 0 entries / 0 instructions -> 1 / 931, Combat 2K 0 / 0 -> 2 / 838**;
   every 2K cartridge previously decoded to nothing at all, and reported that as an analysis. 4K unchanged
   (Frogger 152 instructions either way); the .asm path is byte-identical, 14/31 certified with a zero diff *(15/31 as of 2026-07-30 — SD-6)*.
-  REMAINING: the same canonical key is not yet used by `emu.Coverage` (which records the raw PC), so a
-  static-minus-dynamic subtraction still compares different address spaces. That matters when the
-  "statically reachable but never executed" report is built — see SD-0e.
-- **SD-0d Non-convergence is silent.** `absint.computeStates` returns after `maxIter` without signalling it;
-  unconverged cells are under-approximations consumed as sound. Fix: return a converged flag and refuse to
-  certify without it.
+  ~~REMAINING: the same canonical key is not yet used by `emu.Coverage`~~ — **CLOSED 2026-07-30.**
+  `emu.Coverage` now keys on `(bank, address)`, the same shape as the decoder's `site`, so the
+  static-minus-dynamic subtraction compares one address space. Not asserted: the subtraction was then
+  actually performed, and its answers are in this file — decoded vs executed on four commercial cartridges,
+  and the saturation curve that corrected "static reaches twice what execution does". The report SD-0e
+  wanted is the thing that produced those numbers.
+- **SD-0d Non-convergence is silent — DONE (verified 2026-07-31).** `absint.computeStates` used to return
+  after `maxIter` without signalling it, so unconverged cells — under-approximations — were consumed as
+  sound. It now returns a converged flag, `Report.Converged` carries it, and **both verdicts are gated on
+  it**: `rep.Certified = rep.Converged && …` and `rep.RollFree = rep.Converged && …`
+  (`cyclebound.go:2774`, `:2780`). A capped run can no longer certify anything.
 - **SD-0e `cover` divided by branches OBSERVED — DONE.** A branch never reached left the arithmetic
   entirely, so the percentage ROSE as the test got worse. Measured on this repo's own kernels before the fix:
   `divtable` reported **100% edge coverage with 12 of its 17 branches never executed**; `maze`, `hscroll` and
