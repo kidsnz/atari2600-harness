@@ -61,6 +61,11 @@ type report struct {
 	ExecutedButUndecoded []string `json:"executed_but_undecoded,omitempty"`
 	DecoderIncomplete    bool     `json:"decoder_incomplete"`
 	Note                 string   `json:"note,omitempty"`
+
+	// Drive records HOW the ROM was driven. A coverage percentage is not a property
+	// of a ROM, it is a property of a ROM and a driving, and two numbers taken under
+	// different drivings are not comparable — so the driving travels with the number.
+	Drive string `json:"drive"`
 }
 
 func main() {
@@ -68,7 +73,14 @@ func main() {
 	frames := flag.Int("frames", 120, "frames to run")
 	warmup := flag.Int("warmup", 2, "frames to settle before recording")
 	inputs := flag.String("inputs", "", "comma-separated actions held every frame (e.g. left,fire)")
+	drive := flag.String("drive", "hold", "how to drive the ROM: 'hold' (keep -inputs pressed every frame) or "+
+		"'explore' (cycle SELECT through the game variations, press RESET, then rotate the stick) — measured "+
+		"2026-07-30 on commercial cartridges, explore reaches code hold never does: Seaquest 51%->60%, "+
+		"Adventure 61%->67%, Chopper Command 46%->49%")
 	flag.Parse()
+	if *drive != "hold" && *drive != "explore" {
+		fail(fmt.Errorf("-drive %q: want 'hold' or 'explore'", *drive))
+	}
 
 	if *rom == "" {
 		fmt.Fprintln(os.Stderr, "usage: cover -rom x.bin [-frames 120] [-warmup 2] [-inputs left,fire]")
@@ -94,15 +106,14 @@ func main() {
 	if *inputs != "" {
 		held = strings.Split(*inputs, ",")
 	}
-	for f := 0; f < *frames; f++ {
-		for _, a := range held {
-			if err := e.SetInput(0, strings.TrimSpace(a), true); err != nil {
-				fail(fmt.Errorf("input %q: %w", a, err))
-			}
-		}
-		if err := e.RunFrames(1); err != nil {
-			fail(err)
-		}
+	// A 2600 attract mode runs the GAME LOOP with synthetic input, so simply letting a
+	// cartridge sit there already covers most of what playing it covers — measured, RESET
+	// plus a dozen rounds of stick moved Chopper Command by 4 instructions out of 2358.
+	// What it does not cover are the other game VARIATIONS, and those are behind SELECT.
+	// Hence two modes, and the mode is reported, because a coverage percentage taken under
+	// one driving is not comparable with one taken under another.
+	if err := driveROM(e, *drive, *frames, held); err != nil {
+		fail(err)
 	}
 
 	cov := e.Coverage()
@@ -141,6 +152,7 @@ func main() {
 	rep := report{
 		Rom:                  *rom,
 		Frames:               *frames,
+		Drive:                *drive,
 		PCExecuted:           cov.PCCount(),
 		BranchesStatic:       len(staticBr),
 		BranchesObserved:     cov.BranchCount(),
@@ -171,4 +183,80 @@ func main() {
 func fail(err error) {
 	fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 	os.Exit(2)
+}
+
+// driveROM runs the ROM for `frames` frames under one of two drivings.
+//
+// "hold" keeps `held` pressed every frame — what this command always did. "explore"
+// walks the game VARIATIONS with SELECT, presses RESET, then rotates the stick.
+//
+// The split exists because of a measurement, not a hunch. A 2600 attract mode runs the
+// GAME LOOP with synthetic input, so a cartridge left alone already covers most of what
+// playing it covers: on Chopper Command, RESET plus a dozen rounds of stick moved the
+// executed-instruction count by 4 out of 2358. What sitting there does NOT cover are the
+// other game variations, and those are behind SELECT — Seaquest goes 51% -> 60% of its
+// decoded instructions, Adventure 61% -> 67%, Chopper Command 46% -> 49%.
+//
+// Panel switches are SetPanel, not SetInput; SetInput rejects them, and ignoring that
+// error is how an earlier measurement "pressed" RESET without pressing anything.
+func driveROM(e *emu.Emu, mode string, frames int, held []string) error {
+	press := func(sw string, hold, settle int) error {
+		if err := e.SetPanel(sw, true); err != nil {
+			return fmt.Errorf("panel %q: %w", sw, err)
+		}
+		if err := e.RunFrames(hold); err != nil {
+			return err
+		}
+		if err := e.SetPanel(sw, false); err != nil {
+			return fmt.Errorf("panel %q release: %w", sw, err)
+		}
+		return e.RunFrames(settle)
+	}
+
+	if mode != "explore" {
+		for f := 0; f < frames; f++ {
+			for _, a := range held {
+				if err := e.SetInput(0, strings.TrimSpace(a), true); err != nil {
+					return fmt.Errorf("input %q: %w", a, err)
+				}
+			}
+			if err := e.RunFrames(1); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	budget := frames
+	for i := 0; i < 12 && budget > 12; i++ {
+		if err := press("select", 4, 6); err != nil {
+			return err
+		}
+		budget -= 10
+	}
+	if budget > 12 {
+		if err := press("reset", 4, 6); err != nil {
+			return err
+		}
+		budget -= 10
+	}
+	acts := []string{"left", "right", "up", "down", "fire"}
+	for i := 0; budget > 0; i++ {
+		a := acts[i%len(acts)]
+		if err := e.SetInput(0, a, true); err != nil {
+			return fmt.Errorf("input %q: %w", a, err)
+		}
+		n := 4
+		if n > budget {
+			n = budget
+		}
+		if err := e.RunFrames(n); err != nil {
+			return err
+		}
+		if err := e.SetInput(0, a, false); err != nil {
+			return fmt.Errorf("input %q release: %w", a, err)
+		}
+		budget -= n
+	}
+	return nil
 }
