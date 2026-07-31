@@ -1768,6 +1768,35 @@ of its numbers did not survive.**
 > **2** edges, and a *proven* `X=0` must still yield only the fall-through so the fix is not "assume the worst
 > everywhere". Negative control: removing the substitution makes `successors` return 1 successor instead of 3.
 
+### The bank-blind address key, third instance: coverage itself (2026-07-30)
+
+Two gradings were found keyed on a ROM address with no bank on the same day — the blank classification and
+the "machine never exceeds the proof" check — so the pattern was swept rather than waited on. 97 uses of
+`map[uint16]` exist outside the vendored engine; almost all are about a synthetic memory image or a single
+run and do not care. One does.
+
+**`internal/emu/coverage.go` keys all four of its sets on a bare address**: instructions executed, branches
+seen, and the taken / not-taken edge sets. On an 8K cartridge the two banks decode the SAME addresses, so
+bank 0's `$F123` and bank 1's `$F123` are one entry. Measured over 200k instructions:
+
+| ROM | distinct `(bank,pc)` executed | `Coverage.PCCount()` reports | addresses run in BOTH banks |
+|---|---:|---:|---:|
+| `exerciser.bin` | 319 | **282** | **37** |
+| `banked_game.bin` | 74 | **69** | **5** |
+| `litmus_bank.bin` (4K logic) | 46 | 46 | 0 |
+
+It fails in both directions at once. As a count, `PCCount` **under-reports** distinct executed instructions
+— 282 of 319 on the exerciser, 12% missing. As a query, `Seen(addr)` **over-reports**: it answers "covered"
+for the twin instruction in the bank that never ran, which is the flattering direction and the one that
+matters, because VV-3's coverage percentage and `mutate -covered`'s "honest kill rate over executed code
+only" both rest on it.
+
+**Not fixed in this pass, deliberately.** The repair is to key on `(bank, addr)`, which changes the meaning
+of the exported `Seen(addr)` — today "seen at this address in any bank" — and that is consumed by
+`cmd/cover` and quoted through VV-3/VV-11 figures in the docs. A silent change of meaning in a number
+already published is the failure this section keeps recording, so it is filed with its measurement rather
+than slipped in. The fix is small in code and needs a decision about the API, not about the arithmetic.
+
 ### `displayPreserver` swept: the precise answer fires 61 times and has never been graded (2026-07-30)
 
 Same method, next function on the blank-classification path. `displayPreserver(entry)` answers "does this
