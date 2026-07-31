@@ -1729,10 +1729,28 @@ it said "not among the checked mappers" when the truth is more useful:
 - **E7** — `$0FE7` maps RAM over ROM, `$0FE8-$0FEB` pick a 256-byte RAM block and leave the bank alone, and
   `bank %= NumBanks()` makes the address-to-bank map depend on image size.
 
+**3. The prior question, answered: the absence of support is HONEST.** Before adding anything for G1, the
+thing worth knowing is whether the analysis currently *declines* these or quietly answers them. Every exotic
+image was run through `Prove`: **0 of 33 got an answer.** DPC+ (7), F4SC (10), 3E (5), F8SC (3), E0 (3),
+F6SC / FA / AR (1 each) — all refused, none certified on a machine the model does not describe. That is the
+soundness half of G1 and it had never been checked end to end.
+
+**4. Three of the four new entries can never print, and that is structural.** `bankedUnits` refuses a
+cartridge that maps RAM into the window BEFORE it reaches the edge-semantics table, and FA, FA2 and E7 all
+carry cartridge RAM by construction (CBS RAM Plus, its NVRAM successor, M-Network's 1K+256B). Only **E0**
+has `IsRAM: false` on every segment, and it is the one whose message was observed — on three real
+cartridges. This is the `foldLoops` pattern again: **a fine-grained refusal shadowed by a coarser one that
+always fires first.** Not reordered — RAM in the window is the more fundamental objection and should keep
+winning — but recorded, and recorded in the table itself so the next reader does not assume the text is
+output. The shadowed entries still earn their place: their job is to stop a future reader from
+pattern-matching a mapper's published hotspots onto the Atari rule and promoting it into
+`verifiedEdgeSemantics`, where it *would* be consulted.
+
 **The transferable part:** the backlog entry was "add support for advanced cartridges". The census cost one
 sweep and said the local reach is 4 images across two exotic mappers — while the same sweep turned up a
-server-killing panic that no entry in this document had ever predicted. Measuring the ground before building
-on it keeps finding things that outrank what was being measured for.
+server-killing panic that no entry in this document had ever predicted, and the follow-up turned up three
+refusals that can never fire. Measuring the ground before building on it keeps finding things that outrank
+what was being measured for.
 
 ### SD-11a — the cross-bank rekey shipped an under-approximation, found by review after it was pushed (2026-07-29)
 

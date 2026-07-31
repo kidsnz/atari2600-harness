@@ -406,6 +406,25 @@ func unverifiedEdgeSemantics(id string) string {
 
 // knownDifferentEdgeSemantics records mappers measured to break the model, so the
 // refusal can say what is actually wrong instead of "unverified".
+//
+// REACHABILITY, measured 2026-07-31 — most of these messages never print, and the
+// reason is structural rather than accidental. `bankedUnits` refuses a cartridge that
+// maps RAM into the window BEFORE it consults this table, and FA, FA2 and E7 all
+// carry cartridge RAM by construction (CBS RAM Plus, its NVRAM successor, and
+// M-Network's 1K+256B). So those three are always answered by the coarser refusal and
+// their text below is documentation, not output. E0 has `IsRAM: false` on every
+// segment and does reach here: witnessed on three real cartridges (Montezuma's
+// Revenge Trainer, Super Cobra, Swtagrc).
+//
+// They are still worth stating. The table's job is to stop a future reader from
+// pattern-matching a mapper's published hotspots onto the Atari rule and promoting it
+// to `verifiedEdgeSemantics` — where it WOULD be consulted, and where being wrong
+// invents edges the hardware never takes. A shadowed refusal is a live guard against
+// the wrong promotion even when it is not a live message.
+//
+// This is the same shape as the `foldLoops` finding: a fine-grained refusal sitting
+// behind a coarser one that always fires first. Recorded rather than reordered — RAM
+// in the window is the more fundamental objection, and it should keep winning.
 var knownDifferentEdgeSemantics = map[string]string{
 	"WF8": "mapper_atari_wf8.go wf8.bankswitch responds only to $0FF8 and takes the target bank from " +
 		"DATA BUS BIT 2, while it publishes $1FF8:BANK0 and $1FF9:BANK1 — so $1FF9 does nothing at all " +

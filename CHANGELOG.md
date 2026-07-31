@@ -42,8 +42,19 @@ versions follow [Semantic Versioning](https://semver.org/).
   at all but assigns one of three 1K **segments**, leaving the fourth quarter — the one holding the
   hotspots and the vectors — permanently fixed; **E7** spends four hotspots on RAM rather than banks and
   reduces the result by `bank %= NumBanks()`, so its address-to-bank map depends on the image size.
-  The refusal was already correct for all four; now it says why. Not hypothetical: the same sweep counted
-  **E0 on 3 images and FA on 1** (Montezuma's Revenge Trainer, Super Cobra, Swtagrc, Omega Race).
+  The refusal was already correct for all four; now it says why. **Only E0's message can actually print**,
+  and that was measured rather than assumed: `bankedUnits` refuses a RAM-mapping cartridge before it
+  consults this table, and FA/FA2/E7 all carry cartridge RAM by construction, so those three are
+  permanently shadowed by the coarser refusal — the same shape as the `foldLoops` finding. E0 has
+  `IsRAM: false` on every segment and does reach it, witnessed on three real cartridges (Montezuma's
+  Revenge Trainer, Super Cobra, Swtagrc). The shadowed entries still earn their place: they exist to stop
+  a future reader from pattern-matching published hotspots onto the Atari rule and promoting a mapper into
+  `verifiedEdgeSemantics`, where being wrong invents edges the machine never takes.
+- **Measured, and it is the number nobody had: `Prove` gives an ANSWER to 0 of the 33 exotic-mapper images
+  on this machine.** Every one is refused — DPC+ (7), F4SC (10), 3E (5), F8SC (3), E0 (3), F6SC/FA/AR (1
+  each) — so the analysis has no silent-wrongness path on cartridges outside the F8/F6/F4 families, which
+  had never been checked end to end. G1 in the audit is the work of *adding* support; this is the prior
+  question of whether its absence is honest, and it is.
 
 - **`cb_pushdisplay` / `cb_pushsafe` — the twin fixtures that witness `pushMissesDisplay`'s
   "SP can reach the display" branch**, which had run 0 times across 129 ROMs. A `PHA` writes to `$0100|SP`
