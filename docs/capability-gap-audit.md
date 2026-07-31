@@ -777,12 +777,13 @@ Recorded because three of these were previously mistaken for hard limits when th
   detector now would add a branch with no witness, which is what every sweep this week has penalised, so
   the detector and its planted fixture have to be built together — a ROM that stores into its own decoded
   code space, twinned with one that does not, in the pattern `cb_deadpred`/`cb_pushdisplay` use.
-  **And there is a precondition nobody had stated.** The ROMs where this actually matters are commercial
-  images, not our own kernels — and the static tools cannot read one: `Prove` and `timinglint` ASSEMBLE
-  their input, so a raw `.bin` comes back as "Unknown Mnemonic" (measured on Adventure, Seaquest, Chopper
-  Command, VideoOlympics, Empire Strikes Back). Whatever SD-0c added for raw images is not reachable from
-  those entry points. Until a `.bin` can be analysed, a self-modification detector could only ever run on
-  code we wrote, which is the code least likely to do it.
+  **The precondition nobody had stated — now cleared for `Prove`.** The ROMs where this matters are
+  commercial images, not our own kernels, and the static tools could not read one: `Prove` and `timinglint`
+  ASSEMBLE their input, so a raw `.bin` came back as "Unknown Mnemonic" (measured on Adventure, Seaquest,
+  Chopper Command, VideoOlympics, Empire Strikes Back). SD-0c's raw-image work was in the DECODER and
+  unreachable from any public entry. `Prove` now takes a `.bin` directly — VideoOlympics 8 regions,
+  Adventure 14, Seaquest 49, Chopper Command 29, all converged, with the `.asm` path byte-identical.
+  `timinglint` still assembles; same one-branch change when it is wanted.
 - **Conditional bounds — DONE for the dominant case.** Measured first: of 29 unbounded regions across the
   technique corpus, **15 fail for one reason — "loop bound unknown"**. The body of such a loop is fully
   understood; only its trip count is missing, so the region's cost is still a known function of it and the

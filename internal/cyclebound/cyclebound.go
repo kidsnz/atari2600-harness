@@ -2518,19 +2518,41 @@ func Prove(asmPath string, budget int) (*Report, error) {
 	if budget <= 0 {
 		budget = DefaultBudget
 	}
-	bin := build.BinPathFor(asmPath)
-	out, lst, sym, err := build.AssembleWithListing(asmPath, bin)
-	if err != nil {
-		return nil, fmt.Errorf("assemble %s failed:\n%s", asmPath, out)
+	// A raw cartridge image is analysed directly. Everything derived from source —
+	// `@lines`/`@amax` annotations, label locations, the per-bank line map — is simply
+	// absent, and `srcmap.Map` is nil-safe throughout for exactly that case.
+	//
+	// This entry did not exist, and its absence was the quiet part. SD-0c made the
+	// DECODER read real cartridges (Outlaw 2K went 0 instructions to 931, Combat 0 to
+	// 838), but nothing public took a `.bin`: Prove and timinglint assemble their
+	// input, so a commercial image came back as "Unknown Mnemonic" — measured
+	// 2026-07-30 on Adventure, Seaquest, Chopper Command, VideoOlympics and Empire
+	// Strikes Back. The capability was there and unreachable, which is the same shape
+	// as a description that denies what a tool can do.
+	var (
+		bin      string
+		lst      string
+		sm       *srcmap.Map
+		srcLines []string
+	)
+	if strings.EqualFold(filepath.Ext(asmPath), ".bin") {
+		bin = asmPath
+	} else {
+		bin = build.BinPathFor(asmPath)
+		out, l, sym, err := build.AssembleWithListing(asmPath, bin)
+		if err != nil {
+			return nil, fmt.Errorf("assemble %s failed:\n%s", asmPath, out)
+		}
+		lst = l
+		sm = srcmap.Parse(l, sym, asmPath)
+		src, _ := os.ReadFile(asmPath)
+		srcLines = strings.Split(string(src), "\n")
 	}
-	sm := srcmap.Parse(lst, sym, asmPath)
 
 	// `; @lines N` on the source line that OPENS a WSYNC region declares it spans
 	// N scanlines (a 2-line kernel does ~2 lines of CPU work between WSYNCs), so
 	// that region's budget is N*budget. Default 1. Greens legitimate 2-line kernels
 	// without weakening the proof (an un-annotated over-76 region still flags).
-	src, _ := os.ReadFile(asmPath)
-	srcLines := strings.Split(string(src), "\n")
 	atLinesRe := regexp.MustCompile(`@lines\s+(\d+)`)
 	// The lookup takes the SITE, not a bare address. On a banked image the flat line
 	// map holds bank 1's rows under their physical offsets ($1F03 for $FF03), so an
