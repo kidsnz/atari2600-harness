@@ -2693,6 +2693,97 @@ restoring the old condition reports `FarRow worst = 35, want 39`.
 the same 4096 bytes) leaves `max_worst` **unchanged on all 31**. So no corpus kernel is alignment-
 fragile today, whichever way the question above resolves.
 
+### SD-12 — `dex`/`bpl` was costed as `dex`/`bne`: an under-approximation the gate could not see, because the corpus was the corpus we wrote (2026-07-31)
+
+`determineBound` accepted **BNE and BPL** as the latch of a decrement countdown and returned the
+**same trip count for both**. They do not end on the same iteration. `dex; bne L` from X=6 leaves
+when the decrement produces **zero** — 6 iterations. `dex; bpl L` leaves only when it produces a
+**negative** value, so it runs the body once more with X=0 and exits on X=$FF — **7 iterations**.
+The bound came out one body plus one taken branch short, every time.
+
+Found on the real **Seaquest** cartridge, region **$F1FC**, self-decoded from the bytes
+(`85 02 | 85 2A | 85 09 | A9 FF | A2 06 | 95 B0 | CA | 10 FB | 85 02`):
+
+| | | |
+|---|---:|---|
+| proven worst | **66** | 10 (prologue) + [6·6 + 5·3 + 2] + 3 |
+| machine measured | **75** | 10 + [**7**·6 + **6**·3 + 2] + 3 — 30 intervals over 30 frames, 1 scanline each |
+| slack | **−9** | one body (`sta zp,x` 4 + `dex` 2) + one taken branch (3) |
+
+A proven worst case the hardware **exceeds** is the one direction this package forbids, and it
+rode out on `Bounded=true`. Fixed: the bpl form's trip count is `best+1`. **Sound and exact, not a
+cushion** — `loopCost` is monotone in the iteration count, and the count as a function of the
+entry value `v` is `v+1` for `v <= 128` and `1` for `v >= 129`, so `best+1` bounds it everywhere
+and *equals* it for the loops an author actually writes.
+
+**Why the standing gate could not find it — measured, not guessed.** `TestProvenWorstIsNeverExceededOnCorpus`
+globbed `roms/{techniques,litmus,exerciser}`: 993 comparisons, all green, the whole time this was
+live. A census of every loop fold over the 140 images analysed says why:
+
+| | folds | can this witness the bug? |
+|---|---:|---|
+| `bpl` folds, total | **7** | |
+| …in kernels **we** wrote | **4** | **none of them** |
+| `rts_dispatch` $F036 | 1 (×2 latches) | **no `ProfileLineWorst` row at all** — the gate compares nothing |
+| `zone_multiplex` $F033 | 1 | **no row at all** |
+| `shared_setxpos` $F054 | 1 | proven 83 vs measured 36 — **47 cycles of slack**, the error was 15 |
+| …in commercial cartridges | 3 | Seaquest $F1FC is a tight 75-cycle line: **visible immediately** |
+
+**The general lesson, which is the one this file keeps writing down.** The page-cross bug survived
+because *no corpus ROM took the branch*. This one survived because *the corpus contains no region
+tight enough to notice*. Both are the same defect at the level of the corpus rather than the code:
+**a gate is only as good as the inputs it happens to have, and ours were all written by the same
+author as the thing under test.** Slack hides an under-approximation exactly as well as it hides
+nothing, and a region with no measured row hides it perfectly. The repair is to grade code nobody
+here authored: the gate now also takes **VideoOlympics, Adventure, Seaquest, Chopper Command and
+Empire Strikes Back**, which live in the umbrella `reference/` tree outside this repo — **absent →
+skipped with the reason logged; present → 5/5 graded, 63 region↔row pairs; anything in between
+fails**, because a cartridge that is present, loads, and then compares nothing is a skip wearing a
+pass. (Commercial images are profiled over **30 frames, not 6**: measured, Chopper Command yields
+**0** rows at 6 and **18** at 30 — a title spends its first frames in an attract path.) Nothing is
+read from these cartridges but their own bytes.
+
+**Witness ROM, because a fold nothing grades tightly is not a check.** `roms/litmus/litmus_bpl_trip.asm`
+holds two single-scanline regions containing the countdown and nothing else that varies —
+`ldx #6 / sta $B0,x / dex / bpl` and `ldy #6 / sty COLUBK / dey / bpl`, 262 lines. The test asserts
+**equality**: proven == machine == **75** and **68**, over 950 and 960 intervals. Equality rather
+than `<=` on purpose — a merely-safe bound would send an author trimming a line that was never over
+budget. It checks its own **premise** before its conclusion, through a measurement counter
+incremented at the corrected line, so it cannot quietly grade a region that never folded a `bpl`.
+
+**Negative controls, both directions.** (1) Reverting the `+1` fails the fixture naming the
+**9**-cycle (dex) and **8**-cycle (dey) gaps, and turns the extended gate **red on Seaquest $F1FC**;
+restoring it turns both green. (2) Re-proving the entire corpus before and after moved **6 of 1226
+regions**, every one upward and every one containing a `bpl` fold — Seaquest $F12C 102→107, $F1FC
+66→75, $F419 105→110; `rts_dispatch` $F036 55→69, `shared_setxpos` $F054 83→98, `zone_multiplex`
+$F033 181→214. **Nothing else moved**, so the fix is not a blanket loosening.
+
+**Siblings, checked with the same eyes.** `dey`/`BPL` is the *same* code path (the operator test is
+on the latch, not the register) and had the same off-by-one — Seaquest $F138 is a `dey` fold, and it
+is one of the six regions that moved; it has its own fixture region rather than being asserted by
+argument. `BMI` as a latch is **not** accepted by `determineBound` at all (only BNE/BPL/BCS/BCC), so
+it returns 0, the region is reported unbounded, and it was already safe — a refusal, not a number.
+
+**Left open, recorded rather than fixed blind.** The `bne` path has its own edge case in the other
+direction: an entry value of **0** wraps and runs **256** iterations, while the bound would be
+`best`. Censused: **30 bne folds** across the 140 images, **3 with a counter range that includes 0**
+(all in Seaquest, `[0,15]`), none of which showed a violation against the machine. It needs its own
+witness before it gets a change, which is precisely the discipline whose absence produced SD-12.
+
+### Two subjects of a decoder test had been skipping since the day it was written (2026-07-31)
+
+`TestDecodeReachesCodeInCommercialROMs` names five cartridges. Two of them —
+`VideoOlympics` and `Stampede` — were written with **two** levels of `..` where the umbrella tree is
+**three** up, so both resolved to a `harness/reference/` that does not exist and took `t.Skipf` on
+every run, while the test reported PASS.
+
+What makes it worth recording is that this had already been **measured and misread**. SD-11b's skip
+census says, verbatim: *"28 skip sites exist and only 2 fire today, both missing commercial ROMs
+(VideoOlympics, Stampede), not convergence."* The count was right and the diagnosis was wrong — the
+ROMs are not missing, they are 3.9 MB of cartridge sitting in `reference/`, and nobody checked the
+path. **A skip explained is not a skip investigated.** Fixed; both now decode (**644** and **858**
+instructions), and Stampede's label is corrected from `4K` to its measured **2048 bytes**.
+
 ### 38 of the 95 scenarios were never run by any gate (2026-07-30)
 
 Found by widening the orphan question from "is this ROM referenced by anything" to "is this

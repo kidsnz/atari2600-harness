@@ -2242,8 +2242,64 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 	if best < 0 {
 		return 0
 	}
+	// BNE and BPL do NOT end the same countdown on the same iteration, and this
+	// function returned `best` for both.
+	//
+	// `dex; bne L` with X=6 exits when the decrement produces zero: 6 iterations.
+	// `dex; bpl L` with X=6 exits only when the decrement produces a NEGATIVE value,
+	// so it runs the body once more with X=0 and leaves on X=$FF: 7 iterations. The
+	// trip count of the bpl form is best+1, not best.
+	//
+	// Measured on the real Seaquest cartridge, region $F1FC — `lda #$FF / ldx #$06 /
+	// L: sta $B0,x / dex / bpl L` between two WSYNCs. The missing iteration is one
+	// body (sta abs,x 4 + dex 2 = 6) plus one taken branch (3) = 9 cycles: proven 66,
+	// machine 75. An UNDER-approximation, the one direction this package forbids, and
+	// it rode out on Bounded=true.
+	//
+	// SOUNDNESS. loopCost = n*body + (n-1)*(latch+pen) + latch is monotonically
+	// increasing in n (body >= 0, latch+pen > 0), so raising n can only raise the
+	// bound. best is the maximum entry value of the counter over the header's
+	// predecessors, and for the bpl exit condition the trip count as a function of the
+	// entry value v is: v+1 for v <= 128 (v=128 decrements to 127, still non-negative,
+	// so it too runs to the wrap), and 1 for v >= 129 (the first decrement is already
+	// negative). Its maximum over any range with upper bound `best` is therefore
+	// best+1 when best <= 128, and at most 129 <= best+1 when best >= 129. So best+1
+	// is an upper bound everywhere, and it is EXACT for the counted-down loops an
+	// author actually writes (best <= 128) — the bound rises to the true value rather
+	// than merely away from the violation.
+	//
+	// BNE keeps `best`: it exits on zero, so an entry value v reaches zero after
+	// exactly v decrements. Its own edge case — an entry value of 0, which wraps and
+	// runs 256 times — is a SEPARATE question and is deliberately not touched here.
+	// Censused over the 140 images analysed (135 in-tree kernels + 5 commercial
+	// cartridges): 30 distinct bne folds, of which 3 have a counter range including 0
+	// (all three in Seaquest, range [0,15]); none of the three showed a violation
+	// against the machine. It is filed in the audit (SD-11) rather than fixed blind,
+	// because a change with no witness is how this one got in.
+	if latch.Def.Operator == instructions.BPL {
+		bplTripCountAdjusted++
+		return best + 1
+	}
 	return best
 }
+
+// bplTripCountAdjusted counts how many times determineBound has raised a dex/dey
+// countdown's trip count by one because its latch is BPL rather than BNE.
+//
+// Like proxyFallbackHits above it is a MEASUREMENT counter, not analysis state. It
+// exists because the correction it counts is invisible in the report — a bound 9
+// cycles higher looks like any other bound — and because the standing corpus gate was
+// blind to this defect for a MEASURED reason. Censused over 140 images: 7 distinct bpl
+// folds, only 4 of them in kernels we wrote, and none of the four could expose it —
+// rts_dispatch's region $F036 and zone_multiplex's $F033 produce NO ProfileLineWorst
+// row at all (the gate compares nothing there), and shared_setxpos's $F054 was proven
+// 83 against a measured 36, i.e. 47 cycles of slack to hide 15 cycles of error in. It
+// took a tight commercial region to make the gap visible.
+//
+// A test that reads this counter can prove its own PREMISE — that the region it grades
+// really did fold a bpl latch down this path — instead of passing over a region that
+// never reached it.
+var bplTripCountAdjusted int
 
 // regionTouchesDisplay reports whether any node stores to VSYNC($00)/VBLANK($01),
 // i.e. could change the display state within the region.

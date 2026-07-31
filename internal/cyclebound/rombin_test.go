@@ -8,11 +8,19 @@ import (
 // Commercial cartridges, used here only as inputs — nothing is read from them
 // but their own bytes. 2K and 4K images both appear because the address a 2K
 // cartridge is seen at is exactly what this file is about.
+// The two `reference/` paths were written with TWO levels of `..` and the umbrella
+// tree is THREE up from this package, so both entries pointed at
+// harness/reference/… — a directory that does not exist. They took the skip on every
+// run since they were added: measured here, VideoOlympics and Stampede reported "ROM
+// unavailable" while Outlaw, Combat and Frogger passed, and the test was green the
+// whole time. Two of the five subjects of a decoder test were absent and it read as a
+// pass, which is the same failure this file's own doc comment warns about one
+// paragraph down ("an analysis that finds no instructions does not look wrong").
 var romBins = map[string]string{
-	"VideoOlympics(2K)": "../../reference/roms-study/VideoOlympics.bin",
+	"VideoOlympics(2K)": "../../../reference/roms-study/VideoOlympics.bin",
 	"Outlaw(2K)":        "../../../sandbox/studies/outlaw/Outlaw.bin",
 	"Combat(2K)":        "../../../sandbox/studies/combat/Combat_1977_Atari.bin",
-	"Stampede(4K)":      "../../reference/pizza-boy/Samples for Pizza Boy/Stampede.bin",
+	"Stampede(2K)":      "../../../reference/pizza-boy/Samples for Pizza Boy/Stampede.bin",
 	"Frogger(4K)":       "../../../roms/frogger/frogger.bin",
 }
 

@@ -8,6 +8,53 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The cycle-budget prover under-approximated every `dex`/`dey` countdown latched by `BPL` by one whole
+  iteration — proven 66 where the machine takes 75.** `determineBound` accepted `BNE` and `BPL` as the latch
+  of a decrement countdown and returned the same trip count for both. They do not end on the same iteration:
+  `dex; bne L` from X=6 leaves when the decrement produces **zero** (6 iterations), while `dex; bpl L` leaves
+  only when it produces a **negative** value, so it runs the body once more with X=0 and exits on X=$FF
+  (**7 iterations**). The bound was short by one body plus one taken branch, every time. Found on the real
+  **Seaquest** cartridge, region **$F1FC** — `sta HMOVE / sta COLUBK / lda #$FF / ldx #$06 / L: sta $B0,x /
+  dex / bpl L` between two WSYNCs: **proven 66, machine 75, slack −9**, carried out on `Bounded=true`. A
+  proven worst case the hardware **exceeds** is the one answer this package must never give; an author
+  reading it would have believed a 75-cycle line had 10 cycles spare. Fix: the trip count of the `bpl` form
+  is `best+1`. It is **sound and exact**, not a cushion — `loopCost` is monotone in the iteration count, and
+  for the bpl exit condition the count is `v+1` for entry values `v <= 128` and 1 for `v >= 129`, so `best+1`
+  bounds it everywhere and equals it for the loops an author actually writes.
+- **Why the standing corpus gate never saw it, measured rather than guessed.**
+  `TestProvenWorstIsNeverExceededOnCorpus` globbed only `roms/{techniques,litmus,exerciser}` — the corpus we
+  happened to write. Censused over the 140 images analysed: **7 `bpl` folds, only 4 of them in our own
+  kernels, and not one of the 4 could expose it.** `rts_dispatch`'s region $F036 and `zone_multiplex`'s
+  $F033 produce **no `ProfileLineWorst` row at all**, so the gate compared nothing there; `shared_setxpos`'s
+  $F054 was proven 83 against a measured 36 — **47 cycles of slack** to absorb the 15 cycles of error. Slack
+  hides an under-approximation exactly as well as it hides nothing. The gate now also grades **five
+  commercial cartridges** (VideoOlympics, Adventure, Seaquest, Chopper Command, Empire Strikes Back), which
+  live in the umbrella `reference/` tree outside this repo: **absent → skipped with the reason logged;
+  present → 5/5 graded, 63 region↔row pairs**, and *anything in between fails*, because a ROM that is
+  present, loads, and then quietly compares nothing is a skip wearing a pass. Commercial images are profiled
+  over 30 frames, not 6 — measured, Chopper Command yields **0** rows at 6 and **18** at 30. Nothing is read
+  from these cartridges but their own bytes.
+- **Witness: `roms/litmus/litmus_bpl_trip.asm`**, two single-scanline regions holding nothing but the
+  countdown — `ldx #6 / sta $B0,x / dex / bpl` and `ldy #6 / sty COLUBK / dey / bpl`, 262 lines. The test
+  asserts **equality**, proven == machine == **75** and **68** over 950 and 960 intervals, because tightness
+  is the point: a merely-safe bound would send an author trimming a line that was never over budget. It
+  checks its own premise first, via a measurement counter incremented at the corrected line, so it cannot
+  pass over a region that never reached the fold. **Negative control:** reverting the `+1` fails it naming
+  the **9**-cycle (dex) and **8**-cycle (dey) gaps, and with the bug in place the extended gate goes red on
+  Seaquest `$F1FC` as well. **Second control:** re-proving the whole corpus before and after moved **6 of
+  1226 regions**, all upward, all containing a `bpl` fold — Seaquest $F12C 102→107, $F1FC 66→75, $F419
+  105→110; `rts_dispatch` $F036 55→69, `shared_setxpos` $F054 83→98, `zone_multiplex` $F033 181→214. Nothing
+  else moved. The `dey`/`BPL` sibling is the same code path and is covered by the same fix and its own
+  fixture region; `BMI` as a latch is *refused* rather than bounded (`determineBound` accepts only
+  BNE/BPL/BCS/BCC), so it was already safe.
+- **Two of five subjects of `TestDecodeReachesCodeInCommercialROMs` had been silently skipping.** Their paths
+  used two levels of `..` where the umbrella tree is three up, so `VideoOlympics` and `Stampede` resolved to
+  a `harness/reference/` that does not exist and took `t.Skipf` on every run while the test stayed green —
+  the exact failure that file's own doc comment warns about ("an analysis that finds no instructions does not
+  look wrong, it looks like a clean ROM"). Fixed; both now decode (**644** and **858** instructions), and
+  Stampede's label is corrected from 4K to its measured **2048 bytes**.
+
 ## [2.0.0] - 2026-07-31
 
 **MAJOR, because two MCP tools changed what a caller gets back.** `CLAUDE.md` says this project follows
