@@ -1833,10 +1833,30 @@ chosen from what was at hand**. A backlog ranked on fixtures optimises for fixtu
 **Chopper Command is the outlier worth naming**: 5 of 29 regions bounded, 17%. Whatever it does, the prover
 mostly cannot follow it, and it is the cheapest available specimen for the three dominant reasons.
 
-**Not a claim: the 8 "BRK in region".** Commercial cartridges are unlikely to execute BRK; far more likely
-the decoder walked into data and read `$00`. That is a hypothesis — it would be settled by checking whether
-those addresses are reachable from the vectors by real flow, and it is exactly the kind of thing the
-casebook line needs answered anyway.
+**The 8 "BRK in region", probed — sharper, still not settled.** The hypothesis was that the decoder walked
+into data and read `$00`. Measured: the BRKs are **concentrated in one ROM**, not spread. Empire Strikes
+Back decodes **20** of them; Seaquest 1; Chopper Command and Adventure **zero**. Of Empire's 20, **19 are
+never executed** in a 200k-instruction attract-mode run — and **one is**. So "all phantom" is already
+falsified, and "all real" was never likely. Settling it needs flow reachability from the vectors, not more
+counting; recorded here so the next attempt starts from the distribution rather than from the total.
+
+**The bigger number the same probe produced: static decode reaches about twice what execution does.**
+
+| ROM | decoded | executed (200k instr, no input) | never executed |
+|---|---:|---:|---:|
+| Chopper Command | 2358 | 1108 | **1250 (53%)** |
+| Empire Strikes Back | 2478 | 803 | **1675 (68%)** |
+| Seaquest | 1656 | 858 | 798 (48%) |
+| Adventure | 1236 | 760 | 476 (39%) |
+
+Part of that is attract mode with no input, and "never executed" is not "unreachable" — a run is ∃. But the
+size of the gap matters for how this project grades itself. **Every soundness grading here is dynamic
+containment**: `defuse` at 32655/32655, `beam_intervals` at 19143/19143, "observed ≤ proven" at 896
+regions. Those check that what the machine DID falls inside what the analysis PREDICTED. On a commercial
+cartridge the machine does about half the decoded program, so such a grading would validate roughly half
+the static claims and say nothing about the rest. On our own kernels — small, driven by scenarios that
+exercise them deliberately — the gap is much smaller, which is why it has never shown up. A grading that
+is ∃ over a corpus that is mostly unexercised is a weaker statement than its numerator suggests.
 
 ### A wrong number in "Constants you must never get wrong" (2026-07-30)
 
