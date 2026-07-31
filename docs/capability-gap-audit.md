@@ -1849,8 +1849,25 @@ counting; recorded here so the next attempt starts from the distribution rather 
 | Seaquest | 1656 | 858 | 798 (48%) |
 | Adventure | 1236 | 760 | 476 (39%) |
 
-Part of that is attract mode with no input, and "never executed" is not "unreachable" — a run is ∃. But the
-size of the gap matters for how this project grades itself. **Every soundness grading here is dynamic
+**It is not attract mode — measured 2026-07-30.** Driving the ROMs properly changes the numbers by almost
+nothing: Chopper Command 1108 idle → 1108 after RESET → 1112 with RESET plus twelve rounds of scripted
+joystick input; Seaquest 858 → 858 → 860; Adventure 760 → 760 → 774. RESET is genuinely doing something —
+**53 of 128 RAM bytes differ** with it versus without on Chopper Command, 25 on Seaquest, 26 on Adventure —
+so the switch works and the machine moves to a different state; it moves there **through the same
+instructions**. Which is how 2600 attract modes are built: the demo runs the game loop with synthetic input.
+So the unexecuted half is elsewhere — other game variations, difficulty paths, death and scoring branches —
+and simple scripted input will not reach it. "Never executed" is still not "unreachable", but it is no
+longer explained away by the ROM sitting on a title screen.
+
+*Two instrument failures on the way to that, both caught before it was written down.* The first run pressed
+nothing: `emu.SetInput` rejects console switches — they live on `SetPanel` — and its error was returned and
+ignored, so "RESET changes nothing" was measured on a RESET that never happened. The liveness probe added
+that morning is what exposed it. The second: with RESET working, the coverage was again identical to the
+instruction, which reads exactly like the first failure; distinguishing "the switch did nothing" from "the
+switch did something and the code path is the same" needed a **different observable**, and the RAM diff is
+what settled it.
+
+But the size of the gap matters for how this project grades itself. **Every soundness grading here is dynamic
 containment**: `defuse` at 32655/32655, `beam_intervals` at 19143/19143, "observed ≤ proven" at 896
 regions. Those check that what the machine DID falls inside what the analysis PREDICTED. On a commercial
 cartridge the machine does about half the decoded program, so such a grading would validate roughly half
