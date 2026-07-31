@@ -112,6 +112,16 @@ versions follow [Semantic Versioning](https://semver.org/).
   docs commit on 2026-07-29 and had been contributing a meaningless green tick since. Deleted; the tree is
   now at 343/343 able to fail. The detector clears delegation (`helper(t, ...)`, `t.Run`) — verified against
   a delegating test that would otherwise have been a false positive.
+- **`mutate -covered`'s "honest kill rate" mutated the wrong half of a banked ROM.** `CoveredOffsets`
+  mapped an executed PC to a file offset with `addr & (len(rom)-1)`, which on an 8K image folds every
+  `$Fxxx` into the LAST 4K image whichever bank actually ran. Measured before the fix: on the exerciser
+  **all 278 covered offsets landed in `$1000-$1FFF` and not one in `$0000-$0FFF`** — so "restrict fault
+  injection to code that actually executed" was injecting into bank 1's bytes while bank 0 was the half
+  executing, producing mutants that cannot be killed for precisely the reason `-covered` exists to avoid.
+  Now `bank*4K + (addr & 0x0FFF)`, via the new `Coverage.SeenSites()`. The exerciser goes to 315 offsets
+  with **49 in bank 0's image**; a 4K ROM is the one-bank case and is unchanged (`smoke.bin` still 38, so
+  the published "2% naive vs 68% covered" figure does not move). Negative control: restoring the old fold
+  fails the new test.
 - **Coverage was bank-blind, and it flattered.** `internal/emu/coverage.go` keyed executed instructions,
   branches and both edge sets on a bare address, but two banks of an 8K image decode the same addresses.
   It failed in both directions at once: as a count it under-reported distinct executed instructions

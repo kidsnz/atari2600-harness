@@ -135,6 +135,24 @@ func (c *Coverage) Signature() map[uint64]bool {
 	return sig
 }
 
+// SeenSites は踏んだ命令を (バンク, アドレス) の対で昇順に返す。ROM ファイル内のオフセットに
+// 変換したい呼び手はこちらを使うこと: アドレスだけでは 8K イメージのどちらの 4K 面かが決まらず、
+// `addr & (len(rom)-1)` は $Fxxx を必ず上位面に畳む。実測 2026-07-30、その畳み方で exerciser の
+// 覆われたオフセット 278 個は全部が上位 4K に落ち、バンク 0 のバイトは 1 つも選ばれなかった。
+func (c *Coverage) SeenSites() [][2]int {
+	out := make([][2]int, 0, len(c.pcSeen))
+	for k := range c.pcSeen {
+		out = append(out, [2]int{k.bank, int(k.addr)})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i][0] != out[j][0] {
+			return out[i][0] < out[j][0]
+		}
+		return out[i][1] < out[j][1]
+	})
+	return out
+}
+
 // SeenPCs は踏んだ命令アドレスを昇順で返す（dump 用）。
 func (c *Coverage) SeenPCs() []uint16 { return dedupeAddrs(c.pcSeen) }
 

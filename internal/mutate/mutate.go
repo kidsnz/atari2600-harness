@@ -125,10 +125,20 @@ func CoveredOffsets(romPath, spec string, frames int) (map[int]bool, error) {
 		return nil, err
 	}
 	cov := e.Coverage()
-	mask := len(base) - 1
 	out := map[int]bool{}
-	for _, pc := range cov.SeenPCs() {
-		out[int(pc)&mask] = true
+	// The file offset of an executed instruction is bank*4K + its offset in the
+	// window — NOT `addr & (len(rom)-1)`, which folds every $Fxxx into the LAST 4K
+	// image no matter which bank ran. Measured 2026-07-30 with the old fold: on
+	// exerciser all 278 covered offsets landed in $1000-$1FFF and not one in
+	// $0000-$0FFF, so "restrict fault injection to code that actually executed"
+	// was injecting into bank 1's bytes while bank 0 was the half that ran. A 4K
+	// image is the one-bank case of this and is unaffected.
+	for _, site := range cov.SeenSites() {
+		bank, addr := site[0], site[1]
+		off := bank*0x1000 + (addr & 0x0FFF)
+		if off < len(base) {
+			out[off] = true
+		}
 	}
 	return out, nil
 }
