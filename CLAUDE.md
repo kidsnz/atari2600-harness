@@ -109,8 +109,10 @@ player minimum of 3 was wrong for this kernel, and "the leftmost" is a property 
 of the machine. Measure it for the kernel you have. (The missile/ball figure was not re-measured.)
 
 **HMOVE** — upper nibble only, two's complement, **positive = left / negative = right**, range +7 to −8.
-Moves only at the HMOVE strobe. HMOVE is **right after WSYNC**. (All 16 nibbles hardware-verified in litmus
-v0.4.0: `$70`=left7 … `$00`=0 … `$F0`=right1 … `$80`=right8. 1px granularity.)
+Moves only at the HMOVE strobe. HMOVE is **right after WSYNC**. (All 16 nibbles: `$70`=left7 … `$00`=0 …
+`$F0`=right1 … `$80`=right8, 1px granularity — re-measured 2026-07-30 and now **machine-locked** by
+`TestAllSixteenHmoveNibblesMoveByOnePixelEach`, which checks each nibble at the DRAWN pixel as well as at
+the register, since "verified in v0.4.0" is a claim about a version and nothing had held it true since.)
 **Do not write HMxx within 24 CPU cycles after HMOVE** (Stella PG; unpredictable motion). HMOVE-after-WSYNC
 extends HBLANK by 8 clocks = the left-side 8px blank on HMOVE lines; mid-line HMOVE moves objects RIGHT
 ~1px/4CLK (Towers TIA_HW_Notes; documented, not yet litmus-verified — see `docs/fundamentals-audit.md`).
