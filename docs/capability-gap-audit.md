@@ -1808,7 +1808,27 @@ oracle was short a term — fixed, and the error direction was false ALARMS rath
 nothing unsound had shipped. What it had done instead was silently cap this grading to ROMs that happen to
 raise VBLANK during VSYNC, a property nobody chose.
 
-**Still open: 776 residual disagreements, and the corpus extension is NOT shipped because of them.** After
+**RESOLVED (next tick, measured): both residual groups were defects in the GRADING, not the prover, and
+the corpus is now shipped at 128 ROMs.** The 776 split cleanly once probed at the exact failing PCs:
+
+- **`litmus_bound_proxy` (336) — the sampling instant.** A TIA register write is *delayed*
+  (`tia.futureVblank`), so at the region's opening `sta WSYNC` a `sta VBLANK` issued one instruction
+  earlier has not reached the signal yet. Measured: `DisplayOff()` is **false at the strobe and true one
+  instruction later**, for a region that is genuinely blanked. The test asked its question at the wrong
+  instant — the claim is about the LINE the region opens, not about the strobe.
+- **`exerciser` (440) — a bank-blind key.** `blank` was `map[uint16]bool` keyed on the region's address
+  alone, and an 8K image decodes the SAME addresses in both banks, so the run matched whatever sat at
+  `$Fxxx` in the *other* bank. Measured: the probe landed at scanline 36 with the picture on, nowhere near
+  the frame-top region the prover had classified. **`banked_game` is in the original 32-ROM corpus**, so
+  part of the old number was aimed at the wrong instructions all along.
+
+Both fixed (key on `(bank, addr)`; sample after the strobe retires). Result: **128 ROMs, 133,684
+executions, 0 disagreements**, up from 32 ROMs. The per-ROM instruction budget went 400k → 120k in the same
+change, measured rather than guessed: at 400k the run costs 180s, at 120k 57s, and *blank regions never
+reached* — the coverage number, the one that says what this grading does NOT see — is **1 either way**. The
+extra 280k instructions bought repeat executions of entry points already covered.
+
+**Superseded — kept for the record:** After
 the fix they are confined to `litmus_bound_proxy` (336) and `exerciser` (440). Probed at the exact failing
 PCs, both sit **one instruction after** the store that turns the display off, and `GetLastSignal()` there
 still reports the pre-write pixel (`sig.VBlank=false sig.VSync=false` at `litmus_bound_proxy $F038`,

@@ -25,7 +25,14 @@ func TestBlankClassificationAgreesWithTheMachine(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Skip("technique corpus unavailable")
 	}
-	files = append(files, "../../roms/litmus/litmus_jsr_display.asm")
+	// The whole corpus, not a subset: this grading was implicitly limited to the
+	// technique kernels, and the two defects that limit exposed (a bank-blind key and
+	// a sampling point taken before a delayed register write resolves) were both
+	// invisible while it ran on 32 ROMs.
+	for _, pat := range []string{"../../roms/litmus/*.asm", "../../roms/exerciser/*.asm"} {
+		more, _ := filepath.Glob(pat)
+		files = append(files, more...)
+	}
 
 	romsChecked, regionsChecked, hits, skippedNeverReached := 0, 0, 0, 0
 	for _, asm := range files {
@@ -33,9 +40,25 @@ func TestBlankClassificationAgreesWithTheMachine(t *testing.T) {
 		if err != nil || len(rep.BlankLines) == 0 {
 			continue
 		}
-		blank := map[uint16]bool{}
+		// Keyed on (bank, address), not address alone. exerciser and banked_game are
+		// 8K images, and two banks decode the SAME addresses: a bank-blind map matches
+		// whatever happens to sit at $Fxxx in the OTHER bank and checks the display
+		// state of unrelated code. Measured 2026-07-30 on exerciser — the probe landed
+		// at scanline 36 with the picture on, nowhere near the frame-top region the
+		// prover had classified. banked_game is in this corpus, so the old number was
+		// partly aimed at the wrong instructions.
+		type key struct {
+			bank int
+			addr uint16
+		}
+		blank := map[key]bool{}
+		bankedImage := false
 		for _, r := range rep.BlankLines {
-			blank[r.Start] = true
+			bk := 0
+			if r.BankValid {
+				bk, bankedImage = r.Bank, true
+			}
+			blank[key{bk, r.Start}] = true
 		}
 
 		bin := build.BinPathFor(asm)
@@ -59,18 +82,35 @@ func TestBlankClassificationAgreesWithTheMachine(t *testing.T) {
 		// Long enough for a state machine to move through more than its idle state;
 		// game_states swaps at frame 60, so a short run would prove less than it
 		// looks like it does.
-		for step := 0; step < 400000; step++ {
+		// 120k rather than 400k instructions per ROM. Measured 2026-07-30 while taking
+		// the corpus from 32 ROMs to 128: at 400k the run costs 180s, at 120k it costs
+		// 57s, and the number that matters — blank regions never reached, i.e. the ones
+		// this grading does NOT cover — is 1 either way. The extra 280k instructions
+		// per ROM buy repeat executions of entry points already covered, not coverage.
+		for step := 0; step < 120000; step++ {
 			pc := uint16(e.VCS.CPU.PC.Address())
-			if blank[pc] {
+			bk := 0
+			if bankedImage {
+				bk, _ = e.Bank()
+			}
+			opensBlankRegion := blank[key{bk, pc}]
+			// Sample AFTER the opening WSYNC has been executed, not before it. A TIA
+			// register write is delayed (futureVblank), so at the strobe instruction
+			// itself a `sta VBLANK` issued one instruction earlier has not reached the
+			// signal yet: measured on litmus_bound_proxy, DisplayOff() is false at the
+			// strobe and true one instruction later, for a region that is genuinely
+			// blanked. The question this test asks is about the LINE the region opens,
+			// so the strobe is the wrong instant to ask it at.
+			if err := e.StepInstruction(); err != nil {
+				break
+			}
+			if opensBlankRegion {
 				reached[pc] = true
 				regionsChecked++
 				if !e.DisplayOff() {
 					bad[pc]++
 					hits++
 				}
-			}
-			if err := e.StepInstruction(); err != nil {
-				break
 			}
 		}
 		for pc, n := range bad {

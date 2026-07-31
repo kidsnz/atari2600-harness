@@ -104,6 +104,18 @@ versions follow [Semantic Versioning](https://semver.org/).
   pass; negative controls: truncating to the first frame, and repeating one frame N times, both fail it.
 
 ### Fixed
+- **The blank-classification grading ran on 32 of 129 ROMs, and two defects in the grading itself were
+  what kept it there.** It is the one verdict in the package that can hide a real scanline tear, so its
+  corpus matters. (1) Its `blank` map was keyed on a region's **address alone**, and an 8K image decodes the
+  same addresses in both banks — so on a banked cartridge it matched whatever sat at `$Fxxx` in the *other*
+  bank and graded unrelated code. `banked_game` is in the original corpus, so part of the old number was
+  aimed at the wrong instructions. (2) It sampled the display state **at** the region's opening `sta WSYNC`,
+  but a TIA register write is delayed (`futureVblank`), so a `sta VBLANK` issued one instruction earlier has
+  not reached the signal yet — measured, `DisplayOff()` is false at the strobe and true one instruction
+  later for a region that is genuinely blanked. Both fixed; the corpus now runs the litmus and exerciser
+  ROMs too: **128 ROMs, 133,684 executions of blank-region entry points, 0 disagreements** (was 32 ROMs).
+  The per-ROM budget went 400k → 120k instructions in the same change, measured: 180s → 57s, with *blank
+  regions never reached* — the number that says what this grading does not see — unchanged at **1**.
 - **`emu.DisplayOff()` ignored VSYNC.** It read only `sig.VBlank`, while the prover's own `displayOff()` is
   `VSync || VBlank` — and VSYNC blanks the picture as surely as VBLANK does. Measured while extending the
   blank-classification grading past the technique corpus: **6730 "disagreements" appeared, every one on a
