@@ -67,9 +67,16 @@ func TestEveryPagePenaltyBranchHasAWitness(t *testing.T) {
 			st := states[at]
 			var branch string
 			var want int
+			absIndexed := d.AddressingMode == instructions.AbsoluteX ||
+				d.AddressingMode == instructions.AbsoluteY
 			switch {
 			case !d.PageSensitive || d.IsBranch():
 				branch, want = "not-sensitive-or-branch", 0
+			// Mirrors pagePenalty's order: a page-aligned base settles the question
+			// before either conservative bail-out, because base+255 cannot leave the
+			// page and no index analysis is needed to know it.
+			case absIndexed && int(in.Operand)&0xFF == 0:
+				branch, want = "base-page-aligned", 0
 			case !st.valid:
 				branch, want = "state-unknown", 1
 			case d.AddressingMode != instructions.AbsoluteX && d.AddressingMode != instructions.AbsoluteY:
@@ -117,6 +124,11 @@ func TestEveryPagePenaltyBranchHasAWitness(t *testing.T) {
 				"a branch nothing takes. Add a litmus that does (roms/litmus/litmus_pagecross.asm is the "+
 				"one that covers CROSSES).", k)
 		}
+	}
+	if count["base-page-aligned"] == 0 {
+		t.Errorf("no ROM reaches the %q branch. It was added because a picture kernel aligns its tables "+
+			"and the corpus had none; if litmus_pagealign stopped exercising it, the shortcut is "+
+			"unwitnessed again", "base-page-aligned")
 	}
 	t.Logf("classified the costing of %d ROMs; both precise page-cross branches have a witness", roms)
 }

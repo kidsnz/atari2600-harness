@@ -9,6 +9,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **A page-aligned table cannot be crossed, and the proof now says so — measured on a kernel the corpus
+  did not contain.** `pagePenalty` reached its conservative `+1` whenever the index range was unprovable,
+  which is exactly when a kernel aligns its tables in the first place. The rule that settles it needs no
+  index analysis: a 6502 index register holds 0..255, so `$NN00 + idx` is at most `$NNFF` and never leaves
+  the base's page. **Across the 135 ROMs in `roms/` this case fires ZERO times**, and that is a fact about
+  the corpus rather than the case — 24 of the 31 technique kernels draw no playfield, so not one of them
+  is a table-driven picture kernel, and a picture kernel is what aligns tables. The first one written
+  produced **8 wasted charges on its first run**: proven worst 74 against a machine that takes 66, two
+  cycles of headroom reported where there were ten. Witness `litmus_pagealign.asm`, whose aligned region
+  now proves 34 against a measured 34 — equality, because a bound that is merely safe sends an author
+  trimming work that was never over budget. Negative controls both ways: removing the shortcut puts the
+  aligned region back at 38 vs 34, and widening it to ignore the base's low byte makes the same fixture
+  report 44 for an interval the machine takes 48 — caught by the corpus gate, along with
+  `litmus_pagecross`. **The fixture's first draft proved nothing and its own premise check said so**: the
+  index was written as a constant, and the abstract interpreter tracks RAM well enough to pin it, so all
+  four reads took the already-free path. It reads the joystick port now.
+
 - **The prover stops calling a DAG a loop — and the first attempt at it published a bound BELOW the
   machine, which the corpus gate caught.** `foldLoops` decided what a back edge was by ADDRESS ORDER: a
   branch counted as one when its target sat at a lower address and was not a WSYNC sink. That is not

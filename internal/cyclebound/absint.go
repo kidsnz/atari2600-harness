@@ -926,6 +926,33 @@ func (in Instr) pagePenalty(s State) int {
 	if !d.PageSensitive || d.IsBranch() {
 		return 0
 	}
+	// A PAGE-ALIGNED BASE CANNOT BE CROSSED, and this needs no index analysis at
+	// all: a 6502 index register holds 0..255, so `$NN00 + idx` is at most `$NNFF`
+	// and stays in the base's page for every possible index. The check therefore
+	// runs BEFORE the two conservative bail-outs below, which is the whole point —
+	// the case that matters is precisely the one where the index range is NOT
+	// provable, because that is when a table gets aligned in the first place.
+	//
+	// Only absolute,X / absolute,Y carry a base to reason about. For (ind),Y the
+	// operand is a zero-page POINTER, not the base, and its low byte says nothing
+	// about where the read lands.
+	//
+	// Measured 2026-08-01. Over the 135 ROMs in `roms/`, this branch fires ZERO
+	// times — and that is a fact about the corpus, not about the case. 24 of the 31
+	// technique kernels draw no playfield at all, so the corpus contains no
+	// table-driven picture kernel, which is exactly the shape that aligns tables.
+	// The first one written (`sandbox/practice/horizon`, an asymmetric-playfield
+	// sunset) produced **8 wasted charges immediately**, 11 across the practice set:
+	// eight `lda Tab,y` reads from eight page-aligned tables, each charged a cycle
+	// the hardware cannot spend. Its proven worst was 74 against a budget of 76 and
+	// a machine that takes 66 — the author is told there are 2 cycles of headroom
+	// when there are 10. A bound that is merely safe sends an author trimming work
+	// that was never over budget, which is the objection this file already records
+	// against loose conditional bounds.
+	if (d.AddressingMode == instructions.AbsoluteX || d.AddressingMode == instructions.AbsoluteY) &&
+		int(in.Operand)&0xFF == 0 {
+		return 0
+	}
 	if !s.valid {
 		return 1 // no tracked state at this point -> conservative
 	}
