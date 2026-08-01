@@ -9,6 +9,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`prove_line_budget`, `defuse` and `beam_intervals` now say which build answered — and shout when the
+  source has moved since.** A static analysis is a claim about source; the server answering is whatever
+  binary the session connected to, and editing the analyser does not change it. Measured 2026-08-01, twice
+  in one session and both times on a fix that was already correct: `prove_line_budget` returned worst **74**
+  for a kernel the current source proves at **66**, and reported the DAG-first witness ROM as refused when
+  the current source bounded it at **26**. Both read as "the change did not work"; the honest response to
+  each would have been to revert a correct change. Go already embeds the answer with no build flags — the
+  running binary carried `vcs.revision=bb3b0f8` while the tree sat at `30b492d`, four commits later, and
+  nothing read it. Stamping alone would not have sufficed, since a stamp only helps a reader who thinks to
+  compare, so the server reads HEAD itself and puts a full sentence in the result. It stays SILENT when a
+  guess would be wrong (no build revision, unreadable repository), because a false STALE trains a reader to
+  ignore the real one; a build from an uncommitted tree gets its own milder note. Note that `version.Harness`
+  would NOT have caught this: it read `2.0.0` on both binaries, because the source moved and the release
+  number did not.
+
 - **A page-aligned table cannot be crossed, and the proof now says so — measured on a kernel the corpus
   did not contain.** `pagePenalty` reached its conservative `+1` whenever the index range was unprovable,
   which is exactly when a kernel aligns its tables in the first place. The rule that settles it needs no

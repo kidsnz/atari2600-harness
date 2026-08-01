@@ -1320,6 +1320,11 @@ type ProveLineBudgetIn struct {
 }
 type ProveLineBudgetOut struct {
 	Report *cyclebound.Report `json:"report"`
+	// Analyzer names the build that produced this proof. A static analysis is a
+	// claim about source, and the server answering is whatever binary the session
+	// connected to — see stamp.go for the two times a stale one made a correct fix
+	// look like a failed one.
+	Analyzer AnalyzerStamp `json:"analyzer"`
 }
 
 func handleProveLineBudget(ctx context.Context, req *mcp.CallToolRequest, in ProveLineBudgetIn) (*mcp.CallToolResult, ProveLineBudgetOut, error) {
@@ -1331,7 +1336,7 @@ func handleProveLineBudget(ctx context.Context, req *mcp.CallToolRequest, in Pro
 	if err != nil {
 		return nil, ProveLineBudgetOut{}, err
 	}
-	return nil, ProveLineBudgetOut{Report: rep}, nil
+	return nil, ProveLineBudgetOut{Report: rep, Analyzer: analyzerStamp()}, nil
 }
 
 // --- static def-use / beam-interval proofs (SD-1, SD-2) ---
@@ -1340,7 +1345,8 @@ type DefUseIn struct {
 	AsmPath string `json:"asm_path" jsonschema:"path to the .asm to assemble and analyse"`
 }
 type DefUseOut struct {
-	Report *cyclebound.DefUseReport `json:"report"`
+	Report   *cyclebound.DefUseReport `json:"report"`
+	Analyzer AnalyzerStamp            `json:"analyzer"` // which build answered; see stamp.go
 }
 
 // handleDefUse answers, over ALL paths, which instruction writes which address.
@@ -1352,14 +1358,15 @@ func handleDefUse(ctx context.Context, req *mcp.CallToolRequest, in DefUseIn) (*
 	if err != nil {
 		return nil, DefUseOut{}, err
 	}
-	return nil, DefUseOut{Report: rep}, nil
+	return nil, DefUseOut{Report: rep, Analyzer: analyzerStamp()}, nil
 }
 
 type BeamIntervalsIn struct {
 	AsmPath string `json:"asm_path" jsonschema:"path to the .asm to assemble and analyse"`
 }
 type BeamIntervalsOut struct {
-	Report *cyclebound.BeamReport `json:"report"`
+	Report   *cyclebound.BeamReport `json:"report"`
+	Analyzer AnalyzerStamp          `json:"analyzer"` // which build answered; see stamp.go
 }
 
 // handleBeamIntervals proves, per TIA write, the beam window it can land in.
@@ -1371,7 +1378,7 @@ func handleBeamIntervals(ctx context.Context, req *mcp.CallToolRequest, in BeamI
 	if err != nil {
 		return nil, BeamIntervalsOut{}, err
 	}
-	return nil, BeamIntervalsOut{Report: rep}, nil
+	return nil, BeamIntervalsOut{Report: rep, Analyzer: analyzerStamp()}, nil
 }
 
 // --- authoring aids: beamtrace timeline / beam_race advisory / spritepos solver ---

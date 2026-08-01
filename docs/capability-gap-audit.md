@@ -1671,6 +1671,46 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### The server answers from the binary it was started with, and says so now (2026-08-01)
+
+A static analysis is a claim about SOURCE CODE. The MCP server that answers is whatever binary the session
+connected to, and editing the analyser does not change it. The result carried no sign of this, so a stale
+server reported the old answer with full confidence.
+
+**It happened twice in one session, both times on a fix that was already correct:**
+
+| tool | stale answer | current source | read as |
+|---|---:|---:|---|
+| `prove_line_budget` on the horizon kernel | worst **74** | **66** | "the page-align fix did nothing" |
+| `prove_line_budget` on `litmus_dag_region` | refused, *"multiple back-edges"* | bounded, worst **26** | "the DAG-first fix did nothing" |
+
+Both were caught only by re-running the analysis from Go instead of through the tool. Had they not been,
+the honest response to each would have been to revert a correct change.
+
+**Go already embeds what is needed, with no build flags.** `debug.ReadBuildInfo` carries `vcs.revision`,
+`vcs.time` and `vcs.modified` for any binary built inside a git work tree. Measured: the running
+`bin/harness` reported `vcs.revision=bb3b0f8` while the tree sat at `30b492d`, four commits later. The whole
+story was already in the binary and nothing read it.
+
+**Stamping alone would not have been enough**, because a stamp only helps a reader who thinks to compare,
+and on the day in question nobody did. The server runs on the same machine as the repository, so it reads
+HEAD itself and puts a sentence in the result:
+
+> `STALE: this answer came from a binary built at bb3b0f8, but the repository is now at 30b492d. ... A
+> correct fix reported through a stale server reads exactly like a fix that did not work.`
+
+Silence is the default in the two cases where a guess would be wrong — no build revision, or no readable
+repository — because a false STALE trains a reader to ignore the real one. A build from an uncommitted tree
+gets its own, milder note: the source it analysed is not any commit.
+
+`prove_line_budget`, `defuse` and `beam_intervals` carry it. The dynamic tools do not: they report what the
+emulator did, and the emulator is the same machine whatever built it.
+
+**The shape of this one is worth naming.** The file records many instances of *"the tool's self-report is
+not the fact"*. This is the same family with the direction reversed: the tool reported an old self as the
+current one. A version string alone would not have caught it either — `version.Harness` read `2.0.0` on both
+binaries, because the source moved and the release number did not.
+
 ### The mapper census, and two things it found: a whitelist nobody re-reads and a loader that panics (2026-07-31)
 
 G1 says advanced cartridges have "zero harness verification". Before building anything for that, the cheap
