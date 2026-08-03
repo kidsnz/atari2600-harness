@@ -184,6 +184,7 @@ round trip. Also return `png_path` in JSON.
 | MCP tool implementation spec (go-sdk API, per-tool I/O) | `docs/mcp-tools.md` |
 | harness backlog — capability gaps (G1–G14) + verification-variety (VV-*); **the single live backlog** (ex improvement/hardening-roadmap folded in) | `docs/capability-gap-audit.md` |
 | 8bitworkshop sample cross-check (book techniques vs our library) | `docs/8bitworkshop-crosscheck.md` |
+| the visual CEILING — best the hardware could do for a picture (the denominator `vismatch` lacks) | `docs/visual-ceiling.md` |
 | provenance map (every technique/rule → its origin) | `docs/provenance.md` (gen: `check_provenance.py --list`) |
 | fundamentals audit (verified vs documented vs unknown, with sources) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
