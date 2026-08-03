@@ -28,6 +28,15 @@ type Marker struct {
 	Gfx     uint8
 	Reflect bool
 	Wide    int
+	// Drawn records whether this object painted a visible pixel in the frame, taken
+	// from the per-pixel attribution buffer rather than inferred from the registers.
+	// A TIA object always HAS a position; that says nothing about whether it is on
+	// screen. Rendering a marker for an object that drew nothing puts a labelled
+	// vertical line over a picture that does not contain it — and this image is the
+	// primary channel the user reads a picture through, so that is a false statement
+	// about the ROM, not a cosmetic blemish. Measured on a playfield-only sunset
+	// kernel: five markers, five objects, zero of them on screen.
+	Drawn bool
 }
 
 const (
@@ -112,9 +121,14 @@ func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.R
 
 	// スプライトマーカー（縦線＋数値ラベル）。可視分を clock 順にソートし、順位の偶奇で
 	// ラベルを 2 段に振る＝画面で隣り合うラベルが必ず別段になり重なりを回避。
+	// An object that drew nothing gets no marker. It still has a position — every TIA
+	// object always does — but a labelled line over a picture that does not contain
+	// the object is a false statement about the ROM, and this image is how the user
+	// reads the picture. Measured on a playfield-only kernel: five markers for five
+	// objects, none of them on screen.
 	vis := make([]Marker, 0, len(markers))
 	for _, m := range markers {
-		if m.Clock >= 0 && m.Clock <= fw {
+		if m.Drawn && m.Clock >= 0 && m.Clock <= fw {
 			vis = append(vis, m)
 		}
 	}

@@ -1507,6 +1507,12 @@ type ScreenIn struct {
 type SpritePos struct {
 	Label string `json:"label"`
 	Clock int    `json:"clock"` // HmovedPixel, 可視 0..159
+	// Drawn says whether the object painted a visible pixel in this frame, measured
+	// from the per-pixel attribution buffer. An object always HAS a position, so a
+	// caller reading Clock alone cannot tell a sprite on screen from one parked
+	// off it. Objects that drew nothing are still listed — the position is real and
+	// sometimes wanted — but they carry drawn:false and get no marker on the image.
+	Drawn bool `json:"drawn"`
 }
 type ScreenOut struct {
 	Width   int         `json:"width"`
@@ -1552,7 +1558,7 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 
 	sprites := make([]SpritePos, 0, 5)
 	for _, m := range e.Markers() {
-		sprites = append(sprites, SpritePos{Label: m.Label, Clock: m.Clock})
+		sprites = append(sprites, SpritePos{Label: m.Label, Clock: m.Clock, Drawn: m.Drawn})
 	}
 
 	// 画像（人間向け）＋ 数値（Claude 向け structured Out）を両方返す。

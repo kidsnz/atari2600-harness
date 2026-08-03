@@ -8,6 +8,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The annotated screenshot no longer draws markers for objects that are not on screen.** `Markers` read
+  the TIA's position registers and returned all five movable objects unconditionally — but a TIA object is
+  a counter, it always HAS a position, and that says nothing about whether it painted anything. On a
+  playfield-only kernel the result was **five labelled vertical lines for five objects that drew zero
+  pixels**, over an image CLAUDE.md calls the primary channel the user reads a picture through. That makes
+  a phantom marker a false statement about the ROM rather than a cosmetic blemish. New `emu.DrawnObjects`
+  answers from the frame's own per-pixel attribution buffer — the one `decompose_row` reads — so the
+  question "did P0 appear" is settled by looking for P0 in the picture instead of reasoning about GRP0,
+  NUSIZ, VDEL and the priority rules and hoping the reasoning matches the hardware. The JSON still lists
+  every object, now with `drawn`, because a position is real and sometimes wanted; only the image drops
+  them. Verified end to end over MCP: the sunset kernel returns five objects all `drawn:false` and an image
+  with no markers, `litmus_pos` returns `P0 drawn:true` and keeps its line. Both directions are tested,
+  since a function that returned false for everything would satisfy the playfield case alone and silently
+  erase every real sprite. **One test expectation was written wrong and the measurement caught it**: the
+  `objsizes` litmus was assumed from its name to cover players, and it does not — it sweeps missile and
+  ball widths only. The two independent readings of the buffer agreed with each other and disagreed with
+  the author.
+
 ### Added
 - **`prove_line_budget`, `defuse` and `beam_intervals` now say which build answered — and shout when the
   source has moved since.** A static analysis is a claim about source; the server answering is whatever

@@ -469,6 +469,56 @@ func (e *Emu) Snapshot() (img *image.RGBA, visibleTop int) {
 
 // Markers は 5 オブジェクトの横位置マーカーを Fixed Debug Colors で返す
 // （P0=赤 / M0=橙 / P1=黄 / M1=緑 / BL=紫）。Clock は HmovedPixel（可視 0..159）。
+// DrawnObjects reports, per movable object, whether it painted a single visible
+// pixel in the frame just rendered. Order is P0, M0, P1, M1, BL — the same order as
+// Markers, so the two line up by index.
+//
+// This is a MEASUREMENT, not an inference from registers. The per-pixel attribution
+// buffer already records which TIA object drew each colour clock (it is what
+// DecomposeRow reads), so "did P0 appear" is answered by looking for P0 in the frame
+// rather than by reasoning about GRP0, NUSIZ and VDEL and hoping the reasoning
+// matches the hardware's own priority rules.
+//
+// It exists because the annotated screenshot drew all five markers unconditionally.
+// On a playfield-only kernel that is five vertical lines and five labelled positions
+// for objects that are not on screen — and that image is the primary channel through
+// which the user reads a picture, so a phantom object there is not a cosmetic
+// blemish but a false statement about what the ROM draws.
+func (e *Emu) DrawnObjects() [5]bool {
+	var drawn [5]bool
+	if e.elemBuf == nil {
+		return drawn
+	}
+	// elemBuf holds elemNames' index + 1. Map the movable objects to Markers' order;
+	// BG and PF are not markers and are skipped.
+	idxOf := map[string]int{"P0": 0, "M0": 1, "P1": 2, "M1": 3, "BL": 4}
+	slot := make([]int, len(elemNames)+1)
+	for i := range slot {
+		slot[i] = -1
+	}
+	for i, name := range elemNames {
+		if s, ok := idxOf[name]; ok {
+			slot[i+1] = s
+		}
+	}
+
+	vt := e.cap.frameInfo.VisibleTop
+	vb := e.cap.frameInfo.VisibleBottom
+	for y := vt; y <= vb; y++ {
+		row := y * specification.ClksScanline
+		for x := 0; x < specification.ClksVisible; x++ {
+			i := row + specification.ClksHBlank + x
+			if i < 0 || i >= len(e.elemBuf) {
+				continue
+			}
+			if v := e.elemBuf[i]; int(v) < len(slot) && slot[v] >= 0 {
+				drawn[slot[v]] = true
+			}
+		}
+	}
+	return drawn
+}
+
 func (e *Emu) Markers() []annotate.Marker {
 	v := e.VCS.TIA.Video
 	wide := func(nusiz uint8) int { // NUSIZ サイズビット → ピクセル倍率（$05=2x, $07=4x）
@@ -480,14 +530,19 @@ func (e *Emu) Markers() []annotate.Marker {
 		}
 		return 1
 	}
+	// Drawn comes from the frame's own attribution buffer rather than from the
+	// registers beside it: an object has a position at all times, whether or not it
+	// put anything on screen, so a marker drawn from position alone is a claim the
+	// picture does not support.
+	drawn := e.DrawnObjects()
 	return []annotate.Marker{
-		{Label: "P0", Clock: v.Player0.HmovedPixel, Col: color.RGBA{230, 60, 60, 255},
+		{Label: "P0", Clock: v.Player0.HmovedPixel, Col: color.RGBA{230, 60, 60, 255}, Drawn: drawn[0],
 			Gfx: v.Player0.GfxDataNew, Reflect: v.Player0.Reflected, Wide: wide(v.Player0.SizeAndCopies)},
-		{Label: "M0", Clock: v.Missile0.HmovedPixel, Col: color.RGBA{235, 140, 40, 255}},
-		{Label: "P1", Clock: v.Player1.HmovedPixel, Col: color.RGBA{230, 215, 50, 255},
+		{Label: "M0", Clock: v.Missile0.HmovedPixel, Col: color.RGBA{235, 140, 40, 255}, Drawn: drawn[1]},
+		{Label: "P1", Clock: v.Player1.HmovedPixel, Col: color.RGBA{230, 215, 50, 255}, Drawn: drawn[2],
 			Gfx: v.Player1.GfxDataNew, Reflect: v.Player1.Reflected, Wide: wide(v.Player1.SizeAndCopies)},
-		{Label: "M1", Clock: v.Missile1.HmovedPixel, Col: color.RGBA{70, 200, 70, 255}},
-		{Label: "BL", Clock: v.Ball.HmovedPixel, Col: color.RGBA{180, 90, 210, 255}},
+		{Label: "M1", Clock: v.Missile1.HmovedPixel, Col: color.RGBA{70, 200, 70, 255}, Drawn: drawn[3]},
+		{Label: "BL", Clock: v.Ball.HmovedPixel, Col: color.RGBA{180, 90, 210, 255}, Drawn: drawn[4]},
 	}
 }
 
