@@ -1671,6 +1671,37 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### A call inside a folded loop body cost six cycles, and the tree had a live one (2026-08-03)
+
+`foldLoops` walks the body with `nextSite()` and sums `nodeCost()`. For a JSR that is the RETURN address
+and six cycles — the callee's cycles are dropped, once per iteration. `IsBranch()` does not catch it:
+that predicate is `AddressingMode == Relative && Effect == Flow`, and a JSR is Absolute/Subroutine, a JMP
+Absolute/Flow. Nothing refused either.
+
+**Measured on `litmus_callinloop`** (callee = twelve `nop`s): **proven 48, machine 168 across 3 scanlines —
+3.5x under**, with `certified: true`.
+
+**The worse case is not the arithmetic.** If the callee contains `sta WSYNC`, the walk steps over a REGION
+BOUNDARY: the machine's interval ends at that strobe and the proof's does not, so the two numbers describe
+different intervals and comparing them is a category error rather than a comparison.
+
+`roms/techniques/shared_setxpos.asm` **$F054 is exactly that shape and is the tree's only instance** —
+`jsr SetXPos` into a routine whose second instruction is `sta WSYNC`. It read **proven 98, machine 36**.
+Nothing was wrong with the machine number and nothing was wrong with the proof's arithmetic; they simply
+were not about the same span of time. The 62-cycle "slack" was never slack.
+
+That is worth stating plainly because it is a **third** way for a bound to be wrong, alongside too-low and
+too-high: **a bound about the wrong interval**. `observed <= proven` cannot detect it — both readings pass
+the gate while measuring different things — and the only reason it surfaced is that a premise audit went
+looking for it.
+
+Corpus effect across 155 images: 2 folds lost, one the fixture's own and one `shared_setxpos $F054`, which
+was already `over=true`. No certification lost, zero bounds lowered. The fixture deliberately omits the
+WSYNC from its callee so its own comparison stays a comparison.
+
+`TestTheLiveCallInLoopInstanceIsNowRefused` pins the shipped instance, and fails loudly if the region ever
+stops existing — a test that quietly stops watching is how a check becomes decorative.
+
 ### A loop entered past its header carried a counter nobody scanned (2026-08-03)
 
 `determineBound` takes the counter's entry value by maximising over the predecessors of the **header**.

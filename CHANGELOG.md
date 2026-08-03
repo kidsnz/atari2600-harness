@@ -9,6 +9,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **A `jsr` inside a folded loop body was costed at six cycles, dropping the callee once per iteration —
+  and the tree contains a live instance.** `IsBranch()` is `Relative && Flow`, so a JSR (Absolute,
+  Subroutine) and a JMP (Absolute, Flow) both sailed through the body walk. Measured on the new
+  `litmus_callinloop.asm` with a twelve-`nop` callee: **proven 48, machine 168 across 3 scanlines — 3.5x
+  under**, with `certified: true`. **The worse case is not the arithmetic**: a callee containing
+  `sta WSYNC` makes the walk step over a REGION BOUNDARY, so the machine's interval ends at that strobe and
+  the proof's does not. `roms/techniques/shared_setxpos.asm` $F054 is that shape — `jsr SetXPos` into a
+  routine whose second instruction is `sta WSYNC` — and read **proven 98 against a machine 36**. Neither
+  number was wrong; they were about different spans of time, and the 62-cycle "slack" was never slack.
+  That is a **third** way for a bound to be wrong alongside too-low and too-high — *about the wrong
+  interval* — and `observed <= proven` cannot detect it, because both readings pass while measuring
+  different things. Corpus effect over 155 images: 2 folds lost (the fixture's own, and $F054 which was
+  already over budget), zero bounds lowered, no certification lost.
+
 - **A loop entered PAST its header carried a counter value nobody had scanned.** `determineBound` maximises
   the entry value over the predecessors of the header, which is the right set only if every execution
   reaching the back edge passed through the header — and nothing anywhere stated that premise. Measured on

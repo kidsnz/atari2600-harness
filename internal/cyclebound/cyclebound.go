@@ -2140,6 +2140,33 @@ func (s *solver) foldLoops() string {
 		if in.Def.IsBranch() {
 			return "branch inside loop body — not a simple counted loop"
 		}
+		// A CALL OR JUMP IN THE BODY IS NOT A BRANCH, and `IsBranch` does not catch
+		// it: that is `AddressingMode == Relative && Effect == Flow`, while a JSR is
+		// Absolute/Subroutine and a JMP is Absolute/Flow. So the walk sailed through
+		// both, and `nextSite()` sent it to the RETURN address of a JSR or to the
+		// bytes textually after a JMP.
+		//
+		// The arithmetic alone is unsound: a JSR is costed at its own 6 cycles and the
+		// callee's cycles are dropped, once per iteration. Measured on
+		// litmus_callinloop, whose callee is twelve `nop`s: proven **48** cycles
+		// against a machine that spends **168 across 3 scanlines** — 3.5x under, with
+		// `certified: true`.
+		//
+		// The worse case is a callee containing `sta WSYNC`, because then the walk
+		// steps over a REGION BOUNDARY. The machine's interval ends at that strobe and
+		// the proof's does not, so the two numbers describe different intervals and
+		// comparing them is a category error rather than a comparison.
+		// `roms/techniques/shared_setxpos.asm` $F054 is exactly that shape — its
+		// `jsr SetXPos` calls a routine whose second instruction is `sta WSYNC` — and
+		// it reads **proven 98, machine 36**. Sound only by accident: the machine's
+		// interval ends early, so the inflated number happens to sit above it.
+		// Refusing loses that fold, which was over budget and describing the wrong
+		// interval anyway.
+		switch in.Def.Operator {
+		case instructions.JSR, instructions.JMP,
+			instructions.RTS, instructions.RTI, instructions.BRK:
+			return "call or jump inside loop body — the folded cost is not one iteration"
+		}
 		// A bank switch inside the body is a SOUNDNESS condition, not a precision one:
 		// the folded cost n*body + (n-1)*(latch+pen) + latch assumes every iteration
 		// executes the same bytes, and after a switch iteration 2 executes different
