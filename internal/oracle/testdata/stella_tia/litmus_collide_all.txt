@@ -1,0 +1,37 @@
+# stella-tia-oracle capture
+# rom: roms/litmus/litmus_collide_all.bin
+# frames: 5
+# stella: 
+# captured: 2026-08-03
+Stella 7.0
+> autoExec():
+
+Executed 2 commands from "~/Library/Application Support/St
+ella/autoexec.script"
+script file '~/Desktop/litmus_collide_all.script' not foun
+d
+config file '~/Library/Application Support/Stella/cfg/litm
+us_collide_all.cfg' not found
+list file 'roms/litmus/litmus_collide_all.lst' not found
+symbol file 'roms/litmus/litmus_collide_all.sym' not found
+
+> tia
+scanline=#0   vsync VBLANK
+Collisions: P0_PF P0_BL M1_P0 M0_P0 P0_P1 P1_PF P1_BL M1_P
+1
+            M0_P1 M0_PF M0_BL M0_M1 M1_PF M1_BL BL_PF
+COLUxx: P0=$0e/      P1=$0e/      PF=$0e/      BK=$00/
+
+P0: GR=%11111111 pos=#3   HM=$0 1 copy               refl
+delay
+P1: GR=%11111111 pos=#3   HM=$0 1 copy               refl
+delay
+M0: ENABLED  pos=#2   HM=$0 size=#3 reset
+M1: ENABLED  pos=#2   HM=$0 size=#3 reset
+BL: ENABLED  pos=#2   HM=$0 size=#3 delay
+PF0: %00001111/$0f PF1: %00000000/$00 PF2: %00000000/$00
+     reflect score priority
+inpt0 inpt1 inpt2 inpt3 INPT4 INPT5 dump_gnd_0123
+AUDF0: $00/31440.0Hz AUDC0: $0 AUDV0: $0
+AUDF1: $00/31440.0Hz AUDC1: $0 AUDV1: $0
+> saveSes

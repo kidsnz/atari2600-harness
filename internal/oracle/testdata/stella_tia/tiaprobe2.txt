@@ -1,0 +1,37 @@
+# stella-tia-oracle capture
+# rom: internal/oracle/testdata/tiaprobe2.bin
+# frames: 5
+# stella: 7.0 (/Applications/Stella.app/Contents/MacOS/Stella)
+# captured: 2026-08-03
+Stella 7.0
+> autoExec():
+
+Executed 2 commands from "~/Library/Application Support/St
+ella/autoexec.script"
+script file '~/Desktop/tiaprobe2.script' not found
+config file '~/Library/Application Support/Stella/cfg/tiap
+robe2.cfg' not found
+list file 'internal/oracle/testdata/tiaprobe2.lst' not fou
+nd
+symbol file 'internal/oracle/testdata/tiaprobe2.sym' not f
+ound
+> tia
+scanline=#0   vsync VBLANK
+Collisions: P0_PF p0_bl m1_p0 m0_p0 P0_P1 P1_PF p1_bl m1_p
+1
+            m0_p1 m0_pf m0_bl m0_m1 m1_pf m1_bl bl_pf
+COLUxx: P0=$1a/      P1=$2c/      PF=$4e/      BK=$60/
+
+P0: GR=%10000001 pos=#107 HM=$3 3 copies - close (8) refl
+delay
+P1: GR=%01011010 pos=#81  HM=$9 4x (32) sized player REFL
+DELAY
+M0: disabled pos=#52  HM=$b size=#3 reset
+M1: ENABLED  pos=#25  HM=$e size=#0 reset
+BL: disabled pos=#158 HM=$0 size=#1 delay
+PF0: %00000111/$07 PF1: %00001111/$0f PF2: %10100101/$a5
+     reflect SCORE priority
+inpt0 inpt1 inpt2 inpt3 INPT4 INPT5 dump_gnd_0123
+AUDF0: $00/31440.0Hz AUDC0: $0 AUDV0: $0
+AUDF1: $00/31440.0Hz AUDC1: $0 AUDV1: $0
+> saveSes

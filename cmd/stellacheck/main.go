@@ -38,9 +38,17 @@ func main() {
 	dumpFile := flag.String("dump", "", "compare against an existing Stella dump file (skip launching Stella)")
 	pixels := flag.Bool("pixels", false, "oracle v2: also capture a Stella debugger snapshot and compare pixels (TIA color codes)")
 	snapFile := flag.String("snap", "", "compare pixels against an existing snapshot PNG (skip launching Stella)")
+	sesFile := flag.String("session", "", "oracle v3 (G4): compare the WRITE-ONLY TIA registers against a captured Stella debugger session (scripts/stella_oracle.sh <rom> <frames> tia)")
 	flag.Parse()
+	if *sesFile != "" {
+		if err := compareTIARegs(*sesFile, *romPath, *frames); err != nil {
+			fmt.Fprintln(os.Stderr, "FAIL:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *romPath == "" {
-		fmt.Fprintln(os.Stderr, "usage: stellacheck -rom <path> [-frames N] [-dump <file>]")
+		fmt.Fprintln(os.Stderr, "usage: stellacheck -rom <path> [-frames N] [-dump <file>] | -session <file>")
 		os.Exit(2)
 	}
 	var err error
@@ -229,6 +237,67 @@ func comparePixels(romPath string, frames int, snapPath string) error {
 		return fmt.Errorf("pixel mismatch %.2f%% < 99%%", pct)
 	}
 	fmt.Printf("PASS: pixels agree (Gopher2600 vs Stella, frame %d)\n", frames)
+	return nil
+}
+
+// compareTIARegs は Stella デバッガの `tia` 出力（saveSes で保存したセッション）から
+// 書込専用 TIA レジスタを読み取り、同じ ROM を同じフレーム数だけ回した harness の
+// read_tia_registers 相当と突き合わせる（G4）。RAM・画素は既に照合済みだったが、
+// 書込専用レジスタは未照合＝「GRP=0 の物体は NUSIZ が何でも同じ絵になる」ので
+// 画素一致では詰められない穴だった。
+func compareTIARegs(sesPath, romOverride string, framesOverride int) error {
+	b, err := os.ReadFile(sesPath)
+	if err != nil {
+		return err
+	}
+	session := string(b)
+	rom, frames := romOverride, framesOverride
+	if h, err := oracle.ParseCaptureHeader(session); err == nil {
+		if rom == "" {
+			rom = h.ROM
+		}
+		frames = h.Frames
+	} else if rom == "" {
+		return err
+	}
+	stella, err := oracle.ParseStellaSession(session)
+	if err != nil {
+		return fmt.Errorf("%s: %w", sesPath, err)
+	}
+	ours, err := oracle.GopherTIARegs(rom, frames)
+	if err != nil {
+		return err
+	}
+	diffs, compared, missing := oracle.DiffTIARegs(ours, stella)
+	if len(missing) > 0 {
+		return fmt.Errorf("%s: %d register(s) absent from one side: %v", sesPath, len(missing), missing)
+	}
+	if len(diffs) > 0 {
+		// A disagreement is not automatically a bug: "run N frames" does not name a
+		// moment, and some registers are undefined at power-on. Classify from
+		// measurement (never by assertion) and report every one either way.
+		cls, cerr := oracle.ClassifyTIADiffs(rom, frames, diffs)
+		if cerr != nil {
+			return cerr
+		}
+		real := 0
+		for _, c := range cls {
+			fmt.Println("DIFF", c)
+			if c.Class == oracle.TIADiffReal {
+				real++
+			}
+		}
+		if real > 0 {
+			return fmt.Errorf("TIA write-register divergence in %d of %d readings (%s, frame %d)",
+				real, compared, rom, frames)
+		}
+		fmt.Printf("PASS: %d/%d write-only TIA registers agree; %d disagreement(s) measured to be "+
+			"sampling phase or undefined power-on state (%s @ frame %d)\n",
+			compared-len(diffs), compared, len(diffs), rom, frames)
+		return nil
+	}
+	fmt.Printf("PASS: %d/%d write-only TIA registers agree (%s @ frame %d, Gopher2600 vs Stella)\n",
+		compared, compared, rom, frames)
 	return nil
 }
 

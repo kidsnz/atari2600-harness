@@ -1,0 +1,35 @@
+# stella-tia-oracle capture
+# rom: roms/techniques/divtable.bin
+# frames: 5
+# stella: 
+# captured: 2026-08-03
+Stella 7.0
+> autoExec():
+
+Executed 2 commands from "~/Library/Application Support/St
+ella/autoexec.script"
+script file '~/Desktop/divtable.script' not found
+config file '~/Library/Application Support/Stella/cfg/divt
+able.cfg' not found
+list file 'roms/techniques/divtable.lst' not found
+symbol file 'roms/techniques/divtable.sym' not found
+> tia
+scanline=#0   vsync VBLANK
+Collisions: P0_PF p0_bl m1_p0 m0_p0 p0_p1 p1_pf p1_bl m1_p
+1
+            m0_p1 m0_pf m0_bl m0_m1 m1_pf m1_bl bl_pf
+COLUxx: P0=$0e/      P1=$00/      PF=$00/      BK=$46/
+
+P0: GR=%00000000 pos=#108 HM=$0 2x (16) sized player refl
+delay
+P1: GR=%00000000 pos=#80  HM=$0 1 copy               refl
+delay
+M0: disabled pos=#52  HM=$0 size=#0 reset
+M1: disabled pos=#25  HM=$0 size=#0 reset
+BL: disabled pos=#158 HM=$0 size=#0 delay
+PF0: %00000000/$00 PF1: %00000000/$00 PF2: %00000000/$00
+     REFLECT score priority
+inpt0 inpt1 inpt2 inpt3 INPT4 INPT5 dump_gnd_0123
+AUDF0: $00/31440.0Hz AUDC0: $0 AUDV0: $0
+AUDF1: $00/31440.0Hz AUDC1: $0 AUDV1: $0
+> saveSes
