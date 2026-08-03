@@ -8,6 +8,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`get_screen_annotated` takes `raw=true` and returns the bare frame — 160 x visible-height, one pixel
+  per TIA pixel, no grid, labels, markers or upscale.** The annotated image serves one direction of the
+  pixel-art loop: the user points at a coordinate and Claude turns it into registers. The other direction
+  runs the opposite way — the user opens the frame in Photoshop and paints dots, and Claude samples the
+  file back into `.byte` rows — and that needs the file's pixel grid to BE the machine's. There was no way
+  to get one; every screenshot carried annotations, which in that direction are not decoration but foreign
+  pixels inside the artwork. Scale is deliberately ignored in this mode rather than applied, because an
+  upscaled "raw" image is a file that lies about its own units. It writes to a separate `*_raw.png` so it
+  cannot overwrite the annotated file the user keeps open in a reloading previewer. The height is whatever
+  the frame actually rendered, read rather than assumed at 192 — measured on the sunset kernel it is 214.
+
 ### Fixed
 - **The annotated screenshot no longer draws markers for objects that are not on screen.** `Markers` read
   the TIA's position registers and returned all five movable objects unconditionally — but a TIA object is

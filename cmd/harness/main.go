@@ -1503,6 +1503,15 @@ func handleSpritepos(ctx context.Context, req *mcp.CallToolRequest, in Spritepos
 
 type ScreenIn struct {
 	Scale int `json:"scale,omitempty" jsonschema:"integer upscale factor (default 3)"`
+	// Raw asks for the frame with nothing drawn on it: no grid, no axis labels, no
+	// markers, and no upscale — 160x192, one pixel per TIA pixel.
+	//
+	// The annotated image is for READING a picture: the user points at it by
+	// coordinate and Claude translates to registers. This is for the other half of
+	// the loop, where the user opens the frame in Photoshop and paints. That needs
+	// 1px = 1 dot at 100% (recorded in memory as the preferred form), and every
+	// annotation is then a foreign pixel sitting in the artwork.
+	Raw bool `json:"raw,omitempty" jsonschema:"return the bare 160x192 frame instead: no grid, labels or markers, and no upscale. For opening in an image editor, where 1px must be 1 TIA pixel"`
 }
 type SpritePos struct {
 	Label string `json:"label"`
@@ -1534,7 +1543,16 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 	if scale <= 0 {
 		scale = 3
 	}
-	img := e.Annotated(scale)
+	var img *image.RGBA
+	if in.Raw {
+		// Snapshot returns the visible frame exactly as the TIA drew it. Scale is
+		// deliberately ignored rather than applied: the point of this mode is that a
+		// pixel in the file is a pixel on the machine, and an upscaled "raw" image
+		// would be a file that silently lies about its own units.
+		img, _ = e.Snapshot()
+	} else {
+		img = e.Annotated(scale)
+	}
 
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
@@ -1548,6 +1566,14 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 	pngPath := os.Getenv("ATARI2600_SCREEN_PATH")
 	if pngPath == "" {
 		pngPath = filepath.Join(os.TempDir(), "atari2600_screen.png")
+	}
+	if in.Raw {
+		// A raw shot writes beside the annotated one rather than over it: the user
+		// keeps the annotated file open in a previewer for the round trip, and
+		// replacing its contents with an unlabelled 160x192 image would break that
+		// window without saying so.
+		ext := filepath.Ext(pngPath)
+		pngPath = strings.TrimSuffix(pngPath, ext) + "_raw" + ext
 	}
 	if err := os.MkdirAll(filepath.Dir(pngPath), 0o755); err != nil {
 		return nil, ScreenOut{}, fmt.Errorf("mkdir for png: %w", err)
@@ -1865,7 +1891,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "run_scenario", Description: "Run regression scenario JSON files (input timeline + numeric assertions) in-process and return pass/fail with failing assertion details — the cmd/scenario verdict from the live loop."}, handleRunScenario)
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_screen", Description: "Run the ingest analyzer on the CURRENT emulator frame (no file needed): playfield bands as PF bytes, sprite candidates with GRP bytes + per-row colors, groups, fidelity, plus the TIA-grid overlay. The reverse-direction read of whatever is on screen right now."}, handleAnalyzeScreen)
 	mcp.AddTool(server, &mcp.Tool{Name: "analyze_image", Description: "Ingest a game screenshot (grade A = Stella F12 PNG, unmodified, TV effects off; any integer multiple of the 160-clock raster) and return TIA-space analysis: normalized raster + palette quantization to real COLUxx values, playfield bands as PF0/PF1/PF2 bytes (repeat/reflect/asymmetric, score-mode flag), sprite candidates with GRP bytes + per-row colors + NUSIZ copy folding, plus a TIA-grid overlay image. Ambiguous elements carry confidence. ONE path = one frame of truth, so a flickered/multiplexed object appears only partially; pass `paths` (2-3 consecutive shots of the SAME scene) instead and the multi-frame pipeline runs: static vs dynamic separation, union tracks across the frames, and an explicit flicker report in the `multi` field. If you are chasing flicker, that is the input to use."}, handleAnalyzeImage)
-	mcp.AddTool(server, &mcp.Tool{Name: "get_screen_annotated", Description: "Return the latest frame as a PNG with an XY grid in real TIA coordinates (x=clock 0..159, y=scanline) and labelled sprite-position markers. The primary visual channel: the user can point at it and instruct by coordinate. Also returns sprite positions numerically."}, handleScreenAnnotated)
+	mcp.AddTool(server, &mcp.Tool{Name: "get_screen_annotated", Description: "Return the latest frame as a PNG with an XY grid in real TIA coordinates (x=clock 0..159, y=scanline) and labelled sprite-position markers. The primary visual channel: the user can point at it and instruct by coordinate. Also returns sprite positions numerically, each with drawn=true/false. A marker is drawn ONLY for an object that painted a visible pixel this frame, measured from the per-pixel attribution buffer rather than inferred from the registers: every TIA object always has a position, so marking all five unconditionally put labelled lines over pictures that did not contain them. The JSON still lists all five, since a position is real even when nothing was drawn. raw=true instead returns the BARE frame — 160x192, one pixel per TIA pixel, no grid, labels, markers or upscale — for opening in an image editor where 1px must be 1 dot; it is written to a separate *_raw.png so it does not overwrite the annotated file kept open for the round trip."}, handleScreenAnnotated)
 	registerStateTools(server) // save_state / restore_state / probe_ram_semantics (cmd/harness/tools_state.go)
 
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
