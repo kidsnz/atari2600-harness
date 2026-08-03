@@ -9,6 +9,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **SD-11 closed: a `dex; bne` counter that can enter at ZERO wraps for 256 iterations, and the proof was
+  answering with the range's upper bound.** The trip count is `v` for v > 0 and **256** for v = 0, so it is
+  not monotone and `Hi` is not the maximum when zero is reachable. Measured on the new
+  `litmus_bnezero.asm`, whose join gives the header X in `[0,5]` and whose machine takes the zero arm:
+  **proven 60, machine 2319 across 31 scanlines — 38.7x under**, with `certified: true` and
+  `roll_free: true`. The repair returns 256 rather than refusing, so the region stays bounded and the
+  author gets a number instead of silence; verified against the machine at **2319 == 2319**.
+  **Why it was left alone last time is the interesting part.** When the `bpl` sibling was fixed this hazard
+  was censused over the five commercial cartridges the gate then graded — 3 instances, none violating — and
+  filed rather than fixed, on the stated principle that a change without a witness is how the previous bug
+  got in. That reasoning was right and the corpus was wrong: re-censused after the gate stopped grading a
+  hand-picked five, it is **14 folds across three shipped cartridges** (Seaquest x3, Bermuda Triangle x6,
+  Vanguard x5, all `[0,15]`). Only the denominator changed. Corpus effect over **155 images**: 15 bounds
+  raised, **0 lowered, 0 lost**, and all 14 pre-existing ones were already over budget, so no certification
+  was lost. Controls: a joined range of `[3,5]` must stay exact (the fix must not fire on any join) and a
+  plain `ldx #5` countdown must stay exact (it must not fire on any BNE) — without the latter, a blanket
+  repair reports 2315 for a loop the machine finishes in 56.
+
 - **`determineBound` audited on purpose rather than by accident: 9 unsound bounds measured, the largest
   fixed, and the gate was grading a third of the cartridges on disk.** Two of this package's three known
   unsound bounds were in this one function and both were found while investigating something else, so it

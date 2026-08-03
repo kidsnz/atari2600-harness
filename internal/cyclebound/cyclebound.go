@@ -2485,6 +2485,7 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 	// precision in exchange for the guarantee; a stated refusal is worth more than a
 	// number that can be wrong by 40x.
 	best := -1
+	zeroReachable := false
 	for at, in := range nodes {
 		if at == latch.site() {
 			continue // the back-edge carries the DECREMENTED value, not the entry value
@@ -2523,6 +2524,13 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		if r.Hi > best {
 			best = r.Hi
 		}
+		// Whether ZERO is reachable is a separate fact from the maximum, and the BNE
+		// trip count needs both — see the wrap case below. Collected here because
+		// this is the only place the per-predecessor ranges exist; `best` alone
+		// cannot answer it.
+		if r.Lo <= 0 && r.Hi >= 0 {
+			zeroReachable = true
+		}
 	}
 	if best < 0 {
 		return 0
@@ -2553,17 +2561,41 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 	// author actually writes (best <= 128) — the bound rises to the true value rather
 	// than merely away from the violation.
 	//
-	// BNE keeps `best`: it exits on zero, so an entry value v reaches zero after
-	// exactly v decrements. Its own edge case — an entry value of 0, which wraps and
-	// runs 256 times — is a SEPARATE question and is deliberately not touched here.
-	// Censused over the 140 images analysed (135 in-tree kernels + 5 commercial
-	// cartridges): 30 distinct bne folds, of which 3 have a counter range including 0
-	// (all three in Seaquest, range [0,15]); none of the three showed a violation
-	// against the machine. It is filed in the audit (SD-11) rather than fixed blind,
-	// because a change with no witness is how this one got in.
 	if latch.Def.Operator == instructions.BPL {
 		bplTripCountAdjusted++
 		return best + 1
+	}
+
+	// BNE's trip count is NOT monotone in the entry value, and taking `best` alone
+	// assumed it was.
+	//
+	//     v > 0  ->  v iterations    (the decrement reaches zero after v steps)
+	//     v = 0  ->  256 iterations  (the decrement wraps to $FF and counts down)
+	//
+	// So `Hi` is the maximum only when zero is out of range. When it is in range the
+	// analysis was answering for the SMALLEST possible loop while the machine could
+	// run the largest — measured on litmus_bnezero, whose header sees X in [0,5]:
+	// proven 60 cycles against a machine that spends 2319 across 31 scanlines,
+	// **38.7x under**, with `certified: true` and `roll_free: true`.
+	//
+	// SOUNDNESS. 256 is the exact trip count for v=0 and exceeds it for every other v
+	// in a range bounded by 255, so max(256, Hi) is an upper bound over the whole
+	// range. `loopCost` is monotone increasing in n, so substituting the maximum can
+	// only raise the bound.
+	//
+	// Returning 256 rather than refusing is deliberate: the region stays BOUNDED, so
+	// an author gets a number they can act on ("this loop can cost 256 iterations
+	// here") instead of a refusal that says nothing. The number is honest — it is
+	// what the hardware does on the path the analysis cannot rule out.
+	//
+	// Not fixed when the BPL sibling was, because a census over the five commercial
+	// cartridges the gate then graded found 3 instances and no violation. Re-censused
+	// once the gate stopped grading a hand-picked five: **14 folds across 3 shipped
+	// cartridges** — Seaquest x3, Bermuda Triangle x6, Vanguard x5, all [0,15].
+	// Latent in every observed run and one input away from live in three real games.
+	if zeroReachable && best > 0 {
+		bneZeroWrapAdjusted++
+		return 256
 	}
 	return best
 }
@@ -2585,6 +2617,13 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 // really did fold a bpl latch down this path — instead of passing over a region that
 // never reached it.
 var bplTripCountAdjusted int
+
+// bneZeroWrapAdjusted counts the folds where a `dex; bne` counter could enter at ZERO
+// and the trip count therefore had to be the wrap count rather than the range's upper
+// bound. Same purpose as its sibling: a fixture can assert it moved, and so prove that
+// the region it grades really took this path rather than passing over one that never
+// reached it.
+var bneZeroWrapAdjusted int
 
 // regionTouchesDisplay reports whether any node stores to VSYNC($00)/VBLANK($01),
 // i.e. could change the display state within the region.

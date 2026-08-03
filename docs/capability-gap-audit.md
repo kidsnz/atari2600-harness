@@ -1671,6 +1671,42 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### SD-11 CLOSED — the BNE counter that enters at zero, and why the first census said it was safe (2026-08-03)
+
+Filed and knowingly left alone when the `bpl` sibling was fixed: `determineBound` takes the counter's entry
+range and returns `Hi`, on the reasoning that more iterations cost more. For BNE that fails at exactly one
+point — the trip count as a function of the entry value v is
+
+    v > 0  ->  v iterations      (the decrement reaches zero after v steps)
+    v = 0  ->  256 iterations    (the decrement wraps to $FF and counts down)
+
+which is **not monotone**, so `Hi` is not the maximum whenever zero is reachable. The analysis was
+answering for the smallest possible loop while the machine could run the largest.
+
+**Measured on `litmus_bnezero`** — a join gives the header X in `[0,5]` and the machine takes the zero arm:
+**proven 60, machine 2319 across 31 scanlines. 38.7x under, with `certified: true` and `roll_free: true`.**
+
+**The repair returns 256 rather than refusing**, so the region stays bounded and an author gets a number to
+act on instead of a refusal that says nothing. The number is honest: it is what the hardware does on the
+path the analysis cannot rule out. Sound because 256 is exact for v=0 and exceeds every other v in a range
+bounded by 255, and `loopCost` is monotone in n. Verified against the machine at **2319 == 2319**.
+
+**Why the first census cleared it, and this is the part worth keeping.** When the `bpl` bug was fixed, the
+BNE-zero hazard was censused over the five commercial cartridges the gate then graded: 3 instances, none
+violating, so it was filed rather than fixed — deliberately, on the stated principle that a change without
+a witness is how the previous bug got in. That reasoning was right. **The corpus was wrong.** Re-censused
+once the gate stopped grading a hand-picked five, it is **14 folds across three shipped cartridges** —
+Seaquest x3, Bermuda Triangle x6, Vanguard x5, all `[0,15]`. The census was accurate about the observed
+runs and wrong about the exposure, and nothing about the reasoning would have caught that; only the
+denominator changed.
+
+Corpus effect across **155 images**: 15 bounds RAISED (the 14 plus the fixture), **0 lowered, 0 lost**, and
+all 14 pre-existing ones were already `over=true` — so no certification was lost, only violations that were
+understating themselves by an order of magnitude. Two controls in the fixture rule out the wrong repairs:
+`PosCtl` (joined range `[3,5]`, zero unreachable) proves the fix does not fire on any join, and `ConstCtl`
+(a plain `ldx #5`) proves it does not fire on any BNE — with the latter removed, a blanket repair reports
+2315 for a loop the machine finishes in 56.
+
 ### SD-14 — determineBound audited on purpose: 9 unsound premises, and the gate was grading a third of the images on disk (2026-08-03)
 
 Three unsound bounds had been found in this package and **two were in `determineBound`**, both while
