@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -34,12 +35,24 @@ import (
 // absent and asserts on them when present. A skip that can quietly become permanent is
 // itself a defect this project keeps finding, so the count of images actually graded
 // is logged, and anything between "none" and "all of them" fails.
-var commercialROMs = []string{
-	"../../../reference/roms-study/VideoOlympics.bin",
-	"../../../reference/pizza-boy/Samples for Pizza Boy/Adventure.bin",
-	"../../../reference/pizza-boy/Samples for Pizza Boy/Seaquest.bin",
-	"../../../reference/pizza-boy/Samples for Pizza Boy/Chopper Command.bin",
-	"../../../reference/pizza-boy/Samples for Pizza Boy/Star Wars - The Empire Strikes Back.bin",
+// The list is DISCOVERED, not written out. A hand-maintained list grades the
+// cartridges someone remembered, which is the same defect one level up: measured
+// 2026-08-03, five images were named while **fifteen** sat in the same directories,
+// and extending the sweep to all of them turned one latent unsound premise from "zero
+// instances in the corpus" into a real one (Pressure Cooker $D801) and tripled the
+// count of another (Bermuda Triangle, Vanguard). The same repair was applied to the
+// scenario runner when 38 of 95 scenario files turned out to be run by nothing.
+func commercialROMPaths() []string {
+	var out []string
+	for _, g := range []string{
+		"../../../reference/roms-study/*.bin",
+		"../../../reference/pizza-boy/Samples for Pizza Boy/*.bin",
+	} {
+		m, _ := filepath.Glob(g)
+		out = append(out, m...)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // The proof has to hold on the machine, on every kernel, not on one litmus.
@@ -66,7 +79,8 @@ func TestProvenWorstIsNeverExceededOnCorpus(t *testing.T) {
 		more, _ := filepath.Glob(pat)
 		files = append(files, more...)
 	}
-	// …and every kernel in the tree is still a kernel we wrote. See commercialROMs.
+	// …and every kernel in the tree is still a kernel we wrote. See commercialROMPaths.
+	commercialROMs := commercialROMPaths()
 	commercialPresent := 0
 	for _, bin := range commercialROMs {
 		if _, err := os.Stat(bin); err == nil {

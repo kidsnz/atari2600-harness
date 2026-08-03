@@ -1671,6 +1671,62 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### SD-14 — determineBound audited on purpose: 9 unsound premises, and the gate was grading a third of the images on disk (2026-08-03)
+
+Three unsound bounds had been found in this package and **two were in `determineBound`**, both while
+looking at something else (SD-9's fortyfold entry-value proxy; SD-13's 201x latch-flags hole). That is a
+pattern, not a coincidence: the function turns a trip count into a cycle count, every premise it relies on
+is implicit, and the corpus kept failing to expose a violated one. So it was audited **deliberately** —
+enumerate every premise, decide which fail unsoundly, and build a probe for each.
+
+**Result: 20 premises enumerated, 11 fail unsoundly, 9 measured with a cartridge.** Every probe interval
+was actually executed (`Count = 12`), so none is a refusal on dead code, and every one reported
+`certified: true` / `roll_free: true`:
+
+| premise | probe | proven | machine | |
+|---|---|---:|---:|---|
+| the counter is written in the body ahead of the decrement | `inx / inx / dex / bne` | **22** | **2290** | **104x** |
+| BNE entry range includes 0 (SD-11, known and unfixed) | `[0,5]`, machine takes 0 | 67 | 2326 | 34.7x |
+| `transfer(JSR)` reports the pre-call counter | `jsr` rewrites X before the header | 36 | 738 | 20.5x |
+| the loop is entered mid-body | `jmp` past the header | 40 | 733 | 18.3x |
+| a call inside the loop body | `jsr` in the body | 48 | 168 | 3.5x |
+| the divide path's predecessor scan is fall-through-only | `jmp` into the header | 27 | 87 | 3.2x |
+| …and its `lda #imm` proxy answers when that fails | | 28 | 87 | 3.1x |
+| …and a *textually adjacent non-predecessor* supplies A | `jmp` sits before the header | 29 | 89 | 3.1x |
+| BCC divide with `sub >= 128` | `sbc #200 / bcc` | 16 | 31 | 1.9x |
+
+**Fixed here: the largest one.** SD-13 added `preservesZN` to guard the window AFTER the decrement, where
+a compare substitutes its own condition. The window BEFORE it was untouched, and it is worse — a write
+there changes the COUNT rather than which flags are read. `writesX`/`writesY` now require that the
+counter's own register is written by exactly one instruction in the body, and that it is the decrement.
+Whitelists again, and for the same reason: the engine's `Definition` records memory effects, not register
+effects, so there is no table to consult and the safe default with no table is to assume a write.
+
+**The fixture caught an implementation bug in its own repair.** The first version keyed on "any index
+register written", which refuses every loop that walks two pointers — a common shape. `OtherCtl` (`iny`
+inside a `dex` loop) failed immediately. Which register is the counter is only known once the decrement is
+seen, so a write above it is remembered and judged at the end.
+
+Corpus effect, measured across **155 images**: 4 folds lost, **all four already `over=true`** — they were
+violations carrying a number, not certifications, so no certification was lost. Zero bounds lowered.
+
+**The bigger finding is about the gate, and it is the same one this file keeps recording.** The commercial
+corpus was a hand-written list of **5** while **15 images sat in the same two directories**. Extending the
+sweep is what turned the counter-write premise from "zero instances in the corpus" into a real one
+(`Pressure Cooker.bin $D801`, whose body ends `dex dex dex dex / bpl`) and tripled the count of the SD-11
+hazard (Seaquest x3, Bermuda Triangle x6, Vanguard x5). The list is now **discovered by glob**, exactly as
+the scenario runner was repaired when 38 of 95 scenario files turned out to be run by nothing. The gate
+went from 5 cartridges / 66 pairs / 1022 regions to **16 / 234 / 1190 across 152 ROMs**, and stayed green
+— so those hazards are latent rather than live, which is a fact about the observed runs and not about the
+defects.
+
+**Still open, ranked** (each has a measured probe and a proposed fix in the audit trail): SD-11's BNE-zero
+range (the only one with instances in cartridges the gate already grades), `transfer(JSR)` disagreeing
+with `absSuccessors` in the same package, mid-body entry, a call in the loop body (`shared_setxpos $F054`
+is a live in-tree instance, masked by 62 cycles of slack because the fold walks past a WSYNC sink), and
+the divide path's predecessor scan — which is SD-9 verbatim on the one path SD-9's repair was never
+applied to.
+
 ### SD-13 — the latch was never checked against the counter it counts (2026-08-03)
 
 `determineBound` derives a loop's trip count from "the counter decrements to zero and the branch exits

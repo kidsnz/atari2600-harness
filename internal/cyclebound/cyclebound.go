@@ -2185,6 +2185,37 @@ func (s *solver) foldLoops() string {
 // becomes visible rather than silent.
 var proxyFallbackHits int
 
+// writesX and writesY report whether an operator writes that index register.
+//
+// Hand-written for the same reason `preservesZN` is: the engine's instruction
+// definitions carry no register-effect information — `Effect` is
+// Read/Write/Modify/Flow/Subroutine/Interrupt, which describes MEMORY — so there is no
+// table to consult, and the safe default with no table is to assume a write.
+//
+// That default is why these are stated as the SET THAT WRITES rather than the set that
+// does not: a new or unrecognised operator must fall through to "does not write" only
+// if it genuinely cannot, and every 6502 operator that touches X or Y is listed here.
+// The undocumented opcodes the engine decodes (LAX, SAX, DCP…) are absent because the
+// decoder marks them and `nodeCost` already refuses; if that ever changes, this list
+// must grow with it.
+func writesX(op instructions.Operator) bool {
+	switch op {
+	case instructions.LDX, instructions.INX, instructions.DEX,
+		instructions.TAX, instructions.TSX:
+		return true
+	}
+	return false
+}
+
+func writesY(op instructions.Operator) bool {
+	switch op {
+	case instructions.LDY, instructions.INY, instructions.DEY,
+		instructions.TAY:
+		return true
+	}
+	return false
+}
+
 // preservesZN lists the operators that leave the Z and N flags untouched, so an
 // instruction between a loop counter's decrement and the latch that reads it does not
 // change which condition the latch tests.
@@ -2359,7 +2390,32 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 	// between, the instructions seen are cpx 19, inx 7, adc 5, jsr 5, bne 15 and
 	// similar — all flag-writing. No store appeared at all. So the whitelist costs
 	// essentially no precision today while closing the hole for good.
+	// EXACTLY ONE INSTRUCTION IN THE BODY MAY TOUCH THE COUNTER, AND IT IS THE
+	// DECREMENT.
+	//
+	// The derivation below reads "entry value v, therefore v iterations". That needs
+	// the body's net effect on the counter to be exactly -1, and the previous version
+	// only latched a boolean when it saw a DEX or DEY — so a body that also wrote the
+	// register was indistinguishable from one that did not.
+	//
+	// Measured on a probe of `ldx #2 / L: inx / inx / dex / bne L`: proven **22**
+	// cycles against a machine that spends **2290 across 31 scanlines**, reported as
+	// `certified: true` and `roll_free: true`. **104x under.** Two increments and one
+	// decrement leave the counter rising, so the loop never terminates on it; the
+	// analysis answered 2.
+	//
+	// This is the other half of the SD-13 repair. That one added `preservesZN` to
+	// guard the window AFTER the decrement, where a compare could substitute its own
+	// condition. The window BEFORE it was left open, and it is worse: a write there
+	// changes the count itself rather than which flags are read.
+	//
+	// Two decrements per iteration is the benign form of the same shape and is
+	// refused here as well, though it over-approximates rather than under. Refusing
+	// costs one real fold — `Pressure Cooker.bin $D801`, whose body ends `dex dex dex
+	// dex / bpl` — and buying it back needs the count, not a boolean, which is a
+	// precision change and does not belong in a soundness repair.
 	decX, decY := false, false
+	wroteX, wroteY := false, false
 	at := header
 	for {
 		in, ok := nodes[at]
@@ -2371,10 +2427,35 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		}
 		switch in.Def.Operator {
 		case instructions.DEX:
-			decX, decY = true, false
+			if decX || decY || wroteX {
+				return 0 // a second decrement, or a counter already written above
+			}
+			decX = true
 		case instructions.DEY:
-			decY, decX = true, false
+			if decX || decY || wroteY {
+				return 0
+			}
+			decY = true
 		default:
+			// Anything that writes THE COUNTER invalidates the count, wherever it
+			// sits — before the decrement as well as after. The other index
+			// register moving is not the counter moving: a loop that walks two
+			// pointers is a common and perfectly boundable shape, and refusing it
+			// would cost precision for nothing. Which register is the counter is
+			// only known once the decrement has been seen, so a write BEFORE it is
+			// remembered and judged at the end.
+			if writesX(in.Def.Operator) {
+				wroteX = true
+			}
+			if writesY(in.Def.Operator) {
+				wroteY = true
+			}
+			if decX && wroteX {
+				return 0
+			}
+			if decY && wroteY {
+				return 0
+			}
 			if (decX || decY) && !preservesZN(in.Def.Operator) {
 				return 0 // the latch would be testing THIS instruction's flags
 			}

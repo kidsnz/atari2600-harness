@@ -9,6 +9,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`determineBound` audited on purpose rather than by accident: 9 unsound bounds measured, the largest
+  fixed, and the gate was grading a third of the cartridges on disk.** Two of this package's three known
+  unsound bounds were in this one function and both were found while investigating something else, so it
+  was audited deliberately — 20 premises enumerated, 11 fail unsoundly, 9 probed with a real cartridge.
+  Every probe ran (`Count = 12`, none a refusal on dead code) and every one reported `certified: true`:
+  counter written in the body **22 vs 2290 (104x)**, BNE range including zero 67 vs 2326, `transfer(JSR)`
+  36 vs 738, mid-body entry 40 vs 733, a call in the body 48 vs 168, and four more.
+  **Fixed: the 104x.** SD-13 guarded the window *after* the decrement with `preservesZN`; the window
+  *before* it was open, and a write there changes the COUNT rather than which flags are read. `writesX` /
+  `writesY` now require the counter's register to be written by exactly one instruction, the decrement.
+  The fixture caught a bug in the repair itself — keying on "any index register" refuses every loop that
+  walks two pointers, and `OtherCtl` (`iny` inside a `dex` loop) failed at once. Corpus effect over **155
+  images**: 4 folds lost, **all four already over budget**, so no certification was lost; zero bounds
+  lowered.
+  **And the gate's corpus was a hand-written list of 5 while 15 images sat in the same directories.** It is
+  discovered by glob now — the same repair the scenario runner needed when 38 of 95 scenario files turned
+  out to be run by nothing. **5 cartridges / 66 pairs / 1022 regions → 16 / 234 / 1190 across 152 ROMs**,
+  still green. Extending it is what turned the counter-write hazard from "zero corpus instances" into a
+  real one (`Pressure Cooker $D801`) and tripled the SD-11 count.
+
 - **A loop's latch must read the counter's own flags — it was never checked, and the prover certified a
   region the machine takes 201x longer to run.** `determineBound` derives a trip count from "the counter
   decrements to zero and the branch exits there", which is reasoning about the DECREMENT's Z/N; anything
