@@ -2495,25 +2495,41 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		// set under-approximates the entry value, hence the trip count, hence the worst
 		// case. An instruction whose successors cannot be determined at all makes the
 		// predecessor set unknowable, so the bound is refused.
-		succ, refusal := successors(in, absStates[at], sw)
-		if refusal != "" {
-			return 0
-		}
-		reaches := false
-		for _, nx := range succ {
-			if nx == header {
-				reaches = true
-				break
-			}
-		}
-		if !reaches {
-			continue
-		}
 		st, ok := absStates[at]
 		if !ok || !st.valid {
 			return 0 // a predecessor we know nothing about: no bound
 		}
-		post := st.transfer(in)
+		if _, refusal := successors(in, st, sw); refusal != "" {
+			return 0
+		}
+		// THE STATE ON THE EDGE, not the instruction's own effect.
+		//
+		// This used to compute `st.transfer(in)` and read the counter from that.
+		// `transfer` models what the instruction does to the machine; `absSuccessors`
+		// defines what state FLOWS ALONG EACH EDGE, and for a JSR the two disagree by
+		// design: transfer models only the push and leaves X and Y untouched, while
+		// absSuccessors correctly resets the return point to Top because the callee's
+		// effect is not modelled. Reading the former means reading the counter's value
+		// from BEFORE the call and treating it as the value at the header.
+		//
+		// Measured: a region whose header is preceded by `ldx #2 / jsr SetBig`, where
+		// SetBig does `ldx #$50`. The scan saw X=2 and answered 36 cycles; the machine
+		// spent 738 across 10 scanlines. **20.5x under**, with `certified: true`.
+		//
+		// Taking the edge state deletes the divergence rather than adding a rule —
+		// the same argument `successors` itself makes about having one notion of a
+		// successor. A JSR predecessor now yields X.Top and the refusal below fires.
+		var post State
+		found := false
+		for _, e := range absSuccessors(in, st, sw) {
+			if e.at == header {
+				post, found = e.state, true
+				break
+			}
+		}
+		if !found {
+			continue // not a predecessor of the header
+		}
 		r := post.Y
 		if decX {
 			r = post.X

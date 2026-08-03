@@ -9,6 +9,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **A loop counter's entry value now comes from the EDGE into the header, not from the instruction's own
+  effect — and the two were computed by different functions in the same package.** `determineBound` used
+  `State.transfer`, which models what an instruction does to the machine; for a JSR that is only the push,
+  leaving X and Y at their **pre-call** values. `absSuccessors`, which defines what flows along each edge,
+  correctly resets a JSR's return point to Top because the callee is not modelled. Measured on the new
+  `litmus_jsrentry.asm` — `ldx #$02 / jsr SetBig` where the callee does `ldx #$50` — the scan saw X=2 and
+  answered **36 cycles against a machine that spent 738 across 10 scanlines. 20.5x under**, with
+  `certified: true`. The repair reads the edge state, which **deletes the divergence instead of adding a
+  rule**: a JSR predecessor now yields `X.Top` and the existing unknown-entry refusal fires. **Precision
+  cost over 155 images: zero** — the only folds lost are the fixture's own, since no corpus ROM has a call
+  between a counter's load and its loop. The fixture keeps a control whose callee provably does not touch
+  X as an *asserted refusal*, so the missing callee summary is a measured gap rather than an unexamined
+  side effect; the test names it as the row that should become bounded if one is ever added.
+
 - **SD-11 closed: a `dex; bne` counter that can enter at ZERO wraps for 256 iterations, and the proof was
   answering with the range's upper bound.** The trip count is `v` for v > 0 and **256** for v = 0, so it is
   not monotone and `Hi` is not the maximum when zero is reachable. Measured on the new

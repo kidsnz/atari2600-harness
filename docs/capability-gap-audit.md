@@ -1671,6 +1671,33 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### The counter's entry value came from the instruction, not the edge — two functions in one package disagreeing (2026-08-03)
+
+`determineBound` scans the header's predecessors for the counter's entry value and computed each one's
+contribution with `State.transfer`, which models what an INSTRUCTION does to the machine. For a JSR that is
+only the push: X and Y are left at their pre-call values.
+
+The state that actually flows along an edge is `absSuccessors`', and it resets a JSR's return point to
+**Top** — deliberately, because the callee's effect is not modelled. So the two functions in the same
+package described the same edge differently, and the scan read the one that was not about edges.
+
+**Measured on `litmus_jsrentry`**: `ldx #$02 / jsr SetBig` where the callee does `ldx #$50`. The scan saw
+X=2 and answered **36** cycles; the machine spent **738 across 10 scanlines**. **20.5x under**, with
+`certified: true`.
+
+The repair takes the state from the edge, which **deletes the divergence rather than adding a rule** — the
+same argument `successors` itself makes about having one notion of a successor. A JSR predecessor now
+yields `X.Top` and the existing "unknown entry value" refusal fires.
+
+**Precision cost, measured over 155 images: zero.** The only two folds lost are the fixture's own — the
+unsound row and its `SafeCtl` control. No corpus ROM has a call between a counter's load and its loop.
+
+`SafeCtl` is kept as an asserted REFUSAL rather than deleted. Its callee provably does not touch X, so a
+bound is achievable in principle; the analysis has no callee summary and Top is the honest answer for an
+unmodelled call. Asserting it makes the refusal a measured consequence of that gap instead of an
+unexamined side effect, and marks the row that should become bounded if a summary is ever added — the test
+says so in its own failure message.
+
 ### SD-11 CLOSED — the BNE counter that enters at zero, and why the first census said it was safe (2026-08-03)
 
 Filed and knowingly left alone when the `bpl` sibling was fixed: `determineBound` takes the counter's entry
