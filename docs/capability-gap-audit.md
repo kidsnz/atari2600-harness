@@ -1721,6 +1721,47 @@ emitting a cartridge per rung, proving the budget, comparing the pixels, and dem
 Known unknown: the demonstrated picture had **10 cycles of slack**, and a kernel that also had to position
 objects would have far less.
 
+### BCC counts UP — the divide bound used the wrong variable, and that closes the audit's list (2026-08-03)
+
+The `sbc #N` divide idiom's two latches run the loop in opposite directions, and one formula was applied to
+both:
+
+| latch | loops while | A moves | so a LARGER entry value means |
+|---|---|---|---|
+| `bcs` | no borrow (A >= N) | falls by N | MORE iterations — `amax` bounds it |
+| `bcc` | there IS a borrow (A < N) | **rises** by (255 − N) | **FEWER** iterations — `amax` bounds nothing |
+
+`amax/N + 2` is right for BCS and meaningless for BCC, where the count depends on N alone with the worst
+case at A = 0. It agrees only while N is small: at N = 15 it is loose and safe, at N = 200 it answers **2**
+for a loop the machine runs **5** times. Measured on `litmus_bccdiv`: **proven 16, machine 31 — 1.9x
+under**, with `certified: true`.
+
+The BCC bound is `ceil(N/(255−N)) + 2`, and N = 255 is refused rather than bounded: 255 − 255 = 0 leaves A
+where it was, so the loop does not terminate and any number would be a bound on something endless.
+
+Corpus effect over 155 images: **2 bounds raised, both the fixture's own; 0 lost, 0 lowered.** All 18
+divide folds in the corpus are BCS, which is the only reason none of them was wrong.
+
+**This closes the nine unsound bounds the deliberate audit of `determineBound` measured.** The list, with
+what each turned out to be:
+
+| defect | ratio | what it really was |
+|---|---:|---|
+| counter written in the body before the decrement | 104x | the SD-13 repair stopped one instruction short |
+| BNE entry range including zero (SD-11) | 38.7x | a trip count that is not monotone in the entry value |
+| `transfer(JSR)` reporting the pre-call counter | 20.5x | two functions in one package disagreeing about an edge |
+| loop entered past its header | 18.3x | a premise nothing anywhere stated |
+| a call inside the loop body | 3.5x | **a bound about the wrong interval** — a third failure mode |
+| divide predecessor scan, three shapes | ~3x | SD-9's proxy, alive on the one path its repair skipped |
+| BCC's iteration formula | 1.9x | the wrong variable entirely |
+
+Two things generalise. **Four of the seven repairs deleted a divergence rather than adding a rule** —
+`transfer` vs `absSuccessors` twice, the fall-through filter vs `successors`, and one formula split in two
+where the machine had always had two behaviours. And **every census that cleared a defect was accurate
+about what it counted and wrong about the exposure**: the proxy's "0 uses" was eight hand-listed ROMs while
+nine folds depended on it; SD-11's "3 instances, none violating" was five cartridges while fifteen sat in
+the same directories.
+
 ### SD-9's proxy was still live on the divide path — and it was load-bearing (2026-08-03)
 
 `determineBound`'s BCS/BCC divide path found A's entry bound with

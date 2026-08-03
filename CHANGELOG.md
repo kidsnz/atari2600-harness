@@ -8,6 +8,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **BCC counts UP, so the divide bound used the wrong variable — and this closes the nine unsound bounds
+  the `determineBound` audit found.** `sbc #N / bcs` loops while A >= N and A falls, so a larger entry value
+  means more iterations and `amax` bounds it. `sbc #N / bcc` loops while A < N and the subtraction **wraps**,
+  so A rises by (255−N) until it reaches N — a larger entry value means FEWER iterations and `amax` bounds
+  nothing at all. One formula was applied to both; it agrees only while N is small. Measured on the new
+  `litmus_bccdiv.asm` at N=200: **proven 16, machine 31 — 1.9x under**, with `certified: true`. The BCC
+  bound is `ceil(N/(255−N)) + 2`, and N=255 is refused rather than bounded, since 255−255 = 0 leaves A where
+  it was and the loop never ends. Corpus effect over 155 images: 2 bounds raised (both the fixture's), 0
+  lost, 0 lowered — all 18 divide folds in the corpus are BCS, which is the only reason none was wrong.
+  **Two things generalise from the seven repairs**: four of them *deleted a divergence* rather than adding a
+  rule (`transfer` vs `absSuccessors` twice, the fall-through filter vs `successors`, and one formula split
+  in two where the machine always had two behaviours); and every census that cleared a defect was accurate
+  about what it counted and wrong about the exposure.
+
 ### Added
 - **`visual_ceiling` / `cmd/ceiling` / `internal/ceiling` — a denominator for a picture.** `vismatch`
   compares a build against another ROM, so a wrong picture could not be separated into "the kernel is

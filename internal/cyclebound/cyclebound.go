@@ -2451,6 +2451,40 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		if amax < 0 {
 			return 0
 		}
+
+		// BCC COUNTS UP, so `amax` is the wrong variable for it.
+		//
+		// The two latches run the loop in opposite directions:
+		//
+		//   `sbc #N / bcs L`  loops while NO borrow, i.e. while A >= N. A falls by N
+		//                     each time, so a LARGER entry value means MORE iterations
+		//                     and `amax` is exactly what bounds the count.
+		//
+		//   `sbc #N / bcc L`  loops while there IS a borrow, i.e. while A < N. The
+		//                     subtraction wraps, so A RISES by (255 - N) each time
+		//                     until it reaches N. A larger entry value means FEWER
+		//                     iterations, and `amax` bounds nothing at all — the count
+		//                     depends on N alone, worst case from A = 0.
+		//
+		// One formula was applied to both. It agrees only while N is small: at N = 15
+		// `amax/sub + 2` is loose and safe, at N = 200 it answers 2 for a loop the
+		// machine runs 5 times. Measured on litmus_bccdiv: proven **16** cycles
+		// against a machine that spends **31**, with `certified: true`.
+		//
+		// SOUNDNESS. From A the borrowing step gives A' = A + (255 - N); the loop
+		// exits when A >= N. From the worst start A = 0 that takes ceil(N/(255-N))
+		// borrowing steps, plus the final non-borrowing one, plus one for an entry
+		// carry this analysis does not track: ceil(N/(255-N)) + 2.
+		//
+		// N = 255 never terminates — 255 - 255 = 0, so A does not rise — and is
+		// refused rather than given a number.
+		if latch.Def.Operator == instructions.BCC {
+			up := 255 - sub
+			if up <= 0 {
+				return 0 // A cannot rise; the loop does not terminate
+			}
+			return (sub+up-1)/up + 2
+		}
 		return amax/sub + 2
 	}
 	if latch.Def.Operator != instructions.BNE && latch.Def.Operator != instructions.BPL {
