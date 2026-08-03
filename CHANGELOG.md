@@ -8,6 +8,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **A loop's latch must read the counter's own flags — it was never checked, and the prover certified a
+  region the machine takes 201x longer to run.** `determineBound` derives a trip count from "the counter
+  decrements to zero and the branch exits there", which is reasoning about the DECREMENT's Z/N; anything
+  writing those flags in between substitutes its own condition. Measured on the new
+  `roms/litmus/litmus_latchflags.asm`, whose DangerRow is `ldx #1 / ... / dex / cpx #$02 / bne`: **proven
+  19 cycles, machine 3829 across 51 scanlines**, reported with `certified: true` and `roll_free: true`.
+  After the decrement X is 0, the compare against 2 clears Z, and X wraps through `$FF` for 255 iterations.
+  Two controls in the same ROM isolate the cause and rule out the cheap repair — SafeRow (`nop` instead of
+  the `cpx`) and StoreRow (`stx`, which writes memory not flags) both stay **exact at 21 and 47**, and
+  demanding the decrement be ADJACENT to the latch would break both. **Why 140 images hid it:** reverse the
+  inequality and the bug is an over-approximation, sound by luck — `exerciser.asm $F0C9` is that shape.
+  Census: 757 dex/dey folds, **720 adjacent**, and of the 37 with a gap the instructions are `cpx` 19,
+  `inx` 7, `adc` 5, `jsr` 5 — all flag-writing, no store anywhere. The fix is a whitelist rather than a
+  blacklist because the engine's instruction table records memory effects, not flags, and the safe default
+  with no table is to refuse. Corpus effect: **one region changes, the unsound one**; zero bounds lost,
+  zero lowered, gate green on 1022 regions across 141 ROMs.
+
 ### Added
 - **`get_screen_annotated` takes `raw=true` and returns the bare frame — 160 x visible-height, one pixel
   per TIA pixel, no grid, labels, markers or upscale.** The annotated image serves one direction of the

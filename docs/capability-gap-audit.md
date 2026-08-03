@@ -1671,6 +1671,50 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### SD-13 — the latch was never checked against the counter it counts (2026-08-03)
+
+`determineBound` derives a loop's trip count from "the counter decrements to zero and the branch exits
+there". That reasoning is about the DECREMENT's Z/N flags, and the function **never checked that those are
+the flags the latch reads**. Any flag-writing instruction between them substitutes its own condition, and
+the derived count then describes a loop that does not exist.
+
+**Measured, not argued.** `roms/litmus/litmus_latchflags.asm` DangerRow is `ldx #1 / ... / dex / cpx #$02 /
+bne`:
+
+| region | proven | machine | |
+|---|---:|---:|---|
+| **DangerRow** | **19** | **3829** (51 scanlines) | **201x UNDER** |
+| SafeRow (`nop nop` instead of the `cpx`) | 21 | 21 | exact |
+| StoreRow (`stx`, which writes memory not flags) | 47 | 47 | exact |
+
+and the report said **`certified: true`, `roll_free: true`**. After the decrement X is 0; the `cpx`
+compares 0 against 2, clears Z, takes the branch, and X wraps through `$FF` for 255 iterations.
+
+This is **SD-9's fortyfold proxy bug arriving by a second route** — same function, same forbidden
+direction, different reason. The two controls isolate the cause to the `cpx` and, just as importantly,
+rule out the cheap repair: requiring the decrement to be ADJACENT to the latch breaks StoreRow, and
+Chopper Command `$F39D` is a real loop of that shape.
+
+**Why 140 images hid it.** Reverse the inequality and the same defect is an OVER-approximation, sound by
+luck: `roms/exerciser/exerciser.asm $F0C9` is `dex / cpx #$02 / bne` entered at 5, so it exits at 3 while
+the prover says 5. Census over the technique/litmus/exerciser corpus plus five commercial cartridges: **757
+dex/dey folds, 720 adjacent**, 37 with something in between — `cpx` 19, `inx` 7, `adc` 5, `jsr` 5, `bne`
+15, and **no store at all**. Every corpus instance was either adjacent or accidentally safe.
+
+**The fix is a whitelist, because the engine has no flag table.** Gopher2600's instruction definitions
+carry `Effect` (Read/Write/Modify/Flow/Subroutine/Interrupt), which describes MEMORY, not status. With no
+table to consult, the safe default is to refuse, so `preservesZN` names the operators that provably leave Z
+and N alone — the three stores, PHA/PHP, the flag-only ops, NOP — and everything else clobbers. Corpus
+effect: **1 region changes, and it is the unsound one this fixture added.** Zero bounds lost, zero lowered.
+Gate green on 1022 regions across 141 ROMs.
+
+**The transferable part, and it is uncomfortable.** This was found by a subagent sent to investigate
+something else entirely (the `branch inside loop body` refusal, which turned out to be worth two regions
+and no certifications). The most valuable output of a scheduled investigation was a defect nobody had
+scheduled. Two of the three unsound bounds found in this file were in `determineBound`, both discovered
+while looking at something adjacent — the function that turns a trip count into cycles deserves an audit
+aimed AT it rather than more findings collected on the way past.
+
 ### The server answers from the binary it was started with, and says so now (2026-08-01)
 
 A static analysis is a claim about SOURCE CODE. The MCP server that answers is whatever binary the session

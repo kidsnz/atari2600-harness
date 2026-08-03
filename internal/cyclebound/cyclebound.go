@@ -2185,6 +2185,39 @@ func (s *solver) foldLoops() string {
 // becomes visible rather than silent.
 var proxyFallbackHits int
 
+// preservesZN lists the operators that leave the Z and N flags untouched, so an
+// instruction between a loop counter's decrement and the latch that reads it does not
+// change which condition the latch tests.
+//
+// It is a WHITELIST, and deliberately short. The engine's instruction definitions
+// carry no flag information (`Effect` is Read/Write/Modify/Flow/Subroutine/Interrupt,
+// which is about memory, not status), so there is no table to consult and the safe
+// default when a table is missing is to refuse. Everything here is a store or a
+// stack/flag operation whose 6502 definition sets neither Z nor N:
+//
+//   STA/STX/STY  write memory only
+//   PHA/PHP      push; PLA and PLP are absent because they LOAD the flags
+//   CLC/SEC/CLI/SEI/CLV/CLD/SED  touch C, I, V or D — never Z or N
+//   NOP          by definition
+//
+// Anything else — including every compare, every arithmetic op, every transfer
+// (TAX/TXA set Z and N), TSX, and the loads — is treated as clobbering the flags.
+// Note TXS is excluded on purpose even though it preserves them: it is the one that
+// does NOT set flags among the transfers, and admitting it would invite the reader to
+// assume its siblings are fine too. The precision it would buy is 2 instances in the
+// whole corpus.
+func preservesZN(op instructions.Operator) bool {
+	switch op {
+	case instructions.STA, instructions.STX, instructions.STY,
+		instructions.PHA, instructions.PHP,
+		instructions.CLC, instructions.SEC, instructions.CLI, instructions.SEI,
+		instructions.CLV, instructions.CLD, instructions.SED,
+		instructions.NOP:
+		return true
+	}
+	return false
+}
+
 // determineBound returns an iteration upper bound for the simple counted loop
 // header..latch, or 0 if undeterminable. Two idioms:
 //   - decrement-to-zero (ldx/ldy #N + dex/dey + bne/bpl), and
@@ -2296,6 +2329,36 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 	if latch.Def.Operator != instructions.BNE && latch.Def.Operator != instructions.BPL {
 		return 0
 	}
+	// THE LATCH MUST READ THE COUNTER'S OWN FLAGS.
+	//
+	// The trip count derived below says "the counter decrements to zero and the
+	// branch exits there". That reasoning is about the DECREMENT's Z/N flags, so it
+	// holds only if those are the flags the latch actually tests. Anything that
+	// writes Z or N in between silently substitutes its own condition, and the
+	// derived count then describes a loop that does not exist.
+	//
+	// Measured on litmus_latchflags, whose DangerRow is `ldx #1 / ... / dex /
+	// cpx #$02 / bne`: after the decrement X is 0, the `cpx` compares 0 against 2,
+	// clears Z and takes the branch, so X wraps through $FF and the loop runs 255
+	// times. The prover answered **19 cycles** and the machine spent **3829 across 51
+	// scanlines** — 201x under, carried out on certified:true and roll_free:true. A
+	// bound below the machine's is the one direction this package forbids, and this
+	// is the same failure mode as SD-9's fortyfold proxy bug arriving by a second
+	// route.
+	//
+	// Reversing the inequality hides it: with an entry above the compared value the
+	// loop exits early and the answer is an OVER-approximation, sound by luck.
+	// `roms/exerciser/exerciser.asm $F0C9` (`dex / cpx #$02 / bne`, entry 5) is
+	// exactly that, which is why the defect sat in 140 images with none exposing it.
+	//
+	// The rule is stated as a WHITELIST of instructions known to leave Z and N alone,
+	// because the engine's instruction table does not record flag effects and the
+	// safe default when a table is missing is to refuse. Cost, measured over the
+	// technique/litmus/exerciser corpus plus five commercial cartridges: of 757
+	// dex/dey folds **720 are adjacent** and unaffected; of the 37 with something in
+	// between, the instructions seen are cpx 19, inx 7, adc 5, jsr 5, bne 15 and
+	// similar — all flag-writing. No store appeared at all. So the whitelist costs
+	// essentially no precision today while closing the hole for good.
 	decX, decY := false, false
 	at := header
 	for {
@@ -2308,9 +2371,13 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		}
 		switch in.Def.Operator {
 		case instructions.DEX:
-			decX = true
+			decX, decY = true, false
 		case instructions.DEY:
-			decY = true
+			decY, decX = true, false
+		default:
+			if (decX || decY) && !preservesZN(in.Def.Operator) {
+				return 0 // the latch would be testing THIS instruction's flags
+			}
 		}
 		at = in.nextSite()
 	}
