@@ -121,9 +121,43 @@ that pair.
 2. *The measurement it implies, which is.* Dithertron computes **the best this hardware can do for this
    image**. Turned around, that is a denominator we do not have: `vismatch` compares a build against
    another ROM, so when a picture is wrong there is no way to separate "the kernel is wrong" from "the
-   hardware cannot do this". A theoretical-best reference converts that into a percentage. Filed, not
-   built — it needs a design pass, and the metric has to be falsifiable before it is worth anything.
+   hardware cannot do this". A theoretical-best reference converts that into a percentage.
+   **Design settled 2026-08-03 by prototype and measurement**; see
+   `sandbox/experiments/visual-ceiling/` (local-only) and the summary below. Not implemented.
 3. *The cross-check above*, which is done.
 
 **Licence note.** Reading the design and reimplementing is fine; vendoring their GPL-3.0 source into this
 repo is not, and nothing here does. The comparison kernel in the practice tree is written from scratch.
+
+### The ceiling metric — design settled by measurement (2026-08-03)
+
+An upper bound is **not a property of an image; it is a property of (image, constraint set)**. Measured on
+real frames, rmse against the target:
+
+| frame | C1 (PF grid, 2 colours/line) | C3 (no grid, 2 colours/line) | difference = the 4-clock grid's own cost |
+|---|---:|---:|---:|
+| `horizon` (playfield only, hand-authored) | **0.00** | 0.00 | 0 |
+| Chopper Command | 15.07 | 11.82 | 3.25 |
+| Seaquest | 13.36 | 9.38 | 3.98 |
+| Barnstorming | 15.95 | 7.00 | **8.95** |
+
+Scoring Chopper Command under C1 gives a low number that says nothing about its kernel — Chopper is not
+trying to draw with the playfield alone. **A denominator that does not match the constraints the kernel
+works under is a lie dressed as a percentage.** Rendering the C1 ceiling makes that legible: the landscape
+survives nearly intact while the helicopter, the score digits and the ACTIVISION logo collapse into
+4-clock smears. The bound says, in a picture, "the playfield can do the scenery and cannot do the actors".
+
+**Decision: report a LADDER (C1 → C2 → C3), and treat the DIFFERENCES as the deliverable.** C1→C2 answers
+"what would one sprite buy here"; C1→C3 answers "how much is the column grid costing" — 8.95 on
+Barnstorming, whose content is fine sprite detail, against 3.25 on Chopper, whose content is landscape.
+That is an authoring aid rather than a grade. Detecting the constraint set from the build was rejected
+because it makes the author's own choices the denominator, so the score is high by construction and never
+says "you left a resource unused".
+
+**A trap the self-test caught, worth repeating anywhere this is rebuilt.** The test is: a frame a real ROM
+produced is achievable by construction, so it must score perfectly under a set that describes it —
+`horizon` is playfield-only, so C1 must return 0. It returned **9.95**, because the frames come from
+Gopher2600's renderer while the quantiser used `internal/ingest/palette_stella.go`. **7 of the frame's 14
+colours were not in that palette at all**, off by up to 40 RGB units, the same order as the signal.
+Harvesting the real palette with `roms/litmus/litmus_palette.bin` took it to **0.00**. A percentage
+computed against the wrong palette is noise with a decimal point.
