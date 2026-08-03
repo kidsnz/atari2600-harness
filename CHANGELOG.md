@@ -8,6 +8,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`visual_ceiling` / `cmd/ceiling` / `internal/ceiling` — a denominator for a picture.** `vismatch`
+  compares a build against another ROM, so a wrong picture could not be separated into "the kernel is
+  wrong" and "the hardware cannot do this". The ceiling supplies the missing half: the best any 2600 kernel
+  could reach for a target frame under a **stated constraint set**. A ceiling is a property of *(image,
+  constraint set)*, never of an image, so the output is a **ladder** and the **deltas are the
+  deliverable** — C1 playfield-only / C2 + one 8-clock object / C3 no column grid. Measured on five
+  commercial frames the grid costs 7.09 rmse on Barnstorming and 8.58 on Vanguard against 3.13 on Chopper
+  Command; one sprite is worth 8.88 on Pressure Cooker. C1/C3 are exhaustive over all 8256 colour-pair
+  cases per line (true optima, not heuristics that could understate the machine), C2 exact by
+  branch-and-bound, ~20 ms a frame. **The palette is derived from the renderer, never transcribed** —
+  `PaletteFor` calls the same `GetColor` that paints each pixel, and a test proves that table equals what
+  `litmus_palette.bin` actually draws on all 128 entries. That was the trap: the prototype read 9.95 on a
+  frame achievable by construction because it used Stella's palette on Gopher2600 frames. Self-test: 5
+  in-tree playfield-only ROMs score C1 **exactly 0**; both directions checked (sprite frames 23.06–40.92);
+  planted wrong palettes break it on 5 of 5. **Limitation stated rather than implied: no rung emits a
+  cartridge**, so none is validated against the 76-cycle budget — C1 rests on one prototype demonstration
+  (66 cycles certified, 0/29440 pixels differing), C2 has none, C3 is unreachable by design.
+  `docs/visual-ceiling.md`.
+
 ### Fixed
 - **SD-9's address proxy was still live on the divide path, and nine real folds were resting on it.** The
   BCS/BCC path found A's entry bound with textual fall-through plus address order — the heuristic SD-9

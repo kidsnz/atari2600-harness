@@ -1671,6 +1671,56 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### VC-1 CLOSED — the visual denominator (2026-08-03)
+
+Every visual comparison the harness had — `vismatch`, `framesim`, golden frames — was build-vs-reference,
+so a wrong picture had no decomposition into "the kernel is wrong" and "the hardware cannot do this". The
+missing-denominator defect this file records repeatedly, in visual form.
+
+`internal/ceiling` + `cmd/ceiling` + MCP `visual_ceiling` compute the ceiling as a **ladder over stated
+constraint sets**, because a ceiling is a property of *(image, constraint set)* and never of an image:
+scoring a sprite-drawn game under a playfield-only bound produces a number that says nothing about its
+kernel. **The deltas between rungs are the deliverable**, not the rungs — C1→C2 is "what would one sprite
+buy here", C1→C3 is "what is the 4-clock grid costing". Measured on five commercial frames the grid costs
+7.09 rmse on Barnstorming (fine sprite detail) and 8.58 on Vanguard against 3.13 on Chopper Command
+(landscape), reproducing the prototype's ordering on different frames.
+
+Detecting the constraint set from the build was **rejected**: it makes the author's own choices the
+denominator, so the score is high by construction and never says "you left a resource unused".
+
+C1 and C3 are exhaustive over all 8256 colour-pair cases per line, so they are true optima rather than
+heuristics that could understate the machine; C2 is exact by branch-and-bound. A frame takes ~20 ms.
+
+**The palette trap is closed structurally rather than by care.** `PaletteFor` calls the same
+`specification.Spec.GetColor` that `capture.SetPixels` calls to paint each pixel — nothing is transcribed —
+and `TestHarvestedPaletteEqualsDerivedPalette` proves that table equals what `litmus_palette.bin` actually
+paints, on all 128 entries. The prototype's self-test read 9.95 on a frame achievable by construction
+because it quantised Gopher2600 frames against Stella's palette, 7 of whose 14 colours were absent by up to
+40 RGB units.
+
+Graded: **5 in-tree playfield-only ROMs score C1 exactly 0** (asserted on raw squared error, not a rounded
+rmse); the nesting invariant flat ≥ C1 ≥ C2/C3 holds on **113 litmus frames**; planted wrong palettes
+break the self-test (PAL 0.17, ±40 RGB shift 9.43–39.15, detected on 5 of 5).
+
+**A second defect class was found by measurement rather than designed against:** grading the cleared
+framebuffer, before any `step_frame`, returns rmse **6.0000 on every rung** — pure `(0,0,0)` is 108 squared
+units from the nearest TIA colour while the renderer's own blank is `(6,6,6)`. Flat, small, plausible and
+entirely wrong. `LooksUnrendered` refuses it.
+
+### VC-2 OPEN — no rung is validated by emitting a cartridge
+
+The transferable rule from the reachability work is **"a rung that cannot produce a cartridge inside 76
+cycles is not a ceiling"**, and the shipped metric does not enforce it: it emits no `.asm`, assembles
+nothing, and never calls `prove_line_budget`.
+
+C1's reachability rests on one prototype demonstration — a generated cartridge certified at 66 cycles
+reproducing a Chopper Command C1 ceiling with 0 of 29440 pixels differing. **C2 has no such evidence at
+all**, and C3 is unreachable by design (it is a diagnostic reference, not a ceiling). Closing VC-2 means
+emitting a cartridge per rung, proving the budget, comparing the pixels, and demoting any rung that fails.
+
+Known unknown: the demonstrated picture had **10 cycles of slack**, and a kernel that also had to position
+objects would have far less.
+
 ### SD-9's proxy was still live on the divide path — and it was load-bearing (2026-08-03)
 
 `determineBound`'s BCS/BCC divide path found A's entry bound with
