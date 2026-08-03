@@ -2118,6 +2118,7 @@ func (s *solver) foldLoops() string {
 	// Validate the body header..latch is a simple straight chain and sum its
 	// non-branch cost.
 	bodyNoBranch := 0
+	body := map[site]bool{}
 	at := header
 	for {
 		in, ok := s.nodes[at]
@@ -2147,9 +2148,47 @@ func (s *solver) foldLoops() string {
 			return "bank switch inside loop body — the second iteration does not execute the same bytes"
 		}
 		bodyNoBranch += in.nodeCost()
+		body[at] = true
 		at = in.nextSite()
 		if at.addr > latch.Addr {
 			return "misaligned loop body"
+		}
+	}
+
+	// EVERY WAY IN MUST BE THROUGH THE HEADER.
+	//
+	// determineBound takes the counter's entry value by maximising over the
+	// predecessors of the HEADER. That is the right set only if every execution
+	// reaching the back edge passed through the header. An edge landing inside the
+	// body arrives at the latch without crossing a scanned predecessor, so the value
+	// it carries is not in the maximum, and the fold charges n iterations for a loop
+	// entered with a different n.
+	//
+	// Nothing stated this premise anywhere. The walk above checks that the chain is
+	// straight, cheap and single-bank; it never asked who else can arrive in it.
+	//
+	// Measured on litmus_midentry: the header's only scanned predecessor loads X=2
+	// while a `jmp` lands one instruction past the header with X=$50 already set.
+	// Proven **40** cycles against a machine that spends **733 across 10 scanlines**
+	// — 18.3x under, with `certified: true` and `roll_free: true`.
+	//
+	// The header itself is excluded: arriving there is the normal way in, and a loop
+	// with several such predecessors is fine — the scan sees them all and takes the
+	// maximum. Refusing on "more than one predecessor" would lose that, which is what
+	// the fixture's JoinCtl row exists to prevent.
+	for at, in := range s.nodes {
+		if body[at] || at == latch.site() {
+			continue // inside the loop: its own edges are the chain and the back edge
+		}
+		succ, refusal := successors(in, s.absStates[at], s.sw)
+		if refusal != "" {
+			continue // an instruction whose successors are unknown is handled elsewhere
+		}
+		for _, nx := range succ {
+			if nx != header && body[nx] {
+				return "loop entered past its header — the counter's entry value is not " +
+					"the one the scan maximised over"
+			}
 		}
 	}
 

@@ -9,6 +9,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **A loop entered PAST its header carried a counter value nobody had scanned.** `determineBound` maximises
+  the entry value over the predecessors of the header, which is the right set only if every execution
+  reaching the back edge passed through the header — and nothing anywhere stated that premise. Measured on
+  the new `litmus_midentry.asm`, where a `jmp` lands one instruction past the header with X=$50 while the
+  header's only scanned predecessor loads X=2: **proven 40 cycles against a machine that spends 733 across
+  10 scanlines. 18.3x under**, with `certified: true`. The guard collects the body's sites during the walk
+  that was already happening and refuses an edge from outside into any of them **other than the header** —
+  the exclusion is the whole subtlety, since several predecessors of the header are sound (the scan sees
+  them all and takes the maximum). A guard keyed on "more than one predecessor" would pass the danger case
+  and refuse a common shape; the fixture's control row proves it, and with the header included in the check
+  both controls fail. **Precision cost over 155 images: zero** — the only fold lost is the fixture's own.
+
 - **A loop counter's entry value now comes from the EDGE into the header, not from the instruction's own
   effect — and the two were computed by different functions in the same package.** `determineBound` used
   `State.transfer`, which models what an instruction does to the machine; for a JSR that is only the push,

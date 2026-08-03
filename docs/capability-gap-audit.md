@@ -1671,6 +1671,29 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### A loop entered past its header carried a counter nobody scanned (2026-08-03)
+
+`determineBound` takes the counter's entry value by maximising over the predecessors of the **header**.
+That is the right set only if every execution reaching the back edge passed through the header. An edge
+landing inside the body arrives at the latch without crossing a scanned predecessor, so the value it
+carries is not in the maximum.
+
+**Nothing stated the premise anywhere.** `foldLoops`' body walk checks the chain is straight, cheap and
+single-bank; it never asked who else can arrive in it.
+
+**Measured on `litmus_midentry`**: the header's only scanned predecessor loads X=2 while a `jmp` lands one
+instruction past the header with X=$50 already set. **Proven 40 cycles, machine 733 across 10 scanlines —
+18.3x under**, with `certified: true` and `roll_free: true`.
+
+The guard builds the body's site set during the walk and then looks for an edge from outside it into any
+body site **other than the header**. Excluding the header is the whole subtlety: several predecessors of
+the header are fine, because the scan sees all of them and takes the maximum. A guard keyed on "more than
+one predecessor" would pass the danger case while refusing a common sound shape — the fixture's `JoinCtl`
+row exists to make that failure visible, and it does: with the header included in the check, both controls
+are refused.
+
+Precision cost across **155 images: zero.** The only fold lost is the fixture's own.
+
 ### The counter's entry value came from the instruction, not the edge — two functions in one package disagreeing (2026-08-03)
 
 `determineBound` scans the header's predecessors for the counter's entry value and computed each one's
