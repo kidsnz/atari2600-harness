@@ -161,3 +161,29 @@ Gopher2600's renderer while the quantiser used `internal/ingest/palette_stella.g
 colours were not in that palette at all**, off by up to 40 RGB units, the same order as the signal.
 Harvesting the real palette with `roms/litmus/litmus_palette.bin` took it to **0.00**. A percentage
 computed against the wrong palette is noise with a decimal point.
+
+### The ceiling proved REACHABLE — a cartridge reproduces it pixel for pixel (2026-08-03)
+
+The ladder decision above rested on arithmetic: no ROM had run and no TIA had been involved, so
+"the playfield could reach this" was a claim. The untested part was that **the ceiling calculation never
+looked at the cycle budget** — "two colours per line, any pattern" costs six playfield stores plus two
+colour writes per scanline, inside 76 cycles.
+
+A generator now emits a cartridge from a ceiling image, and for the Chopper Command ceiling it
+**proves at 66 cycles (`certified: true`, `roll_free: true`) and reproduces the image with 0 of 29440
+pixels differing.** The comparison was checked for teeth rather than assumed: the same output differs from
+Chopper's real frame by 5.27% (the sprites — exactly what the ceiling said the playfield cannot do) and
+from a different picture's ceiling by 78.86%.
+
+**A generated kernel hit the same trap a hand-written one did**, which is the part worth carrying forward.
+The first emission proved at 83 cycles, 7 over, because the region from the kernel's last WSYNC to the
+first overscan WSYNC carries the epilogue and the proof charges it to the last visible scanline.
+`horizon.asm` hit this by hand and measured 91. Any generator emitting a WSYNC-per-line kernel needs a
+`sta WSYNC` before its epilogue, and nothing warns about it — both times it was caught only because
+`prove_line_budget` was run before the output was believed.
+
+What this settles: a computed ceiling can be a real bound rather than a fantasy, and each rung of the
+ladder can be validated the same way — emit a cartridge, prove the budget, compare the pixels. **A rung
+that cannot produce a cartridge inside 76 cycles is not a ceiling**, and there is now a procedure that
+says so. What it does not settle: this picture had 10 cycles of slack, and a kernel that also had to
+position objects would have far less.
