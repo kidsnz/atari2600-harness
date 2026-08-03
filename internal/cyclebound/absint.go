@@ -334,7 +334,20 @@ func adcRange(a, m ValueRange, c TriBool) ValueRange {
 	}
 	lo, hi := a.Lo+m.Lo+cl, a.Hi+m.Hi+ch
 	if hi > 255 {
-		return vTop()
+		// The sum wraps. The exact post-value is not expressible as one interval
+		// (the range straddles the wrap), but the RESULT IS STILL A BYTE, so [0,255]
+		// is a true and useful statement about it. Returning Top instead says "this
+		// register could be anything", which is the same claim numerically and a much
+		// worse one structurally: Top makes every consumer refuse, while a byte range
+		// still bounds a divide loop's trip count.
+		//
+		// This mattered. `XCAL = -5` assembles to $FB, so the ordinary calibration
+		// idiom `lda #80 / clc / adc #XCAL` computes 80 + 251 = 331 and the old code
+		// answered Top. Nine divide folds across the technique corpus lost their entry
+		// bound to it — and were then quietly rescued by the `lda #imm` address proxy,
+		// which is how a heuristic SD-9 had already deleted from the other path stayed
+		// load-bearing without anyone noticing.
+		return vRange(0, 255)
 	}
 	return vRange(lo, hi)
 }

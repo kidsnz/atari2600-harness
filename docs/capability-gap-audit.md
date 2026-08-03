@@ -1671,6 +1671,45 @@ offset by 13 lines. The tools do what they were built for: **numbers close holes
   so it predates this work). Correcting it would rewrite the banner of all 34 byte-identical clones, which is
   exactly the regression gate this change had to hold, so it is reported here instead of fixed here.
 
+### SD-9's proxy was still live on the divide path — and it was load-bearing (2026-08-03)
+
+`determineBound`'s BCS/BCC divide path found A's entry bound with
+
+    in.nextSite() == header && at.bank == header.bank && at.addr < header.addr
+
+— textual fall-through plus address order, **the proxy SD-9 deleted from the dex/dey path**, left alive
+here with a second guess behind it: "the closest `lda #imm` below the header". The code's own comment said
+so, and kept it because a counter measured 0 uses.
+
+Wrong in **both directions at once**, measured on `litmus_divpred`, all three with `certified: true`:
+
+| shape | proven | machine |
+|---|---:|---:|
+| a predecessor arriving by `jmp` is not `nextSite() == header`, so its value never entered the maximum | 27 | 87 |
+| nothing adjacent, so the `lda #imm` proxy answered | 28 | 87 |
+| a `jmp` merely SITS before the header, so it was read as a predecessor | 29 | 89 |
+
+**The counter's zero was a fact about eight ROMs.** `TestDivideLoopAddressProxyIsUnused` listed eight files
+by hand. Across the corpus **nine divide folds were bounded by the proxy** — `vertical_pos`, `venetian`,
+`two_line_kernel`, `pf_modes`, `litmus_hmove_mid` and siblings. It reads `lda #80` and ignores the
+`adc #XCAL` two instructions later, so it answered **7 iterations where the sound bound is 19**. Those nine
+sat above the machine by luck, not by proof. This is the same shape as SD-11's census and the gate's
+five-cartridge corpus: **the measurement was accurate about what it counted and wrong about the exposure.**
+
+**Removing the proxy exposed the precision gap that had made it necessary.** `adcRange` returned Top
+whenever the sum exceeded 255, and `XCAL = -5` assembles to `$FB`, so the ordinary calibration idiom
+`lda #80 / clc / adc #XCAL` computes 331 and gave up. **A wrapped sum is still a BYTE**, so `[0,255]` is
+true and useful where Top is true and useless — Top makes every consumer refuse, a byte range still bounds
+a loop.
+
+With both changes, over 155 images: **0 bounds lost, 0 lowered, 12 raised.** The nine go from 53-63 to
+118 — from a number resting on an ignored instruction to one that is proven. Gate green on 1243 measured
+regions across 158 ROMs.
+
+The scan is now the one the dex/dey path uses: ask `absSuccessors` which edges reach the header and read A
+from the edge's own state. **Deleting a divergence rather than adding a rule**, for the third time in this
+function today.
+
 ### A call inside a folded loop body cost six cycles, and the tree had a live one (2026-08-03)
 
 `foldLoops` walks the body with `nextSite()` and sums `nodeCost()`. For a JSR that is the RETURN address

@@ -137,12 +137,16 @@ func TestMergedFixpointConvergesAndIsAffordable(t *testing.T) {
 	}
 }
 
-// determineBound's `lda #imm` address proxy on the BCS/BCC divide path is the same
-// shape of heuristic that under-approximated by 40x on the dex/dey path (SD-9). It is
-// kept, gated to one bank — and counted, so "nothing reaches it" stays a measurement
-// instead of a belief. If a kernel ever starts depending on it, this test says so.
-func TestDivideLoopAddressProxyIsUnused(t *testing.T) {
-	before := proxyFallbackHits
+// The divide path's entry bound now comes from the EDGE state, like the dex/dey path's.
+//
+// It used to come from a fall-through-plus-address-order filter with an `lda #imm`
+// proxy behind it — the heuristic SD-9 deleted from the other path — kept because a
+// counter measured 0 uses across this exact set. That was a fact about the set:
+// `litmus_divpred` reaches the proxy on the first try and gets 28 cycles for an
+// interval the machine takes 87. This test now checks the replacement is LIVE on the
+// same set, so "the scan runs here" stays a measurement rather than a belief.
+func TestDivideLoopEntryBoundComesFromTheEdge(t *testing.T) {
+	before := divEdgeScanned
 	for _, asm := range []string{
 		"../../roms/litmus/cb_divloop.asm",
 		"../../roms/litmus/cb_blank_amax.asm",
@@ -155,10 +159,11 @@ func TestDivideLoopAddressProxyIsUnused(t *testing.T) {
 	} {
 		mustProve(t, asm, 76)
 	}
-	if n := proxyFallbackHits - before; n != 0 {
-		t.Errorf("the divide-loop address proxy fired %d time(s) across this set. A bound taken from "+
-			"'the closest immediate below the header' is only valid while address order matches "+
-			"execution order; if a corpus kernel now needs it, give that kernel an `@amax` and delete "+
-			"the proxy rather than leaving an SD-9-shaped heuristic live", n)
+	if n := divEdgeScanned - before; n == 0 {
+		t.Error("no divide fold in this set took its entry bound from the edge scan. Either these " +
+			"kernels stopped containing the sbc-divide idiom, or the scan is no longer reached — and " +
+			"the second would mean the path this test watches is dead while the test reads green")
+	} else {
+		t.Logf("divide folds bounded from the edge state: %d", n)
 	}
 }

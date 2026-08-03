@@ -9,6 +9,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **SD-9's address proxy was still live on the divide path, and nine real folds were resting on it.** The
+  BCS/BCC path found A's entry bound with textual fall-through plus address order — the heuristic SD-9
+  deleted from the dex/dey path — with an `lda #imm` guess behind it. Measured on the new
+  `litmus_divpred.asm`, all three with `certified: true`: a predecessor arriving by `jmp` was invisible
+  (**27 vs 87**), the proxy answered when nothing was adjacent (**28 vs 87**), and a `jmp` merely sitting
+  before the header was read as a predecessor (**29 vs 89**). **The proxy's "0 uses" counter was a fact
+  about eight hand-listed ROMs**: across the corpus nine folds were bounded by it, and it reads `lda #80`
+  while ignoring the `adc #XCAL` two instructions later — 7 iterations where the sound bound is 19. They
+  sat above the machine by luck.
+  Removing it exposed the precision gap that had made it necessary: **`adcRange` returned Top on wrap**,
+  and `XCAL = -5` assembles to `$FB`, so `lda #80 / clc / adc #XCAL` computes 331 and gave up. A wrapped
+  sum is still a byte, so `[0,255]` is true and *useful* where Top is true and useless. Over 155 images:
+  **0 bounds lost, 0 lowered, 12 raised** — the nine go from 53-63 to 118, from resting on an ignored
+  instruction to proven. Gate green on 1243 regions across 158 ROMs. The scan is now the dex/dey path's:
+  ask `absSuccessors` which edges reach the header and read A from the edge's state — deleting a
+  divergence rather than adding a rule, for the third time in this function.
+
 - **A `jsr` inside a folded loop body was costed at six cycles, dropping the callee once per iteration —
   and the tree contains a live instance.** `IsBranch()` is `Relative && Flow`, so a JSR (Absolute,
   Subroutine) and a JMP (Absolute, Flow) both sailed through the body walk. Measured on the new

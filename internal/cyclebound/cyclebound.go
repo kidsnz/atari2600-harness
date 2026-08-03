@@ -2073,7 +2073,7 @@ func addressOrderLatches(s *solver) int {
 // settles a region, and how often it settles one the address-order guard would have
 // refused outright.
 //
-// They are MEASUREMENT counters like proxyFallbackHits and bplTripCountAdjusted, not
+// They are MEASUREMENT counters like divEdgeScanned and bplTripCountAdjusted, not
 // analysis state. dagFirstAnswered is large and uninteresting on its own — most
 // regions have no loop at all and were always answered by this walk, just after a
 // fold pass that found nothing. dagFirstMultiLatch is the number that says whether
@@ -2239,17 +2239,18 @@ func (s *solver) foldLoops() string {
 	return ""
 }
 
-// proxyFallbackHits counts how many times determineBound has fallen back to the
-// "closest `lda #imm` below the header" address proxy on the BCS/BCC divide path.
+// divEdgeScanned counts how many divide folds took their entry bound from the EDGE
+// state, i.e. from `absSuccessors` rather than from the old fall-through-plus-address
+// -order filter.
 //
-// It is a MEASUREMENT counter, not analysis state: the proxy is the same shape of
-// heuristic that under-approximated by 40x on the dex/dey path (SD-9), and the only
-// honest way to decide between deleting it and keeping it gated was to find out
-// whether anything in the corpus reaches it. Measured over all 31 technique ROMs, all
-// 12 cb_* litmus, litmus_bound_proxy and the four bank ROMs: 0 hits. It is kept
-// same-bank-gated with this counter so a future kernel that starts depending on it
-// becomes visible rather than silent.
-var proxyFallbackHits int
+// It replaces `proxyFallbackHits`, which counted uses of the "closest `lda #imm` below
+// the header" proxy. That counter measured 0 across the corpus and the proxy was kept
+// on the strength of it — a fact about the corpus, not about the proxy, and
+// `litmus_divpred` reaches it on the first try. The proxy is deleted; this counter
+// exists so a fixture can prove its own premise, that the region it grades really took
+// the scan under test.
+var divEdgeScanned int
+
 
 // writesX and writesY report whether an operator writes that index register.
 //
@@ -2373,24 +2374,56 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		// to be known. Skipping the unknown one is exactly how the maximum comes out
 		// too low — an under-approximation, the direction this package forbids, in the
 		// same function whose dex/dey path produced SD-9's fortyfold one.
+		// THE SAME PREDECESSOR SCAN THE DEX/DEY PATH USES, for the same reason.
+		//
+		// This filter used to be `in.nextSite() == header && at.addr < header.addr` —
+		// textual fall-through plus address order, which is the proxy SD-9 deleted
+		// from the other path and left alive here. Its own comment said so and kept
+		// it behind a counter that measured zero uses; the counter fires on a
+		// twenty-line cartridge.
+		//
+		// It was wrong in BOTH directions at once. A predecessor arriving by `jmp` or
+		// a branch is not `nextSite() == header`, so its value never entered the
+		// maximum — an UNDER-approximation. And an instruction that merely SITS before
+		// the header has `nextSite() == header` although control never flows there, so
+		// a value the machine never holds was admitted.
+		//
+		// Measured on litmus_divpred, all three with `certified: true`:
+		//   the missed predecessor    proven 27, machine 87
+		//   the `lda #imm` proxy      proven 28, machine 87
+		//   the phantom predecessor   proven 29, machine 89
+		//
+		// Asking `absSuccessors` which edges reach the header, and reading A from the
+		// edge's own state, answers all three at once and deletes a divergence rather
+		// than adding a rule — the same argument made when the dex/dey path stopped
+		// using `transfer`.
 		amax := -1
 		unknownPred := false
 		for at, in := range nodes {
-			// Same-bank comparison: two addresses in different banks have no order.
-			if in.nextSite() == header && at != latch.site() && at.bank == header.bank && at.addr < header.addr {
-				st, ok := absStates[at]
-				if !ok || !st.valid {
-					unknownPred = true
+
+			if at == latch.site() {
+				continue // the back edge carries the REDUCED A, not the entry value
+			}
+			st, ok := absStates[at]
+			if !ok || !st.valid {
+				continue // not known to be a predecessor at all; see below
+			}
+			if _, refusal := successors(in, st, sw); refusal != "" {
+				unknownPred = true
+				continue
+			}
+			for _, e := range absSuccessors(in, st, sw) {
+				if e.at != header {
 					continue
 				}
-				ea := st.transfer(in).A
-				if ea.Top {
+				if e.state.A.Top {
 					unknownPred = true
-					continue
+					break
 				}
-				if ea.Hi > amax {
-					amax = ea.Hi
+				if e.state.A.Hi > amax {
+					amax = e.state.A.Hi
 				}
+				break
 			}
 		}
 		if unknownPred {
@@ -2399,21 +2432,18 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 			// declared ceiling and is still allowed to answer; an inferred range is not.
 			amax = -1
 		}
-		// Fallback: closest immediate `lda #imm` before the loop, IN THE SAME BANK.
-		// This is the address proxy SD-9 removed from the dex/dey path, still live here;
-		// it is gated to one bank and counted rather than trusted.
-		if amax < 0 {
-			bestAddr := -1
-			for at, in := range nodes {
-				if at.bank == header.bank && at.addr < header.addr && in.Def.Operator == instructions.LDA &&
-					in.Def.AddressingMode == instructions.Immediate && int(at.addr) > bestAddr {
-					bestAddr = int(at.addr)
-					amax = int(in.Operand & 0xFF)
-				}
-			}
-			if amax >= 0 {
-				proxyFallbackHits++
-			}
+		// The `lda #imm` fallback is GONE. It guessed A's entry value from the nearest
+		// immediate below the header — the same address proxy SD-9 removed from the
+		// dex/dey path — and was kept because a counter measured zero uses across the
+		// corpus. Zero uses is a fact about the corpus: `litmus_divpred`'s ProxyDanger
+		// row reaches it on the first try and gets 28 cycles for an interval the
+		// machine takes 87. A fallback that only fires where the sound scan failed is
+		// a fallback that only fires where it is wrong.
+		//
+		// `@amax` below stays: that is the author DECLARING a ceiling, not the
+		// analysis inferring one.
+		if amax >= 0 {
+			divEdgeScanned++
 		}
 		if amax < 0 && amaxHint > 0 {
 			amax = amaxHint // ②: author-declared `@amax N` (the accumulator's proven upper bound) when the abstract range is Top
