@@ -8,7 +8,48 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **G9 closed — the two craft patterns a reconstruction missed now have fixtures, graded tests and docs.**
+  The Fishing Derby casebook recorded that Claude's sealed rebuild had no counterpart for (a) reshaping ONE
+  player per scanline into an irregular silhouette wider than 8px, and (b) drawing an arbitrary-angle 1px
+  line with a missile or ball. Both were prose in a gap list; neither had a ROM, a number, or a doc.
+  New: `roms/litmus/litmus_nusiz_shape.asm` + `internal/emu/nusizshape_test.go` +
+  `docs/techniques/nusiz-shaping.md`, and `roms/litmus/litmus_hmove_slope.asm` +
+  `internal/emu/hmoveslope_test.go` + `docs/techniques/hmove-slope.md`.
+- **The intended shape is stated where the harness cannot reach it, because grading output against output
+  is worth nothing.** (a) states the silhouette as a table of drawn runs, generated in the test from the
+  band table plus two hardware rules — the drawn pixels match on **40 of 40 scanlines**, 840 px of ink
+  against 840 intended, plus **120 of 120** control rows. (b) states an equation,
+  `x(n) = x(0) ± floor(n·NUM/256)`, and the drawn x of the 1-pixel object matches it with **max error 0 px
+  over 160 scanlines**, on two slopes in opposite directions (3/8, and 85/256 chosen precisely because it is
+  not dyadic — that angle is unreachable by any doubling scheme).
+- **(a) is graded a second time with no table at all.** The 40-line kernel runs four times over the same
+  tables with only two zero-page masks changed, so the shaped block must equal the NUSIZ-only block
+  translated by the HMOVE-only block's displacement. It holds on all 8 bands, and it catches the two axes
+  interfering — which no comparison against a table can.
+
 ### Fixed
+- **`sta HMOVE` at CPU cycle 10 instead of cycle 0 adds a phantom +1 clock per line, with `HM=$00`.** Found
+  in the first build of `litmus_nusiz_shape`: 39 clocks of drift over 40 lines, under a silhouette that
+  still looked plausible band by band, and it corrupted every slope in the fixture equally. **A slope graded
+  relative to its own first line cannot see it** — only a deliberately motionless object can. Both fixtures
+  now carry one (block 3 of the shape ROM, M0 of the slope ROM), asserted static on 40/40 and 160/160
+  scanlines. The rule is now written down in both technique docs rather than living in the kernel's shape.
+- **Five negative controls run and reported, not assumed.** Deleting the single `sta NUSIZ0` → 40 matching
+  scanlines becomes 5; zeroing one HM table entry → 15; `$60` → `$61` in the accumulator, a one-bit change →
+  max error 1 px, 120 of 160 exact, travel +60 against +59; giving the static control a move → 157 of 160
+  lines moved; breaking the width oracle → the table tests stay green and the metamorphic relation fails on
+  7 of 8 bands, which is the case that relation exists for.
+- **Cross-checked against the original cartridge by pixels, never by disassembly.** `emu.DecomposeRow` on
+  Fishing Derby (umbrella-only, absent from CI): P0 drawn on 103 scanlines with **13 distinct per-row ink
+  widths**, reaching a **28-clock extent on one line out of an 8-bit graphics register**, the copy count
+  changing inside four scanlines and the left edge stepping 44 → 43 → 42; and the right-hand line drawn as
+  the **ball over 110 consecutive scanlines at −0.0826 px/scanline**, holding each x for 8 to 15 lines
+  rather than on a fixed period — the observable signature of an accumulator, not a divider.
+- **A hardware rule the shape table would otherwise have had to invent, re-measured on the fixture it came
+  from.** Double and quad width start ONE clock later than the 1x modes (`litmus_nusiz_all`: modes 0-4 and 6
+  ink from clock 24, modes 5 and 7 from clock 25). `TestNusizWidthModesStartOneClockLate` re-measures it on
+  that ROM every run, so this package's generator cannot quietly acquire a rule only it believes.
 - **The provenance check then turned CI red for the SAME reason, twice more.** Resolving citations against
   both roots is right on a machine that has both; a CI checkout has only one. Three rounds of it: (1) 11
   citations into `sandbox/` and `reference/`, which are the umbrella's and are never fetched; (2) cited

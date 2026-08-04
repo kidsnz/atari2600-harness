@@ -215,12 +215,51 @@ the wording is coarse.
   exists to catch (gap B). A `breakif`/assert that flags timer writes on the wraparound cycle would be a
   natural sibling to `assert_line_budget`. Source: design-principles.md (採掘 303277), diagnosed in-thread
   by the Gopher2600 author. Verify the exact behaviour against Gopher2600's RIOT model before implementing.
+- **G9 ✅ CLOSED (2026-08-04) — both patterns now have a fixture, a graded test and a technique doc.**
+  (a) **per-scanline NUSIZ+HMOVE shaping**: `roms/litmus/litmus_nusiz_shape.asm` +
+  `internal/emu/nusizshape_test.go` + `docs/techniques/nusiz-shaping.md`. (b) **fractional-HMOVE slope**:
+  `roms/litmus/litmus_hmove_slope.asm` + `internal/emu/hmoveslope_test.go` +
+  `docs/techniques/hmove-slope.md`.
+
+  **The intended shape is stated independently of the harness, in both directions.** For (a) the outline is
+  a table of drawn runs generated in the test from the band table plus two hardware rules, and the drawn
+  pixels match it on **40 of 40 scanlines** (840 px of ink against 840 intended) plus **120 of 120** control
+  rows. For (b) the claim is an equation, `x(n) = x(0) ± floor(n·NUM/256)`, and the drawn x of the 1-pixel
+  object matches it with **max error 0 px over 160 scanlines**, on two slopes running in opposite directions
+  (3/8 and the deliberately non-dyadic 85/256).
+
+  **(a) is graded a second time with no table at all.** The 40-line kernel runs four times over the same
+  data with only two zero-page masks changed, so the shaped block must equal the NUSIZ-only block translated
+  by the HMOVE-only block's displacement — a relation that catches the two axes interfering, which no
+  comparison against a table can. It holds on all 8 bands.
+
+  **The fixture caught a defect in itself, and that is the entry's most useful finding.** With `sta HMOVE`
+  at CPU cycle 10 of the line instead of cycle 0, every object gained **+1 clock per line even with
+  `HM=$00`** — 39 clocks of drift over 40 lines, under an intended shape that still looked plausible band by
+  band. Only a deliberately motionless control row detects it, because every slope graded relative to its
+  own first line survives it. Both fixtures now carry one (block 3, and M0), and both are asserted static on
+  40/40 and 160/160 lines.
+
+  **Five negative controls were run and reported, not assumed:** deleting the single `sta NUSIZ0` (40 → 5
+  matching scanlines); zeroing one HM table entry (40 → 15); `$60` → `$61` in the accumulator, a one-bit
+  change (max error 1 px, 120 of 160 exact, travel +60 against +59); giving the static control a move (157
+  of 160 lines moved); and breaking the width oracle, which leaves the table tests green and fails the
+  metamorphic relation on 7 of 8 bands.
+
+  **Cross-checked against the original by pixels, not by disassembly.** `emu.DecomposeRow` on the Fishing
+  Derby cartridge (umbrella `sandbox/studies/fishing-derby/`, absent from CI) reports P0 drawn on 103
+  scanlines with **13 distinct per-row ink widths**, reaching a **28-clock extent on one line out of an
+  8-bit register**, with the copy count changing inside four scanlines; and the right-hand line drawn as the
+  **ball over 110 consecutive scanlines at −0.0826 px/scanline**, holding each x for 8 to 15 lines rather
+  than on a fixed period. Original entry follows.
 - **G9 (surfaced 2026-06-15, Fishing Derby casebook):** *authoring-craft* support for two patterns the
   Claude-side reconstruction missed (`docs/casebook.md`): (a) **per-scanline NUSIZ+HMOVE shaping** of one
   player into an 8px-plus irregular sprite (the shark), and (b) **fractional-HMOVE slope** drawing of an
   arbitrary-angle 1px line on a missile/ball (the fishing line). A `pkg/design` estimator or a
   `docs/techniques/` skeleton for these would stop the next sports/action build from falling in the same
-  hole. Concrete-driven: build when the next ROM needs it. Source: `_casestudies/fishing-derby/diff-gaps.ja.md`.
+  hole. Concrete-driven: build when the next ROM needs it. Source: `_casestudies/fishing-derby/diff-gaps.ja.md`
+  — **absent** (it is listed in `check_provenance.py`'s KNOWN_ABSENT), so this work was done from the
+  casebook section plus direct measurement of the cartridge.
 
 ## Tier 2b — testing/verification discipline import (2026-06-16, `docs/testing-playbook.md`) — **DONE**
 Imported the established software-testing discipline (oracle problem → property/metamorphic/fuzz/mutation,
