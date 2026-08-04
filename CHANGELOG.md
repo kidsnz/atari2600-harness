@@ -9,6 +9,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **The provenance check then turned CI red for the SAME reason, twice more.** Resolving citations against
+  both roots is right on a machine that has both; a CI checkout has only one. Three rounds of it: (1) 11
+  citations into `sandbox/` and `reference/`, which are the umbrella's and are never fetched; (2) cited
+  `.bin` files, which are gitignored build products absent from any fresh checkout — a cited `.bin` now
+  resolves through the `.asm` beside it, since the source is what a reader can follow; (3) `scripts/`, which
+  exists on BOTH sides, so keying on the root prefix was not enough. The rule is now: **when the umbrella is
+  absent, anything the harness alone cannot resolve is COUNTED and passed over**, because "does not resolve"
+  then carries no information — it cannot distinguish a broken trail from an unfetched tree. The count is
+  printed (`58 citation(s) NOT checked`) so a run that verified everything and a run that skipped a third of
+  it do not look the same.
+- **Verified by cloning the repository outside the umbrella and running the real CI steps there** — assemble
+  150 ROMs, `go vet`, `go test -p 1 ./...`, the five gates, and the 102 scenarios — rather than by running
+  the same commands on a machine that has everything. That is the check the phrase "CI mirror" was standing
+  in for, and it was not the same check.
 - **The coverage test turned real CI red while the local "CI mirror" stayed green.** `TestProverCoverage...`
   demanded 16 commercial cartridges unconditionally, and those cartridges live in the umbrella `reference/`
   tree for licensing reasons — a GitHub Actions checkout has **none**. The very first push after it landed

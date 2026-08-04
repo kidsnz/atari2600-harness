@@ -116,10 +116,36 @@ CITE_RE = re.compile(r"`([A-Za-z0-9_./*-]+)`")
 FILE_EXT = re.compile(r"\.(asm|bin|go|md|json|py|txt|png|jsonl|sh)$")
 
 
+UMBRELLA = os.path.dirname(HARNESS)
+
+# Roots that live in the UMBRELLA, not in this repository. `reference/` is the
+# clean-room source material and `sandbox/` is a separate git repo of authored ROMs;
+# neither is part of a checkout of the harness, so CI has no way to resolve a citation
+# into them.
+UMBRELLA_ROOTS = ("sandbox/", "reference/")
+
+
+def umbrella_present():
+    """Whether the umbrella tree is on disk. Env var forces it off, for testing the
+    CI path without moving the user's files."""
+    if os.environ.get("HARNESS_NO_UMBRELLA"):
+        return False
+    return any(os.path.isdir(os.path.join(UMBRELLA, r.rstrip("/"))) for r in UMBRELLA_ROOTS)
+
+
 def _resolves(path):
-    """True if `path` exists under the harness OR under the umbrella above it."""
+    """True if `path` exists under the harness OR under the umbrella above it.
+
+    A `.bin` is a BUILD PRODUCT and is gitignored, so it is absent from any fresh
+    checkout and present on any machine that has run the build — which makes its
+    existence a fact about the working copy, not about the citation. What is
+    followable is its SOURCE, so a cited `.bin` is resolved through the `.asm` beside
+    it. (Found the third time this check turned CI red for citing something real:
+    first the umbrella, then the commercial corpus, then this.)"""
     import glob as _glob
-    for root in (HARNESS, os.path.dirname(HARNESS)):
+    if path.endswith(".bin"):
+        path = path[:-4] + ".asm"
+    for root in (HARNESS, UMBRELLA):
         full = os.path.join(root, path)
         if "*" in path:
             if _glob.glob(full):
@@ -152,19 +178,45 @@ def cited_paths():
 
 
 def check_citations():
-    """Return (unresolved, stale_known) — cited-but-absent, and entries in
-    KNOWN_ABSENT that now resolve and should be removed from the list."""
+    """Return (unresolved, stale_known, skipped) — cited-but-absent, entries in
+    KNOWN_ABSENT that now resolve, and the count of citations not checked because the
+    umbrella is absent.
+
+    CI CHECKS OUT THIS REPOSITORY ALONE. `sandbox/` and `reference/` are the umbrella's,
+    so on a CI runner every citation into them resolves to nothing — not because the
+    trail is broken but because the tree it leads into was never fetched. The first
+    version of this check did not know that and turned GitHub Actions red on 11 real,
+    followable citations. Checking them there is not a stricter check, it is a
+    different and wrong one.
+
+    The count of what went unchecked is RETURNED rather than swallowed, so a run that
+    verified 756 citations and a run that verified 69 fewer do not print the same
+    thing."""
+    have_umbrella = umbrella_present()
     unresolved = []
-    seen = set()
+    skipped = 0
     for doc, path in cited_paths():
         if _resolves(path):
             continue
-        seen.add(path)
+        if not have_umbrella:
+            # WITHOUT THE UMBRELLA, "does not resolve" carries no information: the
+            # path may be perfectly good and simply live in a tree this checkout does
+            # not contain. Keying on the root prefix is not enough — `scripts/` exists
+            # on BOTH sides, and `docs/techniques/asymmetric-pf-score.md` cites the
+            # umbrella's `scripts/pong_font_gen_pf.py`. So when the umbrella is
+            # absent, anything the harness alone cannot resolve is counted and passed
+            # over rather than called broken.
+            skipped += 1
+            continue
         if path in KNOWN_ABSENT:
             continue
         unresolved.append((doc, path))
-    stale = [p for p in KNOWN_ABSENT if _resolves(p)]
-    return unresolved, stale
+    stale = []
+    if have_umbrella:
+        # With no umbrella there is no way to tell a stale entry from an unfetchable
+        # one, and claiming staleness would delete a real entry from KNOWN_ABSENT.
+        stale = [p for p in KNOWN_ABSENT if _resolves(p)]
+    return unresolved, stale, skipped
 
 def write_list():
     """docs/provenance.md＝要素→原典の集約一覧（手書きせず自動生成・最悪時の戻り先索引）。"""
@@ -206,7 +258,11 @@ def main():
             missing.append("docs/design-principles.md (citations 〔〕=%d, want >=20)" % tags)
 
     # Every cited path must be followable — from the harness or from the umbrella.
-    unresolved, stale = check_citations()
+    unresolved, stale, skipped = check_citations()
+    if skipped:
+        print("citation check: %d citation(s) NOT checked — they do not resolve inside this "
+              "repository and the umbrella tree that holds them is not present, so this run "
+              "cannot tell a broken trail from an unfetched one" % skipped)
     for doc, path in unresolved:
         missing.append("%s cites `%s`, which exists under neither the harness nor the "
                        "umbrella above it" % (doc, path))
