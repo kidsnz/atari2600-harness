@@ -71,6 +71,101 @@ def first_marker_line(path):
     return ""
 
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A citation nobody can follow is not provenance.
+#
+# The marker check above asks whether a doc SAYS where something came from. It
+# never asked whether the thing it names is there. Two independent readers — an
+# agent and the main session — both concluded on 2026-08-04 that
+# `docs/techniques/asymmetric-pf-score.md`'s "verified in-game (PONG
+# `sandbox/practice/pong/steps/...`)" pointed at nothing, and both were WRONG:
+# `sandbox/` and `reference/` live in the UMBRELLA directory one level above
+# `harness/`, not inside it, and documentation paths are written relative to the
+# umbrella. The evidence was there; the readers looked in one of the two roots.
+#
+# So this resolves every cited path against BOTH roots, and reports the ones that
+# resolve against neither. That answers the question provenance exists for —
+# "when this breaks, can I get back to the original?" — instead of the question
+# the marker check answers, which is "does this file contain the word Source:".
+KNOWN_ABSENT = {
+    # path -> why it is cited but not present. Each entry is a claim someone must
+    # eventually make true or retract; the point of listing them is that they are
+    # COUNTED rather than invisible.
+    "reference/disassemblies/_casestudies/breakout/":
+        "casebook.md says the 8-rung Breakout was completed and cites this as its "
+        "output; only _casestudies/outlaw exists. The raw material is there "
+        "(reference/disassemblies/Breakout_debro) but the case study is not.",
+    "roms/breakout/":
+        "casebook.md cites the self-built Breakout ROM and its per-rung snapshots. Absent.",
+    "reference/disassemblies/_casestudies/fishing-derby/manual/":
+        "casebook.md cites the archive.org manual scans. Absent; "
+        "sandbox/studies/fishing-derby and reference/disassemblies/Fishing_Derby_debro exist.",
+    "reference/disassemblies/_casestudies/fishing-derby/diff-gaps.ja.md":
+        "casebook.md cites this as the detailed ledger of Claude-vs-master gaps. Absent.",
+    "docs/2600-constants.md":
+        "resources.md offers it as a distillation target. Never created; the values "
+        "live in CLAUDE.md instead.",
+}
+# MCP protocol method names, not paths.
+NOT_PATHS = {"tools/call", "tools/list"}
+
+CITE_ROOTS = ("sandbox/", "roms/", "reference/", "pkg/", "internal/", "cmd/",
+              "scripts/", "docs/", "third_party/", "tools/")
+CITE_RE = re.compile(r"`([A-Za-z0-9_./*-]+)`")
+FILE_EXT = re.compile(r"\.(asm|bin|go|md|json|py|txt|png|jsonl|sh)$")
+
+
+def _resolves(path):
+    """True if `path` exists under the harness OR under the umbrella above it."""
+    import glob as _glob
+    for root in (HARNESS, os.path.dirname(HARNESS)):
+        full = os.path.join(root, path)
+        if "*" in path:
+            if _glob.glob(full):
+                return True
+        elif os.path.exists(full):
+            return True
+    return False
+
+
+def cited_paths():
+    """Yield (doc, path) for every repo-relative path cited in backticks in docs/."""
+    import glob as _glob
+    docs = os.path.join(HARNESS, "docs")
+    for fn in sorted(_glob.glob(os.path.join(docs, "**", "*.md"), recursive=True)):
+        if fn.endswith(".ja.md"):
+            continue
+        try:
+            body = open(fn, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        for m in CITE_RE.finditer(body):
+            path = m.group(1)
+            if not path.startswith(CITE_ROOTS) or "..." in path or path in NOT_PATHS:
+                continue
+            # `pkg/sprite.DigitFont` is a Go symbol, not a file.
+            base = path.rsplit("/", 1)[-1]
+            if "." in base and not FILE_EXT.search(base):
+                continue
+            yield rel(fn), path
+
+
+def check_citations():
+    """Return (unresolved, stale_known) — cited-but-absent, and entries in
+    KNOWN_ABSENT that now resolve and should be removed from the list."""
+    unresolved = []
+    seen = set()
+    for doc, path in cited_paths():
+        if _resolves(path):
+            continue
+        seen.add(path)
+        if path in KNOWN_ABSENT:
+            continue
+        unresolved.append((doc, path))
+    stale = [p for p in KNOWN_ABSENT if _resolves(p)]
+    return unresolved, stale
+
 def write_list():
     """docs/provenance.md＝要素→原典の集約一覧（手書きせず自動生成・最悪時の戻り先索引）。"""
     out = ["# Provenance map — every harness element → its origin\n",
@@ -110,13 +205,28 @@ def main():
         if tags < 20:
             missing.append("docs/design-principles.md (citations 〔〕=%d, want >=20)" % tags)
 
+    # Every cited path must be followable — from the harness or from the umbrella.
+    unresolved, stale = check_citations()
+    for doc, path in unresolved:
+        missing.append("%s cites `%s`, which exists under neither the harness nor the "
+                       "umbrella above it" % (doc, path))
+    for path in stale:
+        missing.append("KNOWN_ABSENT lists `%s`, but it now resolves — delete the entry "
+                       "so the list keeps meaning something" % path)
+    if KNOWN_ABSENT:
+        print("citations known to be absent (%d) — each is a claim to make true or retract:"
+              % len(KNOWN_ABSENT))
+        for k in sorted(KNOWN_ABSENT):
+            print("  ·", k)
+
     if missing:
         print("PROVENANCE MISSING — these need a source/出典/litmus citation:")
         for m in missing:
             print("  ✗", m)
         print("\nrule: [[feedback-provenance-always]] — every harness element records its origin.")
         sys.exit(1)
-    print("provenance OK — all technique docs / pkg/design / design-principles cite their source.")
+    print("provenance OK — every technique doc / pkg/design / design-principles cites a source, "
+          "and every cited path resolves from the harness or the umbrella.")
 
 
 if __name__ == "__main__":

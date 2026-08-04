@@ -9,7 +9,7 @@ its restrictions are **per scanline, not per frame** — so by **re-using P0/P1 
 This is the standard 2600 trick behind crowded screens (rows of cars, enemies, lily pads).
 
 Sources studied (clean-room — the idea is universal 2600 knowledge; the implementation here is our own):
-DaveC's `landscape.asm` (AtariAge; `reference/dave/`) and the 8bitworkshop multisprite kernels
+DaveC's `landscape.asm` (AtariAge; `reference/files-dave/`) and the 8bitworkshop multisprite kernels
 (`reference/docs_atari/8bitworkshop_samples/multisprite*.asm`). See **References** below.
 
 ## Formal name & taxonomy
@@ -81,4 +81,4 @@ frame). Cross-checked in Stella.
   `reference/docs_atari/Atari_2600_Programming_for_Newbies.txt`; https://www.randomterrain.com/atari-2600-memories-tutorial-andrew-davie-23.html
 - Bumbershoot Software — *Successfully Multiplexing Sprites*: https://bumbershootsoft.wordpress.com/2024/10/05/atari-2600-successfully-multiplexing-sprites/
 - AtariAge — *multi-sprite kernel strategies or examples* (topic 347667); splendidnut, *2600 Display Kernels* (blog)
-- DaveC's `landscape.asm` (`reference/dave/`) — the "zone" form studied here.
+- DaveC's `landscape.asm` (`reference/files-dave/`) — the "zone" form studied here.

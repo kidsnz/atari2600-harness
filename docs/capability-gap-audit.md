@@ -4,7 +4,7 @@
 > list. Cross-references the mined corpus (72 AtariAge threads + research `tools/research-w1..w11`
 > + Pizza Boy dissection) against what the harness can currently verify/support. Status cells cite
 > `docs/fundamentals-audit.md`, `docs/verified-coverage.md`, `docs/stella-oracle.md`,
-> `docs/hscroll.md`, `CHANGELOG.md`.
+> `docs/techniques/hscroll.md`, `CHANGELOG.md`.
 
 **Key insight:** most gaps are **not** closed by mining more. They close by (1) **codifying** mined
 knowledge into code, and (2) **supporting/verifying advanced cartridges**. Views-ranked mining

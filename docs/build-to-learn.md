@@ -37,7 +37,7 @@
 ## 成果物と配置
 - **自作 ROM（作品）**：`roms/<game>/<game>.asm`＋`scenarios/*.json`（git管理）。段ごとに育てる。
 - **study（非リポ）**：`reference/disassemblies/_casestudies/<game>/{impl-map,fixtures,diff-gaps}.ja.md`＋`manual/`。逆アセン原本＝`reference/disassemblies/<Game>_<author>/`。
-- **昇格（完了後・出典付き・lint緑）**：`casebook.md`（状況→技エントリ）／新技あれば `design-principles.md`／`roms/EVALUATION.md`（"書けた"の採点）。`check_wiring`/`check_provenance` 緑・`CHANGELOG`・push/tagは確認。
+- **昇格（完了後・出典付き・lint緑）**：`casebook.md`（状況→技エントリ）／新技あれば `design-principles.md`／`sandbox/EVALUATION.md`（"書けた"の採点）。`check_wiring`/`check_provenance` 緑・`CHANGELOG`・push/tagは確認。
 
 ## 複利（なぜ続けると効くか）
 各ゲームの diff が casebook/design-principles を厚くし、次のゲームが楽になる。受動(casebook)＝技の地図、能動(build-to-learn)＝技の手。両輪で [[project-roadmap-to-pong-capstone]] の capstone（1枚画像→オリジナル制作）の土台を作る。

@@ -60,7 +60,7 @@
 - **状況：背景に安い“ゆらぎ”の質感（水面/砂嵐/星）**
   → **既に回している LFSR/randomSeed のビットを帯ごとに `COLUBK` へ流すだけ**（専用RAM不要・ほぼ無コスト）。→ 原則 色節「背景のゆらぎ」。
 
-### このケースが定量化した能力ギャップ（→ `capability-gap-audit.md`／`roms/EVALUATION.md`）
+### このケースが定量化した能力ギャップ（→ `capability-gap-audit.md`／`sandbox/EVALUATION.md`）
 Claude の封印再構築 vs 実装の差分＝**衝突・入力・難易度の“ロジック”は読めるが、TIA を絞り切る描画 craft（1スプライト成形・斜線・多重利用・無コスト演出）で実ベテランに劣る**。詳細台帳＝`reference/disassemblies/_casestudies/fishing-derby/diff-gaps.ja.md`。
 
 ---
