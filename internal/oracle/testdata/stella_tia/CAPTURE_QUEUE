@@ -1,0 +1,17 @@
+# ROMs awaiting a Stella capture.
+#
+# Capturing needs Stella's GUI: the write-only TIA registers live only in the
+# debugger's TIA tab, and driving it means bringing Stella to the front and sending
+# keystrokes, which takes over the user's screen for ~13 s per ROM. That is not
+# something to do in the middle of someone's working session, so a ROM added while
+# the machine is in use is queued here and captured in a batch later.
+#
+# THIS FILE IS NOT AN EXEMPTION LIST. The test prints every line on every run and
+# fails once the queue passes maxQueuedCaptures, so a queue that stops being drained
+# becomes louder rather than quieter. A permanently uncoverable ROM does not belong
+# here — it belongs in a named exclusion with a reason.
+#
+# Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
+# Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
+
+roms/litmus/litmus_timerwait.bin  # 2026-08-04  added mid-session; the user was working

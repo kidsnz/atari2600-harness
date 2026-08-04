@@ -2200,6 +2200,28 @@ func (s *solver) foldLoops() string {
 	latch, header, bodyNoBranch, pen := sh.latch, sh.header, sh.bodyNoBranch, sh.pen
 	n := determineBound(s.nodes, header, latch, s.absStates, s.sw, s.amaxHint)
 	if n <= 0 {
+		// A TIMER SPIN IS NOT A LOOP MISSING A COUNTER.
+		//
+		// Measured across the corpus, of the loops refused here for having neither a
+		// counted dex/dey nor the divide idiom, TWENTY OF TWENTY-ONE are the same
+		// thing: `lda $0284 / bne` — INTIM, the RIOT's interval-timer read port,
+		// polled until it reaches zero. The trip count is not a property of any
+		// register this analysis tracks; it is whatever the hardware has left to
+		// count down, and no counter will ever appear however much the analysis is
+		// strengthened.
+		//
+		// The refusal is right and the generic reason is wrong. "Needs a counted
+		// dex/dey" tells a builder to look for an analysis gap that is not there,
+		// when what the region needs is to be recognised as a wait. Naming it is the
+		// whole of the change: no bound is invented, and `s.pending` is deliberately
+		// NOT set, because "how many iterations fit in 76 cycles?" is not a question
+		// anyone wants answered about a spin on a clock.
+		if spin, port := timerSpin(s.nodes, header, latch); spin {
+			timerSpins++
+			return fmt.Sprintf("timer wait: the loop polls INTIM ($%04X) until it reaches "+
+				"zero, so its length is set by the RIOT timer rather than by any counter "+
+				"this analysis can read", port)
+		}
 		// The body is fully understood; only the trip count is missing. Keep it so
 		// the caller can still answer "how many iterations fit the budget?".
 		s.pending = &pendingLoop{header: header, latch: latch, bodyNoBranch: bodyNoBranch, pen: pen, exit: latch.nextSite()}
@@ -3653,4 +3675,66 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		len(rep.Violations) == 0 && len(rep.Unbounded) == 0 &&
 		len(rep.BlankOver) == 0 && len(rep.BlankUnbounded) == 0
 	return rep, nil
+}
+
+// intimAddr is the RIOT's interval-timer read port. A read of it returns whatever the
+// timer has left to count down, which is why a loop polling it has no trip count in
+// any register this analysis tracks.
+//
+// ONLY THE CANONICAL ADDRESS IS RECOGNISED, deliberately. The 6532 is decoded from a
+// handful of address lines, so INTIM answers at many mirrors, and matching them would
+// mean reproducing that decode here. All twenty timer spins in the corpus read exactly
+// $0284. A ROM using a mirror is simply not recognised and keeps the generic refusal —
+// the failure mode of matching too narrowly is the message a builder already gets,
+// while the failure mode of matching too widely is calling an ordinary polling loop a
+// timer wait.
+const intimAddr = 0x0284
+
+// timerSpins counts loops named as timer waits. A MEASUREMENT counter, so a fixture
+// can prove its own premise.
+var timerSpins int
+
+// timerSpin reports whether the loop header..latch is a spin on the RIOT timer, and
+// the address it polls.
+//
+// The test is that the LAST instruction in the body to touch Z is a load of INTIM, and
+// that the latch branches on Z. It is written that way rather than as "the body
+// contains `lda $0284`" because the corpus holds `sta $002A / lda $0284 / bne`, where
+// a store sits in the body and leaves the flags alone — and because a body that loads
+// INTIM and then does arithmetic on something else is NOT spinning on the timer, and
+// must keep the generic refusal.
+func timerSpin(nodes map[site]Instr, header site, latch Instr) (bool, uint16) {
+	switch latch.Def.Operator {
+	case instructions.BNE, instructions.BEQ:
+	default:
+		return false, 0 // the latch reads C, N or V: not "until the timer is zero"
+	}
+	var last Instr
+	found := false
+	at := header
+	for i := 0; i < 32; i++ {
+		in, ok := nodes[at]
+		if !ok {
+			return false, 0
+		}
+		if in.Addr == latch.Addr {
+			break
+		}
+		if !preservesZN(in.Def.Operator) {
+			last, found = in, true
+		}
+		at = in.nextSite()
+	}
+	if !found {
+		return false, 0
+	}
+	switch last.Def.Operator {
+	case instructions.LDA, instructions.LDX, instructions.LDY:
+	default:
+		return false, 0
+	}
+	if last.Def.AddressingMode != instructions.Absolute || last.Operand != intimAddr {
+		return false, 0
+	}
+	return true, last.Operand
 }

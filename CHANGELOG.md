@@ -8,7 +8,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **A timer spin is named rather than called uncounted.** `determineBound` needs a counted `dex`/`dey` or the
+  `sbc` divide idiom, and of the loops it refuses for having neither, **twenty of twenty-one are the same
+  thing**: `lda $0284 / bne` — INTIM, the RIOT's interval timer, polled until it reaches zero. The trip count
+  is not a property of any register the analysis tracks; it is whatever the hardware has left to count down,
+  and no counter will ever appear however much the analysis is strengthened. The refusal was right and the
+  reason was wrong: "needs a counted dex/dey" sends a builder looking for an analysis gap that is not there.
+  The detector fires on 12 loops and reaches the reported reason on 5; **no region changes verdict and no
+  bound is invented** — 0 keys moved on the corpus.
+- The detector asks whether the **last instruction in the body to touch Z** is a load of INTIM, not whether
+  the body contains one: the corpus holds `sta $002A / lda $0284 / bne`, where a store leaves the flags alone,
+  while a body that loads INTIM and then tests something else is not spinning on the timer at all.
+  `litmus_timerwait.asm` carries both controls, and only the canonical `$0284` is recognised — matching the
+  6532's mirrors would mean reproducing its address decode, and the cost of matching too narrowly is the
+  message a builder already gets, while the cost of matching too widely is a false claim about the ROM.
+- **A capture queue for the Stella oracle, so adding a ROM does not have to interrupt the user.** Capturing
+  the write-only TIA registers needs Stella's GUI and takes over the screen for ~13 s per ROM. A ROM added
+  mid-session can now be listed in `internal/oracle/testdata/stella_tia/CAPTURE_QUEUE` and captured in a
+  batch later. **It is not an exemption list and is built so it cannot become one**: every queued line is
+  printed on every run, and the test fails once the queue passes six entries — a queue that stops being
+  drained gets louder rather than quieter.
+
 ### Changed
+
 - **A loop body with an if/else in it is still a counted loop.** `loopShape` walked the body as a straight
   chain and refused the moment it met a branch. Measured across the sixteen-cartridge corpus, of the branches
   that tripped that refusal: **89 are a forward skip whose target is still inside the body**, 29 are an early
