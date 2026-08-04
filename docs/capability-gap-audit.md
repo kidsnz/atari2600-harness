@@ -1741,6 +1741,43 @@ emitting a cartridge per rung, proving the budget, comparing the pixels, and dem
 Known unknown: the demonstrated picture had **10 cycles of slack**, and a kernel that also had to position
 objects would have far less.
 
+### The prover answers 47.1% of addresses, the ceiling on loop work is 60.2%, and the obstacles are not independent (2026-08-04)
+
+**The denominator was wrong.** `Prove` reports one Region per (address, call context), so a scanline entered
+from two call sites appears twice. Counting rows gives "626 of 958 = 65.3%", which is not a fact about the
+ROM: an address is only usefully proven when EVERY context proves it, because a builder asking "does this
+line fit in 76 cycles?" gets a refusal if any context refuses. By that measure the corpus reads **295 of
+626 = 47.1%**. Both numbers are true about what they count; only the second answers the question.
+`TestProverCoverageOnTheCommercialCorpus` now pins it with a floor, and fails if it drifts more than five
+points either way.
+
+**The ceiling on this whole line of work, measured rather than argued.** Each obstacle was forced to pass —
+unsound, by hand, discarded afterwards — and the corpus re-measured:
+
+| coverage | condition |
+|---:|---|
+| 47.1% | as shipped |
+| **54.1%** | if every trip count were established |
+| 47.1% | if WSYNC-in-body were ignored — **zero on its own** |
+| 47.1% | if call-or-jump-in-body were ignored — **zero on its own** |
+| **60.2%** | if all three were |
+
+**Two obstacles worth nothing alone are worth 6.1 points together with the first.** A loop blocked by two of
+them appears in neither single measurement, so measuring one at a time systematically understates the pair.
+This is the first-obstacle trap one level up: it applies to *forecasts* of a repair's value, not just to
+histograms of its reasons.
+
+It also explains the three repairs of 2026-08-03/04 — SD-9's proxy, `multiple back-edges`, `branch inside
+loop body`. Each is correct, each is graded against the machine, and each measured ~zero, because each
+removed one wall from loops standing behind two or three. The honest summary is not "three repairs bought
+nothing" but **"the loop path has a 60.2% ceiling and no single repair reaches it"**.
+
+**What this settles for planning:** `trip count unknown` is the only obstacle in this area worth attacking on
+its own (+7.0 points), and it is worth attacking BEFORE the other two rather than after, since it is what
+makes them non-zero. Beyond 60.2%, the remaining 40% is not loop-shaped at all — it is dominated by
+bank-switch suspicion (146 regions, all in the five banked cartridges) and by regions with no WSYNC, a BRK,
+or an indirect JMP.
+
 ### A census of refusal reasons is a census of FIRST obstacles (2026-08-04)
 
 `branch inside loop body` was the largest refusal affecting single-bank cartridges, and the branches behind it
