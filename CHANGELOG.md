@@ -9,6 +9,44 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **A loop body with an if/else in it is still a counted loop.** `loopShape` walked the body as a straight
+  chain and refused the moment it met a branch. Measured across the sixteen-cartridge corpus, of the branches
+  that tripped that refusal: **89 are a forward skip whose target is still inside the body**, 29 are an early
+  exit, and 1 is an inner loop. Three quarters are a skip — most often `bcc` (64 of 118), the "add, and if it
+  did not carry, skip the fixup" idiom. Such a body is a small acyclic graph with two ways through that rejoin
+  before the latch, and it has a **longest path**, which is a sound cost for one iteration because whichever
+  way the machine goes it cannot spend more. `litmus_branchbody.asm` proves **72 cycles against a machine that
+  spends 72**. A chain body has exactly one path, so the walk reproduces the old running sum instruction for
+  instruction: over 958 regions, **0 lost, 0 raised, 0 lowered**.
+- The body walk is now two passes. Pass 1 collects and validates; pass 2 computes the longest path **in
+  address order**, which is a topological order because every surviving edge goes forward. Relaxing distances
+  inside pass 1's work queue would not be correct — a site can be dequeued before a longer path into it has
+  been found, and its successors would then carry a stale distance.
+
+### Fixed
+- **The branch wall hid a raft of larger walls, and that is the finding.** Allowing a branch in the body moved
+  exactly **one loop** on the corpus. The 89 skips were not miscounted: a body walk stops at its FIRST
+  obstacle, so a census of refusal reasons is a census of what is NEAREST, not of what is blocking. With the
+  branch wall gone the walks run further and hit what was always behind it. Measured over single-latch loops
+  after the change: **105 bodies fully understood** (just 1 of which needed the graph), **53 understood but
+  with an unknown trip count**, **41 WSYNC inside loop body**, 13 branch (the early exits and inner loops that
+  stay refused), 13 call or jump. `branch inside loop body` fell from 118 first-hits to 13 while `WSYNC inside
+  loop body` rose to 41 — the same loops, failing further along. The largest obstacle is no longer a body
+  shape at all.
+- **This is the third refusal in a row measured to be a name rather than a cause** (`multiple back-edges`
+  before it, SD-9's proxy before that), and the pattern is worth more than any of them: **removing the first
+  obstacle mostly reveals the second**. Both repairs are correct, both are pinned by fixtures that grade
+  against the machine, and both bought approximately nothing — which is only knowable by measuring the corpus
+  before and after rather than by counting reasons.
+- **A second guard with no negative control, recorded rather than deleted.** Removing the `[header, latch]`
+  test on successors leaves both fixture controls refused exactly as before: an early exit is caught because
+  the walk follows the escape and a region is bounded by WSYNC strobes, and a backward escape is caught
+  because a branch below the header IS a back edge, making the region a two-latch one. Both are accidents of
+  other checks. The guard states the premise pass 2 rests on — every site inside [header, latch], which is
+  what makes ascending address a topological order — and a walk that wandered below the header would produce
+  a wrong answer rather than a refusal.
+
+
 - **Two loops in a region are not necessarily nested, and the refusal was named after
   the rarest of the three shapes.** `foldLoops` refused any region with more than one back edge as
   "multiple back-edges (nested/complex loops)". Measured across the sixteen-cartridge corpus, of the regions

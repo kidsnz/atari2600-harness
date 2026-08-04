@@ -2209,6 +2209,12 @@ func (s *solver) foldLoops() string {
 	return ""
 }
 
+// branchBodyFolds counts loop bodies costed as a DAG because they hold a branch.
+// It is a MEASUREMENT counter like siblingFolds and divEdgeScanned: the corpus yield
+// of the DAG body is ONE loop, so without this a fixture cannot tell whether it is
+// exercising the new path or the old one.
+var branchBodyFolds int
+
 // siblingFolds counts regions settled by folding more than one loop. It is a
 // MEASUREMENT counter like divEdgeScanned: a fixture can read it to prove its own
 // premise, that the region it grades really took the multi-loop path rather than
@@ -2291,30 +2297,57 @@ func (sh loopShape) loopInfo(n int) loopInfo {
 func (s *solver) loopShape(latch Instr) (loopShape, string) {
 	header := latch.branchSite()
 
-	// Validate the body header..latch is a simple straight chain and sum its
-	// non-branch cost.
-	bodyNoBranch := 0
+	// Validate the body header..latch and find the cost of its LONGEST path.
+	//
+	// This used to require a straight chain and refuse any branch in it. Measured
+	// across the sixteen-cartridge corpus, of the branches that tripped that refusal:
+	//
+	//	89   forward, target still inside the body   (an if/else skip)
+	//	29   forward, target outside the body        (an early exit)
+	//	 1   backward, inside the body               (an inner loop)
+	//
+	// Three quarters are a SKIP, most often `bcc` (64 of 118): add, and if it did not
+	// carry, skip the fixup. The body is then not a chain but a small acyclic graph
+	// with two ways through that rejoin before the latch — and such a graph has a
+	// longest path, which is a sound cost for one iteration because whichever way the
+	// machine goes it cannot spend more.
+	//
+	// The two shapes that are NOT sound to cost this way are refused below by the
+	// successor test: a target outside [header, latch] means the loop can end early
+	// and the cost after that exit belongs to another part of the region, and a target
+	// before the header is an inner loop, which a single longest path charges once for
+	// iterations the machine runs many times.
+	// PASS 1 — collect the reachable body, validate every instruction in it, and
+	// record each edge with its cost. Nothing is summed here: the sum depends on the
+	// order the sites are visited, and this walk's order is a work queue.
 	body := map[site]bool{}
-	at := header
-	for {
+	type edge struct {
+		to   site
+		cost int
+	}
+	edges := map[site][]edge{}
+	pending := []site{header}
+	for len(pending) > 0 {
+		at := pending[0]
+		pending = pending[1:]
+		if body[at] {
+			continue
+		}
 		in, ok := s.nodes[at]
 		if !ok {
 			return loopShape{}, "loop body leaves the region"
 		}
 		if in.Bank != latch.Bank {
-			// Should be unreachable — the chain is followed by in.next() inside one bank —
-			// but a body in another bank would make the address comparisons below
-			// meaningless, so it is refused rather than assumed away.
+			// Should be unreachable — every successor is checked to be in the latch's
+			// bank below — but a body in another bank would make the address
+			// comparisons meaningless, so it is refused rather than assumed away.
 			return loopShape{}, "loop body leaves the latch's bank"
 		}
 		if in.Addr == latch.Addr {
-			break
+			continue // the latch closes the body; its own cost is added by the caller
 		}
 		if in.isWSYNC() {
 			return loopShape{}, "WSYNC inside loop body"
-		}
-		if in.Def.IsBranch() {
-			return loopShape{}, "branch inside loop body — not a simple counted loop"
 		}
 		// A CALL OR JUMP IN THE BODY IS NOT A BRANCH, and `IsBranch` does not catch
 		// it: that is `AddressingMode == Relative && Effect == Flow`, while a JSR is
@@ -2350,12 +2383,109 @@ func (s *solver) loopShape(latch Instr) (loopShape, string) {
 		if es, keep, refusal := s.sw.switchEdges(in, s.absStates[at]); refusal != "" || len(es) > 0 || !keep {
 			return loopShape{}, "bank switch inside loop body — the second iteration does not execute the same bytes"
 		}
-		bodyNoBranch += in.nodeCost()
 		body[at] = true
-		at = in.nextSite()
-		if at.addr > latch.Addr {
-			return loopShape{}, "misaligned loop body"
+
+		// Record each successor edge. A branch has two: falling through costs its
+		// base cycles, taking it costs one more — two if it crosses a page — which is
+		// the same arithmetic the region-level walk uses.
+		add := func(to site, cost int, viaBranch bool) string {
+			if to.bank != latch.Bank {
+				return "loop body leaves the latch's bank"
+			}
+			// OUTSIDE [header, latch] IS NOT COSTABLE HERE. Past the latch is an early
+			// exit: the trip count is then not the counter's range, and the cost after
+			// the exit belongs to another part of the region — the fold replaces
+			// header..exit and never charges the escape path, so a long one is simply
+			// dropped. Before the header, the walk would collect sites below the
+			// header and ascending address would stop being a topological order,
+			// which is the premise pass 2 rests on.
+			//
+			// ITS NEGATIVE CONTROL DOES NOT FIRE, and that is written down rather than
+			// taken as permission to delete it. Disabling this test leaves the
+			// fixture's ExitCtl refused for "WSYNC inside loop body": the walk follows
+			// the escape, and a region is bounded by WSYNC strobes, so an escape
+			// inside one runs into a strobe. A backward escape is caught earlier still
+			// — a branch below the header is itself a back edge, so the region carries
+			// two latches and never reaches here. Both are accidents of other checks,
+			// neither states the premise, and the premise is what pass 2 needs.
+			if to.addr > latch.Addr || to.addr < header.addr {
+				if viaBranch {
+					return "branch inside loop body — not a simple counted loop"
+				}
+				// Straight-line code whose next address is outside the body is the
+				// old "misaligned loop body", and it keeps that name: nothing
+				// branched anywhere.
+				return "misaligned loop body"
+			}
+			edges[at] = append(edges[at], edge{to, cost})
+			pending = append(pending, to)
+			return ""
 		}
+		if in.Def.IsBranch() {
+			pen := 1
+			if (in.next() >> 8) != (in.branchTarget() >> 8) {
+				pen = 2
+			}
+			if r := add(in.nextSite(), in.Def.Cycles, true); r != "" {
+				return loopShape{}, r
+			}
+			if r := add(in.branchSite(), in.Def.Cycles+pen, true); r != "" {
+				return loopShape{}, r
+			}
+			continue
+		}
+		if r := add(in.nextSite(), in.nodeCost(), false); r != "" {
+			return loopShape{}, r
+		}
+	}
+
+	// PASS 2 — longest path from the header to the latch, in address order.
+	//
+	// Every edge recorded above goes to a site in [header, latch], and every edge
+	// goes FORWARD: a branch backwards inside the body was refused as an inner loop,
+	// and a fall-through always increases the address. So ascending address is a
+	// topological order and one pass settles every distance. Doing this in the work
+	// queue of pass 1 would not: a site can be dequeued before a longer path into it
+	// has been discovered, and its own successors would then carry a stale distance.
+	order := make([]site, 0, len(body))
+	for at := range body {
+		order = append(order, at)
+	}
+	sort.Slice(order, func(i, j int) bool { return order[i].addr < order[j].addr })
+	dist := map[site]int{header: 0}
+	for _, at := range order {
+		d, reached := dist[at]
+		if !reached {
+			// Unreachable from the header although collected — impossible, since
+			// pass 1 only enqueues successors of reached sites. Refused rather than
+			// silently costed as zero.
+			return loopShape{}, "loop body has an instruction with no path from the header"
+		}
+		for _, e := range edges[at] {
+			if old, seen := dist[e.to]; !seen || d+e.cost > old {
+				dist[e.to] = d + e.cost
+			}
+		}
+	}
+	// The witness counter: how many bodies were costed as a graph rather than a
+	// chain. Across the corpus this is 1, which is the whole measured yield of the
+	// change and the reason the fixture below is the only other witness.
+	for at := range body {
+		if in, ok := s.nodes[at]; ok && in.Def.IsBranch() {
+			branchBodyFolds++
+			break
+		}
+	}
+	// THE COST OF ONE ITERATION IS THE LONGEST PATH TO THE LATCH.
+	//
+	// A body with no branch has exactly one path, so this reproduces the old running
+	// sum instruction for instruction — which is what keeps every folded region in
+	// the corpus at the bound it already had.
+	bodyNoBranch, reached := dist[latch.site()]
+	if !reached {
+		// Every edge was checked to stay inside [header, latch] and to move forward,
+		// so the latch is reachable by construction. Refused rather than assumed.
+		return loopShape{}, "loop body does not reach its latch"
 	}
 
 	// EVERY WAY IN MUST BE THROUGH THE HEADER.

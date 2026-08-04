@@ -1741,6 +1741,39 @@ emitting a cartridge per rung, proving the budget, comparing the pixels, and dem
 Known unknown: the demonstrated picture had **10 cycles of slack**, and a kernel that also had to position
 objects would have far less.
 
+### A census of refusal reasons is a census of FIRST obstacles (2026-08-04)
+
+`branch inside loop body` was the largest refusal affecting single-bank cartridges, and the branches behind it
+are overwhelmingly benign: **89 forward skips that rejoin before the latch, 29 early exits, 1 inner loop**,
+with `bcc` accounting for 64 of the 118. A body with two arms that rejoin has a longest path, and that path is
+a sound cost for one iteration.
+
+It now folds — `litmus_branchbody.asm` proves 72 against a machine that spends 72, with 0 lost, 0 raised and 0
+lowered over 958 regions — and the corpus gained **one loop**.
+
+The measurement that explains it, over single-latch loops after the change:
+
+| count | outcome |
+|---:|---|
+| 105 | body fully understood (**1** of which needed the graph) |
+| **53** | body understood, **trip count unknown** |
+| **41** | WSYNC inside loop body |
+| 13 | branch (early exit / inner loop — still refused, correctly) |
+| 13 | call or jump inside loop body |
+
+`branch inside loop body` fell from 118 first-hits to 13; `WSYNC inside loop body` rose to 41. **The same
+loops, failing further along.** A body walk stops at its first obstacle, so the reason it reports is the
+nearest one, not the binding one — and this is now the third refusal in a row measured to be a name rather
+than a cause.
+
+**What that implies for planning:** the reason histogram cannot rank work. Only an A/B over the corpus can,
+and it has to be run after the change rather than predicted before it. The next candidate by count is
+`trip count unknown` (53) — a body this package understands completely and a counter range it cannot
+establish — followed by `WSYNC inside loop body` (41), which is structural: a region is one WSYNC-to-WSYNC
+interval, so a loop containing a strobe spans several of them and the fold's interval is not the machine's.
+
+Prover coverage is unchanged at **626 of 958 regions**.
+
 ### "multiple back-edges" was named after the rarest shape, and lifting it gained nothing (2026-08-03)
 
 The prover answers **626 of 958 regions (65.3%)** across sixteen commercial cartridges. The largest refusal
