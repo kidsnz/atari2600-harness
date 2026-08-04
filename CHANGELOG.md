@@ -9,6 +9,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **The coverage test turned real CI red while the local "CI mirror" stayed green.** `TestProverCoverage...`
+  demanded 16 commercial cartridges unconditionally, and those cartridges live in the umbrella `reference/`
+  tree for licensing reasons — a GitHub Actions checkout has **none**. The very first push after it landed
+  failed (`run #551`, `b2f2584`), and it was the USER who noticed, from the Actions page, while this session
+  had reported "CI mirror green" four times. Running the same commands on a machine that HAS the corpus is
+  not the same check: it is a proxy, and this is the proxy-versus-artifact mistake the project keeps writing
+  down, committed by the file whose whole purpose is to measure coverage honestly. The test now follows the
+  rule the rest of the package already used — **zero cartridges is a different environment (skip, loudly,
+  naming why); any other shortfall is a corpus that shrank (fail)** — and both branches are verified by
+  hiding the corpus and re-running.
+
+### Fixed
 - **A branch whose flag is already decided has ONE successor, and walking the other arm decoded a data table
   as instructions.** `collectRegion` took both arms of every branch and `longest` costed both. Found on the
   project's own ROM rather than on the corpus: `pizza_boy.asm` has `lda #0 / sta Dx / beq .cexit` — Z is 1 by

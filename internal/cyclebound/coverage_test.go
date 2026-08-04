@@ -39,10 +39,27 @@ import (
 const coverageFloor = 0.47
 
 func TestProverCoverageOnTheCommercialCorpus(t *testing.T) {
+	// THE CORPUS IS NOT IN THIS REPOSITORY. The commercial cartridges live in the
+	// umbrella `reference/` tree for licensing reasons, so a CI checkout has NONE of
+	// them. The rule the rest of this package already follows is all-or-nothing:
+	// zero is a different environment, any other shortfall is a corpus that shrank.
+	//
+	// The first version of this test demanded 16 unconditionally and turned GitHub
+	// Actions red on the very first push after it landed — while the local "CI
+	// mirror" stayed green, because running the same commands on a machine that HAS
+	// the corpus is not the same check. That is the proxy-versus-artifact mistake
+	// this project keeps writing down, made by the file that exists to measure
+	// coverage honestly.
 	paths := commercialROMPaths()
+	if len(paths) == 0 {
+		t.Skip("no commercial cartridges present — they live outside this repository, so a CI " +
+			"checkout cannot measure coverage. The numbers this test pins are recorded in " +
+			"docs/capability-gap-audit.md and are produced by running it locally.")
+	}
 	if len(paths) < 16 {
-		t.Fatalf("only %d cartridges discovered; this number is a fact about the corpus "+
-			"and means nothing if the corpus shrank", len(paths))
+		t.Fatalf("only %d cartridges discovered, and a PARTIAL corpus is worse than none: the "+
+			"missing cartridge is exactly where the next gap would have been. Restore the "+
+			"umbrella reference/ tree or remove it entirely", len(paths))
 	}
 
 	type key struct {
