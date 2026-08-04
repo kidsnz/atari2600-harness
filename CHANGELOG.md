@@ -8,6 +8,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **A branch whose flag is already decided has ONE successor, and walking the other arm decoded a data table
+  as instructions.** `collectRegion` took both arms of every branch and `longest` costed both. Found on the
+  project's own ROM rather than on the corpus: `pizza_boy.asm` has `lda #0 / sta Dx / beq .cexit` — Z is 1 by
+  construction and a store leaves the flags alone, so the fall-through cannot happen — immediately followed by
+  the `Alley3A` snap table. Collection took the impossible arm, decoded the table, and the `$00` at **$F490**,
+  a byte of level data, decoded as **BRK**. The region was refused for "BRK in region": an instruction the
+  machine never executes, at an address that holds graphics. **That refusal is what made the project's own
+  `phase0` scenario fail.** Both `collectRegion` and `longest` now apply `refineBranch`, the same test
+  `absSuccessors` has always used, which prunes only when the flag is KNOWN.
+- **The prune had to go in BOTH passes or they disagree.** Adding it to collection alone cost **5 proven
+  regions** (M.A.S.H. $F126, Bermuda Triangle $F4F8, Star Wars $F649 and its bank-1 image, Planet of the Apes
+  $F86C) — not because pruning was wrong but because `longest` still asked for the cost of an arm collection
+  had left out, and a walk into an uncollected site reports the whole region unbounded.
+- **Corpus effect over 626 addresses: 0 lost, 25 bounds LOWERED, 10 raised** — and the standing gate
+  (`TestProvenWorstIsNeverExceededOnCorpus`, proven vs machine over the whole corpus) stays green, so the
+  lowered bounds are over-approximation removed rather than soundness lost.
+- **The BRK refusal now names its address.** It read exactly "BRK in region" with no location; the region it
+  belongs to began at $F075 while the BRK was at $F490, four hundred bytes away. Diagnosing it meant
+  instrumenting the prover and re-running.
+- **The prune closed the only known route to `determineBound`'s "predecessor with no abstract state" guard**,
+  which `cb_deadpred.asm` existed to witness. That route was the pruned arm itself. The guard is kept — a
+  missing state entry means either proven-unreachable (which the prune now removes earlier, correctly) or
+  never-analysed, and `computeStatesWith` can still return `converged=false` with work outstanding — and the
+  fixture now records the closure and says out loud that the guard is unwitnessed, the same treatment
+  `overlaps` and the body-range check received.
+
 ### Added
 - **The AtariAge queue was already empty, and the threads worth having were in the reject pile.** The roadmap
   still said 761 queued / 212 mined; measured against the filesystem — a thread counts as mined when

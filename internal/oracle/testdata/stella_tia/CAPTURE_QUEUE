@@ -15,3 +15,4 @@
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
 
 roms/litmus/litmus_timerwait.bin  # 2026-08-04  added mid-session; the user was working
+roms/litmus/litmus_deadbranch.bin  # 2026-08-04  added mid-session; the user asked not to have Stella take the screen

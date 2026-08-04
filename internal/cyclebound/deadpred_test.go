@@ -38,7 +38,32 @@ import (
 // iteration cap leaves nodes unprocessed (`computeStatesWith` returns converged=false
 // and the work list non-empty). Skipping a missing predecessor would then drop a real
 // one and under-approximate the entry value — the one direction this package forbids.
-func TestUnboundedWhenAPredecessorHasNoAbstractState(t *testing.T) {
+// **★ 2026-08-04: THE ROUTE THIS FIXTURE USED IS NOW CLOSED, and the closing is the
+// point.** `collectRegion` and `longest` now prune the arm of a branch whose flag is
+// statically decided, using the same `refineBranch` the abstract interpreter has
+// always used. That was done because `pizza_boy.asm` has `lda #0 / sta Dx / beq .exit`
+// followed by a data table: collection walked the impossible fall-through, decoded the
+// table, met a `$00`, and refused the region for "BRK in region" — an instruction the
+// machine never executes at an address that holds graphics.
+//
+// The pruned edge was exactly this fixture's route to the guard. With it gone,
+// `cb_deadpred` comes back fully bounded and the guard has NO witness again.
+//
+// The guard is kept anyway, and the reason is in the note above: a missing state entry
+// means either PROVEN-UNREACHABLE or NEVER-ANALYSED. The prune removes the first kind
+// before `determineBound` can see it, which is correct — a node the machine cannot
+// reach is not a predecessor. The second kind survives: `computeStatesWith` can return
+// `converged=false` with its work list non-empty, and those nodes have no state for a
+// reason that has nothing to do with reachability. Deleting the guard would let one of
+// them be skipped, and a skipped predecessor lowers the maximum, which is an
+// under-approximation.
+//
+// So this test now records the CLOSURE rather than witnessing the guard. It asserts
+// the twin still behaves, that the dead ROM is now fully bounded, and it says out loud
+// that the guard is unwitnessed — the same treatment `overlaps` and the body-range
+// check got, for the same reason: an empty count is a fact to write down, not a
+// licence to delete.
+func TestTheDeadPredecessorRouteIsClosedByBranchPruning(t *testing.T) {
 	dead, err := Prove("../../roms/litmus/cb_deadpred.asm", DefaultBudget)
 	if err != nil {
 		t.Fatal(err)
@@ -64,27 +89,34 @@ func TestUnboundedWhenAPredecessorHasNoAbstractState(t *testing.T) {
 			refused = append(refused, r)
 		}
 	}
-	if len(refused) == 0 {
-		t.Fatal("cb_deadpred came back fully bounded: the pruned edge is no longer reaching the " +
-			"loop header, so the guard is unwitnessed again")
+	// THE CLOSURE. If this ever fires again, the prune has stopped working — which is
+	// a real regression, because the prune is what keeps a data table from being
+	// decoded as instructions.
+	if len(refused) != 0 {
+		t.Errorf("cb_deadpred has %d refused region(s) (first: %s, %q). The branch prune is "+
+			"supposed to remove the dead edge before determineBound scans predecessors; if it "+
+			"is back, check that collectRegion and longest still agree on refineBranch",
+			len(refused), refused[0].StartLoc, refused[0].Reason)
 	}
-	for _, r := range refused {
-		if !strings.Contains(r.Reason, "loop bound unknown") {
-			t.Errorf("region at %s was refused for %q, not for the missing loop bound — the fixture "+
-				"is now proving something else", r.StartLoc, r.Reason)
-		}
-		if !strings.Contains(r.StartLoc, "Top") {
-			t.Errorf("the refusal landed at %s; the delay loop it is built around is under Top", r.StartLoc)
-		}
+	// THE TWINS DO NOT AGREE ON COST, AND THAT IS MEASURED RATHER THAN ASSUMED.
+	// live 33, dead 38. The first draft of this assertion demanded they be equal, on
+	// the reasoning that "the ROMs differ by one edge the machine cannot take" — which
+	// is what the fixture's own header claims. The measurement says otherwise, so the
+	// header's claim is the thing that is loose: the dead ROM carries the instructions
+	// that FEED the dead predecessor as well as the edge into it, and those are still
+	// decoded and still costed, because they are reachable by other paths.
+	//
+	// What must hold is the direction: pruning an edge the machine cannot take can
+	// only ever remove work, so the dead twin cannot come out CHEAPER than the live
+	// one. If it does, the prune has removed a path the machine can take.
+	if dead.MaxWorst < live.MaxWorst {
+		t.Errorf("the dead-predecessor ROM is CHEAPER than its twin (%d vs %d) — pruning an "+
+			"impossible edge must not remove a path the machine can take",
+			dead.MaxWorst, live.MaxWorst)
 	}
-
-	// Premise: the twin really does execute the delay loop, so the difference is a
-	// refusal and not a loop that vanished. Its worst region must be dearer than the
-	// dead ROM's, whose costliest region is one the prover gave up on and left at 0.
-	if live.MaxWorst <= dead.MaxWorst {
-		t.Errorf("the twin's worst region (%d cy) is not dearer than the refused ROM's (%d cy) — "+
-			"the delay loop is supposed to be COUNTED there", live.MaxWorst, dead.MaxWorst)
-	}
-	t.Logf("dead: %d refused region(s), max_worst %d | live twin: all bounded, max_worst %d",
-		len(refused), dead.MaxWorst, live.MaxWorst)
+	t.Logf("both twins fully bounded (dead %d, live %d); determineBound's "+
+		"\"predecessor with no abstract state\" guard is UNWITNESSED — kept for the "+
+		"never-analysed case (computeStatesWith can return converged=false), which no "+
+		"fixture currently reaches", dead.MaxWorst, live.MaxWorst)
+	_ = strings.Contains
 }

@@ -1479,8 +1479,27 @@ func (s *solver) longest(at site, c ctx) result {
 			best = result{cyc: in.Def.Cycles + sub.cyc,
 				path: prepend(s.step(in.site(), in.Def.Cycles, 0), sub.path)}
 		case in.Def.IsBranch():
-			nt := s.longest(in.nextSite(), c)
-			tk := s.longest(in.branchSite(), c)
+			// THE SAME PRUNE collectRegion APPLIES, and it has to be the same or the
+			// two disagree: collection would leave the dead arm out of `s.nodes` while
+			// this walk still asked for its cost, and `longest` on a site that was
+			// never collected reports the whole region unbounded. Measured when the
+			// prune was added to collection alone: five regions lost their bound
+			// (M.A.S.H. $F126, Bermuda Triangle $F4F8, Star Wars $F649 and its bank-1
+			// image, Planet of the Apes $F86C) — not because the pruning was wrong but
+			// because only half the analysis knew about it.
+			onlyTaken, onlyNotTaken := false, false
+			if st, ok := s.absStates[at]; ok && st.valid {
+				tkS, ntS := st.refineBranch(in)
+				onlyTaken = tkS.valid && !ntS.valid
+				onlyNotTaken = ntS.valid && !tkS.valid
+			}
+			var nt, tk result
+			if !onlyTaken {
+				nt = s.longest(in.nextSite(), c)
+			}
+			if !onlyNotTaken {
+				tk = s.longest(in.branchSite(), c)
+			}
 			pen := 1
 			// The page test stays flat address arithmetic: a branch cannot leave its bank,
 			// and the +1 is about which 256-byte page the two addresses sit in.
@@ -1489,6 +1508,12 @@ func (s *solver) longest(at site, c ctx) result {
 			}
 			ntTot := in.Def.Cycles + nt.cyc
 			tkTot := in.Def.Cycles + pen + tk.cyc
+			if onlyTaken {
+				ntTot = -1 // the machine cannot fall through here
+			}
+			if onlyNotTaken {
+				tkTot = -1 // the machine cannot take this branch
+			}
 			if tkTot >= ntTot {
 				best = result{cyc: tkTot, path: prepend(s.step(in.site(), in.Def.Cycles+pen, 0), tk.path)}
 			} else {
@@ -1577,7 +1602,11 @@ func (s *solver) collectFrom(instrs map[site]Instr, from site) string {
 			// resolved in longest() via the threaded return site.
 			continue
 		case instructions.BRK:
-			return "BRK in region"
+			// NAMING THE ADDRESS MATTERS. The region this refusal belongs to starts
+			// somewhere else entirely — on pizza_boy.asm the region begins at $F075 and
+			// the BRK is at $F490, four hundred bytes away inside a data table. Without
+			// the address, finding it meant instrumenting the prover and re-running it.
+			return fmt.Sprintf("BRK in region at %s", siteDesc(at, s.banked))
 		case instructions.JAM:
 			return "JAM (illegal/halt) in region"
 		case instructions.JMP:
@@ -1588,9 +1617,35 @@ func (s *solver) collectFrom(instrs map[site]Instr, from site) string {
 		// One successor function for every walker. JSR contributes both its callee and
 		// its return point (the callee's own WSYNC is a sink as usual, and longest()
 		// threads the return site); collection terminates via the seen-set.
-		succ, refusal := successors(in, s.absStates[at], s.sw)
-		if refusal != "" {
-			return refusal
+		// A BRANCH WHOSE FLAG IS ALREADY DECIDED HAS ONE SUCCESSOR, NOT TWO.
+		//
+		// Collection used to take both arms of every branch unconditionally, so a
+		// `lda #0 / sta Dx / beq .exit` — where Z is 1 by construction and the branch
+		// is always taken — also walked the fall-through, straight into whatever
+		// bytes follow. In `pizza_boy.asm` those bytes are the `Alley3A` snap table,
+		// and its first `$00` decodes as BRK: the region was refused for containing
+		// an instruction the machine never executes, at an address that holds data.
+		//
+		// `refineBranch` is the same test the abstract interpreter already applies in
+		// `absSuccessors`; collection simply was not asking. It prunes only when the
+		// flag is KNOWN — `triUnknown` keeps both arms — so this removes paths the
+		// machine provably cannot take and no others. If both arms come back invalid,
+		// the state is contradictory rather than informative, and both are kept.
+		var succ []site
+		var refusal string
+		if st, ok := s.absStates[at]; ok && st.valid && in.Def.IsBranch() {
+			tk, nt := st.refineBranch(in)
+			if tk.valid && !nt.valid {
+				succ = []site{in.branchSite()}
+			} else if nt.valid && !tk.valid {
+				succ = []site{in.nextSite()}
+			}
+		}
+		if succ == nil {
+			succ, refusal = successors(in, s.absStates[at], s.sw)
+			if refusal != "" {
+				return refusal
+			}
 		}
 		work = append(work, succ...)
 	}
