@@ -39,6 +39,7 @@
 /guidedfuzz
 /cover
 /mutate
+/pcmcheck
 
 # external dependency: Gopher2600 upstream clone (obtain per README)
 /Gopher2600/

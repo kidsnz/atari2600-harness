@@ -103,6 +103,42 @@ versions follow [Semantic Versioning](https://semver.org/).
   `overlaps` and the body-range check received.
 
 ### Added
+- **G3 — a PCM speech stream is now graded on TIME as well as on VALUES, and the harness had only ever
+  graded values.** The mined recipe (topic/234209, iesposta + spiceware) parks AUDC and writes the 4-bit
+  volume register AUDV0 as a DAC at a fixed rate (3900–4000 Hz for voice) from samples packed two nibbles
+  per byte — and its stated failure mode is temporal: the older Berzerk speech hack made the TV **roll**
+  because the playback loop ate the scanline budget. Measured before this change, on a 144-sample/frame
+  fixture: `read_audio` yields **1 reading of 144 (0.69%)**, `read_audio_trace` **1 per frame**, and across
+  the whole 150-ROM corpus traced 5 frames each **only 5 ROMs wrote AUDV at all**, the maximum being 4
+  writes in one frame — **nothing in the corpus emitted a per-scanline stream**.
+- **The pre-existing raw audio path was not blind to the samples — it was blind to their time, and the way
+  it recovered them is why.** `emu.EnableAudioCapture` (524 samples/frame) does contain all 144 values, but
+  only findable by searching **236 offsets × 2 phases** for the best fit, and the same search fits a stream
+  shifted by a whole scanline **equally perfectly, 144/144**. A fitted anchor absorbs exactly the drift the
+  check exists to find, so `internal/pcm` grades against a **declared** slot grid instead.
+- **Two independent axes, one denominator.** VALUE pairs the k-th write with the k-th intended sample (a
+  uniform shift cannot move it); TIMING compares the absolute scanline with `StartLine + k·pitch` (a
+  corrupted value cannot move it); a clock histogram catches a write that wanders inside its line. New:
+  `internal/pcm`, `cmd/pcmcheck`, fixture `roms/litmus/litmus_pcm.asm` (144 samples/frame, one per
+  scanline, high nibble first, first sample on scanline 37, 262 lines) + its scenario. The intended
+  waveform is **parsed out of the ROM's own source** between `; PCM_TABLE_BEGIN` / `; PCM_TABLE_END`, so
+  player and grader read the same bytes and a typo in either cannot cancel out.
+- **Fixture result: 3/3 frames `144/144 captured, 144/144 values exact, 144/144 in slot, mean pitch 1.000
+  lines/sample, all writes at beam clock −23`. Every negative control fired.** One-line shift →
+  `0/144 in slot` with values still `144/144`; dropped sample → `143/144 captured, 63/144 in slot`; one bad
+  value → `143/144 values, 144/144 in slot`; drift of one line per 32 samples → `32/144 in slot, mean pitch
+  1.028`; intra-line jitter → 2 clock buckets, other axes clean; nibble order swapped → `96/144 values
+  differ, 144/144 in slot`. Two controls are **ROM-level**, assembled from a rewritten copy of the fixture
+  rather than a doctored capture: an extra `sta WSYNC` per loop → `1/144 in slot, mean pitch 1.503` with
+  values still perfect, and `PACKED = 71` → `142/144 captured`.
+- **One control did NOT fire, and it defines what this is not.** Corrupting a byte of the fixture's sample
+  table (`$FF` → `$F1`) still graded `144/144`, because the table IS the declared intent — editing it moves
+  the ROM and the expectation together. So this grades *"does the ROM deliver the waveform it declares, in
+  time"*, never *"is that the right waveform"*, and a ROM-level value defect has to break the **player**:
+  narrowing the low-nibble mask to `and #$07` gives `107/144 values exact with 144/144 still in slot`.
+  The controls are themselves witnessed — forcing `LineError` to 0 in the grader turns **4** tests red,
+  forcing every value to count exact turns a different **4** red, and the positive fixture test was seen
+  red twice.
 - **The AtariAge queue was already empty, and the threads worth having were in the reject pile.** The roadmap
   still said 761 queued / 212 mined; measured against the filesystem — a thread counts as mined when
   `reference/atariage/<id>-<slug>/notes.ja.md` exists — **761 of 761 were done**, and the 850 mined

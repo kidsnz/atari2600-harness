@@ -112,11 +112,63 @@ the wording is coarse.
   its M1 flag tracks RESMP0, proven with two mirrored probe ROMs and locked by a test that fails if Stella is
   ever fixed.
 
-### G3 — digital speech (4-bit DAC PCM) fidelity verification
+### G3 — digital speech (4-bit DAC PCM) fidelity verification — CLOSED (2026-08-04)
 - **Techniques:** Doctor Who speech (234209), SAM2600 (309689), Tiamat micro-tuning (386896).
-- **Status:** `read_audio` covers AUDC/AUDF/AUDV + note/cents/duplicate/pitch; **no PCM waveform
-  fidelity check.**
-- **Gap:** only needed for speech/music games — not core to graphics-first authoring.
+- **What the technique is, from the sources.** 234209: park AUDC, write the 4-bit **volume**
+  register AUDV0 as a DAC at a fixed rate — **3900–4000 Hz** for speech — from samples that are the
+  **top nibble** of an 8-bit source, **packed two per byte**; packer and player must agree on nibble
+  order (iesposta low-first, spiceware high-first) or the voice degrades. ~2 s of audio per 4K bank.
+  Its stated failure is **temporal**: the older Berzerk speech hack made the TV *roll and lose sync*
+  because the playback loop ate the scanline budget. 309689 (SAM2600) is the other branch —
+  rule-based **formant synthesis**, no sample data at all — and is explicitly *not* covered here.
+  386896 (Tiamat) is about **pitch** resolution (TiuNA fractional cycling, 1/2/4 switches per frame),
+  a different axis again.
+- **What the harness could see before, measured on a 144-sample/frame fixture.** `read_audio` returns
+  the CURRENT register, so a whole frame reduced to **1 reading of 144 (0.69%)**; `read_audio_trace`
+  steps a full frame per reading, so **1 of 144 per frame**. Across the whole 150-ROM `.asm` corpus
+  traced 5 frames each, only **5 ROMs wrote AUDV at all** and the maximum was **4 writes in a frame**
+  (2 per channel) — **no ROM anywhere in the corpus emitted a per-scanline stream**, so nothing was
+  exercising the case. The raw mixer capture (`emu.EnableAudioCapture`, 524 samples/frame) *did*
+  already carry the amplitudes — **144/144 recoverable** — but only via a search over **236 offsets ×
+  2 phases** for the best fit, with no scanline, no beam clock and no register attribution. That
+  search is the defect: it fits a stream shifted by a whole scanline **equally perfectly (144/144)**,
+  so the pre-existing path graded values and was blind to time.
+- **What closed it.** `internal/pcm` (`Grade`/`Capture`/`GradeROM`/`ParseTable`/`Unpack`) +
+  `cmd/pcmcheck` + fixture `roms/litmus/litmus_pcm.asm` (+ scenario, 262 lines, no roll). The AUDV
+  write stream is taken from `beamtrace` — register-attributed, with scanline and beam clock — and
+  graded on **two independent axes against a DECLARED slot grid**: value by write order (a uniform
+  shift cannot move it) and timing by absolute scanline (a corrupted value cannot move it), plus a
+  clock histogram for intra-line jitter. Denominator throughout = the intended sample count.
+  The intended waveform is **parsed out of the ROM's own source** between `; PCM_TABLE_BEGIN` /
+  `; PCM_TABLE_END`, never restated in Go and never taken from a capture.
+- **Measured on the fixture:** 3/3 frames `144/144 captured, 144/144 values exact, 144/144 in slot,
+  mean pitch 1.000 lines/sample, all 144 writes at beam clock −23`.
+- **Negative controls, all seen RED** (`internal/pcm/pcm_test.go`): one-line shift → `0/144 in slot`
+  while values stay `144/144` (the control the whole package exists for); dropped sample →
+  `143/144 captured, 63/144 in slot`; one corrupted value → `143/144 values, 144/144 in slot`; drift
+  of one line per 32 samples → `32/144 in slot, mean pitch 1.028`; intra-line jitter → 2 clock buckets
+  with both other axes clean; nibble order swapped → `96/144 values differ, 144/144 in slot`. Two are
+  **ROM-level**, assembled from a rewritten copy of the fixture rather than a doctored capture: an
+  extra `sta WSYNC` per loop → `1/144 in slot, mean pitch 1.503` with values still `144/144`, and
+  `PACKED = 71` → `142/144 captured`.
+- **One control did NOT fire, and it says what this capability is not.** Corrupting a byte of the
+  fixture's sample table (`$FF` → `$F1`) left the grade at a perfect **144/144** — because the table
+  IS the declared intent, so editing it moves the ROM and the expectation together. This grades
+  *"does the ROM deliver the waveform it declares, in time"*, never *"is that the right waveform"*.
+  The ROM-level value control has to break the **player** instead: narrowing the low-nibble mask to
+  `and #$07` gives **107/144 values exact with 144/144 still in slot** — clean axis separation.
+- **The controls are themselves witnessed.** Planting a defect in the grader — `LineError` forced to
+  0 — turns **4** tests red (shift, dropped, drift, slow-kernel mutant); forcing every value to count
+  as exact turns a different **4** red (dropped, wrong-value, nibble-order, short-table mutant). And
+  the positive fixture test was seen red twice: one extra VBLANK line → `0/144 in slot, slot 0 wanted
+  line 37, got 38 (+1)` with values still `144/144`, and the `#$07` mask above.
+- **Still open, named:** the pseudo-5-bit AUDV0+AUDV1 split (`roms/techniques/tia_pcm.asm`) is graded
+  one register at a time, and the two halves are not independently meaningful; nothing yet checks a
+  stream against a *resampled audio file* (the SoX `lowpass 2000 rate 4000` half of the recipe); and
+  the formant branch (SAM2600) has no coverage at all — it is a different technique, not a gap in
+  this one. `roms/litmus/litmus_pcm.bin` is queued in `internal/oracle/testdata/stella_tia/CAPTURE_QUEUE`
+  rather than captured, so the Stella oracle does not yet cover it.
+
 
 ## Tier 3 — polish
 - **G5 ✅ RE-MEASURED 2026-07-30 — the entry was stale; both halves have been litmus-locked for some time,

@@ -1,0 +1,17 @@
+{
+  "rom": "roms/litmus/litmus_pcm.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 0, "field": "audio.ch0.control", "op": "==", "value": 0 },
+    { "at_frame": 0, "field": "audio.ch0.freq", "op": "==", "value": 0 },
+    { "at_frame": 0, "field": "audio.ch0.volume", "op": "==", "value": 15 },
+    { "at_frame": 5, "field": "audio.ch0.control", "op": "==", "value": 0 },
+    { "at_frame": 5, "field": "audio.ch0.volume", "op": "==", "value": 15 },
+    { "at_frame": 5, "field": "audio.ch1.volume", "op": "==", "value": 0 }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "golden_frame": true,
+    "golden_audio": true
+  }
+}
