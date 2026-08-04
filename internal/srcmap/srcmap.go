@@ -2,18 +2,17 @@
 // 「PC → ソース行・直近ラベル+オフセット」の対応を作る（U-M9: ソース行デバッグ）。
 // assemble_and_load 経由でロードした ROM に対し、trace_clocks / watch_ram /
 // assert_line_budget / read_cpu の出力へ `at Label+2 (file.asm:123)` を併記するための基盤。
-// Scope, corrected to what the code does (2026-07-29). Flat 2K/4K only. On a
-// BANK-SWITCHED ROM this does NOT return an empty string, as the previous note claimed:
+// Scope, corrected to what the code does (2026-08-04). Map itself is FLAT 2K/4K only:
 // DASM's listing address column is the PHYSICAL ROM OFFSET rather than the RORG'd CPU
-// address, so Parse drops bank 0's rows entirely (they are below $1000, filtered as
-// TIA/RIOT equates) and stores banks 1..n's offsets as if they were CPU addresses
-// ($1F03 for bank 1's $FF03). Locate therefore still answers, from the .sym file's
-// labels alone, with a label-only string and no `(file:line)` — measured: litmus_bank
-// regions come back "Vis+0" while flat cb_clean gives "Main+8 (cb_clean.asm:33)". Line()
-// misses on every banked address, which makes `@lines`/`@amax` inert on a bank-switched
-// kernel; internal/cyclebound reports that in Report.SourceAnnotations rather than
-// letting it look like the prover disagreeing. Fixing it means tracking each segment's
-// ORG/RORG pair and keying on (bank, cpuAddr) = (offset/4096, offset%4096|base).
+// address, so on a banked image Parse drops bank 0's rows entirely (they are below
+// $1000, filtered as TIA/RIOT equates) and stores banks 1..n's offsets as if they were
+// CPU addresses ($1F03 for bank 1's $FF03). A banked image is therefore keyed on
+// (bank, address) by BankMap (banked.go), which a caller that knows the image is
+// bank-switched builds with ParseBanked and hangs here with AttachBanked; LineBank /
+// LocateBank / BankLineCoverage go through it and never fall back to the flat lookup,
+// whose label list interleaves every bank's labels and can name the wrong bank's code.
+// internal/cyclebound reports the per-bank coverage in Report.SourceAnnotations so a
+// caller can tell "resolved nothing" from "resolved everything".
 package srcmap
 
 import (

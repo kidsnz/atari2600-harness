@@ -3421,6 +3421,27 @@ label" rule with "never print another bank's label", checked against `BankMap.La
 (44 of them now named). All 114 flat images byte-identical. Negative control: restoring the flat lookup
 reproduces `bank 0 LvTab+2`.
 
+**★ The figures above are the count of ANSWERS, not of CORRECT answers, and a quarter of them named a line
+that assembles nothing (2026-08-04).** `bank 1 $F000` = `bank 1 B1Work (banked_game.asm:110)` is quoted above
+as the proof the map works; line 110 of that file is the comment `; ===== bank 1（データ＋ローダ） =====`.
+The map took a line number from any listing row that PRINTED an address, and DASM prints one on rows that
+assemble nothing: a comment, an `=` equate, an `ORG`, a bare label, and a macro expansion listed under the
+macro body's own line numbers restarting at 0. Before the first `ORG` that address is offset `$0000` — bank
+0's first byte — so on `litmus_bank_f4` **`bank 0 $F000` resolved to line 1, the file's opening comment**,
+and the equates on lines 6-8, which start in column 1, were placed as bank 0 LABELS at `$F000` as well.
+Measured over the 11 bank-switched images the analysis accepts: **256 of 1671** resolved (bank,address) line
+numbers named a line that assembles nothing, and of the pairs the MACHINE actually executes, **91 of 878**.
+After the fix: **0 of 1617** and **0 of 878**, with the executed-coverage denominator unchanged (878 of 1004
+executed pairs carry a line, before and after) — 54 fabrications removed, 0 real lines lost. A row now
+defines a line number only when it emitted bytes, defines a label when it merely holds a position, and does
+neither when DASM marked it `????`; rows whose line number does not advance past the file's own numbering
+belong to a macro expansion and are not this file's lines at all. `litmus_bank_f4` bank 1 `$FF03/$FF05/$FF07`
+now name lines 70/71/72 = `lda #$B1` / `sta $90` / `inc $91`. All **137** flat images byte-identical.
+`litmus_superchip` stays at zero resolved and is recorded by name with the reason: it `org`s at `$D000`, so
+its listing column is not a 0-based offset, and inferring the base from the lowest address seen would put
+every line in the wrong bank on a source that leaves its first bank empty — the analysis declines F8SC
+before a map is built for it anyway.
+
 ### Three more from the audit re-measurement: an off-by-one in a litmus, a stale figure, a false sentence (2026-07-30)
 
 **1. `litmus_shift_base` and `litmus_shift_down8` ran 261 scanlines, not 262.** Both files' headers state

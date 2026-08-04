@@ -47,6 +47,42 @@ versions follow [Semantic Versioning](https://semver.org/).
   been found, and its successors would then carry a stale distance.
 
 ### Fixed
+- **A quarter of the per-bank source lines named a line that assembles nothing, and the count of answers was
+  being read as a count of correct answers.** `srcmap.BankMap` took a line number from any DASM listing row
+  that PRINTED an address, and DASM prints one on rows that put no byte in the image: a comment, an `=`
+  equate, an `ORG`, a bare label, and a macro expansion listed under the macro body's own line numbers
+  restarting at 0. Before the first `ORG` the address it prints is offset `$0000` — bank 0's first byte — so
+  on `litmus_bank_f4` **`bank 0 $F000` resolved to line 1, the file's opening comment**, and the equates on
+  lines 6-8, which start in column 1, were placed as bank 0 LABELS at `$F000` besides. The commit that built
+  the map quoted `bank 1 B1Work (banked_game.asm:110)` as its proof; line 110 of that file is the comment
+  `; ===== bank 1 =====`. Measured over the 11 bank-switched images the analysis accepts: **256 of 1671**
+  resolved (bank,address) line numbers named a line that assembles nothing, and of the pairs the MACHINE
+  actually executes over 300 frames, **91 of 878**. After: **0 of 1617** and **0 of 878**, with the executed
+  denominator unchanged — 878 of 1004 executed pairs carry a line before and after, so 54 fabrications were
+  removed and no real line was lost.
+- **The cost was the one this project rates worst: a confidently wrong location sends the author to read a
+  line that has nothing to do with the address.** `cyclebound -asm roms/exerciser/exerciser.asm` reported a
+  region at `bank 1 ScoreLoop (exerciser.asm:990)`, which is the bare label `ScoreLoop:`; it is now line 992,
+  the `sta WSYNC` that actually assembles there. `litmus_bank_f4` bank 1 `$FF03/$FF05/$FF07` now name lines
+  70/71/72 = `lda #$B1` / `sta $90` / `inc $91`, spot-checked against the source rather than the listing.
+  A row now defines a line number only when it EMITTED BYTES, defines a label when it merely holds a
+  POSITION (a label alone on its line has an address and no bytes), and does neither when DASM marked it
+  `????`. **Flat ROMs cannot be affected and were measured, not assumed: `ParseBanked` is only built when the
+  image has more than one bank, and all 137 flat images produce byte-identical reports.**
+- `TestBankedSourceLinesNameALineThatAssemblesThere` grades every resolved (bank,address) against the SOURCE
+  FILE — a comment, an equate, a directive or a bare label cannot be the line that assembles somewhere —
+  which is a different authority from the listing being parsed, so the test cannot agree with the parser by
+  construction. It discovers the bank-switched corpus by walking `roms/**` for a `.bin` over 4K, so a bank
+  ROM added later is covered without editing it, and it fails if nothing resolves at all. Negative controls,
+  each restored after: reverting `banked.go` fails it with **256 of 1671**; dropping the macro rule alone,
+  **14 of 1631**; dropping the equate rule alone, **1 of 1618** (`bank 0 $FE10` → line 814,
+  `ZHmove = ZHmoveEnd - 256`); dropping the emitted-bytes rule, `bank 0 $F000` → line 119, `ORG $0000`.
+  Dropping the `????` rule does NOT trip the line check — the emitted-bytes rule catches those rows on its
+  own — it trips the LABEL assertion instead (`LabelBank(VSYNC) = bank 0`), which is the job that rule still
+  does alone. `litmus_superchip` resolves nothing and is recorded by name with the reason rather than
+  skipped: it `org`s at `$D000`, so its listing column is not a 0-based offset, and inferring the base from
+  the lowest address seen would put every line in the wrong bank on a source that leaves its first bank
+  empty. Nothing is lost — the analysis declines F8SC before a map is built for it.
 - **The branch wall hid a raft of larger walls, and that is the finding.** Allowing a branch in the body moved
   exactly **one loop** on the corpus. The 89 skips were not miscounted: a body walk stops at its FIRST
   obstacle, so a census of refusal reasons is a census of what is NEAREST, not of what is blocking. With the
