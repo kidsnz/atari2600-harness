@@ -1741,6 +1741,40 @@ emitting a cartridge per rung, proving the budget, comparing the pixels, and dem
 Known unknown: the demonstrated picture had **10 cycles of slack**, and a kernel that also had to position
 objects would have far less.
 
+### Modelling the RIOT timer is not implementable under region independence — measured, not argued (2026-08-04)
+
+Twenty of the twenty-one loops `determineBound` refuses for having no counter are spins on INTIM. Naming them
+was cheap and is done. The obvious follow-up — model the timer so those loops get a real trip count — was
+costed before being attempted, and **the measurement says do not**.
+
+**Where the timer is armed, relative to where it is awaited:**
+
+| count | |
+|---:|---|
+| **10** | the `sta TIMxxT` is in a DIFFERENT region from the spin |
+| 2 | the same region both arms and awaits |
+
+A region is one WSYNC-to-WSYNC interval and regions are analysed INDEPENDENTLY. Computing "how much of the
+timer is left when the spin begins" needs the cycle count from the arming store to the spin, and for ten of
+twelve that path crosses at least one WSYNC — where the elapsed time is "from wherever the beam is to the
+start of the next line", a quantity this package deliberately does not carry across regions. Modelling the
+timer therefore does not mean adding a field to the abstract state; it means giving up region independence.
+
+Cost: rewriting the analysis's central premise. Benefit: **2 of 12 loops**, worth about 0.3 points of
+coverage.
+
+**The weaker version is not worth building either.** Ignoring elapsed time (assume zero) is sound and would
+reach all twelve — but the bound it produces is the full timer period, so a `TIM64T` of 43 yields ~2752
+cycles and the verdict is "this region exceeds 76 cycles". That is true, useless, and already obvious from
+the fact that it is a timer wait. It buys the coverage NUMBER without buying an answer anyone wants, which
+is the failure mode this audit exists to name.
+
+**What the timer length would actually be good for** is the frame-structure check (does the frame come to 262
+lines?), which is a different tool with a different interval — and which needs the same cross-region cycle
+count, so it is blocked on the same thing.
+
+**Recorded as: not doing this, with the number that says why.**
+
 ### The prover answers 47.1% of addresses, the ceiling on loop work is 60.2%, and the obstacles are not independent (2026-08-04)
 
 **The denominator was wrong.** `Prove` reports one Region per (address, call context), so a scanline entered
