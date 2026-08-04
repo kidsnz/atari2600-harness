@@ -9,6 +9,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **The AtariAge queue was already empty, and the threads worth having were in the reject pile.** The roadmap
+  still said 761 queued / 212 mined; measured against the filesystem — a thread counts as mined when
+  `reference/atariage/<id>-<slug>/notes.ja.md` exists — **761 of 761 were done**, and the 850 mined
+  directories exceeded the queue because 89 predate it. What remained unmined was one directory,
+  `255863-wip-battle-pong`, abandoned after page 1. It is the closest thing in the corpus to the PONG
+  capstone, and it carries the finding the milestone most needs: **`LDA (ptr),Y` costs 6 cycles instead of 5
+  across a page boundary**, which in a 2-line kernel lands as a late `COLUPF` write or a `WSYNC` at cycle 74,
+  i.e. a scanline that appears only on some rows. The fix is to move the data, not to buy the time.
+- **Eleven more threads, chosen by the milestone rather than by the old triage.** The queue being exhausted,
+  the remaining seam was the REJECT bucket, re-read for PONG mechanics (score kernels, paddle, ball/missile,
+  collision, 2LK). **Three of eleven overturned the rejection**: `145747` — filed as "one-off collision debug",
+  is a 6502 Pong whose answer is that **the collision registers latch and must be cleared with `CXCLR`**,
+  the value written being irrelevant; `291730` — the BCD carry chain for a 6-digit score, where the upper
+  bytes take `adc #0` and nothing else; `283840` — filed as "Game WIP", the most-viewed thread in forum 50,
+  which shows that **strobing `HMOVE` during VBLANK removes the left-edge comb entirely**, freeing the Ball
+  object that is otherwise spent smearing over it — for PONG, that is the ball. The other eight confirmed the
+  triage and were distilled anyway, because a thread with no `notes.ja.md` is a thread that gets fetched again.
+  The lesson is about the ledger, not the threads: **a triage is relative to the milestone that wrote it**, so
+  the reject bucket is worth re-reading by keyword whenever the milestone changes.
 - **A timer spin is named rather than called uncounted.** `determineBound` needs a counted `dex`/`dey` or the
   `sbc` divide idiom, and of the loops it refuses for having neither, **twenty of twenty-one are the same
   thing**: `lda $0284 / bne` — INTIM, the RIOT's interval timer, polled until it reaches zero. The trip count
