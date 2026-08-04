@@ -22,6 +22,13 @@ import (
 // This test guards the premise: if a second ROM starts mapping RAM, or if
 // litmus_superchip stops, the reasoning above needs re-doing and the trap row with it.
 // It is also the premise of cyclebound's SD-8c decline.
+//
+// SCOPE, since 2026-08-04: `roms/carts` holds five more ROMs that map cartridge RAM
+// (F6SC, F4SC, 3E, 3E+, DPC), and they are deliberately NOT in this glob. This test
+// is about the corpus the TRAP LINTER scans, and the trap linter scans litmus and
+// techniques. The cartridge-format fixtures are graded by advcart_test.go instead.
+// If they were folded in here the "exactly one" premise would become "exactly six"
+// and would stop saying anything about the trap row it exists to justify.
 func TestCartridgeRAMIsRareAndNamed(t *testing.T) {
 	var files []string
 	for _, pat := range []string{"../../roms/techniques/*.bin", "../../roms/litmus/*.bin"} {

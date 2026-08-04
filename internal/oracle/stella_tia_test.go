@@ -172,6 +172,15 @@ func TestStellaAgreesWithHarnessOnWriteOnlyTIARegisters(t *testing.T) {
 
 	// ALL of the corpus, not "most of it": a ROM with no capture is a ROM this
 	// oracle silently does not cover, and silence is the failure mode.
+	//
+	// The corpus is litmus + techniques and NOT `roms/carts`, and that is a decision
+	// rather than an oversight. The five cartridge-format fixtures added on 2026-08-04
+	// exist to exercise bank-switching schemes (F6SC/F4SC/3E/3E+/DPC); each paints one
+	// flat colour, so five GUI capture sessions — ~13 s of the user's screen apiece —
+	// would add no TIA information at all. They are graded instead by mapper-level
+	// assertions in internal/emu/advcart_test.go and internal/cyclebound/advcart_test.go,
+	// and they are still held in the regression net by scripts/check_wiring.py, which
+	// scans roms/carts alongside roms/litmus. See roms/carts/README.md.
 	var uncovered []string
 	for _, dir := range []string{"../../roms/litmus", "../../roms/techniques"} {
 		bins, err := filepath.Glob(filepath.Join(dir, "*.bin"))

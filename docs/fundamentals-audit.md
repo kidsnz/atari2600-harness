@@ -144,6 +144,13 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   CDF*; not 0840) and **AUTO fingerprints a plain 8K dasm binary as F8** — our harness can verify
   bankswitching *today* with zero code changes. Bonus: `Cartridge.GetBank()` exposes the live bank →
   a tiny `read_bank` MCP tool is a natural addition.
+- ✅(verified 2026-08-04, G1) **`read_bank` now has a witness beyond F8/F6/F4.** `roms/carts` holds a fixture
+  per scheme and the bank count is asserted on each: **F6SC 4, F4SC 8, 3E 4 banks of 2048, 3E+ 4 banks of
+  1024 at four origins, DPC 2 banks of 4096 plus 2048 bytes of graphics in no bank.** Bank SIZE is the part
+  the harness used to assume: two of those five are not 4K. Every one of them is REFUSED by
+  `internal/cyclebound`, naming its mapper and the reason, because in each the cartridge window is not the
+  image. **Not verified: DPC+, CDF*, ELF/ACE and bus stuffing** — see `docs/capability-gap-audit.md` §G1
+  for what specifically blocks each.
 
 ## 11. Procedural generation (new domain)
 - 📖 **Pitfall's bidirectional LFSR** (samiam blog + disassembly, simulated & confirmed): 1 byte = the

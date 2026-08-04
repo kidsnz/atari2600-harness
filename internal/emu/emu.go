@@ -1318,27 +1318,92 @@ func (e *Emu) HasSuperchip() bool { return e.VCS.Mem.Cart.HasSuperchip() }
 // It matters for the same reason the superchip guard does: bytes executed or read
 // from cartridge RAM are not in the image, so folding them into a value range
 // bounds a loop on data the hardware never holds.
+//
+// The name is now narrower than the question. RAM is one way for the window to stop
+// being the image and it is not the only one — see CartridgeWindowNotImage, which
+// this delegates to. The name is kept because the refusal `internal/cyclebound`
+// prints is worded around it; the precise reason is available from the other method.
 func (e *Emu) MapsCartridgeRAM() (bool, error) {
-	if e.VCS.Mem.Cart.HasSuperchip() {
-		return true, nil
+	notImage, _, err := e.CartridgeWindowNotImage()
+	return notImage, err
+}
+
+// CartridgeWindowNotImage reports whether the bytes the CPU reads in the cartridge
+// window can differ from the bytes in the image file, and names why.
+//
+// This is the question every static analysis over cartridge bytes actually needs to
+// ask, and "does it have RAM" was a proxy for it that DPC and DPC+ walk straight
+// past. Measured on both (cart_dpc, and seven real DPC+ cartridges in the umbrella's
+// reference archive):
+//
+//   - banks are exactly 4096 bytes at exactly origin $F000 — the geometry gate passes;
+//   - hotspots are published and parseable (DPC: $1FF8/$1FF9 BANK0/BANK1; DPC+:
+//     $1FF6-$1FFB BANK0-BANK5) — the hotspot gate passes;
+//   - `GetBank` reports `IsRAM: false` at every address — the RAM gate passes;
+//   - and their bankswitch really is address-only, which IS the rule
+//     `internal/cyclebound` models.
+//
+// So the only thing declining them is that their mapper ID is absent from a table of
+// checked switch rules — and anyone who read mapper_dpc.go would be entitled to add
+// it. They would be right about the switch and wrong about the cartridge: $1000-$107F
+// is the data-fetcher / RNG / music register file, computed from cartridge state, and
+// the image's bytes there are never what the CPU reads.
+//
+// The predicate is taken from the ENGINE'S OWN BUS INTERFACES rather than from a list
+// of mapper IDs, because a list is exactly the thing that goes stale when the engine
+// gains a mapper. A cartridge that publishes a RAM bus, a static-data bus, a register
+// bus or a coprocessor has state the image does not contain. Measured over the
+// fixtures and the reference archive:
+//
+//	mapper          ram   static  registers  coproc   verdict
+//	4K, F8, E0       -      -        -         -      window IS the image
+//	F8SC/F6SC/F4SC   x      -        -         -      RAM overlay
+//	FA, 3E, 3E+      x      -        -         -      RAM overlay
+//	AR               x      -        x         -      RAM + control registers
+//	DPC              -      x        x         -      graphics + register file
+//	DPC+             -      x        x         x      graphics + registers + ARM
+//
+// E0 answering "no" on every column is the load-bearing negative: it is a segmented
+// mapper whose window really is image bytes, so a predicate that refused it would be
+// refusing for the wrong reason.
+//
+// The ID switch that follows the bus test is still needed and is not redundant with
+// it: a bus sample taken now sees the CURRENT configuration, and these families map
+// RAM in only after a switch. Where the answer cannot be established statically, say
+// yes — the cost is refusing an analysis, and the cost of the other error is folding
+// RAM into a proven value range.
+func (e *Emu) CartridgeWindowNotImage() (bool, string, error) {
+	cart := e.VCS.Mem.Cart
+	if cart.HasSuperchip() {
+		return true, "a superchip overlays 128 bytes of RAM on the bottom of the window", nil
 	}
 	// Sample the whole cartridge window rather than one address: M-Network maps its
 	// RAM into a SEGMENT, so whether GetBank reports IsRAM depends on where you ask.
 	for a := memorymap.OriginCart; a <= memorymap.MemtopCart; a += 0x40 {
-		if e.VCS.Mem.Cart.GetBank(a).IsRAM {
-			return true, nil
+		if cart.GetBank(a).IsRAM {
+			return true, fmt.Sprintf("the mapper reports cartridge RAM mapped at $%04X", a), nil
 		}
 	}
-	// A sample taken now only sees the CURRENT configuration, and these families map
-	// RAM in only after a switch — so a boot-time look would answer "no" for a
-	// cartridge that maps RAM a frame later. Where the answer cannot be established
-	// statically, say yes: the cost is refusing an analysis, and the cost of the
-	// other error is folding RAM into a proven value range.
-	switch e.VCS.Mem.Cart.ID() {
-	case "3E", "3E+", "E7", "AR":
-		return true, nil
+	if cart.GetRAMbus() != nil {
+		return true, "the mapper publishes a cartridge-RAM bus", nil
 	}
-	return false, nil
+	if cart.GetStaticBus() != nil {
+		return true, "the mapper publishes a static-data area the CPU reads through registers rather " +
+			"than as image bytes", nil
+	}
+	if cart.GetRegistersBus() != nil {
+		return true, "the mapper publishes memory-mapped registers, so part of the window is computed " +
+			"cartridge state rather than image bytes", nil
+	}
+	if cart.GetCoProcBus() != nil {
+		return true, "the mapper carries a coprocessor that can change what the window holds", nil
+	}
+	switch cart.ID() {
+	case "3E", "3E+", "E7", "AR":
+		return true, fmt.Sprintf("mapper %s maps cartridge RAM into the window after a switch, which a "+
+			"sample taken at boot cannot see", cart.ID()), nil
+	}
+	return false, "", nil
 }
 
 // CartBank is one bank of a cartridge as the engine hands it over for static

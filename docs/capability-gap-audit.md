@@ -29,10 +29,60 @@ own authoring loop**, not the editor. The G work stands on its own; M references
 ### G1 — advanced cartridge support + litmus (DPC, DPC+, ARM/ELF, 3E/3E+, bus stuffing, separate SC-RAM)
 - **Techniques:** DPC+ full-screen bitmap (181816), plain Superchip 30K (224683), bus stuffing
   (258191 / 279712), DPC+ deep dive (163495), raycasting (229083).
-- **Status:** only **F8/F6/F4** are litmus-verified. DPC+/3E+/etc. are *recognized* by Gopher2600 but
-  have **zero harness verification**; `read_bank` untested on them. [`fundamentals-audit.md`, `hscroll.md`]
-- **Gap:** can't reliably author/verify "beyond bB / full-screen bitmap" techniques. *Not* required for
-  first authoring targets (vanilla + SC bespoke kernels) — this is the **advanced-track** foundation.
+
+**MEASURED 2026-08-04, and the recognition half was never the problem.** Every scheme that has a cartridge
+to test already **loads and runs**; what was missing was any verification of what the harness then *says*
+about it. Phase-1 numbers, over the 493 cartridge images under the umbrella (478 load; 335 4K, 61 F6, 29 F8,
+16 2K, **12 F4SC, 7 DPC+, 5 3E, 4 F4, 3 E0, 3 F8SC, 1 AR, 1 F6SC, 1 FA**) plus five fixtures authored for the
+schemes with no cartridge on the machine:
+
+| scheme | cartridge available | loads | bank count | `Prove` | `cmd/dissect` decoded it as |
+|---|---|---|---|---|---|
+| F8SC | 3 real + `litmus_superchip` | yes | 2 ✓ | refused, names F8SC | correct |
+| F6SC | 1 real, none in repo → **fixture** | yes | 4 ✓ | refused, names F6SC | correct |
+| F4SC | 12 real, none in repo → **fixture** | yes | 8 ✓ | refused, names F4SC | correct |
+| 3E | 5 real → **fixture** | yes | 4 (fixture) / 24 (DeathMerchant) ✓ | refused, names 3E | **wrong: "2 banks of 4K" for 4 banks of 2K** |
+| 3E+ | **0 anywhere** → fixture | yes | 4 ✓ | refused, names 3E+ | **wrong: reported as not banked** |
+| DPC | **0 anywhere** (no Pitfall II) → fixture | yes | 2 ✓ | refused — *but for the weakest reason* | count right by luck; 2K graphics attributed to a bank that does not exist |
+| DPC+ | 7 real, incl. 2 Pizza Boy builds | yes, **and renders** | 6 ✓ | refused — *weakest reason* | **wrong: "8 banks" for 6** |
+| ARM/ELF, bus stuffing | **0 anywhere** | **no** | — | — | — |
+
+**7 of 8 schemes load; 7 of 8 report a bank count and all 7 are right; 0 of 7 produce a cycle bound and all 7
+are refused; `cmd/dissect` decoded 3 of 7 correctly.**
+
+**The dangerous finding was DPC and DPC+, and it is the opposite of "unsupported".** Both clear *every*
+geometric gate `internal/cyclebound` has — banks of exactly 4096 at exactly origin $F000, parseable
+`BANK0..BANKn` hotspots, `GetBank` reporting `IsRAM: false` at every address — and their bank-switch rule
+genuinely **is** the address-only Atari rule the package models (`mapper_dpc.go` / `dpcplus.go`). The only
+thing declining them was that their ID is absent from `verifiedEdgeSemantics`, i.e. one source-reading away
+from being edited out — and the reader would be right about the switch and wrong about the cartridge, because
+$1000-$107F is the data-fetcher / RNG / music register file, not image bytes.
+
+**Closed (v1.121.0):**
+- `emu.CartridgeWindowNotImage` asks the ENGINE'S OWN BUS INTERFACES — RAM bus / static-data bus / register
+  bus / coprocessor — instead of a list of mapper IDs, and names the reason. Measured: 4K/F8/**E0** answer no
+  on all four (E0 is the load-bearing negative — its window really is image bytes); F8SC/F6SC/F4SC/FA/3E/3E+
+  answer via the RAM bus; AR via RAM + registers; DPC via static + registers; DPC+ via static + registers +
+  coprocessor. `MapsCartridgeRAM` delegates to it, so `internal/cyclebound` now refuses DPC/DPC+ on
+  "the window is not the image" rather than on "this mapper is not in the table".
+- `roms/carts/` — five fixtures (F6SC, F4SC, 3E, 3E+, DPC), each the smallest image the engine fingerprints
+  as its scheme that still boots and runs. **5 of 5 refused, each naming its mapper AND its reason.**
+- `cmd/dissect` reads its banking geometry from the mapper instead of `len(rom)/4096`, and where the layout
+  is not "N banks of 4K at $F000" it prints file offsets and says so rather than inventing a bank number.
+
+**Still open, named:** DPC+ / CDF / ACE have no in-repo fixture — the four fingerprint bytes are easy, real
+ARM Thumb driver code is not, so the refusal is exercised only on out-of-repo cartridges. **ELF and bus
+stuffing cannot be tested at all**: bus stuffing is implemented only by the ELF and ACE mappers, no ELF or ACE
+image exists on this machine, and a synthesised ELF header is rejected by the engine
+(`mismatched ELF version 'EV_NONE'`). A scheme with no cartridge is a finding, not a failure.
+
+**One change is described rather than made** (`internal/cyclebound/cyclebound.go` was being edited in another
+session): `analysisUnits` should call `e.CartridgeWindowNotImage()` and print the returned reason, so a DPC
+refusal says "register file" instead of the currently-inherited word "RAM". The verdict is already right; only
+the wording is coarse.
+- **Gap (remaining):** can't reliably author/verify "beyond bB / full-screen bitmap" DPC+ techniques. *Not*
+  required for first authoring targets (vanilla + SC bespoke kernels) — this is the **advanced-track**
+  foundation, and its separate-Superchip-RAM half is now done.
 
 ## Tier 2 — depth / accuracy
 

@@ -28,7 +28,7 @@ jobs:
 
       - name: Assemble ROMs (.bin are gitignored; tests/scenarios need them)
         run: |
-          for f in roms/litmus/*.asm roms/techniques/*.asm roms/exerciser/*.asm; do
+          for f in roms/litmus/*.asm roms/techniques/*.asm roms/exerciser/*.asm roms/carts/*.asm; do
             dasm "$f" -f3 -o"${f%.asm}.bin"
           done
 

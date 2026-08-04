@@ -32,10 +32,17 @@ ENTRYPOINTS = ["CLAUDE.md", os.path.join("docs", "authoring-protocol.md")]
 SKIP = {"authoring-protocol.md", "mining-digest.md", "provenance.md"}
 
 
+# 検証 ROM を置くディレクトリ。roms/carts は「TIA でなくカートリッジ形式を検査する」別コーパス
+# （Stella TIA オラクルの対象外＝roms/carts/README.md に理由）。別コーパスにしたことで配線検査から
+# 外れては本末転倒なので、ここで同じ網に入れる。
+ROM_DIRS = ["litmus", "carts"]
+
+
 def litmus_orphans():
-    """回帰の網の外にいる litmus ROM を返す。網＝シナリオ or コード/テスト/スクリプトからの参照。"""
-    lit_dir = os.path.join(HARNESS, "roms", "litmus")
-    if not os.path.isdir(lit_dir):
+    """回帰の網の外にいる検証 ROM を返す。網＝シナリオ or コード/テスト/スクリプトからの参照。"""
+    rom_dirs = [os.path.join(HARNESS, "roms", d) for d in ROM_DIRS]
+    rom_dirs = [d for d in rom_dirs if os.path.isdir(d)]
+    if not rom_dirs:
         return [], 0, 0, 0
 
     # 参照側テキストを一度だけ集める（ROM 自身と CHANGELOG は除く＝履歴は「使っている」ではない）。
@@ -56,20 +63,23 @@ def litmus_orphans():
             except OSError:
                 pass
 
-    orphans, via_scenario, via_code = [], 0, 0
-    asms = sorted(glob.glob(os.path.join(lit_dir, "*.asm")))
-    for f in asms:
-        base = os.path.basename(f)[:-4]
-        short = base[len("litmus_"):] if base.startswith("litmus_") else base
-        if os.path.isfile(os.path.join(lit_dir, "scenarios", base + ".json")) or \
-           os.path.isfile(os.path.join(lit_dir, "scenarios", short + ".json")):
-            via_scenario += 1
-            continue
-        if base in refs:
-            via_code += 1
-            continue
-        orphans.append("roms/litmus/" + base + ".asm")
-    return orphans, len(asms), via_scenario, via_code
+    orphans, via_scenario, via_code, total = [], 0, 0, 0
+    for d in rom_dirs:
+        rel = "roms/" + os.path.basename(d) + "/"
+        asms = sorted(glob.glob(os.path.join(d, "*.asm")))
+        total += len(asms)
+        for f in asms:
+            base = os.path.basename(f)[:-4]
+            short = base[len("litmus_"):] if base.startswith("litmus_") else base
+            if os.path.isfile(os.path.join(d, "scenarios", base + ".json")) or \
+               os.path.isfile(os.path.join(d, "scenarios", short + ".json")):
+                via_scenario += 1
+                continue
+            if base in refs:
+                via_code += 1
+                continue
+            orphans.append(rel + base + ".asm")
+    return orphans, total, via_scenario, via_code
 
 
 def coverage_doc_roms():

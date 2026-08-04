@@ -194,17 +194,22 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 	fmt.Fprintf(&rep, "dissect %s — runtime trace × ROM matching (%d frames, %d stores, %d streams)\n",
 		filepath.Base(rom), frames, len(stores), len(streams))
 	fmt.Fprintf(&rep, "%s\n", strings.Repeat("=", 70))
-	banked := len(romBytes) > 4096 // F8/F6/F4: 4K バンクが $F000-$FFFF 窓に入る
+	geom := readGeometry(e)
+	banked := geom.banks > 1
 	addrOf := func(off int) int { return romAddrOf(len(romBytes), off) }
 	fmtRange := func(off, n int) string {
 		if !banked {
 			return fmt.Sprintf("ROM $%04X-$%04X", addrOf(off), addrOf(off)+n-1)
 		}
+		if !geom.atari4K || off+n > geom.banks*4096 {
+			// No bank number and no address: under this geometry neither is derivable
+			// from a file offset, and a file offset is the one thing that IS true.
+			return fmt.Sprintf("ROM file offset $%05X-$%05X", off, off+n-1)
+		}
 		return fmt.Sprintf("ROM bank %d $%04X-$%04X", off/4096, addrOf(off), addrOf(off)+n-1)
 	}
 	if banked {
-		fmt.Fprintf(&rep, "(banked cart: %dK = %d banks of 4K; addresses below are bank-relative in the $F000-$FFFF window)\n",
-			len(romBytes)/1024, len(romBytes)/4096)
+		fmt.Fprintf(&rep, "%s\n", geom.describe(len(romBytes)))
 	}
 	annots := map[int]string{} // ROM offset → 注釈
 	for _, st := range streams {
@@ -335,6 +340,75 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 
 func bytesIndex(hay []byte, needle []uint8) int {
 	return strings.Index(string(hay), string(needle))
+}
+
+// geometry is what the ENGINE says about this cartridge's banking, as opposed to
+// what its file length suggests.
+//
+// This used to be `len(rom)/4096`, and the arithmetic is only right for the Atari
+// family. Measured, on cartridges that are all present and all load:
+//
+//	image                      truth                        len/4096 said
+//	cart_3e (3E)               4 banks of 2K                2 banks of 4K
+//	DeathMerchant_1.0 (3E)     24 banks of 2K               12 banks of 4K
+//	cart_3eplus (3E+)          4 banks of 1K, four origins  not banked at all
+//	cart_dpc (DPC)             2 banks of 4K + 2K graphics  2 banks (of a 10K file)
+//	scrolldemo (DPC+)          6 banks of 4K + ARM driver   8 banks of 4K
+//
+// Every one of those was printed as a fact, and the bank number attached to each
+// matched table came from the same arithmetic. A table found at file offset $1800 in
+// a 3E cartridge was reported as "ROM bank 1 $F800" when it is bank 3 and a 3E bank
+// is mapped at $1000-$17FF — wrong number, wrong address, stated flatly.
+//
+// So the geometry is read from the mapper, and when it is not "N banks of 4K at
+// $F000" this tool declines to name a bank or an address rather than computing one.
+// A file offset is not as useful as an address; it has the advantage of being true.
+type geometry struct {
+	id       string
+	banks    int
+	bankSize int  // 0 when the banks are not all the same size
+	origins  int  // how many origins a bank may be mapped to (1 for the Atari family)
+	atari4K  bool // every bank is exactly 4096 bytes at exactly origin $F000
+}
+
+func readGeometry(e *emu.Emu) geometry {
+	id, banks := e.CartInfo()
+	g := geometry{id: id, banks: banks}
+	contents, err := e.CopyBanks()
+	if err != nil || len(contents) == 0 {
+		return g
+	}
+	g.bankSize = len(contents[0].Data)
+	g.origins = len(contents[0].Origins)
+	g.atari4K = true
+	for _, c := range contents {
+		if len(c.Data) != g.bankSize {
+			g.bankSize = 0
+		}
+		if len(c.Data) != 4096 || len(c.Origins) != 1 || c.Origins[0] != 0xF000 {
+			g.atari4K = false
+		}
+	}
+	return g
+}
+
+func (g geometry) describe(romLen int) string {
+	if g.atari4K {
+		s := fmt.Sprintf("(banked cart: mapper %s, %d banks of 4K; addresses below are bank-relative "+
+			"in the $F000-$FFFF window", g.id, g.banks)
+		if extra := romLen - g.banks*4096; extra > 0 {
+			s += fmt.Sprintf("; the last %d bytes of the file are not in any bank and are reported "+
+				"as file offsets", extra)
+		}
+		return s + ")"
+	}
+	size := "banks of differing sizes"
+	if g.bankSize > 0 {
+		size = fmt.Sprintf("banks of %d bytes", g.bankSize)
+	}
+	return fmt.Sprintf("(banked cart: mapper %s, %d %s at %d origin(s) — NOT the Atari \"4K bank at "+
+		"$F000\" layout, so a file offset does not determine a bank or an address here; ranges below "+
+		"are file offsets)", g.id, g.banks, size, g.origins)
 }
 
 func artRow(v uint8) string {

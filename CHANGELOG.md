@@ -101,6 +101,54 @@ versions follow [Semantic Versioning](https://semver.org/).
   batch later. **It is not an exemption list and is built so it cannot become one**: every queued line is
   printed on every run, and the test fails once the queue passes six entries — a queue that stops being
   drained gets louder rather than quieter.
+- **G1 — the advanced cartridge schemes were never unsupported; they were unverified, and DPC/DPC+ were one
+  edit away from being analysed WRONG.** Measured over the 493 cartridge images under the umbrella (478 load:
+  335 4K, 61 F6, 29 F8, 16 2K, 12 F4SC, 7 DPC+, 5 3E, 4 F4, 3 E0, 3 F8SC, 1 AR, 1 F6SC, 1 FA) plus five
+  authored fixtures: **7 of 8 schemes load, 7 of 8 report a bank count and all 7 are right, 0 of 7 produce a
+  cycle bound (all refused), and `cmd/dissect` decoded 3 of 7 correctly.**
+- **The trap was the two schemes that look most like Atari's.** DPC and DPC+ clear *every* geometric gate
+  `internal/cyclebound` has — banks of exactly 4096 at exactly origin $F000, parseable `BANK0..BANKn`
+  hotspots, `GetBank` reporting `IsRAM: false` everywhere — and their bank-switch rule genuinely **is** the
+  address-only Atari rule the package models. The only thing declining them was the absence of their ID from
+  `verifiedEdgeSemantics`, i.e. one source-reading away from being removed by someone who checked the switch
+  and was right about it. They would still have been wrong about the cartridge: $1000-$107F is the
+  data-fetcher / RNG / music register file, so a value range folded from the image there bounds a loop on
+  data the hardware never holds.
+- **The fix asks the engine, not a list.** New `emu.CartridgeWindowNotImage` reports whether the CPU can read
+  something other than the image in $1000-$1FFF, and names why, from the engine's own bus interfaces — RAM
+  bus / static-data bus / register bus / coprocessor. Measured: 4K, F8 and **E0** answer no on all four (E0 is
+  the load-bearing negative — a segmented mapper whose window really is image bytes); F8SC/F6SC/F4SC/FA/3E/3E+
+  via the RAM bus; AR via RAM + registers; DPC via static + registers; DPC+ via static + registers +
+  coprocessor. `MapsCartridgeRAM` delegates to it, so the refusal now rests on the fundamental objection.
+- **New corpus `roms/carts/`** — five fixtures (F6SC 4 banks, F4SC 8, 3E 4×2K, 3E+ 4×1K at four origins,
+  DPC 2×4K + 2K graphics), each the smallest image the engine fingerprints as its scheme that still boots and
+  runs. **5 of 5 refused by `Prove`, each naming its mapper AND its reason.** They are a separate directory
+  from `roms/litmus` on purpose: the Stella TIA oracle covers litmus + techniques and would demand five GUI
+  capture sessions (~13 s of the user's screen each) for five ROMs that paint one flat colour. They are still
+  in the regression net — `scripts/check_wiring.py` now scans `roms/carts` alongside `roms/litmus` (127 ROMs:
+  57 via scenario, 70 via a test or tool, 0 orphaned).
+- **`cmd/dissect` was stating a wrong bank count as a fact.** Its banking came from `len(rom)/4096`, which is
+  the Atari family's arithmetic and nobody else's: 3E's 4 banks of 2K were printed as "2 banks of 4K"
+  (DeathMerchant's 24 as 12), 3E+ as not banked at all, DPC+'s 6 banks as 8, and DPC's 2K of graphics — which
+  belongs to no bank — was attributed to a third bank of a two-bank cartridge. The bank number was not just a
+  header; it labelled every matched table, so a table at file offset $1800 of a 3E cartridge was reported as
+  "ROM bank 1 $F800" when it is bank 3 and a 3E bank maps at $1000-$17FF. Geometry now comes from the mapper,
+  and where the layout is not "N banks of 4K at $F000" the tool prints file offsets and says why rather than
+  computing a bank number it cannot justify.
+- **Every negative control fired.** Removing the static/register/coprocessor arms → DPC reads
+  `window-not-image = false` and its `Prove` refusal falls back to the weaker "not among the mappers whose
+  bank-switch rule has been checked" wording; making the guard refuse any banked cartridge → four control
+  ROMs (F8, F6, F4, banked_game) report "the guard has spread to cartridges the static analysis was
+  handling"; reverting the geometry to `len/4096` → `cart_3e` reads `{banks:2 atari4K:true}` against
+  `{banks:4 bankSize:2048 atari4K:false}`; hiding one fixture `.bin` → all three suites FAIL with
+  "4 of 5 fixtures are assembled" rather than skipping; hiding the tests → `check_wiring.py` reports
+  `roms/carts/cart_f4sc.asm` and `cart_f6sc.asm` as orphans (the other three are named in Go doc comments,
+  which that checker's substring scan counts as a reference — a pre-existing property of it).
+- **Not closed, and stated:** DPC+/CDF/ACE have no in-repo fixture (real ARM Thumb driver code, not four
+  fingerprint bytes), so their refusal is exercised only on out-of-repo cartridges. **ELF and bus stuffing
+  cannot be tested at all** — bus stuffing is implemented only by the ELF and ACE mappers, no ELF or ACE image
+  exists on this machine, and a synthesised ELF header is rejected by the engine
+  (`mismatched ELF version 'EV_NONE'`).
 
 ### Changed
 
