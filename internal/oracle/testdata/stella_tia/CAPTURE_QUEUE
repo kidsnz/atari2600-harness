@@ -14,3 +14,4 @@
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
 
+roms/litmus/litmus_amax_floor.bin  # 2026-08-04  added after the queue was drained; capture with the next batch

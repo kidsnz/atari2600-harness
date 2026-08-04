@@ -45,8 +45,26 @@ func TestProveBlankRegionAmax(t *testing.T) {
 	if noamax.RollFree {
 		t.Fatal("cb_blank_noamax must NOT be roll_free (the un-@amax'd blank divide loop is unbounded)")
 	}
-	if len(noamax.BlankUnbounded) != 1 {
-		t.Fatalf("cb_blank_noamax must surface exactly 1 unbounded blank region (the divide loop); got %d", len(noamax.BlankUnbounded))
+	// ★ 2026-08-04: THE REFUSAL BECAME AN OVERRUN, and that is the improvement.
+	//
+	// Without `@amax` this region used to be UNBOUNDED — the predecessor scan could
+	// not pin A, and an unpinned accumulator was refused outright. It is now bounded
+	// from the fact that A is eight bits wide (255/15 + 2 iterations), which puts it
+	// at 107 cycles against a 76-cycle budget: still not roll-free, but now for a
+	// reason a builder can act on. "This line runs 107 cycles" beats "I cannot tell".
+	//
+	// `@amax` keeps its whole point: the annotated twin proves 67 and fits. The
+	// annotation is how an author declares the ceiling the analysis cannot derive,
+	// and 67-vs-107 is what it buys.
+	if len(noamax.BlankUnbounded) != 0 {
+		t.Fatalf("cb_blank_noamax should now be BOUNDED (A is 8 bits wide even when unpinned); got %d unbounded", len(noamax.BlankUnbounded))
+	}
+	if len(noamax.BlankOver) != 1 {
+		t.Fatalf("cb_blank_noamax must surface exactly 1 blank region OVER budget (the divide loop at the 255-derived count); got %d", len(noamax.BlankOver))
+	}
+	if noamax.BlankMaxWorst <= amax.BlankMaxWorst {
+		t.Fatalf("the un-annotated twin proves %d and the annotated one %d — @amax must produce a TIGHTER bound, or the annotation has stopped doing anything",
+			noamax.BlankMaxWorst, amax.BlankMaxWorst)
 	}
 	// backward compat: `certified` is visible-only, so BOTH certify despite the blank difference.
 	if !amax.Certified || !noamax.Certified {

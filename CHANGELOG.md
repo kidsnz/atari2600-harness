@@ -8,6 +8,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **"The analysis cannot pin A" is not "A has no bound".** The `sec / sbc #N / bcs` divide's trip count comes
+  from the accumulator entering the loop, and `determineBound` refused whenever any predecessor carried a Top
+  A — correctly, since SD-9's proxy guessed one and under-approximated by 40x. But refusing EVERY unpinned
+  entry conflates *"this analysis does not know the value"* with *"this value has no upper bound"*, and the
+  second is false about a 6502 accumulator: **A is eight bits, so it is at most 255** — a fact about the
+  hardware, not a range inferred from the program, which is why it does not reopen the door SD-9 closed (that
+  failure was reading a number off the wrong INSTRUCTION, not reading a register's width off the datasheet).
+- **Found on the project's own ROM, as the second half of a failure whose first half was fixed the same day.**
+  `pizza_boy.asm` positions sprites through `lda px / jsr SetXPos`, where `SetXPos` opens with `sta WSYNC` and
+  divides A by 15. `px` is a RAM byte, Top by construction, at **all five call sites** — so every call context
+  died on this line and the region came back **"no WSYNC reached from region start"**, a symptom four steps
+  downstream of its cause.
+- Corpus: **4 regions gained, 0 lost** (all four in Panda Chase), and `TestProvenWorstIsNeverExceededOnCorpus`
+  stays green. `litmus_amax_floor.asm` grades the new bound against the machine (proven 103, machine 23) and
+  carries the control that matters: a row whose A the scan CAN pin must stay **tighter** (43), or the floor has
+  replaced the scan rather than standing under it. Both negative controls fire.
+- **`@amax` did not lose its point — the refusal became an overrun.** `cb_blank_noamax` used to be *unbounded*;
+  it is now bounded at **107 cycles against a 76-cycle budget**, while its annotated twin proves **67** and
+  fits. "This line runs 107 cycles" is a fact a builder can act on; "I cannot tell" is not. The witness test
+  now pins that the annotated twin must be strictly tighter.
+- **The fixture took three attempts, and the failures are recorded in it.** `lda SWCHB / and #$0F` does not
+  produce a Top accumulator — the interpreter follows the mask and knows [0,15]. Two different `sta $90` on
+  the arms of an undecidable branch does not either — it joins them into [7,200]. Both were bounded BEFORE
+  the change and would have proved nothing. The value has to come from hardware that moves on its own, so the
+  row reads INTIM while the RIOT is counting.
+
 ### Added
 - **G9 closed — the two craft patterns a reconstruction missed now have fixtures, graded tests and docs.**
   The Fishing Derby casebook recorded that Claude's sealed rebuild had no counterpart for (a) reshaping ONE

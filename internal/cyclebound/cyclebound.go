@@ -2817,8 +2817,30 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		if amax < 0 && amaxHint > 0 {
 			amax = amaxHint // ②: author-declared `@amax N` (the accumulator's proven upper bound) when the abstract range is Top
 		}
+		// A IS EIGHT BITS WIDE, AND THAT IS NOT AN INFERENCE.
+		//
+		// Everything above refuses an entry value it cannot pin, and it is right to:
+		// SD-9's proxy guessed one and under-approximated by 40x. But refusing ALL of
+		// them conflates "the analysis does not know this value" with "this value has
+		// no bound", and the second is false about a 6502 accumulator. Whatever the
+		// machine holds in A, it holds at most 255 — a fact about the HARDWARE, not a
+		// range inferred from the program, which is why it does not reopen the door
+		// SD-9 closed: the failure there was reading a number off the wrong
+		// instruction, not reading the register's width off the datasheet. `@amax`
+		// stays useful because a tighter ceiling gives a tighter bound; this is only
+		// the floor under it.
+		//
+		// Found on the user's own ROM. `pizza_boy.asm`'s `SetXPos` divides A by 15 to
+		// place a sprite, and A arrives from `lda px` — a RAM byte, Top by
+		// construction, at all five of its call sites. The region was refused for "no
+		// WSYNC reached" because every call context died on this line first, and that
+		// refusal is what kept the project's own phase0 scenario red after the BRK
+		// half was fixed.
+		//
+		// The bound is loose — 255/15 + 2 = 19 iterations where a sprite coordinate
+		// can only reach ~160 — and loose is the correct direction.
 		if amax < 0 {
-			return 0
+			amax = 255
 		}
 
 		// BCC COUNTS UP, so `amax` is the wrong variable for it.
