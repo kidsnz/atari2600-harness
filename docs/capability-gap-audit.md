@@ -169,7 +169,6 @@ the wording is coarse.
   this one. `roms/litmus/litmus_pcm.bin` is queued in `internal/oracle/testdata/stella_tia/CAPTURE_QUEUE`
   rather than captured, so the Stella oracle does not yet cover it.
 
-
 ## Tier 3 — polish
 - **G5 ✅ RE-MEASURED 2026-07-30 — the entry was stale; both halves have been litmus-locked for some time,
   and locking them turned out to be the easy part.** `litmus_resp_edge` + `scenarios/resp_edge.json` (golden

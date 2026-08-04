@@ -14,9 +14,3 @@
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
 
-roms/litmus/litmus_timerwait.bin  # 2026-08-04  added mid-session; the user was working
-roms/litmus/litmus_deadbranch.bin  # 2026-08-04  added mid-session; the user asked not to have Stella take the screen
-roms/litmus/litmus_timerwrap_hit.bin  # 2026-08-04  added mid-session; Stella must not take the screen
-roms/litmus/litmus_pcm.bin  # 2026-08-04  G3 PCM fixture added mid-session; Stella must not take the screen
-roms/litmus/litmus_nusiz_shape.bin  # 2026-08-04  added mid-session; the user asked not to have Stella take the screen
-roms/litmus/litmus_hmove_slope.bin  # 2026-08-04  added mid-session; the user asked not to have Stella take the screen
