@@ -143,9 +143,22 @@ own authoring loop**, not the editor. The G work stands on its own; M references
   on a timer-free ROM, plus a test proving **6 divider writes are actually observed** so the silence is not a
   detector returning nil.
 
-  **Stated, not implied: the positive case is untested.** Arranging a store whose cycles straddle the wrap
-  needs cycle-level tuning of the polling exit. Until such a ROM exists this detector's silence must not be
-  read as "no hazard here". Original entry follows.
+  **★ THE POSITIVE CASE NOW HAS A WITNESS (2026-08-04) — G8 is closed.** `litmus_timerwrap_hit` arms TIM1T
+  (one tick per CPU cycle) with N = 1..12 and stores a divider a small, fixed number of cycles later, so the
+  underflow falls inside the second store for some N and outside it for the rest. The cycle-level tuning the
+  entry above called for was not needed: **a sweep settles it, and the rows that do NOT fire are the other
+  half of the witness.** Measured: **12 hazards over 2 frames across 6 distinct scanlines of 12 rows**,
+  `untilWrap` ranging 1..4 against a 4-cycle store — so the boundary at `untilWrap <= storeCycles` is
+  observed rather than assumed, and the detector is reporting the RACE rather than the shape
+  (`sta TIMxxT` soon after arming). The near-miss ROM still reports 0.
+
+  **Both negative controls fire, and the second had to be built twice.** Inverting the condition makes it
+  report a store 21,898 cycles from the wrap. Adding `nop`s at the TOP of the ROM changes nothing — every row
+  opens with `sta WSYNC`, so the beam resets and each row's internal timing is untouched; measured, the same
+  six rows fire with their addresses shifted by four. The control that works puts the `nop`s INSIDE rows
+  N1..N4, between arming and the store: 12 hazards become 8.
+
+  Original entry follows.
 - **G8 (mined 2026-06-14, on-mission):** RIOT timer-wraparound roll detector. Writing `TIM64T`/`TIM1024T`
   on the exact wraparound cycle silently drops the divider to 1T → the ROM rolls on real hardware while
   Stella/emulators pass. This is precisely the "passes-in-emu / fails-on-hardware" timing trap the harness
