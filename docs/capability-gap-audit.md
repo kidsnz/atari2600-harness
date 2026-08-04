@@ -1741,6 +1741,40 @@ emitting a cartridge per rung, proving the budget, comparing the pixels, and dem
 Known unknown: the demonstrated picture had **10 cycles of slack**, and a kernel that also had to position
 objects would have far less.
 
+### "multiple back-edges" was named after the rarest shape, and lifting it gained nothing (2026-08-03)
+
+The prover answers **626 of 958 regions (65.3%)** across sixteen commercial cartridges. The largest refusal
+after normalising the addresses out of the reason strings was bank-switch suspicion (146, 44% of refusals,
+all in banked cartridges); the largest one affecting **single-bank** cartridges — the shape everything this
+project will author for the foreseeable future — was `multiple back-edges` at 35 of 135.
+
+Of the regions carrying exactly two latches: **22 siblings, 9 irreducible overlaps, 1 nest**. The refusal
+named the rarest. A region is one WSYNC-to-WSYNC interval, so a nest would need two levels of iteration
+inside a scanline.
+
+Siblings now fold — `litmus_siblingloops.asm` proves 40 against a machine that spends 40 — and the corpus
+gained **nothing**. The census of why every multi-latch region still fails:
+
+| refusal | share |
+|---|---|
+| `branch inside loop body` | the large majority, at every latch count |
+| `trip count unknown` | 14 of the two-latch regions |
+| `WSYNC inside loop body` | next |
+| `call or jump inside loop body` | next |
+
+**The graph shape was never the obstacle.** `multiple back-edges` was a refusal named after a property that
+is real but not load-bearing, and it hid the one that is. Two further measurements came out of it:
+
+- Reporting the specific body reason instead of `multipleBackEdges` **cost 6 proven regions**, because that
+  constant is the only refusal the DAG walk may override and it is matched by identity.
+- `overlaps`, the guard separating siblings from nests, is **unreachable today** — disabling it changes no
+  fixture row, since a shared instruction means one body holds the other's latch and the body walk refuses a
+  branch first. It is kept and unit-tested directly, because the repair to `branch inside loop body` removes
+  the check that hides it.
+
+**Next, and now measured rather than assumed: `branch inside loop body`.** It is the top refusal for
+single-bank cartridges both on its own (23 of 135) and inside every multi-latch region.
+
 ### BCC counts UP — the divide bound used the wrong variable, and that closes the audit's list (2026-08-03)
 
 The `sbc #N` divide idiom's two latches run the loop in opposite directions, and one formula was applied to

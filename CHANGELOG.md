@@ -8,7 +8,40 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Two loops in a region are not necessarily nested, and the refusal was named after
+  the rarest of the three shapes.** `foldLoops` refused any region with more than one back edge as
+  "multiple back-edges (nested/complex loops)". Measured across the sixteen-cartridge corpus, of the regions
+  carrying exactly two latches: **22 are siblings** whose intervals do not overlap, **9 overlap irreducibly,
+  and exactly 1 is nested** — the name describes the rarest one. Nesting is rare for a reason that is obvious
+  once stated: a region is one WSYNC-to-WSYNC interval, so a nest would have to fit two levels of iteration
+  inside a scanline. Siblings are two plain counted loops one after the other, each a fold the code already
+  computes into a map that is keyed by header and holds as many as it is given. `litmus_siblingloops.asm`
+  proves **40 cycles against a machine that spends 40**, and both controls stay refused.
+
+### Fixed
+- **The diagnosis is worth more than the change: lifting the latch-count limit gained ZERO regions, because
+  the graph shape was never the obstacle.** Every multi-latch region still fails, and the census of why says
+  `branch inside loop body` by a large margin at every latch count, then `trip count unknown` (14 of the
+  two-latch regions), then `WSYNC inside loop body`, then `call or jump inside loop body`. So
+  "multiple back-edges" was a refusal **named after a property that is real but not load-bearing**, and the
+  49 regions behind it are waiting on a different repair. Corpus effect: 0 gained, **0 lost, 0 lowered,
+  0 raised**.
+- **Reporting the specific body reason for a multi-latch region cost 6 proven regions** (Barnstorming $F3D4,
+  Chopper Command $FA78 and $FAEC, Planet of the Apes $F8B9, Seaquest $F1EC, Stampede $F1A5). It is more
+  informative than "multiple back-edges" and it is the wrong answer: `multipleBackEdges` is the ONE refusal
+  the DAG walk is allowed to override, matched **by identity**, so a more precise string is a string the
+  override does not match. Every multi-latch failure now rounds to it, and a test pins that.
+- **`overlaps` is unreachable today, and the negative control measuring that is written down rather than
+  taken as permission to delete it.** Disabling the guard entirely leaves the fixture's nested and
+  overlapping rows refused exactly as before: if two loops share an instruction then one body holds the
+  other's latch, a latch is a branch, and the body walk refuses a branch first. It is kept because the very
+  next repair — `branch inside loop body`, the largest refusal left — removes the check that hides it, and
+  it then becomes the only thing standing between a nest and a fold that charges an inner loop once for
+  iterations the machine runs many times. Pinned directly by a unit test, since no ROM can reach it.
+
 ### Added
+
 - **Stella oracle v3 — the write-only TIA registers are compared, not inferred (G4).** RAM (128/128 bytes) and
   pixels (100%) already agreed with Stella; COLUPF / NUSIZ / CTRLPF / REFP / HMxx did not, and **pixels cannot
   settle them** — an object whose graphics byte is `$00` renders identically whatever its NUSIZ says.

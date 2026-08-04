@@ -2109,10 +2109,186 @@ func (s *solver) foldLoops() string {
 	if len(latches) == 0 {
 		return ""
 	}
+	// TWO LOOPS IN A REGION ARE NOT NECESSARILY NESTED, AND THE REFUSAL WAS NAMED
+	// AFTER THE RAREST OF THE THREE SHAPES.
+	//
+	// This used to be `if len(latches) > 1 { return multipleBackEdges }`. Measured
+	// across the sixteen-cartridge corpus, of the regions carrying exactly two
+	// latches: 22 are SIBLINGS whose intervals do not overlap, 9 overlap
+	// irreducibly, and exactly 1 is nested. Nesting is rare for a reason that is
+	// obvious once stated — a region is one WSYNC-to-WSYNC interval, so a nest would
+	// have to fit two levels of iteration inside a scanline.
+	//
+	// Siblings are two plain counted loops one after the other. Each is a fold the
+	// code below already computes, `s.folds` is keyed by header and holds as many as
+	// it is given, and the longest-path walk pays each fold as it reaches it. So the
+	// region's cost is a sum of things already known, and the refusal was about the
+	// COUNT of back edges rather than about anything the analysis could not do.
+	//
+	// The rule is all-or-nothing: every latch must fold and no two bodies may share
+	// an instruction. A partial fold would leave a real loop in the graph for the
+	// walk to meet, and overlapping bodies have no order in which folding one leaves
+	// the other a simple counted loop.
 	if len(latches) > 1 {
-		return multipleBackEdges
+		// Deterministic order: `s.nodes` is a map, so the iteration above is
+		// randomised, and a refusal string that depends on which latch was examined
+		// first would make the corpus gate flap.
+		sort.Slice(latches, func(i, j int) bool {
+			if latches[i].Bank != latches[j].Bank {
+				return latches[i].Bank < latches[j].Bank
+			}
+			return latches[i].Addr < latches[j].Addr
+		})
+		// EVERY FAILURE HERE REPORTS multipleBackEdges, INCLUDING THE SPECIFIC ONES.
+		//
+		// The first version returned the body refusal instead — "WSYNC inside loop
+		// body" is more informative than "multiple back-edges", and a region whose
+		// second loop holds a WSYNC should be able to say so. It cost **6 proven
+		// regions** across the corpus (Barnstorming $F3D4, Chopper Command $FA78 and
+		// $FAEC, Planet of the Apes $F8B9, Seaquest $F1EC, Stampede $F1A5), and the
+		// reason is stated thirty lines above this: multipleBackEdges is the ONE
+		// refusal `analyzeRegion` lets the DAG walk override. A more precise string
+		// is a string the override does not match, so those regions stopped being
+		// answered by the walk that had been answering them.
+		//
+		// Precision in the message is worth less than the answer it suppresses.
+		shapes := make([]loopShape, 0, len(latches))
+		for _, l := range latches {
+			sh, refusal := s.loopShape(l)
+			if refusal != "" {
+				return multipleBackEdges
+			}
+			shapes = append(shapes, sh)
+		}
+		for i := range shapes {
+			for j := i + 1; j < len(shapes); j++ {
+				if shapes[i].overlaps(shapes[j]) {
+					return multipleBackEdges
+				}
+			}
+		}
+		// determineBound is deferred to here so that NOTHING is folded until every
+		// loop is known to be foldable — a half-folded region hands the walk a graph
+		// with a real cycle still in it.
+		type ready struct {
+			sh loopShape
+			n  int
+		}
+		var rs []ready
+		for _, sh := range shapes {
+			n := determineBound(s.nodes, sh.header, sh.latch, s.absStates, s.sw, s.amaxHint)
+			if n <= 0 {
+				// s.pending carries ONE loop, and the caller uses it to answer "how
+				// many iterations fit the budget?". With several loops in the region
+				// that question has no single answer, so it is refused rather than
+				// answered about whichever loop happened to be scanned last — and
+				// refused as multipleBackEdges, so the DAG walk keeps its override.
+				return multipleBackEdges
+			}
+			rs = append(rs, ready{sh, n})
+		}
+		for _, r := range rs {
+			s.folds[r.sh.header] = r.sh.loopInfo(r.n)
+		}
+		siblingFolds++
+		return ""
 	}
-	latch := latches[0]
+	sh, refusal := s.loopShape(latches[0])
+	if refusal != "" {
+		return refusal
+	}
+	latch, header, bodyNoBranch, pen := sh.latch, sh.header, sh.bodyNoBranch, sh.pen
+	n := determineBound(s.nodes, header, latch, s.absStates, s.sw, s.amaxHint)
+	if n <= 0 {
+		// The body is fully understood; only the trip count is missing. Keep it so
+		// the caller can still answer "how many iterations fit the budget?".
+		s.pending = &pendingLoop{header: header, latch: latch, bodyNoBranch: bodyNoBranch, pen: pen, exit: latch.nextSite()}
+		return "loop bound unknown (need a counted dex/dey or sbc-divide idiom with a proven range)"
+	}
+	s.folds[header] = sh.loopInfo(n)
+	return ""
+}
+
+// siblingFolds counts regions settled by folding more than one loop. It is a
+// MEASUREMENT counter like divEdgeScanned: a fixture can read it to prove its own
+// premise, that the region it grades really took the multi-loop path rather than
+// being answered by the single-loop path or by the DAG walk.
+var siblingFolds int
+
+// loopShape is everything foldLoops learns about one counted loop before it knows
+// the trip count: which instructions are in the body, what they cost, and whether
+// the back edge crosses a page.
+type loopShape struct {
+	latch        Instr
+	header       site
+	body         map[site]bool
+	bodyNoBranch int
+	pen          int
+}
+
+// overlaps reports whether two loops share an instruction. Siblings do not; nests
+// and irreducible overlaps do, and both are refused.
+//
+// IT IS UNREACHABLE TODAY, AND MEASURED TO BE. Disabling it entirely (`return false`)
+// leaves the fixture's NestedRow and OverlapRow refused exactly as before — the
+// negative control does not fire. The reason is structural: if two loops share an
+// instruction, one body contains the other's LATCH, a latch is a branch, and
+// `loopShape` refuses a body holding a branch before this is ever consulted.
+//
+// It is kept, and the emptiness is written down rather than taken as permission to
+// delete, because the very next repair to this package removes the check that hides
+// it. `branch inside loop body` is the largest refusal left on the corpus; the moment
+// a branch in the body is allowed, nests and overlaps reach here and this becomes the
+// only thing standing between them and a fold that charges an inner loop once for
+// iterations the machine runs many times. Its behaviour is pinned directly by
+// TestOverlapsSeparatesSiblingsFromNests rather than through a fixture, since no
+// fixture can reach it.
+//
+// It compares BODY SETS rather than address ranges. Address ranges would call two
+// loops disjoint whenever their [header, latch] spans do not intersect, which is the
+// same answer for the shapes that matter here but relies on the body being
+// contiguous — and `loopShape` follows `nextSite()`, which is not obliged to walk
+// addresses in order. The set is what the fold actually charges for, so the set is
+// what must not be shared.
+func (a loopShape) overlaps(b loopShape) bool {
+	if a.header == b.header || a.latch.site() == b.latch.site() {
+		return true
+	}
+	if b.body[a.header] || a.body[b.header] {
+		return true
+	}
+	if b.body[a.latch.site()] || a.body[b.latch.site()] {
+		return true
+	}
+	small, large := a.body, b.body
+	if len(large) < len(small) {
+		small, large = large, small
+	}
+	for at := range small {
+		if large[at] {
+			return true
+		}
+	}
+	return false
+}
+
+// loopInfo turns a shape plus a trip count into the folded cost.
+func (sh loopShape) loopInfo(n int) loopInfo {
+	// n iterations: n bodies, (n-1) taken branches back, 1 final not-taken exit.
+	loopCost := n*sh.bodyNoBranch + (n-1)*(sh.latch.Def.Cycles+sh.pen) + sh.latch.Def.Cycles
+	// Fewest iterations: the back edge is a bne/bpl AFTER the body, so the body
+	// runs at least once and the branch then falls through.
+	minLoopCost := sh.bodyNoBranch + sh.latch.Def.Cycles
+	return loopInfo{cost: loopCost, minCost: minLoopCost, exit: sh.latch.nextSite(), n: n}
+}
+
+// loopShape validates that one back edge closes a simple counted loop and returns
+// its shape, or a refusal string naming what is wrong with the body.
+//
+// It is the whole of the old foldLoops from the body walk down to the page penalty,
+// lifted out unchanged so that a region with several back edges can ask the same
+// question about each of them.
+func (s *solver) loopShape(latch Instr) (loopShape, string) {
 	header := latch.branchSite()
 
 	// Validate the body header..latch is a simple straight chain and sum its
@@ -2123,22 +2299,22 @@ func (s *solver) foldLoops() string {
 	for {
 		in, ok := s.nodes[at]
 		if !ok {
-			return "loop body leaves the region"
+			return loopShape{}, "loop body leaves the region"
 		}
 		if in.Bank != latch.Bank {
 			// Should be unreachable — the chain is followed by in.next() inside one bank —
 			// but a body in another bank would make the address comparisons below
 			// meaningless, so it is refused rather than assumed away.
-			return "loop body leaves the latch's bank"
+			return loopShape{}, "loop body leaves the latch's bank"
 		}
 		if in.Addr == latch.Addr {
 			break
 		}
 		if in.isWSYNC() {
-			return "WSYNC inside loop body"
+			return loopShape{}, "WSYNC inside loop body"
 		}
 		if in.Def.IsBranch() {
-			return "branch inside loop body — not a simple counted loop"
+			return loopShape{}, "branch inside loop body — not a simple counted loop"
 		}
 		// A CALL OR JUMP IN THE BODY IS NOT A BRANCH, and `IsBranch` does not catch
 		// it: that is `AddressingMode == Relative && Effect == Flow`, while a JSR is
@@ -2165,20 +2341,20 @@ func (s *solver) foldLoops() string {
 		switch in.Def.Operator {
 		case instructions.JSR, instructions.JMP,
 			instructions.RTS, instructions.RTI, instructions.BRK:
-			return "call or jump inside loop body — the folded cost is not one iteration"
+			return loopShape{}, "call or jump inside loop body — the folded cost is not one iteration"
 		}
 		// A bank switch inside the body is a SOUNDNESS condition, not a precision one:
 		// the folded cost n*body + (n-1)*(latch+pen) + latch assumes every iteration
 		// executes the same bytes, and after a switch iteration 2 executes different
 		// bytes at the same addresses.
 		if es, keep, refusal := s.sw.switchEdges(in, s.absStates[at]); refusal != "" || len(es) > 0 || !keep {
-			return "bank switch inside loop body — the second iteration does not execute the same bytes"
+			return loopShape{}, "bank switch inside loop body — the second iteration does not execute the same bytes"
 		}
 		bodyNoBranch += in.nodeCost()
 		body[at] = true
 		at = in.nextSite()
 		if at.addr > latch.Addr {
-			return "misaligned loop body"
+			return loopShape{}, "misaligned loop body"
 		}
 	}
 
@@ -2213,7 +2389,7 @@ func (s *solver) foldLoops() string {
 		}
 		for _, nx := range succ {
 			if nx != header && body[nx] {
-				return "loop entered past its header — the counter's entry value is not " +
+				return loopShape{}, "loop entered past its header — the counter's entry value is not " +
 					"the one the scan maximised over"
 			}
 		}
@@ -2223,20 +2399,7 @@ func (s *solver) foldLoops() string {
 	if (latch.next() >> 8) != (header.addr >> 8) {
 		pen = 2
 	}
-	n := determineBound(s.nodes, header, latch, s.absStates, s.sw, s.amaxHint)
-	if n <= 0 {
-		// The body is fully understood; only the trip count is missing. Keep it so
-		// the caller can still answer "how many iterations fit the budget?".
-		s.pending = &pendingLoop{header: header, latch: latch, bodyNoBranch: bodyNoBranch, pen: pen, exit: latch.nextSite()}
-		return "loop bound unknown (need a counted dex/dey or sbc-divide idiom with a proven range)"
-	}
-	// n iterations: n bodies, (n-1) taken branches back, 1 final not-taken exit.
-	loopCost := n*bodyNoBranch + (n-1)*(latch.Def.Cycles+pen) + latch.Def.Cycles
-	// Fewest iterations: the back edge is a bne/bpl AFTER the body, so the body
-	// runs at least once and the branch then falls through.
-	minLoopCost := bodyNoBranch + latch.Def.Cycles
-	s.folds[header] = loopInfo{cost: loopCost, minCost: minLoopCost, exit: latch.nextSite(), n: n}
-	return ""
+	return loopShape{latch: latch, header: header, body: body, bodyNoBranch: bodyNoBranch, pen: pen}, ""
 }
 
 // divEdgeScanned counts how many divide folds took their entry bound from the EDGE
@@ -2250,7 +2413,6 @@ func (s *solver) foldLoops() string {
 // exists so a fixture can prove its own premise, that the region it grades really took
 // the scan under test.
 var divEdgeScanned int
-
 
 // writesX and writesY report whether an operator writes that index register.
 //
@@ -2293,10 +2455,10 @@ func writesY(op instructions.Operator) bool {
 // default when a table is missing is to refuse. Everything here is a store or a
 // stack/flag operation whose 6502 definition sets neither Z nor N:
 //
-//   STA/STX/STY  write memory only
-//   PHA/PHP      push; PLA and PLP are absent because they LOAD the flags
-//   CLC/SEC/CLI/SEI/CLV/CLD/SED  touch C, I, V or D — never Z or N
-//   NOP          by definition
+//	STA/STX/STY  write memory only
+//	PHA/PHP      push; PLA and PLP are absent because they LOAD the flags
+//	CLC/SEC/CLI/SEI/CLV/CLD/SED  touch C, I, V or D — never Z or N
+//	NOP          by definition
 //
 // Anything else — including every compare, every arithmetic op, every transfer
 // (TAX/TXA set Z and N), TSX, and the loads — is treated as clobbering the flags.
