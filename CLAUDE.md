@@ -55,7 +55,11 @@ must always hold *only* in a doc — burn them here or into memory.
 - Every tool returns results as **numbers (typed JSON, with Coords)**. The image (`get_screen_annotated`) is
   a special case = the annotated screenshot below.
 - Regression = **Gopher2600's `regress` + record/replay**. Pure-6502 cycles = sim65 / 6502profiler.
-- Reference oracle = **Stella** (`-sssingle -ss1x`, `-tia.dbgcolors roygbp`, `-dbg.script`+`dump`).
+- Reference oracle = **Stella** (`-sssingle -ss1x`, `-tia.dbgcolors roygbp`). Debugger commands are delivered
+  by writing `~/Library/Application Support/Stella/autoexec.script` and entering the debugger, **not** by a
+  command-line flag: `-dbg.script` does not exist in Stella 7.0 (`-help` has no such option) and never did any
+  work here. `dump` covers RAM; the **write-only TIA registers** are reachable only through the debugger's
+  `tia` command, which needs the GUI — hence the captured sessions in `internal/oracle/testdata/stella_tia/`.
 - Image overlay = **in-house Go** (`image/draw` + `fogleman/gg`). No shelling out to ImageMagick.
 - Assembler = **DASM** (`-f3`). **BizHawk not adopted (not on macOS).**
 - MCP tools (**implemented**, `cmd/harness`): `load_rom` / `step_frame` / `read_cpu` / `read_ram` /

@@ -8,6 +8,45 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Stella oracle v3 — the write-only TIA registers are compared, not inferred (G4).** RAM (128/128 bytes) and
+  pixels (100%) already agreed with Stella; COLUPF / NUSIZ / CTRLPF / REFP / HMxx did not, and **pixels cannot
+  settle them** — an object whose graphics byte is `$00` renders identically whatever its NUSIZ says.
+  `scripts/stella_oracle.sh <rom> <frames> tia` captures Stella's `tia` debugger output, `cmd/stellacheck
+  -session` grades it offline, and `internal/oracle` re-grades every capture on every `go test`. **147 captures
+  (all 114 `roms/litmus` + all 31 `roms/techniques` + 2 probes) x 37 registers = 5,439 readings, 19
+  disagreements, 0 divergences**, with all 37 registers taking more than one value across the corpus.
+- **Each disagreement is classified from measurement, never from assertion.** 7 are sub-frame phase — our side
+  holds Stella's exact value at some scanline of the next frame (`litmus_hmxx_freeze` sets `HMP0=$80` right
+  after VSYNC and `HMCLR`s it later in the same frame, so the two frame boundaries fall either side of one
+  store). 10 are undefined at power-on: `litmus_cycles` and `uninit_trap` contain no `HMxx` or `HMCLR` write at
+  all and read Gopher2600's power-on nibble 8 against Stella's 0, where a real TIA leaves the register
+  undefined and **neither is right**. 2 are power-on RAM, and there **Stella is not reproducible**: two
+  consecutive captures of `uninit_trap` at the same frame gave COLUBK `$fc` and then `$02`.
+- **Stella's `tia` text is decoded by probe ROMs written for the purpose, not by reading Gopher2600.** Taking
+  the field conventions off our own emulator would have made the comparison circular, so
+  `internal/oracle/testdata/tiaprobe.asm` fixes from ROM source that `HM=$7` is the raw nibble, `size=#N` the
+  raw two-bit field, `GR=` the **new** VDEL copy, and `PF0` pre-shifted.
+- **RESMP1 is a Stella 7.0 defect, so it is named rather than compared.** `tiaprobe.asm` writes RESMP0=`$02` /
+  RESMP1=`$00` and Stella prints the reset flag SET on both missile lines; the mirrored `tiaprobe2.asm` writes
+  the opposite and Stella prints it CLEAR on both. Stella's M1 flag equals RESMP0 in both cases and RESMP1 in
+  neither. `TestStella70MisreportsRESMP1` locks this, so a fixed Stella turns the test red and the register
+  comes back into the comparison.
+- **The channels that would have made this headless were ruled out by measurement, not assumption**
+  (Stella 7.0): `dump 00 3f 1` returns the TIA *read* ports mirrored every `$10`; `saveState` from autoexec
+  writes no file anywhere; the debugger expression language exposes no TIA-register accessor; and
+  `tia` + `saveSes` inside `autoexec.script` yields a **0-byte file**, because `Debugger::exec()` keeps only
+  the `Executed N commands` summary and discards each command's output.
+- **The GUI dependency is loud rather than silent.** A corpus ROM with no capture fails the test by name, and
+  it fired for real when `litmus_bccdiv.bin` was added mid-run. Adding a litmus or technique ROM now requires
+  `scripts/stella_oracle.sh <rom> 5 tia`.
+
+### Fixed
+- **CLAUDE.md named a Stella flag that does not exist.** The settled-architecture line listed `-dbg.script` as
+  how debugger commands reach Stella. `Stella -help` (7.0) has no such option and the real mechanism has always
+  been `~/Library/Application Support/Stella/autoexec.script`. A wrong name in the one document that is loaded
+  every session is worse than no name.
+
 ### Fixed
 - **BCC counts UP, so the divide bound used the wrong variable — and this closes the nine unsound bounds
   the `determineBound` audit found.** `sbc #N / bcs` loops while A >= N and A falls, so a larger entry value

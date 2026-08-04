@@ -36,11 +36,31 @@ own authoring loop**, not the editor. The G work stands on its own; M references
 
 ## Tier 2 — depth / accuracy
 
-### G4 — Stella oracle TIA write-register compare
-- **Status:** RAM (128/128) and pixels (100%) are cross-checked; **COLUPF/NUSIZ etc. write registers
-  are not compared vs Stella.** [`stella-oracle.md` v2 backlog]
-- **Gap:** can't authoritatively confirm a generated kernel wrote the right registers (only indirect
-  via `read_tia` / pixels).
+### G4 — Stella oracle TIA write-register compare — CLOSED (2026-08-03)
+- **Status:** 37 write-only TIA registers per ROM are now compared against Stella across the whole corpus:
+  **147 captures (all 114 `roms/litmus` + all 31 `roms/techniques` + 2 probes), 5,439 readings, 19
+  disagreements, 0 divergences**, and all 37 registers take more than one value across the corpus, so the
+  denominator is not constant-against-constant.
+- **The gap's premise held.** Stella does report the registers — but only through the debugger's `tia`
+  command, and no file-writing debugger command carries them. `dump 00 3f 1` returns the TIA *read* ports
+  mirrored every `$10`; `saveState` from autoexec writes nothing; the expression language has no
+  TIA-register accessor; `tia` + `saveSes` inside `autoexec.script` produces a **0-byte** file because
+  `Debugger::exec()` keeps only the "Executed N commands" summary. Capture is therefore GUI-driven at
+  ~13 s/ROM, stored with `# rom:` / `# frames:` provenance, and re-graded on every `go test`.
+- **The 19 disagreements are classified from measurement.** 7 sub-frame phase (our side holds Stella's exact
+  value at some scanline of the next frame); 10 undefined at power-on (`litmus_cycles` and `uninit_trap`
+  contain no `HMxx`/`HMCLR` write and read Gopher2600's power-on nibble 8 against Stella's 0, where the TIA
+  itself leaves the register undefined and neither side is right); 2 power-on RAM, where **Stella is not
+  reproducible** — two captures of `uninit_trap` gave COLUBK `$fc` then `$02`.
+- **Verified in the main session by three controls, not by the agent's report.** Green as shipped; hiding one
+  capture turns it red by name (`1 corpus ROM(s) have no Stella capture, so this oracle does not cover them`);
+  altering one captured byte is caught as a **divergence**, not excused as phase — `COLUBK: harness=$98
+  stella=$97 [divergence: our side never holds $97 anywhere in the next 300 scanlines]`.
+- **Still open, named:** VSYNC / VBLANK (Stella prints only the D1 blanking flag, and `emu.TIARegisters` has
+  no VBLANK at all); the raw NUSIZ and CTRLPF bytes (both sides report decoded fields, so the TIA-unused bits
+  are uncompared); the OLD copies of GRP0 / GRP1 / ENABL; and **RESMP1**, because Stella 7.0 misreports it —
+  its M1 flag tracks RESMP0, proven with two mirrored probe ROMs and locked by a test that fails if Stella is
+  ever fixed.
 
 ### G3 — digital speech (4-bit DAC PCM) fidelity verification
 - **Techniques:** Doctor Who speech (234209), SAM2600 (309689), Tiamat micro-tuning (386896).
