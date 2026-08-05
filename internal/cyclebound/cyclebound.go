@@ -1369,6 +1369,14 @@ type solver struct {
 	unbReason string // why
 	sm        *srcmap.Map
 	amaxHint  int // ②: `@amax N` = author-declared upper bound of a divide-loop accumulator; used by determineBound when the abstract range is Top
+	// allInstrs is the WHOLE decoded program, not just this region's subgraph.
+	// determineBound's predecessor scan needs it: a divide loop's entry value is
+	// normally established BEFORE the region's opening WSYNC (`lda #SCORE_X` then
+	// `jsr SetXPos`, whose first act is `sta WSYNC`), and a scan confined to the
+	// region cannot see it. Measured on a probe pair that differ only in whether the
+	// `lda #78` sits before or after the opening WSYNC: 116cy NOT CERTIFIED vs 60cy
+	// CERTIFIED, for machine behaviour that is identical.
+	allInstrs map[site]Instr
 
 	// pending holds a loop whose body is perfectly well understood but whose
 	// iteration count could not be established. Keeping it, instead of only
@@ -1887,7 +1895,7 @@ func analyzeRegionInContexts(instrs map[site]Instr, start Instr, budget, amaxHin
 		s := &solver{
 			nodes: map[site]Instr{}, sinks: map[site]bool{}, folds: map[site]loopInfo{},
 			memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states, sm: sm, amaxHint: amaxHint,
-			sw: sw, banked: sw.banked,
+			sw: sw, banked: sw.banked, allInstrs: instrs,
 		}
 		if msg := s.collectRegion(instrs, start); msg != "" {
 			return nil
@@ -2238,7 +2246,7 @@ func (s *solver) foldLoops() string {
 		}
 		var rs []ready
 		for _, sh := range shapes {
-			n := determineBound(s.nodes, sh.header, sh.latch, s.absStates, s.sw, s.amaxHint)
+			n := determineBound(s.nodes, s.allInstrs, sh.header, sh.latch, s.absStates, s.sw, s.amaxHint)
 			if n <= 0 {
 				// s.pending carries ONE loop, and the caller uses it to answer "how
 				// many iterations fit the budget?". With several loops in the region
@@ -2260,7 +2268,7 @@ func (s *solver) foldLoops() string {
 		return refusal
 	}
 	latch, header, bodyNoBranch, pen := sh.latch, sh.header, sh.bodyNoBranch, sh.pen
-	n := determineBound(s.nodes, header, latch, s.absStates, s.sw, s.amaxHint)
+	n := determineBound(s.nodes, s.allInstrs, header, latch, s.absStates, s.sw, s.amaxHint)
 	if n <= 0 {
 		// A TIMER SPIN IS NOT A LOOP MISSING A COUNTER.
 		//
@@ -2712,7 +2720,7 @@ func preservesZN(op instructions.Operator) bool {
 //     corpus with a counter (proxyFallbackHits): 0 ROMs reach it, so it is gated to
 //     the same bank rather than deleted, and the counter stays so a future ROM that
 //     starts relying on it is visible instead of silent.
-func determineBound(nodes map[site]Instr, header site, latch Instr, absStates map[site]State, sw switchModel, amaxHint int) int {
+func determineBound(nodes, allInstrs map[site]Instr, header site, latch Instr, absStates map[site]State, sw switchModel, amaxHint int) int {
 	// 2B: divide-by-N coarse-positioning idiom — the body subtracts a constant from
 	// A and loops while no borrow (BCS) / while borrow (BCC). Max iterations =
 	// floor(Amax/const)+1 (with carry set); +1 more covers an unknown entry carry.
@@ -2775,7 +2783,36 @@ func determineBound(nodes map[site]Instr, header site, latch Instr, absStates ma
 		// using `transfer`.
 		amax := -1
 		unknownPred := false
-		for at, in := range nodes {
+		// SCAN THE WHOLE PROGRAM, NOT THIS REGION'S SUBGRAPH.
+		//
+		// A divide loop's entry value is normally established BEFORE the region's
+		// opening WSYNC — `lda #SCORE_X` and then `jsr SetXPos`, whose first act is
+		// `sta WSYNC`. `nodes` starts AFTER that WSYNC, so the only in-region
+		// predecessor of the header was the latch, which this loop excludes, leaving
+		// amax = -1 and the 255 floor below. The floor is sound but it is 19 iterations
+		// where a sprite coordinate reaches 6, and it is the difference between a
+		// certified kernel and a red one.
+		//
+		// Measured on a probe pair identical except for where `lda #78` sits:
+		//   before the opening WSYNC   116cy, NOT CERTIFIED
+		//   after it (same machine)     60cy, CERTIFIED
+		// Two verdicts for one behaviour, decided by which side of a WSYNC a constant
+		// was written on.
+		//
+		// Widening the scan can only ADD predecessors, and the maximum over a LARGER
+		// predecessor set is >= the maximum over a smaller one — so this cannot lower
+		// a bound that was already derived, and the direction this package forbids
+		// (under-approximation) is not reachable this way. What it CAN do is turn
+		// amax = -1 into a real value, which lowers the count from the 255 floor. That
+		// is only sound if the predecessor set is COMPLETE, which is exactly what the
+		// `unknownPred` guard below is for: any instruction whose successors we cannot
+		// resolve might be a predecessor we never saw, and one of those forfeits the
+		// inferred bound entirely.
+		scan := allInstrs
+		if scan == nil {
+			scan = nodes
+		}
+		for at, in := range scan {
 
 			if at == latch.site() {
 				continue // the back edge carries the REDUCED A, not the entry value
@@ -3213,6 +3250,7 @@ func analyzeRegion(instrs map[site]Instr, start Instr, budget, amaxHint int, sm 
 		amaxHint:  amaxHint,
 		sw:        sw,
 		banked:    sw.banked,
+		allInstrs: instrs,
 	}
 	reg := Region{Start: start.Addr, StartLoc: s.loc(start.site()), Budget: budget, Bounded: true, Kind: "visible"}
 	if sw.banked {

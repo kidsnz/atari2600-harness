@@ -9,6 +9,40 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **The divide loop's entry value now crosses the region boundary — and the backlog item that sent me looking
+  was wrong in both of its premises, which is the more useful half of this entry.** The board said the prover
+  mislabels pizza-boy's `SetXPos` as `kind=visible` because blank classification does not cross a JSR.
+  - **It is not the JSR.** The same 116cy refusal reproduces with the loop INLINED and no call anywhere.
+  - **`kind=visible` is not a mislabel.** `SetXPos` is called twice from VBLANK *and three times from the
+    HUD*, which is visible (`pizza_boy.asm:320,336,339`). A visible context genuinely exists.
+  What the probes actually found: two ROMs with identical machine behaviour get opposite verdicts depending
+  on which side of a WSYNC a constant is written on. `lda #78` before the region's opening WSYNC → **122cy,
+  NOT CERTIFIED**; the same `lda #78` after it → **60cy, CERTIFIED**. `determineBound`'s predecessor scan ran
+  over the region subgraph only, and the ordinary positioning idiom (`lda #TARGET_X` then `jsr SetXPos`, whose
+  first act is `sta WSYNC`) puts the deciding instruction on the far side of that boundary — so the scan found
+  only the latch, which it correctly excludes, and fell through to the 255 floor: 19 iterations for a value
+  of 78. Widened to the whole decoded program. Sound by construction (a maximum over MORE predecessors cannot
+  be smaller) and graded: **observed <= proven on 1399 regions across 172 ROMs, no exceptions.**
+- **The corpus does not witness that fix, and saying so is the point.** Sweeping all 157 ROMs before and
+  after, **ZERO changed their proven bound** — every real kernel that shares a positioning routine passes it a
+  RAM byte (Top whatever the scan sees) or is refused earlier for an unrelated reason (`shared_setxpos` dies
+  at "no WSYNC reached from region start"). A fix whose only demonstration is a throwaway probe is one nothing
+  would notice losing, so the probe is checked in as `roms/litmus/litmus_divpre.asm` + `scenarios/divpre.json`:
+  CERTIFIED at 62cy with the change, `OVER 122>76` without.
+- **A second change was written, measured, and thrown away.** Classifying each call CONTEXT's display state
+  from its own call site — rather than from the callee's entry state, which is the join over all callers and
+  therefore unknown the moment one caller is visible — is correct in principle and is exactly what "the blank
+  classification does not cross a JSR" should have meant. Measured over 157 ROMs: **102 certified either way,
+  and not one proven bound moved.** It cannot differ: the join is only unknown when some context is visible,
+  and a visible context outranks a blank one in the verdict regardless. Reverted rather than shipped as
+  unwitnessed complexity.
+- **pizza-boy's `prove_line_budget` is still red, and now for a precisely stated reason.** The remaining
+  imprecision is that loop bounds are **context-insensitive**: A's range at the divide header is the join over
+  all five call sites, two of which pass a RAM byte, so the HUD contexts inherit 19 iterations even though
+  they pass compile-time constants. Fixing that means context-sensitive abstract interpretation, which is a
+  project and not a patch. `@amax` does not substitute for it — one declared ceiling cannot say "160 here and
+  78 there".
+
 - **All 4 breathing ROMs repaired: the corpus is now 156/156 single-valued, 0 breathing.** Every fix is the
   same lesson stated twice, because the two halves of the corpus broke it in different ways.
   - `banked_game` (+2 lines every 120th frame) and the two `lint_bank_*` fixtures (+3 every 120th) do their
