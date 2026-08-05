@@ -3907,3 +3907,31 @@ correlation, and this corpus contains two counters with compatible periods.
 **The corpus-wide gate no longer needs an exclusion list.** That was the reason not to add one. What remains
 is only its cost: **76s** for 156 ROMs at 130 frames. Still not added unilaterally; the invariant it would
 assert is "every ROM's frame count is single-valued", not "every ROM is 262".
+
+### K6 — the prover's loop bounds are context-insensitive, and full k-CFA is not the cheapest fix (2026-08-05)
+
+**Where it bites.** `pizza_boy.asm` is the only ROM in reach whose `prove_line_budget` is red, and the reason
+is now exact. `SetXPos`'s `sbc #15` divide is bounded from A's range at the loop header; the region walk is
+already per-call-context (`analyzeRegionInContexts`), but `determineBound` reads `absStates`, which is
+`map[site]State` — **keyed by site alone**. A's range there is the join over all five call sites, two of which
+pass a RAM byte (`lda px`), so the three HUD contexts inherit Top and get 19 iterations although they pass
+compile-time constants (78, 86, 59) and could not exceed ~6.
+
+**What full context sensitivity would cost.** The key becomes (site, context) across ~40 uses of the state map
+in 4 files (`cyclebound.go` 26, `defuse.go` 7, `beaminterval.go` 6, `absint.go`'s fixpoint), over 5,053 lines
+of soundness-critical code. It also needs a context abstraction chosen and defended — call-string depth k,
+recursion handling, a widening that terminates — in a package where under-approximation is the one forbidden
+direction and the grade is `observed <= proven` over 1,399 regions. That is a project.
+
+**A narrower fix that reaches the same case.** The region walk already KNOWS its context: it is handed the
+return site `ret`, and the calling JSR sits at `ret-3`. So for a region entered through a JSR, read the
+divide's entry value from **that call site's** state rather than the header's join, guarded by a def-use
+question this package can already answer: *is A written anywhere between the JSR and the loop header?* If it
+is not — which is the whole positioning idiom, `lda #X` / `jsr SetXPos` / `sec` / `sta WSYNC` / loop — then
+`states[jsr].A` IS the entry range for that context, exactly and soundly. If it is, fall back to today's
+behaviour. This is one rule with one guard, it composes with the widened predecessor scan already landed, and
+it is gradable by the same corpus test.
+
+**Not started.** Recorded here with the measurement so the next pass does not begin by re-deriving why the
+obvious fix (`@amax`) does not work: one declared ceiling cannot say "160 here and 78 there", and the
+contexts differ by two orders of magnitude in trip count.
