@@ -98,6 +98,20 @@ type Access struct {
 // (see killStoreTargets): if the two disagreed, a cell could be invalidated
 // without being reported, or reported without being invalidated.
 func accessOf(in Instr, st State) (Access, bool) {
+	// THE STACK FIRST, because its operators wear every Effect class: PHA/PHP are
+	// Implied writes, JSR is Subroutine, BRK is Interrupt — and the Effect switch
+	// below returns false for the last two, which is exactly how a JSR's two
+	// return-address bytes stayed invisible to the may-write set. Measured on
+	// litmus_jsr_stack: PC $F059 wrote $01FD and PC $F05E wrote $0109, both outside
+	// their predicted sets, 2 of 39,563 corpus pairs.
+	//
+	// stackAccess also changes what an UNKNOWN SP means: the old PHA case answered
+	// Unbounded, but an 8-bit SP reaches all 256 bytes of page 1 and not one more —
+	// a bounded footprint that provably contains no cartridge address, therefore no
+	// bank-switch hotspot, therefore nothing for switchEdges to refuse.
+	if a, ok := stackAccess(in, st); ok {
+		return a, true
+	}
 	d := in.Def
 	var kind AccessKind
 	switch d.Effect {
@@ -129,17 +143,8 @@ func accessOf(in Instr, st State) (Access, bool) {
 	case instructions.Immediate, instructions.Relative:
 		return Access{}, false
 	case instructions.Implied:
-		switch d.Operator {
-		case instructions.PHA, instructions.PHP:
-			a := Access{PC: in.Addr, Kind: AccessWrite}
-			sp, ok := st.SP.konst()
-			if !ok {
-				a.Unbounded = true // SP unknown: the push could be anywhere in page 1
-				return a, true
-			}
-			a.Addrs, a.Exact = []uint16{uint16(0x0100 | (sp & 0xFF))}, true
-			return a, true
-		}
+		// Pushes were handled by stackAccess above; nothing else Implied touches
+		// memory.
 		return Access{}, false
 	}
 

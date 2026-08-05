@@ -11,7 +11,12 @@
 // positives are allowed, false negatives are not. (Cousot & Cousot, POPL 1977.)
 package cyclebound
 
-import "github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
+import (
+	"sort"
+
+	"github.com/jetsetilly/gopher2600/hardware/cpu/instructions"
+	"github.com/jetsetilly/gopher2600/hardware/memory/memorymap"
+)
 
 func imin(a, b int) int {
 	if a < b {
@@ -138,6 +143,176 @@ func decWrap(r ValueRange) ValueRange {
 		return vTop()
 	}
 	return vRange(r.Lo-1, r.Hi-1)
+}
+
+// --- the stack (SD-3) ---
+//
+// On the 2600 a stack operation is a memory operation like any other, because page 1
+// is decoded exactly as page 0 is: $0100-$017F is TIA (with its mirrors) and
+// $0180-$01FF is RAM $80-$FF. So the model owes two answers about every push and
+// every pull — where SP ends up, and which cell the byte reached — and both have to
+// be right, because consumers read the footprint straight off SP (accessOf, and
+// through it the bank-switch model and the def-use may-write set).
+//
+// INTERRUPTS. The audit's other half — "an interrupt would move SP without being
+// seen at all" — is BRK and nothing else on this machine. The 6507 brings no IRQ or
+// NMI pin out of the package, and the vendored engine agrees: `CPU.Interrupt` is
+// defined in Gopher2600/hardware/cpu/cpu.go and no call to it exists anywhere under
+// hardware/ (the only `Interrupt()` calls are the ARM coprocessor's own). So the
+// only route to the IRQ vector is the BRK instruction, which is modelled below.
+
+// spDelta shifts SP by d bytes (negative = pushes). A shift that wraps past either
+// end of the page cannot be written as one interval, so it answers Top — sound,
+// because Top is exactly the 8-bit range SP lives in anyway.
+func spDelta(sp ValueRange, d int) ValueRange {
+	if sp.Top {
+		return vTop()
+	}
+	lo, hi := sp.Lo+d, sp.Hi+d
+	if lo < 0 || hi > 255 {
+		return vTop()
+	}
+	return vRange(lo, hi)
+}
+
+// stackTargets enumerates the page-1 addresses n consecutive pushes from SP reach:
+// the first at $0100|SP, the next at $0100|SP-1, and so on downward.
+//
+// An UNKNOWN SP reaches all 256 addresses of page 1 and not one more, because SP is
+// eight bits. That is a bounded footprint, not an unknown one, and the difference is
+// load-bearing: switchEdges refuses an entire region when an access is Unbounded,
+// while a page-1 footprint provably contains no cartridge address, therefore no
+// bank-switch hotspot, therefore nothing to refuse.
+func stackTargets(sp ValueRange, n int) []uint16 {
+	if n <= 0 {
+		return nil
+	}
+	if sp.Top || sp.Hi-sp.Lo >= 255 {
+		out := make([]uint16, 256)
+		for i := range out {
+			out[i] = uint16(0x0100 | i)
+		}
+		return out
+	}
+	seen := map[uint16]bool{}
+	out := make([]uint16, 0, (sp.Hi-sp.Lo+1)*n)
+	for v := sp.Lo; v <= sp.Hi; v++ {
+		for i := 0; i < n; i++ {
+			t := uint16(0x0100 | ((v - i) & 0xFF))
+			if !seen[t] {
+				seen[t] = true
+				out = append(out, t)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+// displayRegister folds a page-1 address through the engine's own memory map and
+// reports VSYNC ($00) or VBLANK ($01) if that is what the console decodes there.
+// Folding matters: $0141 is VBLANK through a TIA mirror, and a raw comparison
+// against $0101 would miss it.
+func displayRegister(t uint16) (uint16, bool) {
+	ma, area := memorymap.MapAddress(t, false)
+	if area != memorymap.TIA || (ma != 0x00 && ma != 0x01) {
+		return 0, false
+	}
+	return ma, true
+}
+
+// applyPush performs the memory side of pushing vals (vals[0] to $0100|SP, vals[1]
+// to $0100|SP-1, ...). It has to do everything applyStore does, because it IS a
+// store, and each part of it was missing:
+//
+//   - the tracked cell is dropped. A page-1 target above $017F is RAM $80-$FF; below
+//     it, it is a TIA register, whose shadow in Mem is equally stale afterwards.
+//   - ZPVal (3B) absorbs the value. ZPVal is the join of every value stored anywhere
+//     in zero page and is what an indexed load `lda $80,x` returns; a push that puts
+//     $A5 into RAM $FD while ZPVal still says [0,0] would bound a loop on a range the
+//     hardware has already left.
+//   - the display bits follow the write. A push landing on VSYNC/VBLANK changes them,
+//     and a push that CLEARS VBLANK unseen leaves a visible region classified "blank"
+//     and skipped by the budget check — the one direction this package forbids.
+func (n *State) applyPush(sp ValueRange, vals []ValueRange) {
+	targets := stackTargets(sp, len(vals))
+	for _, t := range targets {
+		delete(n.Mem, t&0xFF)
+	}
+	if spv, ok := sp.konst(); ok {
+		for i, v := range vals {
+			t := uint16(0x0100 | ((spv - i) & 0xFF))
+			if t >= 0x0180 {
+				n.ZPVal = n.ZPVal.join(v)
+			}
+			if ma, isDisplay := displayRegister(t); isDisplay {
+				if ma == 0x00 {
+					n.VSync = vblankBit(v)
+				} else {
+					n.VBlank = vblankBit(v)
+				}
+			}
+		}
+		return
+	}
+	// SP is not pinned down, so which byte landed where is not either: every value
+	// may have reached every target the range can hit.
+	joined := vals[0]
+	for _, v := range vals[1:] {
+		joined = joined.join(v)
+	}
+	for _, t := range targets {
+		if t >= 0x0180 {
+			n.ZPVal = n.ZPVal.join(joined)
+		}
+		if ma, isDisplay := displayRegister(t); isDisplay {
+			if ma == 0x00 {
+				n.VSync = triUnknown
+			} else {
+				n.VBlank = triUnknown
+			}
+		}
+	}
+}
+
+// returnAddressBytes is what a JSR pushes, and it is not unknown: the 6502 stores
+// the address of the JSR's LAST BYTE (RTS adds the one back), high byte first. That
+// is read off the engine rather than from folklore — Gopher2600 cpu.go's JSR case
+// pushes `PC>>8` then `PC` with the PC standing at instruction+2, and its RTS case
+// reads the pair back and adds one.
+//
+// Modelling the value, not just the address, is the difference between "a JSR writes
+// two bytes somewhere" and knowing that a JSR onto $0100 writes VSYNC with $F0.
+func returnAddressBytes(in Instr) []ValueRange {
+	ret := in.Addr + 2
+	return []ValueRange{vConst(int(ret >> 8)), vConst(int(ret & 0xFF))}
+}
+
+// stackAccess resolves the memory an instruction touches through the stack. A push
+// is a store; so is the return address a JSR leaves behind, and so are the three
+// bytes BRK pushes on its way to the IRQ vector. Reporting nothing for those is not
+// conservatism, it is a write the hardware performs that no analysis here can see.
+func stackAccess(in Instr, st State) (Access, bool) {
+	var n int
+	switch in.Def.Operator {
+	case instructions.PHA, instructions.PHP:
+		n = 1
+	case instructions.JSR:
+		n = 2
+	case instructions.BRK:
+		n = 3
+	default:
+		return Access{}, false
+	}
+	sp := st.SP
+	if !st.valid {
+		sp = vTop()
+	}
+	a := Access{PC: in.Addr, Kind: AccessWrite}
+	a.Addrs = stackTargets(sp, n)
+	a.Exact = len(a.Addrs) == 1
+	a.Wide = sp.Top || sp.Hi > sp.Lo
+	return a, true
 }
 
 // TriBool is a three-valued flag: known true/false, or unknown.
@@ -738,7 +913,19 @@ func absSuccessors(in Instr, st State, sw switchModel) []absEdge {
 		}
 		ret.preservesDisplay = st.preservesDisplay
 		ret.romAt, ret.sw = st.romAt, st.sw
-		return []absEdge{{site{in.Bank, in.Operand}, st}, {in.nextSite(), ret}}
+		// THE CALLEE INHERITS THE POST-JSR STATE, NOT THE PRE-JSR ONE. This edge
+		// used to carry `st` — the state BEFORE the instruction — so the callee
+		// believed SP still held its caller's value and every push inside it was
+		// predicted two bytes too high.
+		//
+		// Measured on litmus_jsr_stack, whose own header states the ground truth:
+		// `Save` is called with SP=$FF, the JSR leaves SP at $FD, and its PHA writes
+		// $01FD — the analysis predicted $01FF. `Green` is entered with SP=$0B and
+		// its PHA writes $0109, which is COLUBK: a push that changes the background
+		// colour, invisible to a model that thinks SP is elsewhere. Those were the
+		// 2 of 39,571 (pc,addr) pairs the def-use containment check reported outside
+		// their predicted sets.
+		return []absEdge{{site{in.Bank, in.Operand}, st.transfer(in)}, {in.nextSite(), ret}}
 	case instructions.RTS, instructions.RTI, instructions.BRK, instructions.JAM:
 		return nil
 	}

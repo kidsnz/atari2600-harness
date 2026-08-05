@@ -72,6 +72,22 @@ func TestDefUseCorpusSoundness(t *testing.T) {
 	if pairs == 0 {
 		t.Fatal("no (pc,addr) pairs were checked — the sweep proved nothing")
 	}
+	// THE DENOMINATOR IS ITSELF AN ASSERTION, and a negative control that did not
+	// fire is why it is here. Disabling stackAccess in accessOf leaves this test
+	// GREEN — but at 39,555 of 39,555 instead of 39,571 of 39,571. Containment only
+	// grades writes the analysis PREDICTED, so an instruction it declines to model is
+	// not a miss; it is absent from the denominator. A model that predicts nothing
+	// scores 100%.
+	//
+	// So the pair count is floored: it measures how much of the machine the analysis
+	// claims to understand, and it must not fall silently.
+	const pairFloor = 39571
+	if pairs < pairFloor {
+		t.Errorf("only %d (pc,addr) pairs graded, down from %d. Containment grades what the "+
+			"analysis PREDICTS, so a shrinking denominator means the model stopped claiming to "+
+			"understand something — and that scores as a pass. Find what stopped being modelled "+
+			"before accepting this", pairs, pairFloor)
+	}
 	t.Logf("containment: %d/%d observed (pc,addr) pairs inside their predicted sets", contained, pairs)
 	if undecoded > 0 {
 		t.Logf("CFG reach gap: %d writes came from instructions the decoder never reached, in %v "+
