@@ -3935,3 +3935,17 @@ it is gradable by the same corpus test.
 **Not started.** Recorded here with the measurement so the next pass does not begin by re-deriving why the
 obvious fix (`@amax`) does not work: one declared ceiling cannot say "160 here and 78 there", and the
 contexts differ by two orders of magnitude in trip count.
+
+**K6 CLOSED (2026-08-05).** Implemented as the narrow fix described above, not as k-CFA. Two pieces, and
+both are required — removing either leaves `litmus_divctx` NOT CERTIFIED:
+1. `solver.ctxEntryA` reads the divide's entry value from the CONTEXT's call site, guarded by
+   `accumulatorSurvives` (a whitelist walk that refuses on a nested JSR, an unresolvable successor set, or a
+   step limit). Consulted only after the site-keyed scan declines, and only from the per-context walk.
+2. The per-context display classification — written, measured as a no-op, and reverted a day earlier — turns
+   out to have been a no-op *because* bounds were context-insensitive. Once contexts differ in cost, ranking
+   a visible context above a blank one decides the verdict.
+
+`pizza_boy.asm` certifies (worst region 74cy) and the umbrella's `knownFailing` list is empty: **16 of 16
+scenarios pass, 0 known-red.** Soundness: observed <= proven on 1408 regions across 173 ROMs.
+`divCtxEntryUsed` counts uses of the new path; it read 0 over the corpus before `litmus_divctx` was added,
+which is why that ROM exists.

@@ -8,6 +8,34 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **K6 — the divide loop's entry value is now the CONTEXT's, and pizza-boy certifies. The umbrella's
+  known-failing list is empty for the first time: 16 of 16 scenarios pass, 0 known-red.**
+  `absStates` is keyed by SITE, so A at a shared routine's loop header is the join over every caller.
+  `pizza_boy.asm` calls `SetXPos` five times — twice from VBLANK with a sprite coordinate out of RAM (Top)
+  and three times from the HUD with a compile-time constant — so the constant callers inherited Top, the
+  divide was bounded from the 255 floor at 19 iterations against the 6 they can reach, and the region was
+  reported as a visible-line overrun on a path that cannot happen.
+  **Full context-sensitive abstract interpretation was NOT needed**, which the previous entry had already
+  measured: the region walk is per-context already. It knows its return site, the calling JSR sits at ret-3,
+  and when nothing between the callee's entry and the loop header can touch A — `sec` and a WSYNC store, for
+  the whole positioning idiom — the accumulator at the CALL is the accumulator at the header, exactly, for
+  that context. `preservesA` is a whitelist and `accumulatorSurvives` refuses on anything it cannot prove
+  (a nested JSR, an unresolvable successor set, a step limit); the flat walk passes -1 and is unchanged.
+- **The per-context display classification, previously measured as a no-op and reverted, is back — and this
+  time it is load-bearing.** It was a no-op *because* loop bounds were context-insensitive: every context
+  cost the same, so ranking visible above blank could not change a verdict. With each context carrying its
+  own entry value they differ, and pizza-boy needs both halves. Verified by removing them one at a time:
+  **disable either and `litmus_divctx` is NOT CERTIFIED.**
+- **Witnessed in the corpus, because the corpus did not witness it.** `divCtxEntryUsed` — a counter added for
+  exactly this question — read **0 over 164 ROMs**: `litmus_divpre` has one call site, so the per-context walk
+  never runs on it. `roms/litmus/litmus_divctx.asm` is the missing shape: one `SetXPos`, called from VBLANK
+  with a RAM byte and from the visible region with a constant. It certifies at 62cy with K6 and fails without
+  either half, and the counter now reads 1. Negative control on the guard: a callee that reloads A from RAM
+  before the loop is refused and falls back to the 255 floor (`OVER 122>76`).
+  Soundness re-graded with both changes in: **observed <= proven on 1408 regions across 173 ROMs, no
+  exceptions.**
+
 ### Added
 - **A corpus-wide frame-stability gate, because the scenarios cannot reach most of the corpus.** Measured:
   **36 of 164 ROMs carried `frame_lines_stable`, 128 carried nothing.** Wiring 128 scenarios by hand is more

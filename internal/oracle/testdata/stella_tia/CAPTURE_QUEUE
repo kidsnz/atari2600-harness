@@ -18,3 +18,4 @@ roms/litmus/litmus_jsr_stack.bin  # 2026-08-05  SD-3 witness ROM; capture with t
 roms/litmus/framelines_trap.bin  # 2026-08-05  frame_lines_stable witness; capture with the next batch
 roms/litmus/framelines_clean.bin  # 2026-08-05  its negative control; capture with the next batch
 roms/litmus/litmus_divpre.bin  # 2026-08-05  divide-loop predecessor-scan witness; capture with the next batch
+roms/litmus/litmus_divctx.bin  # 2026-08-05  K6 two-context divide-bound witness; capture with the next batch

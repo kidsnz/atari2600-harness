@@ -1377,6 +1377,13 @@ type solver struct {
 	// `lda #78` sits before or after the opening WSYNC: 116cy NOT CERTIFIED vs 60cy
 	// CERTIFIED, for machine behaviour that is identical.
 	allInstrs map[site]Instr
+	// ctxCall is the JSR this region is being analysed THROUGH, when there is one.
+	// analyzeRegionInContexts walks a shared subroutine once per call site, so the
+	// entry value of a loop inside it is a property of the context — not of the
+	// site-keyed join in absStates, which merges every caller. Zero value means
+	// "no context" (the flat walk), and determineBound then behaves as before.
+	ctxCall      site
+	ctxCallValid bool
 
 	// pending holds a loop whose body is perfectly well understood but whose
 	// iteration count could not be established. Keeping it, instead of only
@@ -1852,6 +1859,125 @@ func indexedStoreMissesDisplay(in Instr, st State) bool {
 // unfollowable switch simply stops that branch of the walk — the answer can only be
 // too small, and too small means one fewer call context, which is the direction that
 // refuses rather than the one that flatters.
+// ctxEntryA answers "what is A when this context enters that loop header?" — or -1
+// when it cannot say. It is the whole of K6's narrow fix.
+//
+// absStates is keyed by SITE, so A at a shared subroutine's loop header is the join
+// over every caller. pizza_boy.asm calls SetXPos five times: twice from VBLANK with a
+// sprite coordinate out of RAM (Top) and three times from the HUD with a compile-time
+// constant. The join is Top, so the constant callers inherited 19 divide iterations
+// against the 6 they can actually reach, and the region was reported over budget on a
+// path that does not exist.
+//
+// The region walk already knows which call it is inside. When nothing between the
+// callee's entry and the loop header can touch A — `sec` and a WSYNC store, for the
+// positioning idiom — the accumulator at the CALL is the accumulator at the header,
+// exactly, for this context. Anything less certain returns -1 and the caller falls back
+// to the site-keyed scan and then to the 255 floor.
+//
+// Sound because analyzeRegionInContexts uses the result for THIS context only and takes
+// the worst across contexts; a per-context bound narrower than the join is not a claim
+// about the other contexts.
+func (s *solver) ctxEntryA(header site) int {
+	if !s.ctxCallValid || s.allInstrs == nil || s.absStates == nil {
+		return -1
+	}
+	jin, ok := s.allInstrs[s.ctxCall]
+	if !ok {
+		return -1
+	}
+	st, ok := s.absStates[s.ctxCall]
+	if !ok || !st.valid || st.A.Top {
+		return -1
+	}
+	callee := site{jin.Bank, jin.Operand}
+	if !accumulatorSurvives(s.allInstrs, callee, header, s.sw) {
+		return -1
+	}
+	return int(st.A.Hi)
+}
+
+// preservesA lists the operators that provably leave the accumulator alone. It is a
+// WHITELIST and everything absent from it counts as clobbering A, which is the safe
+// default when the answer is "this analysis does not know": being wrong here would let
+// a divide loop be bounded from a value the machine no longer holds, and that is an
+// UNDER-approximation — the one direction this package forbids.
+//
+// JSR is deliberately absent. A nested call's effect on A is not modelled, so a route
+// that goes through one cannot claim A survived it. So are PLA (loads A from the stack)
+// and every arithmetic/logic operator. The shifts appear only in their memory forms:
+// `asl` with no operand is Implied and targets A, which is exactly what SetXPos does
+// four times AFTER its loop, so getting this distinction wrong would be easy and would
+// matter.
+func preservesA(in Instr) bool {
+	switch in.Def.Operator {
+	case instructions.STA, instructions.STX, instructions.STY,
+		instructions.LDX, instructions.LDY,
+		instructions.INX, instructions.INY, instructions.DEX, instructions.DEY,
+		instructions.TAX, instructions.TAY, instructions.TSX, instructions.TXS,
+		instructions.PHA, instructions.PHP,
+		instructions.CMP, instructions.CPX, instructions.CPY, instructions.BIT,
+		instructions.INC, instructions.DEC,
+		instructions.CLC, instructions.SEC, instructions.CLI, instructions.SEI,
+		instructions.CLV, instructions.CLD, instructions.SED,
+		instructions.NOP,
+		instructions.JMP,
+		instructions.BCC, instructions.BCS, instructions.BEQ, instructions.BNE,
+		instructions.BMI, instructions.BPL, instructions.BVC, instructions.BVS:
+		return true
+	case instructions.ASL, instructions.LSR, instructions.ROL, instructions.ROR:
+		// Implied = accumulator form; the memory forms leave A alone.
+		return in.Def.AddressingMode != instructions.Implied
+	}
+	return false
+}
+
+// accumulatorSurvives reports whether A provably still holds the caller's value when
+// control reaches `target` from `entry`. Every instruction on every route must be one
+// preservesA vouches for; an unresolvable successor set, an RTS (control leaving before
+// the target), or a step limit all answer false.
+//
+// This is what makes a call site's A usable as a loop's entry value. `lda #SCORE_X` /
+// `jsr SetXPos` / `sec` / `sta WSYNC` / `sbc #15` is the entire positioning idiom, and
+// between the call and the loop it executes exactly `sec` — so the answer is yes, and
+// the constant the caller loaded is the constant the loop divides.
+func accumulatorSurvives(instrs map[site]Instr, entry, target site, sw switchModel) bool {
+	const maxSteps = 4096
+	seen := map[site]bool{}
+	work := []site{entry}
+	steps := 0
+	for len(work) > 0 {
+		steps++
+		if steps > maxSteps {
+			return false
+		}
+		a := work[len(work)-1]
+		work = work[:len(work)-1]
+		if a == target {
+			continue // reached the header; this route is clean
+		}
+		if seen[a] {
+			continue
+		}
+		seen[a] = true
+		in, ok := instrs[a]
+		if !ok {
+			return false
+		}
+		if !preservesA(in) {
+			return false
+		}
+		succ, refusal := successors(in, topState(), sw)
+		if refusal != "" || len(succ) == 0 {
+			return false
+		}
+		for _, nx := range succ {
+			work = append(work, nx)
+		}
+	}
+	return true
+}
+
 func reachableWithinCallee(instrs map[site]Instr, entry, target site, sw switchModel) bool {
 	seen := map[site]bool{entry: true}
 	work := []site{entry}
@@ -1897,6 +2023,13 @@ func analyzeRegionInContexts(instrs map[site]Instr, start Instr, budget, amaxHin
 			memo: map[lkey]result{}, state: map[lkey]int{}, absStates: states, sm: sm, amaxHint: amaxHint,
 			sw: sw, banked: sw.banked, allInstrs: instrs,
 		}
+		// The JSR that opened this context sits three bytes before the return site;
+		// confirm it against the decoded instruction rather than assuming.
+		if js := (site{ret.bank, ret.addr - 3}); true {
+			if jin, ok := instrs[js]; ok && jin.Def.Operator == instructions.JSR {
+				s.ctxCall, s.ctxCallValid = js, true
+			}
+		}
 		if msg := s.collectRegion(instrs, start); msg != "" {
 			return nil
 		}
@@ -1934,16 +2067,44 @@ func analyzeRegionInContexts(instrs map[site]Instr, start Instr, budget, amaxHin
 				return nil
 			}
 		}
-		if worst == nil || r.cyc > worst.Worst {
+		// CLASSIFY THIS CONTEXT, NOT THE JOIN OF ALL OF THEM.
+		//
+		// This used to read states[start.site()] — the callee's entry state, which for a
+		// shared subroutine is the join over every caller. One visible caller therefore
+		// made the display bits unknown at the entry and EVERY context came out
+		// "visible", including ones that provably run inside VBLANK. That is what "the
+		// blank classification does not cross a JSR" actually meant: the JSR edge
+		// carries the bits correctly; the loss is at the merge on the other side.
+		//
+		// Written once before and MEASURED AS A NO-OP (102/157 certified either way, not
+		// one bound moved), then reverted rather than shipped unwitnessed. It was a
+		// no-op only because loop bounds were context-INSENSITIVE, so every context cost
+		// the same and the ranking below could not change anything. With ctxEntryA above
+		// giving each context its own entry value, the contexts differ and it does.
+		kind := "visible"
+		if s.ctxCallValid {
+			if st, ok := states[s.ctxCall]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
+				kind = "blank"
+			}
+		} else if st, ok := states[start.site()]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
+			kind = "blank"
+		}
+		// A VISIBLE context outranks a blank one whatever the cycle counts, because this
+		// Region is what the budget gate reads and the gate is a claim about visible
+		// lines. A blank context that overruns does not tear a line; it adds one, and
+		// that failure mode has its own gate now — `frame_lines_stable` plus the
+		// corpus-wide TestNoRomBreathesAcrossFrames — rather than being folded into a
+		// tearing verdict, which is a different and much louder claim.
+		better := worst == nil ||
+			(kind == "visible" && worst.Kind == "blank") ||
+			(kind == worst.Kind && r.cyc > worst.Worst)
+		if better {
 			reg := Region{
 				Start: start.Addr, StartLoc: s.loc(start.site()), Budget: budget,
-				Bounded: true, Kind: "visible", Worst: r.cyc, Over: r.cyc > budget,
+				Bounded: true, Kind: kind, Worst: r.cyc, Over: r.cyc > budget,
 			}
 			if sw.banked {
 				reg.Bank, reg.BankValid = start.Bank, true
-			}
-			if st, ok := states[start.site()]; ok && st.displayOff() && !regionTouchesDisplay(s.nodes, states) {
-				reg.Kind = "blank"
 			}
 			if reg.Over {
 				reg.Path = r.path
@@ -2246,7 +2407,7 @@ func (s *solver) foldLoops() string {
 		}
 		var rs []ready
 		for _, sh := range shapes {
-			n := determineBound(s.nodes, s.allInstrs, sh.header, sh.latch, s.absStates, s.sw, s.amaxHint)
+			n := determineBound(s.nodes, s.allInstrs, sh.header, sh.latch, s.absStates, s.sw, s.amaxHint, s.ctxEntryA(sh.header))
 			if n <= 0 {
 				// s.pending carries ONE loop, and the caller uses it to answer "how
 				// many iterations fit the budget?". With several loops in the region
@@ -2268,7 +2429,7 @@ func (s *solver) foldLoops() string {
 		return refusal
 	}
 	latch, header, bodyNoBranch, pen := sh.latch, sh.header, sh.bodyNoBranch, sh.pen
-	n := determineBound(s.nodes, s.allInstrs, header, latch, s.absStates, s.sw, s.amaxHint)
+	n := determineBound(s.nodes, s.allInstrs, header, latch, s.absStates, s.sw, s.amaxHint, s.ctxEntryA(header))
 	if n <= 0 {
 		// A TIMER SPIN IS NOT A LOOP MISSING A COUNTER.
 		//
@@ -2636,6 +2797,11 @@ func (s *solver) loopShape(latch Instr) (loopShape, string) {
 // the scan under test.
 var divEdgeScanned int
 
+// divCtxEntryUsed counts loops bounded from the CONTEXT's call-site accumulator rather
+// than the site-keyed join (K6). A corpus where this stays 0 is a corpus that never
+// exercises the fix, which is a fact worth being able to read off rather than assume.
+var divCtxEntryUsed int
+
 // writesX and writesY report whether an operator writes that index register.
 //
 // Hand-written for the same reason `preservesZN` is: the engine's instruction
@@ -2720,7 +2886,7 @@ func preservesZN(op instructions.Operator) bool {
 //     corpus with a counter (proxyFallbackHits): 0 ROMs reach it, so it is gated to
 //     the same bank rather than deleted, and the counter stays so a future ROM that
 //     starts relying on it is visible instead of silent.
-func determineBound(nodes, allInstrs map[site]Instr, header site, latch Instr, absStates map[site]State, sw switchModel, amaxHint int) int {
+func determineBound(nodes, allInstrs map[site]Instr, header site, latch Instr, absStates map[site]State, sw switchModel, amaxHint, ctxAmax int) int {
 	// 2B: divide-by-N coarse-positioning idiom — the body subtracts a constant from
 	// A and loops while no borrow (BCS) / while borrow (BCC). Max iterations =
 	// floor(Amax/const)+1 (with carry set); +1 more covers an unknown entry carry.
@@ -2857,6 +3023,22 @@ func determineBound(nodes, allInstrs map[site]Instr, header site, latch Instr, a
 		// analysis inferring one.
 		if amax >= 0 {
 			divEdgeScanned++
+		}
+		// THE CONTEXT'S OWN ENTRY VALUE, when the site-keyed scan could not produce one.
+		//
+		// It is consulted here rather than earlier on purpose: the scan above is a
+		// property of the program and holds for every context, so when it answers, its
+		// answer already covers this one. ctxAmax is narrower — true of THIS call site
+		// only — and analyzeRegionInContexts is what makes that legitimate, by walking
+		// each context separately and taking the worst. Using it in the flat walk would
+		// be unsound, which is why the flat walk passes -1.
+		//
+		// This is what the 255 floor was standing in for on pizza_boy.asm's SetXPos:
+		// the HUD contexts pass a constant and the VBLANK ones pass a RAM byte, and the
+		// join of those is Top no matter how good the scan is.
+		if amax < 0 && ctxAmax >= 0 {
+			amax = ctxAmax
+			divCtxEntryUsed++
 		}
 		if amax < 0 && amaxHint > 0 {
 			amax = amaxHint // ②: author-declared `@amax N` (the accumulator's proven upper bound) when the abstract range is Top

@@ -31,13 +31,15 @@ import (
 // and what would fix it. It is not an exemption list: every entry is printed on every
 // run, an entry that starts passing FAILS the test so it cannot rot into permission,
 // and anything red that is NOT listed fails immediately.
-var knownFailing = map[string]string{
-	"practice/pizza-boy-tokyo/build/scenarios/phase0.json": "prove_line_budget leaves 1 region " +
-		"unbounded: SetXPos+1 (pizza_boy.asm:813) is a subroutine that opens with `sta WSYNC` and " +
-		"returns by `rts`, so its region continues in the CALLER and the walk finds no WSYNC ahead " +
-		"of it. The BRK half of this scenario's failure was fixed on 2026-08-04 (bf37fd1); this half " +
-		"is the remaining work in that task.",
-}
+// EMPTY, and it got there by the entries being fixed rather than deleted.
+// pizza-boy's phase0.json was the last one. Its `prove_line_budget` half survived two
+// wrong diagnoses — first "the region continues in the caller and no WSYNC is found
+// ahead of it", then "the blank classification does not cross a JSR" — before the
+// measurement said what it actually was: A's range at a shared routine's divide loop is
+// the join over every caller, so the callers passing a constant inherited the ones
+// passing a RAM byte. Closed 2026-08-05 by K6 (docs/capability-gap-audit.md), witnessed
+// by roms/litmus/litmus_divctx.asm.
+var knownFailing = map[string]string{}
 
 func umbrellaScenarios(t *testing.T) (root string, found []string) {
 	t.Helper()

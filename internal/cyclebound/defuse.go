@@ -434,7 +434,7 @@ func findSweeps(instrs map[site]Instr, states map[site]State, sw switchModel) ma
 		if !ok || len(stores) == 0 || (!decX && !decY) || (decX && decY) {
 			continue
 		}
-		n := determineBound(instrs, instrs, header, latch, states, sw, 0)
+		n := determineBound(instrs, instrs, header, latch, states, sw, 0, -1)
 		if n <= 0 || n > 255 {
 			continue
 		}
