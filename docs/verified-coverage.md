@@ -134,7 +134,7 @@ velocity). `internal/motion`, surfaced as `cmd/motion`, the `read_motion` MCP to
 | A deliberate +2,0,+2,0 stutter reads as judder | `motion_stutter` | `read_motion` top `jerk_rms == 2` (≫ the clean 0) — `scenarios/motion_glide.json` + `TestMotionSelfTest` lock the separation |
 
 The metric is **self-validated** (the stutter must score above the glide, else it is vacuous) and was
-confirmed against the user's perception — `motion_stutter` run in Stella reproduced their reported "ブルブル".
+confirmed against the user's perception — `motion_stutter` run in Stella reproduced the symptom they reported, *buruburu* (judder).
 Src: Flash & Hogan, *The coordination of arm movements*, J. Neurosci. 1985 (minimum-jerk).
 
 ## Not yet covered (open)

@@ -264,7 +264,7 @@ the wording is coarse.
   on the exact wraparound cycle silently drops the divider to 1T → the ROM rolls on real hardware while
   Stella/emulators pass. This is precisely the "passes-in-emu / fails-on-hardware" timing trap the harness
   exists to catch (gap B). A `breakif`/assert that flags timer writes on the wraparound cycle would be a
-  natural sibling to `assert_line_budget`. Source: design-principles.md (採掘 303277), diagnosed in-thread
+  natural sibling to `assert_line_budget`. Source: design-principles.md (mining 303277), diagnosed in-thread
   by the Gopher2600 author. Verify the exact behaviour against Gopher2600's RIOT model before implementing.
 - **G9 ✅ CLOSED (2026-08-04) — both patterns now have a fixture, a graded test and a technique doc.**
   (a) **per-scanline NUSIZ+HMOVE shaping**: `roms/litmus/litmus_nusiz_shape.asm` +
@@ -368,7 +368,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-1** ✅v1.78.0 | Activate vendored **Klaus + Tom-Harte 65x02** CPU suites in CI (gated) | external, exhaustive, all-256-opcode + **per-cycle bus** certification of the engine | B-C1 | S–M | ★1 |
 | **VV-2** ✅v1.80.0 | **Static per-scanline cycle-budget PROVER** (`cmd/cyclebound`) | **proof over ALL paths** (∀) vs observe-one-run — the only ∀-claim member; attacks gap B | C-1 | M | ★1 |
 | **VV-3** ✅v1.83.0 | **PC/branch coverage map** (`cmd/cover`) → **coverage-guided fuzzing** (`cmd/guidedfuzz`) | test-adequacy axis + AFL-style feedback fuzz (today's fuzz is blind) | D-1→D-2 | S→M | ★1 |
-| **VV-4** ✅v1.79.0 | **Motion-smoothness / jerk metric** (`cmd/motion` + `read_motion` MCP + `checks.motion`) | per-frame motion-jerk NUMBER = "judder/ブルブル" automated (closes the Breakout hand-trace) | E-1 | S–M | ★1 |
+| **VV-4** ✅v1.79.0 | **Motion-smoothness / jerk metric** (`cmd/motion` + `read_motion` MCP + `checks.motion`) | per-frame motion-jerk NUMBER = "judder" (the user's word, *buruburu*) automated (closes the Breakout hand-trace) | E-1 | S–M | ★1 |
 | **VV-5** ✅v1.82.0 | **Temporal-logic trace assertions** (`temporal` block: eventually-within-K/response/never-for-N; `always`=existing invariant) | properties over a **sequence** of frames (per-frame invariants can't) | F-1 | M | ★1 |
 | **VV-6** ✅v1.90.0 | **MAME headless cross-oracle** (`internal/oracle.Mame` + `cmd/oraclevote`) | a **3rd independent** full-system oracle, **fully headless** (no keypress unlike Stella) | A1 | M | 2 |
 | **VV-7** ✅v1.91.0 | **perfect6502 silicon CPU differential** (`internal/cpudiff` + `cmd/cpucheck`) | transistor-netlist truth at the **CPU layer** (catches a CPU bug ALL software emulators could share); covers undocumented/decimal opcodes Harte (VV-1) excludes | A2/A3/B-C3 | M | 2 |
@@ -428,7 +428,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   itself (sfx_demo, via the 2C `@lines` once 2A exposed its region) — the rest are blocked by a combination of
   honest scope limits (no-WSYNC, multi-call-site RTS context, nested loops, WSYNC-in-loop, divide loops whose
   counter lives in untracked indexed RAM). Those stay UNBOUNDED (correct), not false positives.
-- **VV-2 value-range arc (v1.97.0, "諦め悪い" array-range push):** three more sound, composable absint capabilities,
+- **VV-2 value-range arc (v1.97.0, the refuse-to-give-up array-range push):** three more sound, composable absint capabilities,
   each litmus-locked — **3A** AND/ORA #imm range + reading a divide loop's entry value from the fall-through
   predecessor (header is back-edge-polluted); **3B** zero-page **RAM** array-element range (`State.ZPVal`, $80–$FF
   only — TIA/RIOT regs at $00–$7F excluded); **3D** **ROM data-table** value range (constant bytes read from the
@@ -450,7 +450,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   budget, deterministically), plus emu-wiring integration tests. **Scope (honest):** full dead-code over the
   *decodable* universe (reusing the cyclebound decoder) is a follow-on; today's map is reached-coverage +
   one-sided branches. **Src:** Zalewski AFL whitepaper; Go native fuzzing.
-- **VV-4 ✅ DONE (v1.79.0):** `internal/motion` (pure `Analyze` + `TrackObject`) tracks an object's exact X (`Markers().HmovedPixel`) and rendered top (column scan over a uniform-background window) over N frames → velocity / accel / **jerk_rms** (RMS of the 2nd difference; 0 = constant velocity) + `max_accel`/`monotonic` (glitch vs benign staircase). Shipped 3 ways: `cmd/motion` CLI, **`read_motion` MCP tool** (interactive — used live on the Breakout ball: vertical jerk 0, horizontal jerk 1 = the benign 1px/2-frame staircase, not a bug), and scenario **`checks.motion: max_jerk_rms`** (regression gate). Litmus `motion_glide` (clean +1/frame → jerk 0) + `motion_stutter` (+2,0,+2,0 → jerk 2). Self-test = Go `TestMotionSelfTest` (glide jerk 0 vs stutter ≫) + scenario probe. **Validated against the user's own perception: motion_stutter run in Stella reproduced their exact "ブルブル" symptom.** **Src:** Flash & Hogan min-jerk 1985.
+- **VV-4 ✅ DONE (v1.79.0):** `internal/motion` (pure `Analyze` + `TrackObject`) tracks an object's exact X (`Markers().HmovedPixel`) and rendered top (column scan over a uniform-background window) over N frames → velocity / accel / **jerk_rms** (RMS of the 2nd difference; 0 = constant velocity) + `max_accel`/`monotonic` (glitch vs benign staircase). Shipped 3 ways: `cmd/motion` CLI, **`read_motion` MCP tool** (interactive — used live on the Breakout ball: vertical jerk 0, horizontal jerk 1 = the benign 1px/2-frame staircase, not a bug), and scenario **`checks.motion: max_jerk_rms`** (regression gate). Litmus `motion_glide` (clean +1/frame → jerk 0) + `motion_stutter` (+2,0,+2,0 → jerk 2). Self-test = Go `TestMotionSelfTest` (glide jerk 0 vs stutter ≫) + scenario probe. **Validated against the user's own perception: motion_stutter run in Stella reproduced the exact symptom they reported, *buruburu* (judder).** **Src:** Flash & Hogan min-jerk 1985.
 - **VV-5 ✅ DONE (v1.82.0):** `temporal` block in `internal/scenario` with bounded LTL₃/MTL monitors, reusing the
   existing condition vocabulary (`resolve` + `condPass` + `condDesc`). Three new `kind`s — **`eventually`** (P
   within K frames; bounded liveness), **`response`** (every trigger A answered by P within K), **`never_for`**
@@ -750,7 +750,7 @@ knowledge-state audit remains `fundamentals-audit.md`.
 Three harness-capability candidates surfaced by an efficiency/structure comparison of a self-authored Combat clone (`combat_mine` 4K) against the original Wagner 2K ROM (`sandbox/studies/combat/comparison-structure-vs-original.ja.md`, `diff-gaps.ja.md`). Clean-room note: citing the original disassembly here is the casebook contract. These target **integration-under-budget** capability (see `design-principles.md` "Structure & efficiency rules from the Combat disassembly comparison"). **Registration only — each implementation is a separate approval.**
 
 - **CMB-1 — structural-efficiency lint: flag inlined code that could be one `,X`-indexed loop when it runs in *blanked* (non-beam-critical) time.** The comparison measured **~250-400 recoverable ROM bytes** that are **not** a provability trade — pure duplication the original avoids by running all four moving objects through a **single `,X` path over `DIRECTN[0..3]`**. The clone instead **4×-inlines** friction/accel (~120-200B) and **duplicates** missile fly/kill ×2 + sound ×2 (~60-100B); the key qualifier is that this code runs in **overscan/VBLANK** so the 76cy budget does **not** bind → indexing it is "small **and** free." Capability: a static lint (reusing the `cyclebound` decoder + `srcmap` + absint, like `timinglint`/AT-1) that detects N near-identical straight-line blocks differing only by a base address/offset, confirms they sit in a provably-blank region (blank-region ∀ classification already exists — **v1.106.0 PONG-C3/VV-2b**, do not re-file), and advises collapsing to a `,X` loop. A **ROM-size/structure** lint (distinct from `prove_line_budget`'s cycles). Zero false positives on the known-good corpus (AT-1 discipline). Size: M. 〔Combat `DIRECTN`/`MVtable`/`MVadjA`/`MVadjB`; comparison §2.4/§4/§6①/§7, diff-gaps GAP-3〕
-- **CMB-2 — `INTIM`/`TIM64T` "fixed-picture-start" detector + advisor.** The original times its VBLANK with a RIOT timer (`VCNTRL` loads `TIM64T=43`, then polls `INTIM`) so the **picture starts on a fixed line while VBLANK logic time is free to vary** — logic growth auto-absorbed. The clone relies on a **hand-tuned fixed WSYNC count + elastic pad**: correct today but "screen-dip fragile." Capability: a static/runtime advisor that (a) **detects** the fixed-WSYNC-count-plus-pad pattern (a counted `sta WSYNC` sequence framing VBLANK with no `INTIM` poll) and (b) **advises** the timer load-leveling idiom. Sibling to but distinct from **G8/VV-10 T-1** (the timer-*wrap* HW-trap detector — that guards a hazard; this is an authoring-robustness advisor). Reuses the `Emu.TimerState` exposure built for T-1. Size: S-M. 〔Combat `VCNTRL`/`INTIM`/`TIM64T=43`; comparison §2.1/§6⑥/§7, diff-gaps 追加ディテール〕
+- **CMB-2 — `INTIM`/`TIM64T` "fixed-picture-start" detector + advisor.** The original times its VBLANK with a RIOT timer (`VCNTRL` loads `TIM64T=43`, then polls `INTIM`) so the **picture starts on a fixed line while VBLANK logic time is free to vary** — logic growth auto-absorbed. The clone relies on a **hand-tuned fixed WSYNC count + elastic pad**: correct today but "screen-dip fragile." Capability: a static/runtime advisor that (a) **detects** the fixed-WSYNC-count-plus-pad pattern (a counted `sta WSYNC` sequence framing VBLANK with no `INTIM` poll) and (b) **advises** the timer load-leveling idiom. Sibling to but distinct from **G8/VV-10 T-1** (the timer-*wrap* HW-trap detector — that guards a hazard; this is an authoring-robustness advisor). Reuses the `Emu.TimerState` exposure built for T-1. Size: S-M. 〔Combat `VCNTRL`/`INTIM`/`TIM64T=43`; comparison §2.1/§6⑥/§7, diff-gaps additional detail〕
 - **CMB-3 — collision-face / wall-normal estimation aid.** The TIA reports **THAT** an object hit the playfield (`CXP0FB`/`CXM0FB`) but not **WHICH FACE** — so a correct maze-wall bounce cannot be computed in one frame. The original reconstructs the normal with a **multi-frame trial-and-error solver** (`MxPFcount`: frame0 vertical → frame1 flip 180° → frame2 wait → frame3+ corner, held until clear; `COLcount` ignores sub-few-frame contacts). A genuinely hard, under-specified problem the clone never solved (its collision path is a last-safe-position restore, no reflection). Capability: a harness aid — static (a `pkg/design`/`docs/techniques` state-machine skeleton) or runtime (a scenario primitive that drives an object into a PF wall and **verifies** the reconstructed bounce direction against the geometric normal) — to help **author and verify** such a solver. Distinct from **G7** (RAM/bus collision *trap*) — this is the *semantics* of wall-normal recovery. Concrete-driven (build when a maze/bounce ROM needs it, cf. G9). Size: M. 〔Combat `MxPFcount`/`COLcount`/`CXP0FB`/`CXM0FB`; comparison §2.6/§7, diff-gaps GAP-4〕
 
 ## Combat deep-read — capability candidates (round 2, 2026-07-23)
@@ -992,12 +992,29 @@ Recorded because three of these were previously mistaken for hard limits when th
   obligation automatically (prove the trip count elsewhere, or emit a runtime assertion) is not built.
 
 ## Housekeeping backlog (docs/repo, not a harness capability)
-- **DOC-EN — translate the JA-heavy canonical docs to English** to finish the public-repo English-only pass
-  (`design-principles.md` ~98 JA lines, `casebook.md` ~39, `build-to-learn.md` ~33). Deferred from the
-  2026-06-17 docs cleanup (which dropped the 13 `.ja.md` duplicate files); these `.md` bodies are the *only*
-  copy so they were left intact, but the user asked that the English-ization "reliably happen later" — tracked
-  here so it is not dropped. `mining-digest.md` is **excluded** (generated from Japanese-source thread data —
-  translating would break source fidelity). Size: medium; needs review. Separate approval.
+- **DOC-EN ✅ DONE (2026-08-04) — the JA-heavy canonical docs are English; 5 quoted lines remain by design.**
+  Deferred from the 2026-06-17 docs cleanup (which dropped the 13 `.ja.md` duplicate files); these `.md`
+  bodies are the *only* copy, so they were left intact until now. Measured over `docs/**/*.md` excluding
+  `*.ja.md` and the excluded `mining-digest.md`: lines carrying Japanese **script** went **210 → 5**, and
+  lines carrying **any** non-ASCII character **2491 → 2427** — the residue is em-dashes, `★`/`⚠`/`✅`,
+  `≈`/`÷`/`§`/`⅔` and the `〔…〕` provenance bracket the gate matches on, none of which is Japanese. Per file:
+  `design-principles.md` 105 → 4, `casebook.md` 58 → 0, `build-to-learn.md` 35 → 0, `capability-gap-audit.md`
+  7 → 1, `fundamentals-audit.md` 2 → 0, and one line each in `verified-coverage.md`, `cookbook.md` and
+  `techniques/multicolor48.md` → 0. Numbers, addresses, register names, cited paths, `〔source〕` brackets and
+  the `★`/bold emphasis structure were carried across unchanged; `scripts/check_provenance.py` resolves the
+  same citation set before and after (61 skipped for the absent umbrella, both runs).
+  **The 5 remaining Japanese lines are deliberate quotations, not untranslated prose.** Four are
+  `<!-- TODO: ambiguous original: … -->` comments in `design-principles.md` quoting a source sentence whose two
+  halves disagree — the colour-band minimum width ("4 colour clocks" vs "= 12px, `STx.w`"), the "line 38"
+  back-reference beside the cy45 deadline, the Overscan-vs-VBLANK surplus rule, and the pixel aspect
+  (`≒ 1/2` vs `≈ 2:1`). Each is translated literally and flagged rather than guessed, because a confident wrong
+  translation of a measured finding is worse than an awkward literal one; **all four are still open questions
+  for a future measurement pass.** The fifth is this file's verbatim quote of `banked_game.asm:110`, whose
+  whole point is that that exact line assembles nothing. `mining-digest.md` remains **excluded** (generated
+  from Japanese-source thread data — translating it would break source fidelity), so its 440 JA lines stand.
+  **Explicitly still outside this pass:** Japanese comments inside Go/Python sources (e.g.
+  `internal/emu/emu.go:1535`, `scripts/check_provenance.py`) and the local `CHANGELOG.ja.md`. The language
+  policy in `CLAUDE.md` names docs, and no gate covers source comments — file separately if that is wanted.
 
 ## Reproduction-loop backlog (RL-*) — 2026-07-29
 The clean-room reproduction loop tools (`docs/reproduce-loop.md`): **`vismatch`** (palette-independent
@@ -2981,7 +2998,7 @@ was held to.
 | Tool | The description says | The code does | Class |
 |---|---|---|---|
 | `step_scanline` | "CPU cycles consumed across that scanline" | `TotalCycles()` delta, which **excludes WSYNC stall cycles** (`emu.go:142,144,159`). Measured: `cycles_consumed=8` on twelve consecutive 76-cycle lines of `smoke.bin` | wrong measurement |
-| `read_row` / `decompose_row` | tag: "visible scanline (**0-based**…)" | **Absolute** scanline; accepted range measured 29..242. `emu.go:1355` already records that "0起点" was the error and the fix landed on the Go comment only. `decompose_row`'s own Description says "absolute" while its own tag says 0-based | silent off-by-`visibleTop` |
+| `read_row` / `decompose_row` | tag: "visible scanline (**0-based**…)" | **Absolute** scanline; accepted range measured 29..242. `emu.go:1355` already records that "0-based" was the error and the fix landed on the Go comment only. `decompose_row`'s own Description says "absolute" while its own tag says 0-based | silent off-by-`visibleTop` |
 | `breakif` | "beam reaches this color clock (**0-227**)" | Compared against `GetCoords().Clock` = **−68..159**; 160..227 is unreachable, so the call silently runs to `max_frames` and returns `halted=false` | half the domain is dead |
 | `assert_line_budget` | "line_cycles (machine cycles it consumed)" | `lines * 76` (`emu.go:1683`) — a scanline delta, **always a multiple of 76**, never measured | invented arithmetic |
 | `beam_intervals` | min/max "same coordinates as read_row: −68..159" | `clockAt` folds modulo 228, so a window past the line end comes back **inverted** (min > max) with `crosses_line=false` | wrong measurement |
@@ -3576,7 +3593,8 @@ reproduces `bank 0 LvTab+2`.
 
 **★ The figures above are the count of ANSWERS, not of CORRECT answers, and a quarter of them named a line
 that assembles nothing (2026-08-04).** `bank 1 $F000` = `bank 1 B1Work (banked_game.asm:110)` is quoted above
-as the proof the map works; line 110 of that file is the comment `; ===== bank 1（データ＋ローダ） =====`.
+as the proof the map works; line 110 of that file is the comment `; ===== bank 1（データ＋ローダ） =====`
+(verbatim source text, "bank 1 (data + loader)" — quoted unchanged because the claim is about that exact line).
 The map took a line number from any listing row that PRINTED an address, and DASM prints one on rows that
 assemble nothing: a comment, an `=` equate, an `ORG`, a bare label, and a macro expansion listed under the
 macro body's own line numbers restarting at 0. Before the first `ORG` that address is offset `$0000` — bank

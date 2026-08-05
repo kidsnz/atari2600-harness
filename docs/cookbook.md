@@ -13,7 +13,7 @@ finished 2600 game. Build and verify each step before the next.
 `pkg/playfield`) → 7. switches/input (`paddle_demo`, SWCHA/SWCHB) → 8. game variations (`game_states`) →
 9. RNG (LFSR, `litmus_lfsr`) → 10. ball → 11. missiles (`bullets`) → 12. sound (`sfx`, `sound_driver`,
 `music_driver`) → 13. animation (`sprite_anim`) → 14. polish.
-〔出典: 採掘 reference/atariage/blogs/ — SpiceWare "Collect" tutorial index〕
+〔Source: mining reference/atariage/blogs/ — SpiceWare "Collect" tutorial index〕
 
 ## Game-type recipes
 

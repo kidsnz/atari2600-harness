@@ -55,8 +55,8 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   starts 1 line above P1; VDELP0=1 → P0 shifts +1 line and aligns exactly (read_row 137→138).
 - 📖 Missiles have **no** vertical delay (so in a 2LK they start only on even lines).
 - ✅ Moveable-object writes are shear-safe at CPU cycles 0–22 of the line — closed by derivation from
-  verified constants（any write completing by cy 22 precedes every draw start: (X+68)/3 ≥ 22.67 even at
-  X=0）plus litmus_48px6's measured mid-line GRP choreography (writes landing in copy gaps).
+  verified constants (any write completing by cy 22 precedes every draw start: (X+68)/3 ≥ 22.67 even at
+  X=0) plus litmus_48px6's measured mid-line GRP choreography (writes landing in copy gaps).
 - ⬜ 48px kernel GRP write windows: **no local source documents the cycle map** — derive ourselves (the
   recipe exists in score6.asm: NUSIZ=3-close, RESP0/RESP1 3 cycles apart at ~cycle 26+, HMP1=$10, VDELP both
   on, 6-store choreography, font `align $100`).
