@@ -66,6 +66,6 @@ scanline; vary it to taste (here a 16-step rainbow).
 - The color table is independent of the graphic data — swap `ColorTab` for a flashing/cycling
   effect by offsetting the index per frame.
 - For pixel-exact X placement of the band (1px instead of the 3px coarse grid), combine with the
-  ÷3 coarse/fine table + clockslide from topic/209137 (台帳 ⑯); orthogonal to the color trick.
+  ÷3 coarse/fine table + clockslide from topic/209137 (technique ledger ⑯); orthogonal to the color trick.
 - Budget headroom is small (~73 cy used). Adding more per-row work (e.g. a second color register
   for the PF) needs an illegal-opcode tightening (LAX to fuse LDA+TAX) — verify on Gopher2600 first.

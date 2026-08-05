@@ -8,6 +8,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **DOC-EN closed: the canonical docs are English, and the count says how much was left rather than claiming
+  "done".** The 2026-06-17 cleanup dropped the 13 `.ja.md` duplicates but left the Japanese *bodies* of three
+  canonical docs untouched, because they were the only copy. Measured over `docs/**/*.md` (excluding `*.ja.md`
+  and `mining-digest.md`): lines carrying Japanese **script** **210 → 5**, lines carrying **any** non-ASCII
+  character **2491 → 2427**. `design-principles.md` 105 → 4, `casebook.md` 58 → 0, `build-to-learn.md` 35 → 0,
+  `capability-gap-audit.md` 7 → 1, `fundamentals-audit.md` 2 → 0, plus one line each in `verified-coverage.md`,
+  `cookbook.md` and `techniques/multicolor48.md`.
+- **The non-ASCII residue is not a shortfall.** 2427 lines still hold a non-ASCII character and every one of
+  them should: em-dashes, `★`/`⚠`/`✅`, `≈`/`÷`/`§`/`⅔`, and the `〔…〕` provenance bracket that
+  `scripts/check_provenance.py`'s `MARKERS` regex matches on. Translating `出典` to `Source:` keeps the marker;
+  deleting the bracket would fail the gate. Provenance resolves the same citation set before and after
+  (61 skipped for the absent umbrella on both runs), so no citation was broken or invented.
+- **Five Japanese lines are kept ON PURPOSE, and each one is a quotation.** Four are
+  `<!-- TODO: ambiguous original: … -->` comments in `design-principles.md` where the source sentence
+  contradicts itself and a confident English rendering would have invented a measurement: the colour-band
+  minimum width ("4 colour clocks" vs "= 12px, `STx.w`" — 4 colour clocks is 4px), the bare "line 38"
+  back-reference next to the cy45 write deadline, the Overscan-vs-VBLANK surplus rule (reads as "not Overscan
+  … do not absorb in VBLANK"), and the pixel aspect (`≒ 1/2` says tall, `≈ 2:1` and the ⚠ note say wide).
+  Translated literally and flagged; all four remain open for a measurement pass. The fifth is
+  `capability-gap-audit.md`'s verbatim quote of `banked_game.asm:110`, where the claim *is* about that exact
+  line's bytes. `mining-digest.md` stays excluded — it is generated from Japanese-source thread data and
+  translating it would break source fidelity.
+
 ### Fixed
 - **"The analysis cannot pin A" is not "A has no bound".** The `sec / sbc #N / bcs` divide's trip count comes
   from the accumulator entering the loop, and `determineBound` refused whenever any predecessor carried a Top

@@ -1,87 +1,87 @@
-# Casebook — 状況 → 技（実在の市販ゲーム逆アセンで裏打ちした事例集）
+# Casebook — situation → technique (cases backed by disassemblies of real commercial games)
 
-`cookbook.md` が「**作りたいゲーム型 → 標準レシピ**」（前向き）なのに対し、本書は「**実在の市販ゲームが、ある状況をどの技で解いたか**」の**事例カタログ**（逆向き・エビデンス駆動）。各エントリは **状況 → 採用技 → なぜそれが効くか → 出典（マニュアル＋逆アセン著者）** を持つ。著述ループ（`authoring-protocol.md`）の retrieve で「この状況、実ゲームではどう解いている？」を引くための索引。
+Where `cookbook.md` runs forwards — "**the game type you want to build → the standard recipe**" — this document is a **case catalogue** that runs backwards and is evidence-driven: "**how a real commercial game solved a given situation**". Every entry carries **situation → technique adopted → why it works → source (manual + disassembly author)**. It is the index to consult in the retrieve step of the authoring loop (`authoring-protocol.md`) when asking "how do real games solve this situation?".
 
-> 本書は**読んで学ぶ**（受動）。**手を動かして学ぶ**（能動＝実ゲームを1メカニクスずつ自分で再現し実ROMに数値照合）は対の `build-to-learn.md` を参照。
+> This document is learned **by reading** (passive). For learning **by doing** (active = reproducing a real game one mechanic at a time yourself and matching the numbers against the real ROM), see its counterpart `build-to-learn.md`.
 
-> **作り方（3層ケーススタディ）**：商用ゲームを「マニュアル(spec)×逆アセンブル(impl)×Claude再構築(rehearsal)」で学び、**再構築と実装の差分＝能力ギャップ**を一般化散文として昇格する（[[project-casebook-3layer]]）。**クリーンルーム厳守＝逆アセンのコードは転載せず、一般化した散文と出典のみ**。生ペアリングは非リポ `reference/disassemblies/<game>/` 配下の `_casestudies/`。
+> **How an entry is made (the 3-layer case study)**: study a commercial game through "manual (spec) × disassembly (impl) × Claude reconstruction (rehearsal)" and promote **the difference between the reconstruction and the implementation = the capability gap** into generalized prose ([[project-casebook-3layer]]). **Clean room, strictly = never transcribe disassembly code; generalized prose and the source only.** The raw pairing lives outside the repo, under `_casestudies/` inside `reference/disassemblies/<game>/`.
 >
-> **Layer1 spec はマニュアルだけで足りない＝実プレイ（実ROM観察）を必ず足す**：マニュアルは目的・操作・スコアの「意図」は書くが、画面の実際の動き・物量・描画 craft・手触りは伝えない。`load_rom`→`step_frame`→`get_screen_annotated` で挙動を観察し spec に足す（Fishing Derby では魚=1行1体・斜め釣り糸・水面シマーが全て実走観察で判明＝マニュアルの穴）。[[feedback-verification-standard]]。
+> **A Layer-1 spec is not complete from the manual alone = always add real play (observation of the real ROM)**: a manual records the "intent" of objective, controls and scoring, but conveys nothing about the screen's actual movement, quantity, drawing craft or feel. Observe the behaviour with `load_rom`→`step_frame`→`get_screen_annotated` and add it to the spec (in Fishing Derby, "one fish per row", the diagonal fishing line and the water shimmer were ALL discovered by running it = holes in the manual). [[feedback-verification-standard]].
 >
-> **Layer2 impl は逆アセンを読む前に、まず自分で測る**（v1.107.0）：`save_state` で局面を固定し **`probe_ram_semantics`** を回すと「$XX を書き換えると画面のどこがどう動くか」が総当たりで出る（非破壊・Combat 実ROM 全走査 3.1 秒 → 31/128 検出）。得られた分類は umbrella `reference/ale-ram-maps/`（商用104本・ALE 由来の外部表）で**採点**できる。順序が肝で、**先に測って後で照合**すれば逆アセンやこの外部表は「答え合わせ」に留まり、クリーンルームを壊さない。逆に先に読むと自分の観察が汚染される。注意：毎フレーム再計算される変数（Combat の `XOFFS`）は `none` と出る＝probe が測るのは意図でなく**観測可能な効果**。
+> **For Layer 2 (impl), measure it yourself BEFORE reading the disassembly** (v1.107.0): freeze a position with `save_state` and run **`probe_ram_semantics`**, and you get an exhaustive answer to "if I rewrite $XX, what on screen moves and how" (non-destructive; a full sweep of the real Combat ROM takes 3.1 seconds → 31/128 detected). The resulting classification can then be **scored** against the umbrella's `reference/ale-ram-maps/` (an external table for 104 commercial titles, ALE-derived). The order is the crux: **measure first and cross-check afterwards**, and the disassembly and that external table stay mere answer-checking without breaking the clean room. Read them first and your own observation is contaminated. Caution: a variable recomputed every frame (Combat's `XOFFS`) comes back as `none` — what the probe measures is not intent but **observable effect**.
 
-## 索引
-| ゲーム | 年/設計 | サイズ/型 | 状況→技 エントリ |
+## Index
+| Game | Year / designer | Size / type | situation→technique entries |
 |---|---|---|---|
-| Fishing Derby | 1980 Activision / David Crane（逆アセン Dennis Debro） | 2K / 単画面スポーツ | 大型不定形・斜めの線・多ターゲットのオブジェクト経済・対向スコア・同種衝突・無コスト演出 |
-| Breakout | 1978 Atari / Brad Stewart（逆アセン Dennis Debro） | 2K / 単画面アクション | **build-to-learn 初実装**（[[build-to-learn]]）＝自作で「書けた」技：多領域PFカーネル・RAM駆動の破壊可能PF・BL/P0位置決め・キーパドル・位置ベース衝突・サーブ/残球のゲーム状態 |
-| PONG | 2026 in-house capstone | 4K / 単画面スポーツ | 対戦AIの4パラダイム（倒せる設計込み）・不完全さの調律（誤差/遅延）・排他パスの共有末尾スキップで予算捻出・**AI強さの非推移性（単一基準ベンチ≠総当たり）** |
+| Fishing Derby | 1980 Activision / David Crane (disasm Dennis Debro) | 2K / single-screen sport | large irregular shapes · diagonal lines · object economy for many targets · facing scores · same-type collision · zero-cost effects |
+| Breakout | 1978 Atari / Brad Stewart (disasm Dennis Debro) | 2K / single-screen action | **the first build-to-learn implementation** ([[build-to-learn]]) = techniques we could actually WRITE ourselves: multi-region PF kernel · RAM-driven destructible PF · BL/P0 positioning · key-driven paddle · position-based collision · serve/lives game state |
+| PONG | 2026 in-house capstone | 4K / single-screen sport | 4 paradigms of opponent AI (designed beatability included) · tuning imperfection (error / latency) · freeing budget by skipping the shared tail on an exclusive path · **non-transitivity of AI strength (a single-baseline bench ≠ a round-robin)** |
 | Combat | 1977 Atari / Larry Wagner (disasm Roger Williams) | 2K / 27-variant 2-player | PF-only dual score (players are tank-only) · multi-frame wall-normal bounce solver · stir hit-reaction state machine · 27-variant bit-packed config selector + DDR input-gating |
 
-## Breakout（Atari 1978）— build-to-learn の worked example（「書けた」技）
-`build-to-learn.md` の手順で、マニュアル＋逆アセン＋実ROM寸法スペックから**自作で8段（rung1-8）を実装し遊べる1人用 Breakout を完成**。各段は実ROMに数値照合。＝「説明できる」が「自分で書ける」に変わった実証。出典＝`reference/disassemblies/_casestudies/breakout/`（impl-map/fixtures/method-diff/layout-compare）＋`roms/breakout/`（自作ROM・steps/に各段スナップショット）。
+## Breakout (Atari 1978) — the build-to-learn worked example (techniques we could WRITE)
+Following the procedure in `build-to-learn.md`, working from the manual + the disassembly + a dimensional spec measured off the real ROM, **8 rungs (rung1-8) were implemented from scratch into a complete, playable one-player Breakout**. Every rung was matched numerically against the real ROM. = the demonstration that "can explain" turned into "can write it myself". Source = `reference/disassemblies/_casestudies/breakout/` (impl-map / fixtures / method-diff / layout-compare) + `roms/breakout/` (the self-built ROM, with a snapshot of each rung under steps/).
 
-- **状況：単画面に複数の縦領域（スコア帯／ブロック帯／プレイ域）** → **領域ごとに COLUBK/PF の役割を切替える多領域カーネル**（壁＝PF端 or COLUBK、ブロック＝PF＋行COLUPF）。
-- **状況：壊せるブロック壁** → **PF値をRAM(`brkPF0/1/2`)に持ち、毎走査線リロードして描画。当たったビットをクリア＝破壊**（反射PFはミラー破壊の簡略／非対称PFが上位）。
-- **状況：1px のボール／横長パドルを任意X位置に** → **÷15 coarse(RESxx)＋HMxx fine を1 HMOVEで複数オブジェクト同時**位置決め。レンダ位置＝RAM値−offset（read_rowで実測較正）。
-- **状況：操作（キー）** → SWCHA でパドル±、INPT4 でサーブ。
-- **状況：衝突** → 今回は位置ベース（学習用に `CXBLPF` ハード衝突への置換を method-diff に記録）。
-- **状況：ゲーム進行** → `ballLive`(サーブ待ち/プレイ)・`lives`(5球)・`gameOver` の小さな状態機械。
-- **★craft 較正の作法**：色も寸法も **read_row/get_screen_annotated でオリジナルに数値収束**（目測だけだとパドルを「白24px」と誤認→実測「赤16px」）。[[build-to-learn]]・`layout-compare.ja.md`。
+- **Situation: several vertical regions on one screen (score band / brick band / play area)** → **a multi-region kernel that switches the roles of COLUBK/PF per region** (walls = the PF edge or COLUBK; bricks = PF + a per-row COLUPF).
+- **Situation: a destructible brick wall** → **hold the PF values in RAM (`brkPF0/1/2`), reload them every scanline to draw, and clear the bit that was hit = destruction** (a reflected PF simplifies this to mirrored destruction; an asymmetric PF is the better option).
+- **Situation: place a 1px ball and a wide paddle at arbitrary X** → **÷15 coarse (RESxx) + HMxx fine, positioning several objects simultaneously in one HMOVE**. Rendered position = RAM value − offset (calibrated by measuring with read_row).
+- **Situation: controls (keys)** → paddle ± from SWCHA, serve from INPT4.
+- **Situation: collision** → position-based this time (the substitution to `CXBLPF` hardware collision is recorded in method-diff for study).
+- **Situation: game progression** → a small state machine of `ballLive` (awaiting serve / in play), `lives` (5 balls) and `gameOver`.
+- **★The discipline of craft calibration**: both colour and dimensions **converge numerically on the original via read_row / get_screen_annotated** (judged by eye alone, the paddle was misread as "white 24px"; measured, it is "red 16px"). [[build-to-learn]] · `layout-compare.ja.md`.
 
-## 次ゲームの選定基準（scale-up）
-合成難易度の**昇順**で keystone を増やす。選定キー：
-1. **ROMサイズ／バンク切替（主・機械判定）**：2K → 4K → バンク切替（8K+）。dissect 注釈も 2K/4K が綺麗。
-2. **アーキタイプ**：単画面 → 迷路/スポーツ/固定シューター → スクロール/多画面 → プラットフォーマー/3D。
-3. **マニュアルの詳しさ（spec の濃さ・ユーザー指摘 2026-06-15）**：説明が厚いゲームほど Layer1 spec が濃く、diff が豊かになる＝学びが大きい。例＝**Asteroids は説明が非常に厚い**（ただし 8K バンク切替＝バンク keystone 帯）。マニュアル濃度は良い選定信号だが、難易度昇順（1）と両立させる。
-4. **逆アセンの入手性**（完全注釈・実ROM一致が望ましい）。
-- **必須工程**：どのゲームでも **Layer1 spec＝マニュアル＋実ROM観察の二本立て**（[[feedback-verification-standard]]）。マニュアルだけでは挙動を把握し切れない。
-
----
-
-## Fishing Derby（Activision, 1980, David Crane）
-出典＝マニュアル `reference/disassemblies/_casestudies/fishing-derby/manual/`（archive.org 原本）＋ Dennis Debro 完全注釈逆アセン（実ROM完全一致）。検証＝`build/fishing_derby.bin` を Gopher2600 実走（2026-06-15）。
-
-- **状況：8px より大きい単体の不定形クリーチャを出したい（魚より大きいサメ等）**
-  → **1個の player を per-走査線 NUSIZ（サイズ/コピー）＋HMOVE テーブルで“引き伸ばして”成形**。GRP は小さいまま横 ~40clock の不定形になる。色は単色割り切り。**フリッカも追加オブジェクトも不要**。実走で確認。→ 原則 `design-principles.md`「8px 超の単体不定形」。
-
-- **状況：2点を結ぶ動く細い斜め線（釣り糸/テザー/ロープ/レーザー）が要る**
-  → **missile/ball を縦に出し、slope を整数+分数で持って毎走査線 `adc`、桁上りで `HMMx`/`HMBL` に ±1px HMOVE**（Bresenham を HMOVE で実装）。右糸=BL・左糸=M1。実走で傾きを確認。→ 原則「任意傾きの1px 直線」。
-
-- **状況：単画面に多数の同種ターゲットを置きたい（"6 rows of fish"）**
-  → **「1行1体 × バンド再利用」が定石**。全6匹を P0 を7バンドで使い回して1匹ずつ描画し、**操作対象（掛かって巻上中の魚）は P1 専任**に分ける。マニュアルの名詞（"rows of fish"）から同時表示数を過大に見積もらない＝**先に「TIA 6枠×バンド再利用で実際に置ける数」を算出**してからゲーム性を当てる。〔Claude 再構築は「群れ＝P0×3+P1×3」と誤認→実走で反証〕
-
-- **状況：左右対向の2桁スコア×2**
-  → **player2枠（P0=十/P1=一）＋数字フォント表＋1走査線内 re-strobe（`Waste18Cycles` を挟み GRP 描き直し）**。PF score は単一/左右対称向き、対向2スコアは player 方式。既存技 `docs/techniques/score-kernel.md` に該当。実走で「スコア行の PF にフォント無し＝数字は player」を確認。
-
-- **状況：同種2オブジェクトの接触判定（ハザードが標的を奪う）**
-  → **`CXPPMM`（P0×P1）一発**。座標計算に逃げない。サメ(P0)×掛かり魚(P1)接触を検出して魚を消す。
-
-- **状況：背景に安い“ゆらぎ”の質感（水面/砂嵐/星）**
-  → **既に回している LFSR/randomSeed のビットを帯ごとに `COLUBK` へ流すだけ**（専用RAM不要・ほぼ無コスト）。→ 原則 色節「背景のゆらぎ」。
-
-### このケースが定量化した能力ギャップ（→ `capability-gap-audit.md`／`sandbox/EVALUATION.md`）
-Claude の封印再構築 vs 実装の差分＝**衝突・入力・難易度の“ロジック”は読めるが、TIA を絞り切る描画 craft（1スプライト成形・斜線・多重利用・無コスト演出）で実ベテランに劣る**。詳細台帳＝`reference/disassemblies/_casestudies/fishing-derby/diff-gaps.ja.md`。
+## Selection criteria for the next game (scale-up)
+Add keystones in **ascending order** of integration difficulty. Selection keys:
+1. **ROM size / bankswitching (primary, machine-decidable)**: 2K → 4K → bankswitched (8K+). dissect annotation is also cleanest on 2K/4K.
+2. **Archetype**: single screen → maze / sport / fixed shooter → scrolling / multi-screen → platformer / 3D.
+3. **How detailed the manual is (the density of the spec — user's point, 2026-06-15)**: the thicker the explanation, the denser the Layer-1 spec and the richer the diff = the more that is learned. Example = **Asteroids' documentation is very thick** (but it is 8K bankswitched = the bankswitching keystone band). Manual density is a good selection signal, but reconcile it with the ascending difficulty order (1).
+4. **Availability of a disassembly** (fully annotated and byte-identical to the real ROM is preferred).
+- **Mandatory step**: for every game, **the Layer-1 spec stands on two legs = manual + observation of the real ROM** ([[feedback-verification-standard]]). The manual alone never captures the whole behaviour.
 
 ---
 
-## PONG（in-house capstone, 2026）— 対戦AIの4パラダイムと「強さ」の測り方
-市販ゲーム逆アセンでなく、**自作 capstone（1枚画像→完成PONG）で実測裏取りした gameplay 事例**（Breakout 同様「書けた」側のエントリ）。4変種は本流から**AIコードのみ**差替（物理/english/サーブ/音/スコアは完全同一＝純粋比較）・全本で実機予算検証済（全物理行≤76cy・900f over:false）。出典＝`sandbox/practice/pong/ai-variants/`（README＝4種設計・`bench/README.md`＝客観ベンチ＋総当たり実測・2026-07）。
+## Fishing Derby (Activision, 1980, David Crane)
+Source = the manual `reference/disassemblies/_casestudies/fishing-derby/manual/` (the archive.org originals) + Dennis Debro's fully annotated disassembly (byte-identical to the real ROM). Verification = running `build/fishing_derby.bin` under Gopher2600 (2026-06-15).
 
-- **状況：倒せる対戦相手AI（パドル系）が要る**
-  → 古典PONG-AIの**4大パラダイム**から選ぶ。鍵＝**攻略口は後付けでなく設計入力**（各型に構造的な負け筋を残す）：
-  | 型 | 仕組み | 攻略口（designed beatability） |
+- **Situation: you want a single irregular creature larger than 8px (a shark bigger than the fish, say)**
+  → **shape ONE player by "stretching" it with a per-scanline NUSIZ (size / copies) + HMOVE table**. GRP stays small while the shape becomes an irregular ~40 colour clocks wide. Accept a single colour. **Neither flicker nor an extra object is needed.** Confirmed on a live run. → the principle in `design-principles.md`, "a single irregular shape wider than 8px".
+
+- **Situation: you need a thin moving diagonal line joining two points (fishing line / tether / rope / laser)**
+  → **draw a missile/ball vertically, hold the slope as integer + fraction, `adc` it every scanline, and on carry apply a ±1px HMOVE through `HMMx`/`HMBL`** (Bresenham implemented in HMOVE). Right line = BL, left line = M1. Slope confirmed on a live run. → the principle "a 1px line at an arbitrary slope".
+
+- **Situation: you want many targets of the same kind on one screen ("6 rows of fish")**
+  → **the standard answer is "one object per row × band reuse"**. All six fish are drawn one at a time by reusing P0 across 7 bands, and **the object you interact with (the hooked fish being reeled in) gets P1 exclusively**. Do not over-estimate the simultaneous object count from a noun in the manual ("rows of fish") = **first compute "how many can actually be placed given the TIA's 6 slots × band reuse"**, and only then fit the gameplay to it. 〔Claude's reconstruction wrongly assumed "the school = P0×3 + P1×3" → refuted by a live run〕
+
+- **Situation: two facing 2-digit scores, left and right**
+  → **two player slots (P0 = tens / P1 = units) + a digit font table + a re-strobe inside one scanline (redrawing GRP with a `Waste18Cycles` in between)**. A PF score suits a single or left-right-symmetric score; two facing scores want the player method. Corresponds to the existing technique `docs/techniques/score-kernel.md`. A live run confirmed "no font in the PF on the score rows = the digits are players".
+
+- **Situation: contact between two objects of the same kind (a hazard steals the target)**
+  → **one `CXPPMM` (P0 × P1)**. Don't retreat into coordinate arithmetic. Detect shark (P0) × hooked fish (P1) contact and remove the fish.
+
+- **Situation: a cheap "shimmer" texture in the background (water / sandstorm / stars)**
+  → **just stream bits of the LFSR/randomSeed you already run into `COLUBK` per band** (no dedicated RAM, almost zero cost). → the principle in the colour section, "background shimmer".
+
+### The capability gap this case quantified (→ `capability-gap-audit.md` / `sandbox/EVALUATION.md`)
+Claude's sealed reconstruction vs the implementation = **the "logic" of collision, input and difficulty is readable, but on the drawing craft that wrings the TIA dry (shaping one sprite, diagonal lines, multiple reuse, zero-cost effects) we fall short of a real veteran**. Detailed ledger = `reference/disassemblies/_casestudies/fishing-derby/diff-gaps.ja.md`.
+
+---
+
+## PONG (in-house capstone, 2026) — 4 paradigms of opponent AI and how to measure "strength"
+Not a commercial-game disassembly but **a gameplay case measured and backed on our own capstone (one image → a finished PONG)** — like Breakout, an entry on the "we could write it" side. The 4 variants replace **only the AI code** relative to the mainline (physics / english / serve / sound / score are completely identical = a pure comparison), and every one of them passed the hardware budget check (all physics lines ≤ 76cy, 900f over:false). Source = `sandbox/practice/pong/ai-variants/` (README = the design of the 4 variants; `bench/README.md` = the objective bench + the measured round-robin, 2026-07).
+
+- **Situation: you need a beatable opponent AI (paddle games)**
+  → choose from the **4 major paradigms** of classic PONG AI. The key = **the way to beat it is a design INPUT, not an afterthought** (leave every type a structural way to lose):
+  | Type | Mechanism | The way to beat it (designed beatability) |
   |---|---|---|
-  | 追従 tracker | 現在Yを遅延追従（8fに1回再サンプル・3px） | 再サンプルの一拍遅れを速球・角度変化で抜く |
-  | 予測迎撃 predictive | 影ボール（実ボールの2倍速で前進＋**壁反射込み**）で着弾Yを確定→先回り待機 | 着弾確定後の角度変化（english/WHAMMY急球）・注入した誤読（1/16で逆読み） |
-  | 先読みリード anticipatory | 線形外挿 target=BallRow+4×BallDY・毎f連続2px（滑らか） | **壁を読まない**＝バウンド球に見当違いの先行 |
-  | ラバーバンド rubberband | スコア差で**誤差幅**を変調（負け=締める/勝ち=甘い）・速度2px固定 | リードすると緩む＋人間の瞬間速度優位（WHAMMY±3 > AI2px） |
-- **状況：AIの「らしさ」＝不完全さを調律したい**
-  → 速度でなく**誤差と遅延**で作る：狙い誤差 AIErr の注入（生成は余裕のある行へ移設）・反応遅延（再サンプル間隔）・速度上限。難易度可変は「**誤差幅の変調**」（速度変調は見た目でバレる・誤差変調はバレにくい＝ゲームAIの定石）。
-- **状況：カーネル予算が足りず精度を上げられない**
-  → **排他パスで不要な共有末尾をスキップして予算を捻出**：v2 は予測フェーズ中パドルが動かない＝共有末尾 PaddleR_End 再計算（10cy）が不要→`jmp OverEnt` で housekeeping 行へ直行。**浮いた10cyで影ボールの傾きを近似（X速3固定）→正確（2×BallDX＝全速度で正確）へ強化**。design-principles「物理行の間借り」の変種＝パス固有に不要な共有処理を見つけて省き、浮いた分を精度に回す。
-- **状況：AIの強さを測りたい（評価・バランス調整）**
-  → **単一基準ベンチは1つのレンズにすぎず、順位を正反対に誤り得る（実測）**。固定基準AI（決定論1px追従）相手の11点先取では v4 11-0／v1 11-1／v3 1-11／v2 1-11＝「v4>v1>v3≈v2」。だが**総当たり（head-to-head・AIを左パドルへ移植し左右反転で side bias 排除）の真実は v3≈v4 ＞ v2 ＞ v1**——v1 は 0勝3敗の最弱（8f再サンプル遅延を実AIに突かれる）・v3/v4 は 37000f 走らせても 0-0 の完全膠着。基準を混ぜると **v1→基準→{v2,v3}→v1 の循環＝強さは非推移（ジャンケン）**。さらに**客観ベンチ≠人間相手の難易度**：v3 は完璧追従の基準には 1-11 で「弱」だが、追従が不完全な人間には「中・なんとか勝てる」＝本流採用。教訓＝**AI の強さは相手依存で一次元でない。真の評価は総当たり＋多様な相手モデル**（→ harness backlog の gameplay-verification フロンティア）。
+  | tracker | follows the ball's current Y with a lag (re-samples once every 8 frames, 3px) | beat the one-beat re-sampling lag with a fast ball or an angle change |
+  | predictive | a shadow ball (advances at twice the real ball's speed, **wall reflections included**) fixes the arrival Y → it waits there in advance | an angle change after the arrival is already fixed (english / the WHAMMY fast ball); the injected misread (reads it backwards 1 time in 16) |
+  | anticipatory (lookahead) | linear extrapolation, target = BallRow + 4×BallDY, a continuous 2px every frame (smooth) | **it does not read the walls** = it leads a bouncing ball to the wrong place |
+  | rubberband | modulates the **error width** by the score difference (losing = tighten / winning = sloppy), speed fixed at 2px | it slackens once it leads, plus the human's instantaneous speed advantage (WHAMMY ±3 > the AI's 2px) |
+- **Situation: you want to tune the AI's "character" = its imperfection**
+  → build it out of **error and latency**, not speed: inject an aiming error AIErr (move its generation onto a line with slack), a reaction delay (the re-sampling interval), and a speed cap. Variable difficulty means "**modulating the error width**" (modulating speed is visible to the eye, modulating error is hard to spot = the standard move in game AI).
+- **Situation: the kernel budget is too tight to raise accuracy**
+  → **free up budget by skipping a shared tail that an exclusive path does not need**: in v2 the paddle does not move during the prediction phase = the shared tail's PaddleR_End recomputation (10cy) is unnecessary → `jmp OverEnt` goes straight to the housekeeping line. **The 10cy freed upgraded the shadow ball's slope from approximate (X speed fixed at 3) to exact (2×BallDX = exact at every speed).** A variant of design-principles' "lodging on a physics line" = find the shared work a particular path does not need, drop it, and spend what is freed on accuracy.
+- **Situation: you want to measure how strong an AI is (evaluation, balancing)**
+  → **a single-baseline bench is only one lens, and it can get the ranking exactly backwards (measured)**. First-to-11 against a fixed baseline AI (a deterministic 1px tracker) gives v4 11-0 / v1 11-1 / v3 1-11 / v2 1-11 = "v4 > v1 > v3 ≈ v2". But **the truth from the round-robin (head-to-head, porting each AI onto the left paddle and mirroring left/right to remove side bias) is v3 ≈ v4 > v2 > v1** —— v1 is the weakest at 0 wins 3 losses (a real AI exploits its 8-frame re-sampling lag), and v3/v4 stay a perfect 0-0 deadlock even over 37000 frames. Mix the baseline back in and you get a **cycle, v1 → baseline → {v2,v3} → v1 = strength is non-transitive (rock-paper-scissors)**. Furthermore **an objective bench ≠ difficulty against a human**: v3 scores 1-11 against the perfect-tracking baseline and reads "weak", but against a human whose tracking is imperfect it reads "medium — you can just about win", which is why it was adopted for the mainline. Lesson = **AI strength depends on the opponent and is not one-dimensional. Real evaluation means a round-robin plus a variety of opponent models** (→ the gameplay-verification frontier in the harness backlog).
 
 ---
 
