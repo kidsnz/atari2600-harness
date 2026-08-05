@@ -47,9 +47,9 @@ func TestDrawnObjectsSeparatesPaintedFromMerelyPositioned(t *testing.T) {
 			// a case precisely because the two readings of the buffer agreed with
 			// each other and disagreed with the author, which is the arrangement
 			// that makes a wrong expectation visible instead of a wrong tool.
-			name:    "the missile/ball width litmus draws the missiles and the ball, and no player",
-			rom:     "../../roms/litmus/litmus_objsizes.bin",
-			want:    [5]bool{false, true, false, true, true},
+			name: "the missile/ball width litmus draws the missiles and the ball, and no player",
+			rom:  "../../roms/litmus/litmus_objsizes.bin",
+			want: [5]bool{false, true, false, true, true},
 			because: "it sweeps every missile and ball WIDTH plus the ball's vertical delay; it never " +
 				"writes GRP0 or GRP1, so neither player appears",
 		},
@@ -67,7 +67,20 @@ func TestDrawnObjectsSeparatesPaintedFromMerelyPositioned(t *testing.T) {
 			}
 
 			got := e.DrawnObjects()
-			labels := [5]string{"P0", "M0", "P1", "M1", "BL"}
+			// DERIVE the labels from Markers() rather than restating them. DrawnObjects'
+			// idxOf exists for exactly one reason — to line up with the Markers() literal
+			// beside it — so a test that hard-codes the same order agrees with idxOf even
+			// when idxOf has stopped agreeing with Markers. Reading them back makes the
+			// two impossible to reorder independently.
+			var labels [5]string
+			ms := e.Markers()
+			if len(ms) != len(labels) {
+				t.Fatalf("Markers() returned %d markers, want %d — DrawnObjects indexes "+
+					"this slice and the two have gone out of step", len(ms), len(labels))
+			}
+			for i, m := range ms {
+				labels[i] = m.Label
+			}
 			for i := range got {
 				if got[i] != c.want[i] {
 					t.Errorf("%s: drawn=%v, want %v — %s", labels[i], got[i], c.want[i], c.because)

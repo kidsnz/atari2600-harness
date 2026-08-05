@@ -54,7 +54,21 @@ const LuminanceLevels = 8
 
 // VividMaxLuminance is the highest luminance step where a "color meant to look vivid" can go.
 // Brighter than this, saturation drops and the color washes out (bright blue in particular
-// loses its identity). [mining 132561]
+// loses its identity).
+//
+// WHAT THE SOURCE SUPPORTS AND WHAT IS A JUDGEMENT CALL, kept apart on purpose (2026-08-05).
+// Thread 132561 establishes the PHENOMENON and nothing narrower: raising luma desaturates on
+// real hardware (not an emulator artefact, and the reason is NTSC's I/Q ceiling), bright blues
+// hue7-9 stop being distinguishable at the top, and the advice given is "pick mid-to-low
+// luminance, and treat max ($xE) as near-white plus a tint". **It never states a threshold.**
+// The 5 is this project's cut on that advice, not a measured number, and it is written here
+// rather than left to look sourced.
+//
+// The UNIT is not ambiguous, which was worth checking: Luminance() returns (reg>>1)&7, a step
+// on 0..7, and WashoutRisk takes its argument from there — so 5 is step 5 of 8, luma nibble
+// $A. The source's own $x0..$xE notation is the nibble; the two scales differ by that factor
+// and the code is self-consistent.
+// [mining 132561 — phenomenon only; the threshold is ours]
 const VividMaxLuminance = 5
 
 // Hue returns the hue of a color register value (D7..D4, 0–15).

@@ -66,7 +66,7 @@ FEED = {
     "title-screen-opinion": ("Text/HUD", "§作画craft / 字形誤読(doc)"),
     "title-to-game-transition": ("Text/HUD", "§カーネル予算 / GameState(doc)"),
     "pf48-title-tool": ("Text/HUD", "§PF(HUD) / 48pxタイトル(tool)"),
-    "interlacing-multi-sprites": ("Multiplex", "§多重化 / design.NeedsFlicker,FitsMultiSprite"),
+    "interlacing-multi-sprites": ("Multiplex", "§多重化 / design.NeedsFlicker"),
     "flicker-to-enhance-graphics": ("Multiplex", "§多重化 / design.NeedsFlicker(意図フリッカ)"),
     "asymmetric-reflected-playfield": ("Playfield", "§PF / design.AsymRightWindow,FitsAsymRightWrite"),
     "castlevania-port": ("Playfield", "§PF / design.AsymRightWindow(非対称高コスト)"),

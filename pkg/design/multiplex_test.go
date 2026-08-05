@@ -10,9 +10,6 @@ func TestMultiplexConstants(t *testing.T) {
 	if DistinctPlayerSprites != 2 {
 		t.Errorf("DistinctPlayerSprites=%d want 2", DistinctPlayerSprites)
 	}
-	if MaxMultiSprite != 5 {
-		t.Errorf("MaxMultiSprite=%d want 5", MaxMultiSprite)
-	}
 }
 
 // TestNeedsFlicker は 2体までフリッカ無し・3体以上で要フリッカ。
@@ -33,15 +30,6 @@ func TestNeedsFlicker(t *testing.T) {
 	}
 }
 
-// TestFitsMultiSprite は multisprite 上限(5)の境界。
-func TestFitsMultiSprite(t *testing.T) {
-	if !FitsMultiSprite(5) || !FitsMultiSprite(1) {
-		t.Error("<=5 sprites should fit")
-	}
-	if FitsMultiSprite(6) {
-		t.Error(">5 sprites should not fit")
-	}
-}
 
 // TestNeedsEmptyYLane は再配置に空Yレーンが要る条件（3体以上）と再配置コスト。
 func TestNeedsEmptyYLane(t *testing.T) {

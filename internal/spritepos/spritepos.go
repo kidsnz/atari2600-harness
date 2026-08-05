@@ -19,7 +19,14 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
 
-// objIndex maps an object name to the index used by `RESP0,x` / `HMP0,x`.
+// objIndex maps an object name to the index used by `RESP0,x` / `HMP0,x` — i.e. the
+// TIA REGISTER LAYOUT ($10..$14 and $20..$24), which is a fact about the hardware.
+//
+// Deliberately NOT internal/emu's DrawnObjects/Markers order (P0,M0,P1,M1,BL), which
+// is the order of an annotation slice and has no bearing on any register. The two
+// index different things and never meet; assuming one from the other is a silent
+// off-by-two. Verified against the machine by TestSolveHitsTargets, which pokes the
+// index into the kernel and reads the object back BY NAME, over all five objects.
 var objIndex = map[string]int{"P0": 0, "P1": 1, "M0": 2, "M1": 3, "BL": 4}
 
 // Objects lists the supported object names in index order.
@@ -170,11 +177,11 @@ func (p *Positioner) Achieve(object string, inputA int) (int, error) {
 type Solution struct {
 	Object      string `json:"object"`
 	TargetX     int    `json:"target_x"`
-	InputA      int    `json:"input_a"`       // value to load before SetXPos to land on TargetX
-	AchievedX   int    `json:"achieved_x"`    // measured HmovedPixel (== TargetX when Exact)
-	Exact       bool   `json:"exact"`         // AchievedX == TargetX
-	CoarseSteps int    `json:"coarse_steps"`  // div-15 loop iterations for InputA
-	HMOVENibble int    `json:"hmove_nibble"`  // signed fine adjust (-8..+7)
+	InputA      int    `json:"input_a"`      // value to load before SetXPos to land on TargetX
+	AchievedX   int    `json:"achieved_x"`   // measured HmovedPixel (== TargetX when Exact)
+	Exact       bool   `json:"exact"`        // AchievedX == TargetX
+	CoarseSteps int    `json:"coarse_steps"` // div-15 loop iterations for InputA
+	HMOVENibble int    `json:"hmove_nibble"` // signed fine adjust (-8..+7)
 }
 
 // Solve finds the routine input that lands `object` on targetX in this kernel and

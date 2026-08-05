@@ -65,7 +65,12 @@ func TestSolveHitsTargets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, obj := range []string{"P0", "P1", "M0", "BL"} {
+	// All FIVE objects, because this loop is what verifies objIndex against the
+	// machine: Achieve pokes the INDEX into the kernel and then reads the object back
+	// BY NAME, so a wrong index positions one object while the check reads another and
+	// the target is missed. M1 (index 3) was the one name absent from this list, which
+	// left that entry asserted by nothing.
+	for _, obj := range []string{"P0", "P1", "M0", "M1", "BL"} {
 		for _, tx := range []int{12, 31, 48, 75, 96, 123, 150} {
 			sol, err := p.Solve(obj, tx)
 			if err != nil {

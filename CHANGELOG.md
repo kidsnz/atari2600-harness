@@ -8,7 +8,56 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **A corpus-wide frame-stability gate, because the scenarios cannot reach most of the corpus.** Measured:
+  **36 of 164 ROMs carried `frame_lines_stable`, 128 carried nothing.** Wiring 128 scenarios by hand is more
+  work and more to maintain than one sweep, so `TestNoRomBreathesAcrossFrames` walks `roms/**/*.bin` and
+  requires every ROM to hold ONE frame length for 130 frames. **162 swept, all pass, 19s** — the serial sweep
+  was 76s, which is why this was not added before; `t.Parallel()` per ROM is what made it affordable.
+  The invariant is **single-valued, not 262**: 38 ROMs hold a deliberately different frame length and are
+  stable at it, and a gate demanding 262 would fail them all and teach everyone to ignore it.
+  Negative control: un-excluding `framelines_trap` fails it with `262x129 263x1`.
+- **The gate found one ROM on its first run — `cart_f4sc`, in `roms/carts/`, which the earlier 156-ROM sweep
+  never covered.** It is a bank-switch/superchip FINGERPRINT fixture, not a display ROM: all eight banks end
+  `lda $FFF4 / jmp .reset`, handing back to bank 0 and re-entering the reset vector, so the machine
+  ping-pongs between banks instead of driving frames. Over 130 frames it never produces a 262 at all
+  (`1x1 2x1 3x1 4x4 … 350x22`). Excluded BY NAME with that measurement, alongside `framelines_trap`; its four
+  siblings (`cart_3e`, `cart_3eplus`, `cart_dpc`, `cart_f6sc`) do carry frame loops and are swept normally,
+  so this is one fixture's shape and not a blanket exemption.
+
 ### Fixed
+- **`objIndex["M1"]` was asserted by nothing, and it is the one entry that could have been wrong.**
+  `spritepos.Achieve` pokes the INDEX into the kernel and reads the object back BY NAME, so that loop is what
+  verifies the table against the machine — and `TestSolveHitsTargets` ran `P0, P1, M0, BL`, leaving index 3
+  unexercised. Added `M1`. Negative control: setting it to 1 fails with
+  `M1 target 12: achieved 25 (inputA=67, off by +13)`.
+- **D5 — "two incompatible object-index orderings" is NOT a defect, and the inventory called it the sweep's
+  highest-consequence duplicate.** `emu.DrawnObjects`'s `P0,M0,P1,M1,BL` exists to line up with the
+  `Markers()` literal in the same file and indexes nothing else; `spritepos.objIndex`'s `P0,P1,M0,M1,BL` is
+  the TIA register layout ($10..$14 / $20..$24). They index different things and never meet. What was real is
+  that neither was pinned: `drawnobjects_test` restated the order instead of reading it back, so it agreed
+  with `idxOf` even if `idxOf` had stopped agreeing with `Markers()`. It now DERIVES the labels from
+  `Markers()`, and both declarations carry a comment naming the other as the thing they are not.
+- **Deleted `design.MaxMultiSprite` and `FitsMultiSprite`: the cited thread does not say what they claim.**
+  The constant was 5, documented as bB's multisprite/flickersort ceiling and cited to AtariAge 107063.
+  That thread never mentions bB or the number 5 — it is a 2007 raw-assembly discussion of Venetian blinds for
+  chess pieces, and its actual numbers are "8 distinct sprites per line is infeasible" (supercat) and
+  "4 pieces per line by rewriting GRP0/GRP1 mid-line" (hornpipe2, measured). It was also numerically identical
+  to `MovableObjects = 5`, so nothing about the value distinguished the two concepts, and the test asserted
+  only that the definition equals itself. A bB-derived ceiling is also the one thing this project has decided
+  on purpose not to inherit. `gen_mining_digest.py`'s 107063 mapping updated to stop naming a dead symbol.
+- **`design.VividMaxLuminance` keeps its value and loses its false provenance.** It is NOT dead — it is the
+  threshold behind `WashoutRisk`, which the docs do reference. Thread 132561 establishes the phenomenon
+  (luma desaturates on real hardware, NTSC's I/Q ceiling is why, blues 7-9 stop separating at the top) and
+  advises "mid-to-low luminance"; **it never states a threshold.** The 5 is this project's cut, now said so
+  in the comment instead of looking measured. The "unit-ambiguous" charge does not survive checking:
+  `Luminance()` returns `(reg>>1)&7` and `WashoutRisk` takes its argument from there, so 5 is step 5 of 8.
+- **`pkg/design` has an importer, contrary to the inventory.** `internal/cyclebound` imports it, and 25 of its
+  38 exports are referenced from code or docs. The package's contract is the routing table's step 2b —
+  executable feasibility checks run during authoring — not Go-level reuse, so "N exports, 0 importers" was
+  the wrong measurement to act on. The 13 unreferenced exports are hardware facts that are correct
+  (`ColorClockPerColumn`, `PixelsPerCycle`, `LuminanceLevels`, …); deleting right constants is not the goal,
+  and they are left alone.
 - **`pkg/sprite.DigitFont()`'s digit 9 was upside down, and the doc comment that would have caught it is now
   the test.** The comment claims the glyphs are identical to the `score6` technique's and that they are
   returned top-first, while `score6.asm` stores them bottom-first for a `Y=7->0` kernel — so the two tables

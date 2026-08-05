@@ -504,6 +504,12 @@ func (e *Emu) DrawnObjects() [5]bool {
 	}
 	// elemBuf holds elemNames' index + 1. Map the movable objects to Markers' order;
 	// BG and PF are not markers and are skipped.
+	// P0,M0,P1,M1,BL — the order of the Markers() literal below, and NOTHING ELSE.
+	// This is deliberately NOT the TIA register order (P0,P1,M0,M1,BL) that
+	// internal/spritepos uses for `RESP0,x`/`HMP0,x`; the two index different things
+	// and never meet, so neither is wrong, but a reader who assumes one from the other
+	// gets a silent off-by-two. TestDrawnObjectsSeparatesPaintedFromMerelyPositioned
+	// derives its labels from Markers() so this pairing cannot drift.
 	idxOf := map[string]int{"P0": 0, "M0": 1, "P1": 2, "M1": 3, "BL": 4}
 	slot := make([]int, len(elemNames)+1)
 	for i := range slot {
@@ -1798,7 +1804,9 @@ func (e *Emu) ReadCollisions() (Collisions, error) {
 
 // beamPos はフレーム内のビーム位置を単調増加する 1 本の数直線に写す（HBLANK 先頭 = 0）。
 // clock の規約は Coords と同じ HBLANK −68..−1 / 可視 0..159（= 1 ライン 228 カラークロック）。
-func beamPos(scanline, clock int) int { return scanline*specification.ClksScanline + clock + specification.ClksHBlank }
+func beamPos(scanline, clock int) int {
+	return scanline*specification.ClksScanline + clock + specification.ClksHBlank
+}
 
 // RunUntilBeam は最大 maxFrames フレーム実行し、ビームが (scanline, clock) に**到達した**時点で
 // 早期停止する。条件で止まったとき halted=true（breakif の土台）。
