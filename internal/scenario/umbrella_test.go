@@ -75,8 +75,9 @@ func TestTheAuthoredROMsStillPass(t *testing.T) {
 			"the machine where the ROMs are written, which is the machine that breaks them.")
 	}
 	// A tree that shrank is a different failure from a tree that is absent.
-	if len(scen) < 8 {
-		t.Fatalf("only %d umbrella scenarios found; there were 11 on 2026-08-04. A partial "+
+	if len(scen) < 12 {
+		t.Fatalf("only %d umbrella scenarios found; there were 13 on 2026-08-04 (11 plus the two "+
+			"PONG ones added the same day). A partial "+
 			"corpus is worse than none — the missing one is where the next regression hides",
 			len(scen))
 	}
