@@ -120,7 +120,7 @@ func TestAnUnpinnableAccumulatorIsStillEightBitsWide(t *testing.T) {
 		"KnownCtl proven %d (A pinned at 60)", fl.Worst, row.WorstCycles, kc.Worst)
 }
 
-// TestTheFloorDoesNotRescueTheDexPath pins the boundary of the change.
+// TestTheFloorDoesNotRescueTheCounterPath pins the boundary of the change.
 //
 // The dex/dey counter path refuses an unknown entry value for a different reason: the
 // count IS the register's value there, so a 255 floor would say "this loop may run 255
@@ -128,24 +128,63 @@ func TestAnUnpinnableAccumulatorIsStillEightBitsWide(t *testing.T) {
 // loose, and it would mask the very defect SD-9 was about (a wrong count read off the
 // wrong instruction). The floor is deliberately confined to the divide idiom, where
 // the count is A/N and the subtrahend is a constant in the instruction.
-func TestTheFloorDoesNotRescueTheDexPath(t *testing.T) {
-	rep, err := Prove("../../roms/litmus/cb_deadpred.asm", DefaultBudget)
-	if err != nil {
-		t.Fatalf("prove: %v", err)
-	}
-	// cb_deadpred's delay loop is a dex countdown. Whatever its verdict, the reason
-	// must never become a divide-style bound: if it does, the floor has leaked.
-	for _, r := range rep.Unbounded {
-		if strings.Contains(r.Reason, "loop bound unknown") {
-			return // still refused, which is the point
+//
+// THE PREVIOUS VERSION OF THIS TEST COULD NOT FAIL. It proved cb_deadpred, looked
+// for a "loop bound unknown" refusal, `return`ed if it found one — and t.Log'd
+// "this test currently records the boundary rather than witnessing it" if it did
+// not, then passed. Its only t.Fatal was the error check on Prove. The comment was
+// honest about having no witness and the tick was green either way, which is worse
+// than no test: it occupied the name.
+//
+// A witness does exist, and it was in the corpus the whole time. Three litmus
+// fixtures put an UNPINNABLE value into a dex/dey countdown and must be refused —
+// if the 255 floor ever escaped the BCS/BCC divide branch of determineBound, every
+// one of them would come back BOUNDED at a 255-derived count instead:
+//
+//	litmus_counterwrite  DangerRow  body writes the counter (`inx/inx/dex`), net +1
+//	litmus_latchflags    DangerRow  a `cpx` between the decrement and the latch
+//	litmus_jsrentry      DangerRow  loop entered past its header via jsr
+//
+// Measured 2026-08-04: all three refuse with "loop bound unknown (need a counted
+// dex/dey or sbc-divide idiom with a proven range)", 11 such refusals across the
+// litmus + technique corpus. The REASON is asserted, not just `!Bounded`: a bound
+// arriving from the floor would change the reason to nothing at all, and a
+// different refusal reason would mean the region died earlier for an unrelated
+// cause and this test stopped watching the counter path.
+func TestTheFloorDoesNotRescueTheCounterPath(t *testing.T) {
+	const want = "loop bound unknown"
+	for _, asm := range []string{
+		"../../roms/litmus/litmus_counterwrite.asm",
+		"../../roms/litmus/litmus_latchflags.asm",
+		"../../roms/litmus/litmus_jsrentry.asm",
+	} {
+		rep, err := Prove(asm, DefaultBudget)
+		if err != nil {
+			t.Fatalf("prove %s: %v", asm, err)
+		}
+		var danger *Region
+		all := append(append([]Region{}, rep.Lines...), rep.Unbounded...)
+		for i := range all {
+			if strings.HasPrefix(all[i].StartLoc, "DangerRow") {
+				danger = &all[i]
+				break
+			}
+		}
+		if danger == nil {
+			t.Errorf("%s: no DangerRow region — the fixture's labels moved and this test now "+
+				"watches nothing", asm)
+			continue
+		}
+		if danger.Bounded {
+			t.Errorf("%s: DangerRow is BOUNDED at %d cycles. Its counter's entry value cannot be "+
+				"pinned, so a bound here means the 255 accumulator floor leaked out of the "+
+				"BCS/BCC divide branch into the dex/dey path — which is exactly the "+
+				"over-loose count SD-9 removed", asm, danger.Worst)
+			continue
+		}
+		if !strings.Contains(danger.Reason, want) {
+			t.Errorf("%s: DangerRow is refused for %q, not %q — it is no longer the counter "+
+				"path being watched here", asm, danger.Reason, want)
 		}
 	}
-	// It may legitimately be fully bounded (the branch prune closed its dead
-	// predecessor route on 2026-08-04). What must not happen is a bound that came
-	// from the floor, and there is no dex fixture that would show that here — so this
-	// test records the boundary rather than witnessing it, and says so.
-	t.Log("cb_deadpred is fully bounded, so this test currently records the boundary " +
-		"rather than witnessing it: the 255 floor is confined to the BCS/BCC divide path " +
-		"by construction (it sits inside that branch of determineBound), and no dex " +
-		"fixture in the tree reaches a Top counter to prove it stays out")
 }

@@ -123,10 +123,26 @@ func TestBeamIntervalContainsObserved(t *testing.T) {
 	}
 }
 
-// A proven window is only worth having if it is often narrow. A report of
-// "somewhere on this line" is technically true and useless, so the width is
-// measured and stated rather than assumed to be small.
-func TestBeamIntervalWidthIsMeasured(t *testing.T) {
+// A proven window is only worth having if it is often narrow. "Somewhere on this
+// line" is technically true and useless, and NOTHING ELSE IN THE SUITE WOULD
+// NOTICE the difference: TestBeamIntervalContainsObserved only gets easier as the
+// windows widen, so precision can rot all the way to 228 colour clocks with every
+// soundness test still green.
+//
+// This test used to measure the width and t.Logf it. That printed the number into
+// a log nobody reads and compared it to nothing — the mean could have tripled
+// between two commits without a single red tick.
+//
+// MEASURED on the 31-kernel technique corpus, 2026-08-04:
+//
+//	340 writes bounded, 103 exact (30%), mean width 8.3 colour clocks
+//
+// The thresholds below sit outside those numbers with deliberate slack, because
+// they are a RATCHET against precision rot, not a re-statement of today's figure:
+// a mean of 8.3 is about one player-sprite's width (8 clocks), and 16 — the limit
+// asserted — is the point where a window stops telling an author which half of a
+// sprite a write lands in. Exactness is allowed to fall to 20% from 30%.
+func TestBeamIntervalWindowsAreNarrowEnoughToBeWorthHaving(t *testing.T) {
 	files, _ := filepath.Glob("../../roms/techniques/*.asm")
 	total, exact, widths := 0, 0, 0
 	for _, asm := range files {
@@ -147,11 +163,24 @@ func TestBeamIntervalWidthIsMeasured(t *testing.T) {
 			}
 		}
 	}
-	if total == 0 {
-		t.Skip("no bounded writes")
+	// PREMISE — an empty corpus meets every threshold below.
+	if total < 300 {
+		t.Fatalf("only %d bounded writes measured (340 at the time of writing); the width "+
+			"figures below are computed over a corpus that shrank, so they grade little", total)
 	}
+	mean := float64(widths) / float64(total)
+	frac := 100 * float64(exact) / float64(total)
 	t.Logf("beam windows: %d writes, %d exact (%.0f%%), mean width %.1f colour clocks",
-		total, exact, 100*float64(exact)/float64(total), float64(widths)/float64(total))
+		total, exact, frac, mean)
+	if mean > 16 {
+		t.Errorf("mean proven window is %.1f colour clocks (was 8.3, limit 16) — wider than a "+
+			"player sprite, so the report no longer says WHERE on the line a write lands",
+			mean)
+	}
+	if frac < 20 {
+		t.Errorf("only %.0f%% of windows are exact (was 30%%, limit 20%%) — the path-independent "+
+			"cases are the ones an author can act on", frac)
+	}
 }
 
 func parseHexAddr(s string) uint16 {

@@ -18,12 +18,35 @@ import (
 // that the decoder never reached means the denominator is too small and the
 // figure is an over-estimate; that is a real condition (bank switching, computed
 // dispatch) and must be reported as such rather than hidden inside a percentage.
+//
+// THIS TEST USED TO PRINT ITS OWN VERDICT. It found the ROMs whose denominator is
+// too small, t.Logf'd their names and addresses, and then passed — the only
+// t.Fatal in the function was "no ROM was measured". Every technique kernel could
+// have drifted into computed dispatch and the tick would still be green, which is
+// the same defect this file exists to describe one level down: a figure that
+// silently stops covering what it claims to cover.
+//
+// The offenders are now NAMED rather than counted. Measured over the 31-kernel
+// technique corpus, 2026-08-04: exactly one, `rts_dispatch`, with 6 executed
+// branches never decoded ($F081 $F0A2 $F0E3 $F0E8 $F108 $F118) — a kernel that
+// pushes a target and RTSes to it, so a decoder that follows flow cannot reach the
+// code and the gap is a property of the technique, not a defect. A NEW name means
+// a kernel started doing something the decoder cannot see. `rts_dispatch`
+// disappearing from the list means the decoder got better and this comment is
+// stale; both must be a failing test rather than a line in a log.
 func TestStaticBranchSetContainsObserved(t *testing.T) {
+	// Kernels whose control flow is computed at run time, so a flow-following
+	// decoder provably cannot reach every branch. The name is the evidence, not
+	// an exemption: each one has to earn its place with a stated reason.
+	knownComputedDispatch := map[string]string{
+		"rts_dispatch.asm": "pushes a return address and RTSes to it (docs/techniques/rts-dispatch.md)",
+	}
 	files, err := filepath.Glob("../../roms/techniques/*.asm")
 	if err != nil || len(files) == 0 {
 		t.Skip("technique corpus unavailable")
 	}
 	roms, gaps := 0, 0
+	seenGap := map[string]bool{}
 	for _, asm := range files {
 		bin := build.BinPathFor(asm)
 		if out, err := build.Assemble(asm, bin); err != nil {
@@ -64,22 +87,42 @@ func TestStaticBranchSetContainsObserved(t *testing.T) {
 			continue
 		}
 		gaps++
-		if !banked {
-			// Not bank-switched, so the decoder should have reached this code. Report
-			// it rather than letting it quietly shrink the denominator.
-			addrs := make([]uint16, len(missing))
-			for i, s := range missing {
-				addrs[i] = s.Addr
-			}
-			t.Logf("%s: %d executed branches were never decoded (%v) — the denominator is "+
-				"too small here and coverage is an over-estimate",
-				filepath.Base(asm), len(missing), hexAddrs(addrs))
+		if banked {
+			continue // flow between banks is not modelled; that refusal is stated elsewhere
 		}
+		// Not bank-switched, so the decoder should have reached this code.
+		base := filepath.Base(asm)
+		seenGap[base] = true
+		addrs := make([]uint16, len(missing))
+		for i, s := range missing {
+			addrs[i] = s.Addr
+		}
+		if why, ok := knownComputedDispatch[base]; ok {
+			t.Logf("%s: %d executed branches never decoded (%v) — expected: %s",
+				base, len(missing), hexAddrs(addrs), why)
+			continue
+		}
+		t.Errorf("%s: %d executed branches were never decoded (%v) — the denominator is too "+
+			"small here and its coverage figure is an over-estimate. Either the decoder "+
+			"stopped reaching code it used to reach, or this kernel started computing its "+
+			"control flow and belongs in knownComputedDispatch WITH the reason",
+			base, len(missing), hexAddrs(addrs))
 	}
 	if roms == 0 {
 		t.Fatal("no ROM was measured — the test proves nothing")
 	}
-	t.Logf("%d ROMs measured, %d with executed-but-undecoded branches", roms, gaps)
+	// The list is a ratchet in both directions: an entry that no longer has a gap is
+	// a decoder that improved, and leaving the name behind would exempt a future
+	// regression on that ROM.
+	for name := range knownComputedDispatch {
+		if !seenGap[name] {
+			t.Errorf("%s is listed as computed-dispatch but its executed branches are now ALL "+
+				"decoded — the decoder reaches it, so the exemption is stale and must go",
+				name)
+		}
+	}
+	t.Logf("%d ROMs measured, %d with executed-but-undecoded branches (%d expected by name)",
+		roms, gaps, len(knownComputedDispatch))
 }
 
 // The honest figure can never exceed the flattering one on a ROM the decoder
