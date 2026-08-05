@@ -8,6 +8,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **All 4 breathing ROMs repaired: the corpus is now 156/156 single-valued, 0 breathing.** Every fix is the
+  same lesson stated twice, because the two halves of the corpus broke it in different ways.
+  - `banked_game` (+2 lines every 120th frame) and the two `lint_bank_*` fixtures (+3 every 120th) do their
+    switch work AHEAD of a fixed `ldx #37 / sta WSYNC` loop, so the overflow was ADDED to the frame instead of
+    absorbed by it. Fixed by paying the switch path's extra lines on BOTH paths and reducing the loop by the
+    same amount — the frame is 262 whatever the counter does. Proved confined: the first 100 frames (the
+    switch is at 120) hash IDENTICALLY before and after, so only the switch frame changed, and
+    `banked_game.golden` was regenerated on that basis. Negative control: the pre-fix ROM against the new gate
+    gives `262x199 264x1`, while `ntsc_frame_lines` stays green on the same run.
+  - `exerciser` (+2 every 64th frame) was a different fault wearing the same symptom, and the first guess —
+    the missile-fire path — was **wrong**: with no input the ROM never leaves scene 0, so that code never
+    runs. `profile_line_budget` named the real lines instead of arguing about them: `$F1A0` **79cy** and
+    `$F16E` **77cy**, both worst at **frame 65**, both spilling into 2 physical scanlines. The listing maps
+    them to the ch1 and ch0 music ticks — each note-change path overran 76 by 3 and 1. Fixed by hoisting the
+    constant `lda #8 / sta AUDVx` out of both note-change paths into the Title scene's entry-time music init
+    (-5cy each): re-profiled at **74cy and 72cy, `worst_lines: 1`**, whole-ROM worst 74.
+    The melody is intact — every audio assertion in `m7_music` still passes (freq 14/11/9/23/14, volume 8),
+    and `audiospec` over 200 frames / 104,327 samples reports **identical dominant frequency on both
+    channels** (1308.25 Hz ch0, 31.38 Hz ch1) with envelope distance 0.0006/0.0007. The residual spectral
+    distance of 0.091 (ch0) and 0.0022 (ch1) is a sub-line sample-boundary shift, not a note change — the
+    tool's calibration point for "a completely different pitch" is 0.998. 6 of the 7 exerciser goldens are
+    byte-identical after the fix; only `m7_music`'s two were regenerated.
+- **`frame_lines_stable` wired into everything that can carry it**: all 31 technique scenarios (banked_game
+  included now that it passes), all 7 exerciser scenarios, and two NEW scenarios for `lint_bank_hazard` /
+  `lint_bank_split`, which had no scenario at all and so had nothing standing between them and a regression.
+  `TestLintReadsBothBanks` still pins their warning sets, so the padding did not disturb what they exist for.
+- **The corpus-wide gate now needs no exclusion list** — that was the reason not to add one, and it is gone.
+  What remains is only its cost: a 156-ROM sweep at 130 frames is **76s**. Still not added unilaterally.
+
 ### Added
 - **`frame_lines_stable` — the ∀-over-frames sibling of `ntsc_frame_lines`, because sampling one frame is not
   a claim about the frame after it.** `ntsc_frame_lines` calls `StepFrame()` exactly once, so a ROM whose

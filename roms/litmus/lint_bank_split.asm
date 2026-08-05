@@ -61,18 +61,31 @@ NextFrame:
         lda #$10
         sta HMP0
         ; --- 120 フレーム毎にレベル切替 → bank1 ローダ ---
+        ; The switch path spans 4 scanlines here and the idle path fits in 1, and that
+        ; difference used to reach the frame total: this work sits AHEAD of the fixed
+        ; WSYNC loop below, so its overflow was ADDED to the frame rather than absorbed.
+        ; Measured before padding: 262x129 265x1 over 130 frames, the outlier landing on
+        ; the `cmp #120` period. Pay the same 3 lines on both paths and the frame is 262
+        ; whatever the counter does. (This fixture exists for the bank-aware lint rules;
+        ; the padding is deliberately inert with respect to every HMxx/HMOVE relation it
+        ; plants, and TestLintReadsBothBanks still pins the warning set.)
         inc fc
         lda fc
         cmp #120
-        bcc NoSwitch
+        bcs DoSwitch
+        sta WSYNC           ; idle path pays the switch path's 3 lines
+        sta WSYNC
+        sta WSYNC
+        jmp SwitchDone
+DoSwitch:
         lda #0
         sta fc
         lda level
         eor #1
         sta level
         jsr $FF80           ; クロスバンク呼び出し（bank1 がバッファを書き換える）
-NoSwitch:
-        ldx #37
+SwitchDone:
+        ldx #34             ; 3 lines already spent above => VBLANK is still 37
 VB:     sta WSYNC
         dex
         bne VB

@@ -874,6 +874,16 @@ TitleScene:
         lda #1
         sta m0dur
         sta m1dur
+        ; Volume is constant for the whole tune, so it is set ON ENTRY rather than on
+        ; every note change. It used to be written inside both note-change paths, which
+        ; put those two kernel lines at 77cy (ch0) and 79cy (ch1) — measured, and only
+        ; on the frames where a note actually changed, so each spilled into a second
+        ; scanline and the frame ran 264 instead of 262 every 64 frames. Other scenes
+        ; zero AUDV, and this block runs whenever Title is (re-)entered, so hoisting it
+        ; here loses nothing. -5cy on each of the two lines.
+        lda #8
+        sta AUDV0
+        sta AUDV1
 TMusOk: sta WSYNC           ; HMOVE 行をここで閉じる（閉じないと計算と合体して 93cy=2 scanline 跨ぎ→263 行）
         ; ここまで 3 行
 
@@ -1057,8 +1067,6 @@ TM0note:
         tax
         lda MusTypes,x
         sta AUDC0
-        lda #8
-        sta AUDV0
         lda Song0+1,y
         sta m0dur
         iny
@@ -1087,8 +1095,6 @@ TM1note:
         tax
         lda MusTypes,x
         sta AUDC1
-        lda #8
-        sta AUDV1
         lda Song1+1,y
         sta m1dur
         iny

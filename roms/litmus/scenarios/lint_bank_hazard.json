@@ -1,0 +1,5 @@
+{
+  "rom": "roms/litmus/lint_bank_hazard.asm",
+  "warmup_frames": 3,
+  "checks": { "ntsc_frame_lines": 262, "frame_lines_stable": { "frames": 130, "lines": 262 } }
+}

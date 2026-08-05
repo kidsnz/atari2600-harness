@@ -3884,11 +3884,26 @@ frame's extra work leaks into the frame total instead of being absorbed by it. T
 **variable-cost work placed outside the region whose length is fixed.** `banked_game` is a technique ROM,
 which means the reference kernel has been teaching it.
 
-`frame_lines_stable` (`docs/scenarios.md`) closes the measurement gap and is wired into 30 of 31 technique
-scenarios. **The 4 ROMs above are NOT fixed** — `banked_game.json` is the one technique scenario without the
-check, and the exerciser and lint fixtures do not carry it either. Whether to repair them (move the switch
-work inside the fixed region, as pizza-boy will do) is open.
+`frame_lines_stable` (`docs/scenarios.md`) closes the measurement gap.
 
-**Open sub-item: a corpus-wide gate.** A sweep of all 156 ROMs at 130 frames costs **76s**, which is why it
-was not added to `go test` unilaterally. Making it a gate means an explicit named exclusion list for the 4,
-which is the right shape only once someone has decided they stay broken.
+**All 4 are now FIXED — the corpus is 156/156 single-valued, 0 breathing** (130 frames after a 3-frame
+warmup). Note the criterion is *single-valued*, not *262*: 38 of the 156 are litmus fixtures that hold a
+deliberately different frame length, and they are stable at it.
+
+The two halves of the corpus broke the rule in different ways, which is why both are worth recording:
+
+| ROM | fault | fix | after |
+|---|---|---|---|
+| `banked_game`, `lint_bank_hazard`, `lint_bank_split` | switch work sits AHEAD of the fixed `ldx #37` WSYNC loop, so its overflow is added to the frame | pay the switch path's extra lines on BOTH paths, reduce the loop by the same | 262x500 |
+| `exerciser` | two kernel lines OVERRAN 76cy on note-change frames | hoist the constant `AUDVx` write out of both note-change paths | 262x500 |
+
+**The exerciser is the one to remember, because the first hypothesis was wrong.** The 64-frame period looked
+like the missile-fire path (`frameCt and #$1F`), but with no input the ROM never leaves scene 0 and that code
+never runs. `profile_line_budget` answered it by measurement: `$F1A0` **79cy** and `$F16E` **77cy**, both
+worst at **frame 65**, both `worst_lines: 2`; the listing maps them to the ch1 and ch0 music ticks. After
+hoisting the volume write, 74cy and 72cy at `worst_lines: 1`. A period that *matches* a counter is a
+correlation, and this corpus contains two counters with compatible periods.
+
+**The corpus-wide gate no longer needs an exclusion list.** That was the reason not to add one. What remains
+is only its cost: **76s** for 156 ROMs at 130 frames. Still not added unilaterally; the invariant it would
+assert is "every ROM's frame count is single-valued", not "every ROM is 262".

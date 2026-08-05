@@ -49,18 +49,33 @@ NextFrame:
         lda #2
         sta VBLANK
         ; --- 120 フレーム毎にレベル切替 → bank1 ローダ ---
+        ; The switch path spans 3 scanlines and the idle path fits in 1, and that
+        ; difference used to reach the frame total: this work sits AHEAD of the fixed
+        ; WSYNC loop below, so its overflow was ADDED to the frame instead of absorbed
+        ; by it. Measured over 500 frames before this was padded: 262x496 264x4, the
+        ; four outliers landing on frames 120/240/360/480 — exactly the `cmp #120`
+        ; period declared two lines up. A 2-line jump every two seconds rolls the whole
+        ; picture on a CRT, and no single-frame check can see it (`ntsc_frame_lines`
+        ; stayed green throughout; `frame_lines_stable` is what caught it).
+        ; Pay the switch path's 2 extra lines on BOTH paths and the frame is 262
+        ; whatever the frame counter does. General rule: variable-cost work belongs
+        ; INSIDE the region whose length is fixed, or it must cost the same either way.
         inc fc
         lda fc
         cmp #120
-        bcc NoSwitch
+        bcs DoSwitch
+        sta WSYNC           ; idle path pays the switch path's 2 lines
+        sta WSYNC
+        jmp SwitchDone
+DoSwitch:
         lda #0
         sta fc
         lda level
         eor #1
         sta level
         jsr $FF80           ; クロスバンク呼び出し（bank1 がバッファを書き換える）
-NoSwitch:
-        ldx #37
+SwitchDone:
+        ldx #35             ; 2 lines already spent above => VBLANK is still 37
 VB:     sta WSYNC
         dex
         bne VB
