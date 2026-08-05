@@ -5,13 +5,21 @@ premises, settled decisions, constants you must never get wrong, and which doc t
 Deep dives go in `docs/` (routing table below). Assume anything not here is unread. Don't put facts that
 must always hold *only* in a doc — burn them here or into memory.
 
-> **Language policy:** docs are **English-only**. The author works/communicates in Japanese, but the former
-> per-doc `*.ja.md` copies were **dropped (2026-06-17)** to avoid duplicate, drift-prone files — the English
-> `*.md` is the single source of truth. (A few `.md` bodies still contain Japanese; full English-ization is
-> tracked as **DOC-EN** in `docs/capability-gap-audit.md`.)
-> **Talk to the user in Japanese.** The English-only policy is about *repo artifacts* (docs/code/CHANGELOG) —
-> it does **not** apply to conversation. The user works in Japanese; answer in Japanese. Don't conflate
-> "the repo is English" with "reply in English" (drift caught 2026-06-17).
+> **Language policy (settled 2026-08-05 by the author — this is the whole rule):**
+> 1. **Anything that goes into a git repository is written in ENGLISH, from the first keystroke.** docs,
+>    code, comments, CHANGELOG, commit messages, study notes — the repo is public-facing (GitHub), so English
+>    is the form it is authored in, not a form it is converted to later.
+> 2. **Talk to the author in JAPANESE.** Always. The English rule is about repo artifacts and does not touch
+>    conversation. Don't conflate "the repo is English" with "reply in English" (drift caught 2026-06-17).
+> 3. **NEVER run a translation pass. Not on docs, not on code comments, not on ROM headers.** The Japanese
+>    already in the tree stays exactly where it is, untranslated, forever. It is not debt and it is not a
+>    backlog item. The author does not read these files — they ask Claude and Claude explains, in Japanese.
+>    A translation pass buys nobody anything and costs a session; one was run on 2026-08-04/05 and was the
+>    single largest waste of the project to date. **DOC-EN is closed permanently on that basis.**
+>
+> The practical shape of this: when you create a file, write it in English the first time. When you touch an
+> old file that happens to be Japanese, translate NOTHING — add in English if you must add, and leave the
+> rest. `*.ja.md` files are gitignored local reading copies and are none of this rule's business.
 
 ## Invariant premises
 - Goal: build a **verification harness** so Claude can author the Atari 2600 in 6502 assembly accurately

@@ -992,20 +992,19 @@ Recorded because three of these were previously mistaken for hard limits when th
   obligation automatically (prove the trip count elsewhere, or emit a runtime assertion) is not built.
 
 ## Housekeeping backlog (docs/repo, not a harness capability)
-- **DOC-EN — DOCS DONE, SOURCES STILL OPEN (status corrected 2026-08-05).** The entry below was marked
-  wholly ✅ DONE after the `docs/**` half finished. It is not: `cmd/`, `pkg/`, `internal/` and `roms/` carry
-  **2,844 Japanese-script lines** after a partial pass (go 1507→1125, asm 1746→1617, py 157→102). The policy
-  in `CLAUDE.md` covers repo artifacts — docs, **code**, CHANGELOG — so those lines are open work, and this
-  item stays open with them.
-  **A retraction belongs here too.** On 2026-08-05 I recorded that the remainder would be "left in place
-  deliberately, not tracked as debt" (commit `4598bd5`). That retired a live policy item on my own authority
-  and was wrong. What the author objected to was the MODEL ASSIGNMENT — mechanical translation running on
-  the strongest available model while real defects went unexamined — not the requirement.
-  **How to finish it:** cheap model, one directory per agent, and two mechanical invariants that already
-  caught real problems — (1) `.asm` files must be byte-identical before the first `;` on every line, because
-  the Stella captures are keyed to the assembled bytes; (2) `scripts/gen_mining_digest.py` EMITS Japanese by
-  design, so only its comments may be touched, and `docs/mining-digest.md` stays excluded for source
-  fidelity. Some `check_*.py` gates also hold functional Japanese inside regexes.
+- **DOC-EN — ❌ CLOSED PERMANENTLY, NOT DONE (author's decision, 2026-08-05).** The remaining 2,844
+  Japanese-script lines in `cmd/`, `pkg/`, `internal/` and `roms/` **will never be translated**, and that is
+  the settled answer rather than a deferral. The rule that replaces it is in `CLAUDE.md`: **anything entering
+  a repository is written in English from the first keystroke, and no translation pass is ever run.** New
+  files are born English; old Japanese stays put.
+  **Why, in the author's own reasoning:** they do not read these files. They ask Claude and Claude explains,
+  in Japanese. So translating them serves no reader — while the pass run on 2026-08-04/05 consumed a session
+  of the strongest available model on mechanical work, and the item scheduled immediately after it turned out
+  to be a live soundness bug (`b3c4a3c`, a JSR's callee inheriting its caller's stack pointer).
+  **My own error is recorded here because it is the instructive part.** I first retired this item on my own
+  authority (`4598bd5`), which was overreach — the requirement was not mine to drop. Then I over-corrected
+  and restored it (`e3f02fb`). Only the author could close it, and has. The distinction worth keeping: the
+  ORDER of work was mine to get wrong; the EXISTENCE of a requirement was not.
 - **DOC-EN (docs half) ✅ DONE (2026-08-04) — the JA-heavy canonical docs are English; 5 quoted lines remain by design.**
   Deferred from the 2026-06-17 docs cleanup (which dropped the 13 `.ja.md` duplicate files); these `.md`
   bodies are the *only* copy, so they were left intact until now. Measured over `docs/**/*.md` excluding
