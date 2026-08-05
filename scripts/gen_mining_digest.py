@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""gen_mining_digest.py — MINED.csv から docs/mining-digest.md(+ja) を冪等に再生成。
+"""gen_mining_digest.py — idempotently regenerate docs/mining-digest.md(+ja) from MINED.csv.
 
-採掘した AtariAge スレ（`reference/atariage/MINED.csv`）を、harness 内の自己完結した
-「要点索引」に落とす。各スレを「効く design-principles 節 / pkg/design 関数 /
-技候補」へ対応づける。生のスレ保存は reference/ に来歴として残す（ここには入れない）。
+Distills the mined AtariAge threads (`reference/atariage/MINED.csv`) into a self-contained
+"takeaway index" inside the harness. Maps each thread to the design-principles section /
+pkg/design function / technique candidate it feeds. Raw thread captures stay in reference/
+as provenance (they do not go in here).
 
-注: 取得・台帳生成のスクロール系ツール（旧 aa_fetch/aa_index/aa_manifest）はリポジトリ外の
-ローカル研究ツール（`reference/atariage/_tools/`）に移設済み。MINED.csv はそこで生成する。
-本スクリプトは生成済み CSV を蒸留するだけで取得は行わない。
+Note: the fetch/ledger-generation scraping tools (old aa_fetch/aa_index/aa_manifest) have been
+moved out of the repository into local research tooling (`reference/atariage/_tools/`).
+MINED.csv is generated there. This script only distills the already-generated CSV; it does
+no fetching.
 
-使い方:
+Usage:
     cd harness
-    python3 scripts/gen_mining_digest.py  # 既存の MINED.csv から docs/mining-digest.md(+ja) を再生成（冪等）
+    python3 scripts/gen_mining_digest.py  # regenerate docs/mining-digest.md(+ja) from the existing MINED.csv (idempotent)
 
-対応づけ = (1) 既知 slug の手当て FEED（curated）→ (2) slug キーワード推論 → (3) 既定 Reference。
-新規採掘スレは (2)/(3) で自動分類される。高価値スレは FEED に1行足して精緻化する。
+Mapping = (1) curated FEED entries for known slugs -> (2) slug keyword inference -> (3) default Reference.
+Newly mined threads are auto-classified by (2)/(3). Refine a high-value thread by adding one FEED line.
 """
 import csv
 import os
@@ -36,7 +38,7 @@ CATNAME = {
     "Pizza Boy": "Pizza Boy / DaveC（ground-truth）",
 }
 
-# (1) curated 手当て: slug -> (category, feeds)
+# (1) curated mapping: slug -> (category, feeds)
 FEED = {
     "symbolic-color-names": ("Color", "§色 / design.Hue,Luminance,HueName"),
     "rgb-color-values": ("Color", "§色 / palette_stella.go(正本)"),
@@ -82,7 +84,7 @@ FEED = {
     "pointer-optimization": ("Kernel", "§カーネル予算 / ポインタ最適化(doc)"),
     "modular-kernel": ("Kernel", "§カーネル予算 / design.LineBudget"),
     "wip-battle-pong": ("Kernel", "§カーネル予算 / cyclebound((ind),Y ページ境界+1cy) / PONG capstone"),
-    # PONG capstone 向け採掘（2026-08-04・旧トリアージ REJECT の再評価分を含む）
+    # Mining for the PONG capstone (2026-08-04; includes re-evaluations of old triage REJECTs)
     "two-player-tetris": ("Kernel", "§カーネル予算 / HMOVEはVBLANKで撃つ(櫛回避) / CTRLPF SCOREモード"),
     "collision-not-working": ("Sprite", "§スプライト・位置決め / CXCLR必須, PositionSprite(÷15,sta.wx)"),
     "ball-help": ("Sprite", "§スプライト・位置決め / VDELBL誤設定=ボール伸び"),
@@ -131,7 +133,7 @@ FEED = {
     "stocking-stuffer-marble-game": ("Pizza Boy", "reference / DaveC作"),
 }
 
-# (2) slug キーワード -> (category, feeds) 推論（FEED に無い新規スレ用・上から順に最初の一致）
+# (2) slug keyword -> (category, feeds) inference (for new threads not in FEED; first match wins, top to bottom)
 KEYWORD_RULES = [
     (r"hmove|positioning|reposition|div15|respx?|hmxx", ("Sprite", "§スプライト / design.PositionSplit, CLAUDE.md HMOVE")),
     (r"48-?(px|pixel|bit)|sprite", ("Sprite", "§スプライト / pkg/sprite, design.PositionSplit")),
@@ -208,7 +210,7 @@ BLOGS = os.path.normpath(os.path.join(HARNESS, "..", "reference", "atariage", "b
 
 
 def blog_section():
-    """reference/atariage/blogs/*/notes.ja.md から Dev-blogs 索引節を生成（出典URL＋見出し）。"""
+    """Generate the Dev-blogs index section from reference/atariage/blogs/*/notes.ja.md (source URL + heading)."""
     rows = []
     if os.path.isdir(BLOGS):
         for name in sorted(os.listdir(BLOGS)):

@@ -67,20 +67,20 @@ def scan_text(asm):
             has_cld = True
         if re.search(r"clean_start", low):
             has_cleanstart = True
-        # 1) 不安定な違法オペコード（個体/温度依存で実機で壊れる）〔known-traps D / 採掘 168616,132496〕
+        # 1) Unstable illegal opcodes (break on real hardware depending on the unit/temperature) 〔known-traps D / mined 168616,132496〕
         m = re.search(r"\b(lxa|xaa|ane)\b", low)
         if m:
             errors.append((n, f"unstable illegal opcode `{m.group(1)}` — HW-unreliable (use LAX/SAX/SBX/DCP instead)"))
         if re.search(r"\blax\s+#", low):
             errors.append((n, "`LAX #imm` (immediate) is the unstable LXA form — avoid"))
-        # 2) NOP $00 / BIT $00 を skip 用途で（3F/X07 で誤バンク切替）〔known-traps C / 採掘 139089〕
+        # 2) NOP $00 / BIT $00 used as a skip (spurious bankswitch on 3F/X07) 〔known-traps C / mined 139089〕
         if re.search(r"\b(nop|bit)\s+\$00\b", low):
             warns.append((n, "`NOP $00`/`BIT $00` can trigger a bankswitch on 3F/X07 carts — use `NOP $80` or a safe address"))
-        # 3) スタック衝突域($F8-$FF)への変数割当〔known-traps C / 採掘 302998,301766〕
+        # 3) Variable assigned into the stack-collision zone ($F8-$FF) 〔known-traps C / mined 302998,301766〕
         m = re.search(r"=\s*\$(f[89a-f])\b", low) or re.search(r"\bequ\s+\$(f[89a-f])\b", low)
         if m:
             warns.append((n, f"variable at $%s — JSR pushes onto the $0100/$00FF stack mirror and can clobber it (keep vars from $80)" % m.group(1).upper()))
-        # 6) ROM への書き込み（宣言が無いもの）〔known-traps C / 採掘 285759,204819〕
+        # 6) Writes into ROM (with no declaration) 〔known-traps C / mined 285759,204819〕
         m = STORE_OP.search(code)
         if m and "@rom-write-ok" not in raw:
             a = int(m.group(2), 16)
@@ -88,9 +88,10 @@ def scan_text(asm):
                 errors.append((n, f"stores to ${a:04X}, which is cartridge ROM — the write is discarded. "
                                   f"If it is a bank-switch hotspot or a SuperChip write port, say so with "
                                   f"`; @rom-write-ok` so the intent is declared rather than guessed"))
-        # 5) 書込専用 TIA レジスタの読み出し〔known-traps / Gopher2600 cpubus.TIAReadRegisters=$00-$0D〕
-        #    誤検出ゼロを実測: roms/techniques + roms/litmus の 123 本で 0 件（読み系オペコードの
-        #    マッチ自体は 509 件あるので、検出器が黙っているのではなく本当に無い）。
+        # 5) Reads of a write-only TIA register 〔known-traps / Gopher2600 cpubus.TIAReadRegisters=$00-$0D〕
+        #    Zero false positives measured: 0 hits across the 123 files in roms/techniques + roms/litmus
+        #    (the read-side opcodes themselves match 509 times, so the detector is not silent — there
+        #    really are none).
         m = READ_OP.search(code)
         if m:
             operand = m.group(2)
@@ -108,7 +109,7 @@ def scan_text(asm):
                 errors.append((n, f"reads {reg}, a WRITE-ONLY TIA register — the TIA answers reads only at "
                                   f"$00-$0D (CXxx/INPTx); this returns bus residue, which an emulator may "
                                   f"make look deterministic"))
-    # 4) リセット初期化（CLD も CLEAN_START も無い）〔known-traps D / 採掘 261488,318346〕
+    # 4) Reset initialisation (neither CLD nor CLEAN_START) 〔known-traps D / mined 261488,318346〕
     if not (has_cld or has_cleanstart):
         errors.append((0, "no CLD and no CLEAN_START — decimal flag / SP / RAM are undefined at power-up (BCD garbage, rolls)"))
     return errors, warns
@@ -119,7 +120,7 @@ def check_file(path):
         return scan_text(f.read())
 
 
-# --- 自己テスト用 bait（各検出器が必ず1つは発火すること）---
+# --- Self-test bait (every detector must fire at least once) ---
 BAIT = """
         processor 6502
 Start

@@ -1,10 +1,10 @@
-; vertical_pos_dcp — skipDraw（未文書命令 DCP）変種（technique #3 の verified variant）
-; compare 方式（vertical_pos.asm）と同じ見た目を、毎行
-;   lda #H-1 / DCP sprDraw / bcs 圏内
-; で実現する古典 idiom。DCP（$C7 zp）= DEC+CMP の複合。sprDraw は毎フレーム sprY+H に初期化し
-; 毎行デクリメント＝「カウントダウンが 0..H-1 を通過する H 行だけ描く」。絵は逆順テーブル。
-; DASM は未文書命令ニーモニック非対応 → .byte \$C7 で直接エンコード。
-; 横は起動後毎フレーム固定 X=80 へ（divide-by-15＋HMOVE 表、pos(v)=v 校正済み・sprite_anim と同型）。
+; vertical_pos_dcp — skipDraw variant using the undocumented DCP (verified variant of technique #3)
+; Produces the same look as the compare method (vertical_pos.asm), but on every line via
+;   lda #H-1 / DCP sprDraw / bcs in-range
+; — the classic idiom. DCP ($C7 zp) = DEC+CMP combined. sprDraw is initialized to sprY+H every frame,
+; decremented every line = "draw only during the H lines where the countdown passes 0..H-1". Art is a reversed table.
+; DASM does not accept undocumented mnemonics → encode directly as .byte \$C7.
+; Horizontal: fixed to X=80 every frame after startup (divide-by-15 + HMOVE table, pos(v)=v calibrated; same shape as sprite_anim).
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
@@ -21,10 +21,10 @@ Y_MIN    = 4
 Y_MAX    = 180
 XPOS     = 80
 
-sprY     = $80      ; スプライト上端の可視行（0-191）
-vdir     = $81      ; 0=下へ / 1=上へ
-sprDraw  = $82      ; skipDraw カウンタ（毎フレーム sprY+H で初期化・毎行 DCP で減算）
-sent     = $9E      ; 実行センチネル
+sprY     = $80      ; visible line of the sprite's top edge (0-191)
+vdir     = $81      ; 0=moving down / 1=moving up
+sprDraw  = $82      ; skipDraw counter (init to sprY+H every frame; DCP-decremented every line)
+sent     = $9E      ; execution sentinel
 
         org $F000
 Start:
@@ -37,7 +37,7 @@ Clr:    sta $00,x
         dex
         bne Clr
         lda #$86
-        sta COLUP0          ; 青
+        sta COLUP0          ; blue
         lda #Y_MIN
         sta sprY
         lda #$B4
@@ -53,17 +53,17 @@ NextFrame:
         sta VSYNC
         lda #2
         sta VBLANK
-        ; --- VB行1: 縦移動（ピンポン）---
+        ; --- VB line 1: vertical movement (ping-pong) ---
         lda vdir
         bne MoveUp
-        inc sprY            ; 下へ
+        inc sprY            ; down
         lda sprY
         cmp #Y_MAX
         bcc MvDone
         lda #1
         sta vdir
         jmp MvDone
-MoveUp: dec sprY            ; 上へ
+MoveUp: dec sprY            ; up
         lda sprY
         cmp #Y_MIN+1
         bcs MvDone
@@ -72,9 +72,9 @@ MoveUp: dec sprY            ; 上へ
 MvDone: lda sprY
         clc
         adc #SPRITE_H
-        sta sprDraw         ; skipDraw 初期化（可視行毎に1減 → 0..H-1 の H 行だけ圏内）
+        sta sprDraw         ; skipDraw init (drops by 1 each visible line → in range only for the H lines 0..H-1)
         sta WSYNC           ; VB 1
-        ; --- VB行2: P0 を X=80 へ（粗+微・pos(v)=v 校正）---
+        ; --- VB line 2: P0 to X=80 (coarse+fine; pos(v)=v calibrated) ---
         lda #XPOS
         clc
         adc #XCAL
@@ -87,24 +87,24 @@ Div:    sbc #15
         sta RESP0
         sta WSYNC           ; VB 2
         sta HMOVE
-        ldx #34             ; VBLANK 残り（1+1+34+1=37）
+        ldx #34             ; VBLANK remainder (1+1+34+1=37)
 VB:     sta WSYNC
         dex
         bne VB
         lda #0
         sta VBLANK
-        sta WSYNC           ; VB 37 → 可視開始
+        sta WSYNC           ; VB 37 → visible starts
 
-        ; --- 可視 192 行: skipDraw（DCP）。圏内 20cy / 圏外 17cy ＝ compare 方式より軽い ---
+        ; --- Visible 192 lines: skipDraw (DCP). In-range 20cy / out-of-range 17cy = lighter than the compare method ---
         ldy #0
 Vis:    sta WSYNC
         lda #SPRITE_H-1     ; 2
-        .byte $C7,sprDraw   ; 7   DCP sprDraw（M--; A と比較）
-        bcs VDraw           ; 9/10 圏内（sprDraw ≤ H-1）
+        .byte $C7,sprDraw   ; 7   DCP sprDraw (M--; compare with A)
+        bcs VDraw           ; 9/10 in range (sprDraw ≤ H-1)
         lda #0              ; 11
-        beq VStore          ; 14（必ず成立）
+        beq VStore          ; 14 (always taken)
 VDraw:  ldx sprDraw         ; 13
-        lda ArtRev,x        ; 17  逆順テーブル（sprDraw は H-1→0 と降る）
+        lda ArtRev,x        ; 17  reversed table (sprDraw descends H-1→0)
 VStore: sta GRP0            ; ~17-20
         iny
         cpy #192
@@ -118,12 +118,12 @@ VStore: sta GRP0            ; ~17-20
 OS:     sta WSYNC
         dex
         bne OS
-        jmp NextFrame       ; 3+37+192+30 = 262 を明示所有
+        jmp NextFrame       ; explicitly own 3+37+192+30 = 262
 
-XCAL = -5                   ; 校正は kernel 固有: 本 ROM は lda #即値（2cy）で sprite_anim（lda zp=3cy）より
-                            ; プロローグが 1cy 短い＝3px 左に出る → -8+3。実測 hmoved=80 で確認
+XCAL = -5                   ; calibration is kernel-specific: this ROM uses lda #imm (2cy), so its prologue is
+                            ; 1cy shorter than sprite_anim (lda zp=3cy) = lands 3px left → -8+3. Measured hmoved=80 confirms
 
-ArtRev: ; 8×8 ボール（自作・skipDraw 用に下→上の逆順格納）
+ArtRev: ; 8×8 ball (own art; stored bottom→top, reversed for skipDraw)
         byte %00111100
         byte %01111110
         byte %11100111

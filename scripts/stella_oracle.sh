@@ -1,31 +1,32 @@
 #!/bin/bash
-# stella_oracle.sh — Stella オラクル照合の全自動化（R5, v1.33.0 / tia モード v2.1.0）
-# 使い方:  scripts/stella_oracle.sh <rom.bin> [frames] [pixels|tia]
+# stella_oracle.sh — fully automated Stella oracle cross-check (R5, v1.33.0 / tia mode v2.1.0)
+# Usage:  scripts/stella_oracle.sh <rom.bin> [frames] [pixels|tia]
 #
-# 仕組み（ram / pixels モード）:
-#   cmd/stellacheck が Stella を起動し dump を待つ。本スクリプトは並行で osascript により
-#   Stella へバッククォートキーを送出（デバッガ突入→autoexec 実行）。
+# How it works (ram / pixels mode):
+#   cmd/stellacheck launches Stella and waits for the dump. This script concurrently sends the
+#   backquote key to Stella via osascript (enter the debugger -> autoexec runs).
 #
-# 仕組み（tia モード = G4 書込専用レジスタ照合）:
-#   Stella は書込専用 TIA レジスタ（COLUPF/NUSIZ/HMxx…）を **デバッガの `tia` コマンド**でしか
-#   出さない。しかも `tia` の出力は prompt widget にしか行かず、autoexec.script 経由では
-#   取り出せない（Debugger::exec は各コマンドの出力を捨て "Executed N commands" しか残さない
-#   ＝ autoexec 内の saveSes は 0 バイトになる。2026-08-03 実測）。`dump 00 3f 1` も届かない
-#   （TIA の **読み出し**ポート＝衝突/INPT が $10 ごとにミラーされて返るだけ。実測）。
-#   よってここでは Stella を起動 → ` でデバッガ突入 → プロンプトへ `tia` と `saveSes` を
-#   **クリップボード貼り付け**で送る（keystroke だと日本語 IME に食われるため paste 経由）。
-#   保存先は Stella の user dir（~/Desktop、-userdir では変わらない＝実測）なので、
-#   取得後ただちに internal/oracle/testdata/stella_tia/<rom>.txt へ退避する。
+# How it works (tia mode = G4 write-only register cross-check):
+#   Stella exposes the write-only TIA registers (COLUPF/NUSIZ/HMxx...) ONLY through the
+#   **debugger's `tia` command**. Moreover `tia`'s output goes only to the prompt widget and
+#   cannot be extracted via autoexec.script (Debugger::exec discards each command's output and
+#   leaves only "Executed N commands" = a saveSes inside autoexec produces 0 bytes. Measured
+#   2026-08-03). `dump 00 3f 1` does not reach them either (only the TIA's **read** ports =
+#   collisions/INPT come back, mirrored every $10. Measured).
+#   So here we launch Stella -> enter the debugger with ` -> send `tia` and `saveSes` to the
+#   prompt via **clipboard paste** (keystroke gets eaten by the Japanese IME, hence paste).
+#   The save location is Stella's user dir (~/Desktop; -userdir does not change it = measured),
+#   so immediately after capture the file is moved to internal/oracle/testdata/stella_tia/<rom>.txt.
 #
-# 必要条件（初回のみ・人間の1クリック）:
-#   システム設定 → プライバシーとセキュリティ → アクセシビリティ → このターミナル(または iTerm 等)を許可
+# Prerequisite (first run only; one human click):
+#   System Settings -> Privacy & Security -> Accessibility -> allow this terminal (or iTerm etc.)
 set -u
 ROM="${1:?usage: stella_oracle.sh <rom.bin> [frames] [pixels|tia]}"
 FRAMES="${2:-5}"
 MODE="${3:-}"
 cd "$(dirname "$0")/.."
 
-# --- アクセシビリティ許可のプリフライト ---
+# --- Accessibility-permission preflight ---
 if ! osascript -e 'tell application "System Events" to get name of first process' >/dev/null 2>&1; then
   echo "✋ アクセシビリティ許可が必要です（初回のみ）:"
   echo "   システム設定 → プライバシーとセキュリティ → アクセシビリティ → このターミナルをON"
@@ -41,8 +42,8 @@ CAPDIR=internal/oracle/testdata/stella_tia
 frontmost() {
   osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null
 }
-# Stella を最前面に戻す。別プロセス（ブラウザ等）に焦点を奪われても打鍵前に取り返す＝
-# 打鍵が無関係なアプリに落ちる事故を構造的に防ぐ。
+# Bring Stella back to the front. Even if another process (a browser etc.) steals focus, take it
+# back before typing = structurally prevents the accident of keystrokes landing in an unrelated app.
 ensure_front() {
   for _ in 1 2 3 4 5 6; do
     osascript -e 'tell application "Stella" to activate' >/dev/null 2>&1
@@ -59,8 +60,8 @@ capture_tia() {
   clip="$(mktemp)"; pbpaste > "$clip" 2>/dev/null
 
   printf 'reset\nframe %s\n' "$frames" > "$AUTOEXEC"
-  # 既存の session_*.txt は「我々が作っていないファイル」なので触らない。起動前の一覧を
-  # 控えて、あとで **新規に現れた 1 本だけ** を自分の成果物として扱う。
+  # Pre-existing session_*.txt are "files we did not create", so leave them alone. Note the
+  # pre-launch listing, and later treat **only the single newly appeared file** as our artifact.
   local before; before="$(mktemp)"
   ls "$HOME/Desktop"/session_*.txt 2>/dev/null > "$before"
   "$STELLA" -dbg.res 1000x700 -dbg.fontsize small "$rom" >/dev/null 2>&1 &
@@ -108,8 +109,8 @@ case "$MODE" in
   tia)
     OUT="$CAPDIR/$(basename "${ROM%.*}").txt"
     capture_tia "$ROM" "$FRAMES" "$OUT" || exit $?
-    # コーパス一括取得では 1 本ごとに go run するとビルドの方が長い。取得だけして
-    # 採点は `go test ./internal/oracle` にまとめる用の逃げ道。
+    # In a whole-corpus batch capture, a go run per ROM spends longer building than capturing.
+    # Escape hatch for capturing only, and batching the grading into `go test ./internal/oracle`.
     [ "${STELLA_CAPTURE_ONLY:-}" = "1" ] && exit 0
     go run ./cmd/stellacheck -session "$OUT"
     ;;

@@ -1,12 +1,16 @@
-// stellacheck — Stella オラクル照合（V2-17 / F-4）。
-// 同じ ROM を Stella と Gopher2600（harness）で「電源投入から N フレーム」走らせ、RAM ($80-$FF) を突き合わせる。
+// stellacheck — Stella oracle cross-check (V2-17 / F-4).
+// Runs the same ROM in Stella and in Gopher2600 (harness) for "N frames from power-on" and
+// cross-checks RAM ($80-$FF).
 //
-// 仕組み（対話セッションで実測した Stella 7.0 の挙動に基づく）:
-//  1. ~/Library/Application Support/Stella/autoexec.script に「reset / frame N / dump 80 ff 7」を書く
-//     （autoexec はデバッガ突入時に自動実行される。reset で電源投入に揃うため、突入タイミングは任意でよい）。
-//  2. Stella を起動 → 【人間がデバッガキー(`)を1回押す】（-debug フラグは突入しないと実測）。
-//  3. dump はファイル直書き（~/Desktop/<rom>_dbg_<hash>.dump、実測）。出現をポーリング → パース。
-//  4. harness 側で同じ ROM を N フレーム実行 → RAM を比較 → 一致/差分を報告。
+// Mechanism (based on Stella 7.0 behaviour measured in an interactive session):
+//  1. Write "reset / frame N / dump 80 ff 7" to ~/Library/Application Support/Stella/autoexec.script
+//     (autoexec runs automatically on debugger entry; reset aligns to power-on, so the entry timing
+//     can be arbitrary).
+//  2. Launch Stella → [a HUMAN presses the debugger key (`) once] (measured: the -debug flag does
+//     not enter the debugger).
+//  3. dump writes straight to a file (~/Desktop/<rom>_dbg_<hash>.dump, measured). Poll for its
+//     appearance → parse.
+//  4. Run the same ROM for N frames on the harness side → compare RAM → report match/diffs.
 package main
 
 import (
@@ -71,7 +75,7 @@ func run(romPath string, frames int, timeout time.Duration, pixels bool) error {
 	scriptPath := filepath.Join(scriptDir, "autoexec.script")
 	desktop := filepath.Join(home, "Desktop")
 
-	// 1) autoexec.script（既存があれば退避→終了時に復元）
+	// 1) autoexec.script (back up any existing one → restore on exit)
 	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 		return err
 	}
@@ -94,7 +98,7 @@ func run(romPath string, frames int, timeout time.Duration, pixels bool) error {
 		}
 	}()
 
-	// 2) 既存 dump の把握（新規出現を検出するため）
+	// 2) note the pre-existing dumps (so a newly appearing one can be detected)
 	romBase := strings.TrimSuffix(filepath.Base(romPath), filepath.Ext(romPath))
 	pattern := filepath.Join(desktop, romBase+"_dbg_*.dump")
 	old := map[string]bool{}
@@ -104,7 +108,7 @@ func run(romPath string, frames int, timeout time.Duration, pixels bool) error {
 		}
 	}
 
-	// 3) Stella 起動
+	// 3) launch Stella
 	cmd := exec.Command(stellaBin, romPath)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("launch stella: %w", err)
@@ -117,7 +121,7 @@ func run(romPath string, frames int, timeout time.Duration, pixels bool) error {
 	fmt.Println("★ In the Stella window, press the ` (backquote) key once to enter the debugger.")
 	fmt.Println("  (autoexec runs reset -> frame", frames, "-> dump automatically)")
 
-	// 4) dump 出現を待つ
+	// 4) wait for the dump to appear
 	var dumpFile string
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -136,7 +140,7 @@ func run(romPath string, frames int, timeout time.Duration, pixels bool) error {
 	if dumpFile == "" {
 		return fmt.Errorf("dump file did not appear within %v (did you press the key?)", timeout)
 	}
-	time.Sleep(300 * time.Millisecond) // 書き込み完了待ち
+	time.Sleep(300 * time.Millisecond) // wait for the write to finish
 	fmt.Println("dump captured:", dumpFile)
 	if err := compare(romPath, frames, dumpFile); err != nil {
 		return err
@@ -161,9 +165,10 @@ func run(romPath string, frames int, timeout time.Duration, pixels bool) error {
 	return nil
 }
 
-// comparePixels は Stella のスナップショット PNG と harness の同フレーム描画を
-// TIA 色コード格子（ingest.Normalize+量子化）に落として突き合わせる（oracle v2）。
-// 縦オフセットは ±8 行で最良一致を探索（両者の可視開始行定義の差を吸収）。
+// comparePixels reduces a Stella snapshot PNG and the harness's rendering of the same frame
+// to TIA color-code grids (ingest.Normalize + quantization) and cross-checks them (oracle v2).
+// The vertical offset is searched over ±8 rows for the best match (absorbing the two sides'
+// differing definitions of the first visible row).
 func comparePixels(romPath string, frames int, snapPath string) error {
 	f, err := os.Open(snapPath)
 	if err != nil {
@@ -174,7 +179,7 @@ func comparePixels(romPath string, frames int, snapPath string) error {
 	if err != nil {
 		return fmt.Errorf("decode %s: %w", snapPath, err)
 	}
-	sq := ingest.NewStellaNTSCQuantizer() // Stella 実測パレット（litmus_palette 採取）
+	sq := ingest.NewStellaNTSCQuantizer() // palette measured from Stella (captured with litmus_palette)
 	sn, err := ingest.Normalize(img, sq)
 	if err != nil {
 		return fmt.Errorf("normalize stella snap: %w", err)
@@ -218,7 +223,7 @@ func comparePixels(romPath string, frames int, snapPath string) error {
 	fmt.Printf("pixel compare: %.2f%% of %d cells match (vertical offset %+d, stella H=%d gopher H=%d)\n",
 		pct, bestTotal, bestOff, sn.Height, gn.Height)
 	if pct < 99.0 {
-		// 最初の不一致行を列挙（診断）
+		// list the first mismatching rows (diagnostics)
 		shown := 0
 		for y := 0; y < gn.Height && shown < 5; y++ {
 			sy := y + bestOff
@@ -240,11 +245,12 @@ func comparePixels(romPath string, frames int, snapPath string) error {
 	return nil
 }
 
-// compareTIARegs は Stella デバッガの `tia` 出力（saveSes で保存したセッション）から
-// 書込専用 TIA レジスタを読み取り、同じ ROM を同じフレーム数だけ回した harness の
-// read_tia_registers 相当と突き合わせる（G4）。RAM・画素は既に照合済みだったが、
-// 書込専用レジスタは未照合＝「GRP=0 の物体は NUSIZ が何でも同じ絵になる」ので
-// 画素一致では詰められない穴だった。
+// compareTIARegs reads the write-only TIA registers out of the Stella debugger's `tia` output
+// (a session saved with saveSes) and cross-checks them against the harness's
+// read_tia_registers equivalent after running the same ROM for the same number of frames (G4).
+// RAM and pixels were already cross-checked, but the write-only registers were not — "an object
+// with GRP=0 draws the same picture whatever NUSIZ is", so this was a hole pixel matching
+// could not close.
 func compareTIARegs(sesPath, romOverride string, framesOverride int) error {
 	b, err := os.ReadFile(sesPath)
 	if err != nil {
@@ -301,7 +307,7 @@ func compareTIARegs(sesPath, romOverride string, framesOverride int) error {
 	return nil
 }
 
-// compare は Stella の dump ファイルと harness 実行結果の RAM ($80-$FF) を突き合わせる。
+// compare cross-checks a Stella dump file against the harness run's RAM ($80-$FF).
 func compare(romPath string, frames int, dumpFile string) error {
 	stellaRAM, err := parseDump(dumpFile)
 	if err != nil {
@@ -341,7 +347,7 @@ func parseDump(path string) ([128]uint8, error) {
 		}
 		base, err := strconv.ParseUint(m[1], 16, 16)
 		if err != nil || base < 0x80 {
-			continue // XC/XS 行などは除外（先頭が 80-f0 の RAM 行のみ）
+			continue // exclude XC/XS etc. lines (only RAM rows whose base is 80-f0)
 		}
 		hexes := strings.Fields(m[2] + " " + m[3])
 		for i, h := range hexes {

@@ -12,7 +12,7 @@ func playfieldEncode(cells []bool) (uint8, uint8, uint8) {
 	return playfield.EncodeSymmetric(cells)
 }
 
-// 疑似 Stella 化: TIA 画像を sx×sy の整数スケールで拡大する。
+// Pseudo-Stella conversion: upscale a TIA image by an integer scale of sx×sy.
 func upscale(src *image.RGBA, sx, sy int) *image.RGBA {
 	b := src.Bounds()
 	dst := image.NewRGBA(image.Rect(0, 0, b.Dx()*sx, b.Dy()*sy))
@@ -29,8 +29,8 @@ func upscale(src *image.RGBA, sx, sy int) *image.RGBA {
 	return dst
 }
 
-// ラウンドトリップ（正解既知）: litmus_pf_async を Gopher2600 で描画 → 2×1 拡大で
-// Stella 形状を模す → Normalize がスケールを正しく当て、ピクセルが完全往復すること。
+// Round trip (known ground truth): render litmus_pf_async with Gopher2600 → upscale 2×1 to
+// mimic the Stella shape → Normalize must detect the scale correctly and the pixels must round-trip exactly.
 func TestRoundTripNormalize(t *testing.T) {
 	e, err := emu.New("NTSC")
 	if err != nil {
@@ -43,7 +43,7 @@ func TestRoundTripNormalize(t *testing.T) {
 		t.Fatal(err)
 	}
 	truth, _ := e.Snapshot()
-	fake := upscale(truth, 2, 1) // Stella F12 と同じ 320 幅
+	fake := upscale(truth, 2, 1) // same 320 width as Stella F12
 
 	q := NewNTSCQuantizer()
 	n, err := Normalize(fake, q)
@@ -72,7 +72,7 @@ func TestRoundTripNormalize(t *testing.T) {
 	}
 }
 
-// 2×2 など他の整数スケールも当てられること。
+// Other integer scales such as 2×2 must be detected too.
 func TestScaleDetection2x2(t *testing.T) {
 	e, _ := emu.New("NTSC")
 	if err := e.LoadROM("../../roms/litmus/litmus_pf_async.bin"); err != nil {
@@ -98,7 +98,7 @@ func TestScaleDetection2x2(t *testing.T) {
 
 func TestQuantizerExactness(t *testing.T) {
 	q := NewNTSCQuantizer()
-	// パレット内の全色は距離 0 で自分自身に戻る
+	// every color in the palette maps back to itself with distance 0
 	for _, code := range q.codes {
 		got, d := q.Nearest(q.RGB(code))
 		if d != 0 {
@@ -110,9 +110,9 @@ func TestQuantizerExactness(t *testing.T) {
 	}
 }
 
-// --- M2: playfield 抽出のラウンドトリップ（正解既知） ---
+// --- M2: playfield extraction round trip (known ground truth) ---
 
-// litmus_pf: PF0=$10 PF1=$80 PF2=$01・repeat・白 $0E が全可視行で出続ける。
+// litmus_pf: PF0=$10 PF1=$80 PF2=$01, repeat, white $0E shown on every visible row.
 func TestExtractLitmusPF(t *testing.T) {
 	e, _ := emu.New("NTSC")
 	if err := e.LoadROM("../../roms/litmus/litmus_pf.bin"); err != nil {
@@ -134,7 +134,7 @@ func TestExtractLitmusPF(t *testing.T) {
 		if b.Mode != "repeat" || b.PF0 != 0x10 || b.PF1 != 0x80 || b.PF2 != 0x01 {
 			t.Fatalf("band %+v, want repeat $10/$80/$01", b)
 		}
-		want := q.Canonical(0x0E) // パレット同色衝突（$0C≡$0E）は正準値で比較
+		want := q.Canonical(0x0E) // palette same-color collisions ($0C≡$0E) are compared via the canonical value
 		if b.ColorLeft != want || b.ColorRight != want {
 			t.Fatalf("band colors $%02X/$%02X, want $%02X", b.ColorLeft, b.ColorRight, want)
 		}
@@ -145,7 +145,7 @@ func TestExtractLitmusPF(t *testing.T) {
 	}
 }
 
-// pf_modes: score-mode（PF1=$66 左右同パターン・別色）と壁（PF2=$10）が抽出できる。
+// pf_modes: score-mode (PF1=$66, same pattern left/right with different colors) and the wall (PF2=$10) must be extracted.
 func TestExtractPFModes(t *testing.T) {
 	e, _ := emu.New("NTSC")
 	if err := e.LoadROM("../../roms/techniques/pf_modes.bin"); err != nil {
@@ -176,7 +176,7 @@ func TestExtractPFModes(t *testing.T) {
 	}
 }
 
-// Exerciser 山脈: reflect 判定＋抽出バイトが RAM の band データ（実行時の正解）と一致。
+// Exerciser mountain range: the reflect verdict and the extracted bytes match the band data in RAM (runtime ground truth).
 func TestExtractReflectMountains(t *testing.T) {
 	e, _ := emu.New("NTSC")
 	if err := e.LoadROM("../../roms/exerciser/exerciser.bin"); err != nil {
@@ -184,7 +184,7 @@ func TestExtractReflectMountains(t *testing.T) {
 	}
 	e.RunFrames(5)
 	e.Poke(0x80, 4) // scene=proc
-	e.Poke(0x83, 0) // lastScene≠4 → 進入初期化（山生成）
+	e.Poke(0x83, 0) // lastScene≠4 → entry initialization (mountain generation)
 	e.RunFrames(20)
 	truth, _ := e.Snapshot()
 	q := NewNTSCQuantizer()
@@ -193,14 +193,14 @@ func TestExtractReflectMountains(t *testing.T) {
 		t.Fatal(err)
 	}
 	bands, _, _ := ExtractPlayfield(n)
-	// RAM の band 三つ組（mPF0/mPF1/mPF2 = $C0/$CA/$D4 起点 ×10）
+	// band triples in RAM (mPF0/mPF1/mPF2 = starting at $C0/$CA/$D4, ×10)
 	type triple struct{ p0, p1, p2 uint8 }
 	ram := map[triple]bool{}
 	for i := 0; i < 10; i++ {
 		a, _ := e.PeekRAM(uint16(0xC0 + i))
 		b, _ := e.PeekRAM(uint16(0xCA + i))
 		c, _ := e.PeekRAM(uint16(0xD4 + i))
-		ram[triple{a & 0xF0, b, c}] = true // PF0 は上位ニブルのみ表示＝表示真実でマスク
+		ram[triple{a & 0xF0, b, c}] = true // only PF0's upper nibble is displayed = mask to the displayed truth
 	}
 	found := 0
 	for _, b := range bands {
@@ -217,9 +217,9 @@ func TestExtractReflectMountains(t *testing.T) {
 	}
 }
 
-// --- M3: スプライト抽出のラウンドトリップ（正解既知） ---
+// --- M3: sprite extraction round trip (known ground truth) ---
 
-// vertical_pos のボール: GRP 行が Art 定数とビット単位で一致、X=80、色は青 $86（正準）。
+// The ball in vertical_pos: GRP rows match the Art constant bit-for-bit, X=80, color blue $86 (canonical).
 func TestExtractSpriteBall(t *testing.T) {
 	e, _ := emu.New("NTSC")
 	if err := e.LoadROM("../../roms/techniques/vertical_pos.bin"); err != nil {
@@ -252,13 +252,13 @@ func TestExtractSpriteBall(t *testing.T) {
 	}
 }
 
-// sprite_anim の歩行者: 行4倍化（h=32）込みで GRP がフェーズの絵と一致。
+// The walker in sprite_anim: GRP matches the phase art, including row quadrupling (h=32).
 func TestExtractSpriteWalker(t *testing.T) {
 	e, _ := emu.New("NTSC")
 	if err := e.LoadROM("../../roms/techniques/sprite_anim.bin"); err != nil {
 		t.Fatal(err)
 	}
-	// phase==0（$80）かつ右向き（$83==0）のフレームまで進める
+	// advance to a frame where phase==0 ($80) and facing right ($83==0)
 	for i := 0; i < 200; i++ {
 		e.RunFrames(1)
 		ph, _ := e.PeekRAM(0x80)
@@ -291,7 +291,7 @@ func TestExtractSpriteWalker(t *testing.T) {
 	}
 }
 
-// litmus_nusiz_copies: 3 コピー近接（間隔16）が 1 件 copies=3 に畳まれる。
+// litmus_nusiz_copies: 3 close copies (spacing 16) fold into a single entry with copies=3.
 func TestExtractNusizCopies(t *testing.T) {
 	e, _ := emu.New("NTSC")
 	if err := e.LoadROM("../../roms/litmus/litmus_nusiz_copies.bin"); err != nil {
@@ -308,13 +308,13 @@ func TestExtractNusizCopies(t *testing.T) {
 	sprites := ExtractSprites(n, residual)
 	for _, s := range sprites {
 		if s.Copies == 3 && s.Spacing == 16 {
-			return // 期待どおり
+			return // as expected
 		}
 	}
 	t.Fatalf("no 3-copy/spacing-16 group found in %+v", sprites)
 }
 
-// --- M5: 忠実度（自前 ROM は完全再構成できなければバグ） ---
+// --- M5: fidelity (failing to fully reconstruct our own ROMs is a bug) ---
 
 func fidelityOf(t *testing.T, romPath string, frames int) float64 {
 	t.Helper()
@@ -340,7 +340,7 @@ func TestFidelityOwnROMs(t *testing.T) {
 		min    float64
 	}{
 		{"../../roms/litmus/litmus_pf.bin", 10, 1.0},
-		{"../../roms/techniques/pf_modes.bin", 10, 0.999}, // 優先度領域は再構成が sprite-over-PF 仮定（誤差数px）
+		{"../../roms/techniques/pf_modes.bin", 10, 0.999}, // priority regions are reconstructed under the sprite-over-PF assumption (a few px of error)
 		{"../../roms/techniques/vertical_pos.bin", 30, 1.0},
 		{"../../roms/techniques/sprite_anim.bin", 30, 1.0},
 		{"../../roms/litmus/litmus_nusiz_copies.bin", 10, 1.0},
@@ -353,20 +353,20 @@ func TestFidelityOwnROMs(t *testing.T) {
 	}
 }
 
-// --- M6: 文脈つき降格（スプライトの水平ストロークを PF に取られない） ---
-// 4clk 整列の上下棒を持つリング3つ（"000" 型）が、棒も含めて 3 つの完全な成分になること。
+// --- M6: contextual demotion (a sprite's horizontal strokes must not be captured as PF) ---
+// Three rings with 4clk-aligned top/bottom bars (the "000" shape) must become 3 complete components, bars included.
 func TestContextDemotionRings(t *testing.T) {
 	q := NewNTSCQuantizer()
 	orange := q.RGB(q.Canonical(0x3C))
 	img := image.NewRGBA(image.Rect(0, 0, 160, 24))
 	draw := func(x, y int) { img.SetRGBA(x, y, orange) }
 	for d := 0; d < 3; d++ {
-		x0 := 72 + d*8 // 上下棒は col18/20/22 に 4clk 整列（列数3 > 2 ＝旧規則をすり抜ける形）
+		x0 := 72 + d*8 // top/bottom bars are 4clk-aligned at col18/20/22 (3 lit columns > 2 = a shape that slips past the old rule)
 		for dx := 0; dx < 4; dx++ {
-			draw(x0+dx, 6)  // 上棒
-			draw(x0+dx, 13) // 下棒
+			draw(x0+dx, 6)  // top bar
+			draw(x0+dx, 13) // bottom bar
 		}
-		for y := 7; y <= 12; y++ { // 両壁（1px ＝ 4clk 列として不均一 → residual に落ちる側）
+		for y := 7; y <= 12; y++ { // both walls (1px = non-uniform as a 4clk column → the side that falls into residual)
 			draw(x0, y)
 			draw(x0+3, y)
 		}
@@ -390,16 +390,16 @@ func TestContextDemotionRings(t *testing.T) {
 	}
 }
 
-// --- M7: 重なり修復（正解既知の合成画像） ---
-// 繰り返すビル風 PF（3周期）の中央周期にスプライトを重ね、
-// ①スプライト GRP が重なり前の定義とビット単位一致 ②PF が参照周期どおりに修復
-// ③fidelity 100% を assert する。
+// --- M7: overlap repair (synthetic image with known ground truth) ---
+// Overlay a sprite on the middle period of a repeating building-like PF (3 periods) and assert:
+// (1) the sprite GRP matches the pre-overlap definition bit-for-bit, (2) the PF is repaired
+// to match the reference period, (3) fidelity 100%.
 func TestRepairOverlap(t *testing.T) {
 	q := NewNTSCQuantizer()
 	cyan := q.Canonical(0x9E)
 	green := q.Canonical(0xCE)
 	img := image.NewRGBA(image.Rect(0, 0, 160, 40))
-	// PF: 屋根行(cols2-8)と窓行(cols2,4,6,8)を4行ずつ、8行周期×3（y=4..27）、repeat
+	// PF: roof rows (cols2-8) and window rows (cols2,4,6,8), 4 rows each, 8-row period ×3 (y=4..27), repeat
 	pfRow := func(y int, cols []int) {
 		for _, c := range cols {
 			for _, base := range []int{0, 80} {
@@ -417,12 +417,12 @@ func TestRepairOverlap(t *testing.T) {
 			pfRow(4+cyc*8+4+r, win)
 		}
 	}
-	// スプライト: 8px 枠 ($FF,$81,$BD,$A5,$A5,$BD,$81,$FF) を x=16, y=12（中央周期に重なる）
+	// sprite: an 8px frame ($FF,$81,$BD,$A5,$A5,$BD,$81,$FF) at x=16, y=12 (overlapping the middle period)
 	art := []uint8{0xFF, 0x81, 0xBD, 0xA5, 0xA5, 0xBD, 0x81, 0xFF}
 	for r, g := range art {
 		for bit := 0; bit < 8; bit++ {
 			if g&(1<<(7-uint(bit))) != 0 {
-				img.SetRGBA(16+bit, 12+r, q.RGB(green)) // PF を上書き＝sprite over PF
+				img.SetRGBA(16+bit, 12+r, q.RGB(green)) // overwrites PF = sprite over PF
 			}
 		}
 	}
@@ -431,7 +431,7 @@ func TestRepairOverlap(t *testing.T) {
 		t.Fatal(err)
 	}
 	rep := Analyze(n, q)
-	// ① スプライト完全復元
+	// (1) sprite fully restored
 	if len(rep.Sprites) != 1 {
 		t.Fatalf("found %d sprites, want 1: %+v", len(rep.Sprites), rep.Sprites)
 	}
@@ -444,7 +444,7 @@ func TestRepairOverlap(t *testing.T) {
 			t.Fatalf("GRP[%d] = %%%08b, want %%%08b", i, s.GRP[i], want)
 		}
 	}
-	// ② 修復: 全バンドが屋根 or 窓のどちらかのバイト列（汚染パターンが残っていない）
+	// (2) repair: every band is either the roof or the window byte triple (no contaminated pattern survives)
 	wantRoof := bandBytes(roof)
 	wantWin := bandBytes(win)
 	for _, b := range rep.Playfield {
@@ -453,7 +453,7 @@ func TestRepairOverlap(t *testing.T) {
 			t.Fatalf("contaminated band survived: %+v", b)
 		}
 	}
-	// ③ 完全再構成
+	// (3) full reconstruction
 	if rep.Fidelity != 1.0 {
 		t.Fatalf("fidelity %.4f, want 1.0", rep.Fidelity)
 	}
@@ -468,7 +468,7 @@ func bandBytes(cols []int) [3]uint8 {
 	return [3]uint8{pf0, pf1, pf2}
 }
 
-// --- M8: マルチフレーム分離（正解既知・自前 ROM で多フレーム生成） ---
+// --- M8: multi-frame separation (known ground truth; multiple frames generated with our own ROMs) ---
 
 func captureFrames(t *testing.T, romPath string, warmup, count int) []*Normalized {
 	t.Helper()
@@ -491,7 +491,7 @@ func captureFrames(t *testing.T, romPath string, warmup, count int) []*Normalize
 	return out
 }
 
-// flicker_multiplex: 連続2フレームで 4 オブジェクト全部が union に揃い、flicker 判定が立つ。
+// flicker_multiplex: over 2 consecutive frames all 4 objects line up in the union and the flicker verdict is set.
 func TestMultiFrameFlicker(t *testing.T) {
 	frames := captureFrames(t, "../../roms/techniques/flicker_multiplex.bin", 40, 2)
 	q := NewNTSCQuantizer()
@@ -517,7 +517,7 @@ func TestMultiFrameFlicker(t *testing.T) {
 	if len(colors) != 4 {
 		t.Fatalf("union colors %v, want 4 distinct", colors)
 	}
-	// 静的層は空（PF なし・駐機物なし）、各フレーム fidelity 100%
+	// static layer is empty (no PF, no parked objects), each frame at 100% fidelity
 	if len(mr.Static.Playfield) != 0 || len(mr.Static.Sprites) != 0 {
 		t.Fatalf("static layer should be empty: pf=%d static=%d", len(mr.Static.Playfield), len(mr.Static.Sprites))
 	}
@@ -528,7 +528,7 @@ func TestMultiFrameFlicker(t *testing.T) {
 	}
 }
 
-// sprite_anim: 歩行者が両フレームに（移動して）出る＝flicker ではない。静的層クリーン。
+// sprite_anim: the walker appears in both frames (moving) = not flicker. Static layer clean.
 func TestMultiFrameWalker(t *testing.T) {
 	frames := captureFrames(t, "../../roms/techniques/sprite_anim.bin", 30, 2)
 	q := NewNTSCQuantizer()
@@ -544,7 +544,7 @@ func TestMultiFrameWalker(t *testing.T) {
 			t.Fatalf("frame %d fidelity %.4f", i, fr.Fidelity)
 		}
 	}
-	// 位置が 1px 進んでいる（同一オブジェクトの移動）
+	// the position has advanced by 1px (the same object moving)
 	if mr.Frames[1].Sprites[0].X != mr.Frames[0].Sprites[0].X+1 {
 		t.Fatalf("walker did not advance: %d -> %d", mr.Frames[0].Sprites[0].X, mr.Frames[1].Sprites[0].X)
 	}

@@ -14,3 +14,4 @@
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
 
+roms/litmus/litmus_jsr_stack.bin  # 2026-08-05  SD-3 witness ROM; capture with the next batch

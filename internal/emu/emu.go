@@ -1,7 +1,7 @@
-// Package emu は Gopher2600 をライブラリとして自プロセスに埋め込み、headless で
-// 駆動する薄いラッパ。MCP ツール群（cmd/harness）と配管検証 CLI（cmd/probe）の
-// 共通土台。低レベルの terminal/PushedFunction は使わず hardware.VCS を直接叩く
-// （より決定的・単純・高速）。
+// Package emu is a thin wrapper that embeds Gopher2600 in-process as a library and
+// drives it headless. The shared foundation for the MCP tool set (cmd/harness) and
+// the plumbing-verification CLI (cmd/probe). It drives hardware.VCS directly instead
+// of the low-level terminal/PushedFunction (more deterministic, simpler, faster).
 package emu
 
 import (
@@ -33,55 +33,60 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/annotate"
 )
 
-// Emu は 1 台の VCS とその TV を保持する。
+// Emu holds one VCS and its TV.
 type Emu struct {
 	TV  *television.Television
 	VCS *hardware.VCS
-	cap *capture // 最新フレームを image.RGBA に取り込む PixelRenderer
+	cap *capture // PixelRenderer that captures the latest frame into an image.RGBA
 
-	cpuCycles int64 // ROM ロード以降に実行した CPU サイクルの累積（命令完了ごとに加算）
-	cycleMark int64 // 区間計測の基準点（MarkCycles で現在の cpuCycles に揃える）
+	cpuCycles int64 // cumulative CPU cycles executed since ROM load (added on each instruction completion)
+	cycleMark int64 // baseline for interval measurement (MarkCycles aligns it to the current cpuCycles)
 
-	vdigest       *digest.Video // ゴールデンフレーム回帰用の連鎖ハッシュ（任意・EnableVideoDigest で有効化）
-	adigest       *digest.Audio // ゴールデン音声回帰用の連鎖ハッシュ（任意・EnableAudioDigest で有効化）
-	acap          *audioCapture // 生音声サンプル取得（任意・EnableAudioCapture で有効化, V2-15）
-	paddlePlugged [2]bool       // SetPaddle がポートへ paddle peripheral を差したか（冪等化, V2-4b）
+	vdigest       *digest.Video // chained hash for golden-frame regression (optional; enabled via EnableVideoDigest)
+	adigest       *digest.Audio // chained hash for golden-audio regression (optional; enabled via EnableAudioDigest)
+	acap          *audioCapture // raw audio sample capture (optional; enabled via EnableAudioCapture, V2-15)
+	paddlePlugged [2]bool       // whether SetPaddle has plugged a paddle peripheral into the port (idempotency, V2-4b)
 
-	cov *Coverage // PC/分岐カバレッジ記録（任意・EnableCoverage で有効化, VV-3）。nil=無効でゼロコスト
+	cov *Coverage // PC/branch coverage recording (optional; enabled via EnableCoverage, VV-3). nil=disabled, zero cost
 
-	// AT-5: per-pixel の描画オブジェクト帰属（PF/P0/P1/M0/M1/BL/BG）。elemCB を毎カラー
-	// クロック呼び、GetLastSignal().Index を索引に Video.LastElement を記録する。
-	// 値は element+1（0=未記録）。elemCB=nil のとき VCS.Step(nil) と等価＝ゼロコスト。
-	elemBuf []uint8 // 索引 = signal.Index（フルフレーム 228×scanline 空間）
-	// hmRipple / hmFlags は elemBuf と同じ索引で HMOVE 機構の状態を毎カラークロック記録する。
-	// 現在値の読み出しだけでは足りない：リップルはカラークロック単位で動くので、命令単位で
-	// 標本化すると値が飛び、実測で 16 値中 3 値しか見えず終了も一度も捕まらなかった。
+	// AT-5: per-pixel drawn-object attribution (PF/P0/P1/M0/M1/BL/BG). elemCB is called
+	// every colour clock and records Video.LastElement indexed by GetLastSignal().Index.
+	// Stored value is element+1 (0=unrecorded). With elemCB=nil this is equivalent to
+	// VCS.Step(nil) = zero cost.
+	elemBuf []uint8 // index = signal.Index (full-frame 228 x scanline space)
+	// hmRipple / hmFlags record the HMOVE machinery's state every colour clock, indexed
+	// the same as elemBuf. Reading the current value alone is not enough: the ripple
+	// moves per colour clock, so sampling per instruction skips values — measured, only
+	// 3 of the 16 values were ever seen and the expiry was never caught even once.
 	hmRipple []uint8
 	hmFlags  []uint8
-	// elemCtBuf は elemBuf と同じ索引で「その要素の何番目のコピーが描いたか」。
-	// player/missile なら NUSIZ 複製のコピー番号、playfield なら PF0/1/2 のどれか。
-	// 0 は未記録の番兵で、格納値は実際の値 +1。
+	// elemCtBuf, indexed the same as elemBuf, records "which copy of the element drew
+	// it": for a player/missile the NUSIZ replication copy number, for the playfield
+	// which of PF0/1/2. 0 is the unrecorded sentinel; the stored value is the real
+	// value +1.
 	elemCtBuf []uint8
-	elemCB    func(bool) error // 事前確保クロージャ（stepInstr で毎回渡す。per-call alloc 回避）
+	elemCB    func(bool) error // preallocated closure (passed on every stepInstr; avoids per-call alloc)
 
-	// フレーム内ウォッチ（StartFrameWatch / FrameWatch）。watching=false でゼロコスト。
+	// Intra-frame watch (StartFrameWatch / FrameWatch). Zero cost while watching=false.
 	watching bool
-	cxAccum  video.CollisionEvent // 起きた衝突の OR 蓄積（CXCLR に消されない）
-	// cxFirst は各衝突ビットが**最初に立ったカラークロック**のビーム位置。蓄積だけでは
-	// 「このフレームで起きたか」しか言えず、「どこで起きたか」は命令が退役する頃には
-	// ビームが移動して失われている。nil の間はゼロコスト。
+	cxAccum  video.CollisionEvent // OR-accumulation of collisions that occurred (not erased by CXCLR)
+	// cxFirst is the beam position at the colour clock each collision bit **first went
+	// high**. Accumulation alone only answers "did it happen this frame"; "where it
+	// happened" is lost by the time the instruction retires, the beam having moved on.
+	// Zero cost while nil.
 	cxFirst map[video.CollisionEvent]CollisionSite
-	spLow   uint8 // SP が到達した最小値
-	spHigh  uint8 // SP が到達した最大値（低い値に「固定」なのか「途中で降りた」のかを区別する）
+	spLow   uint8 // lowest value SP reached
+	spHigh  uint8 // highest value SP reached (distinguishes "pinned at a low value" from "came down partway")
 }
 
-// EnableVideoDigest はフレームの連鎖ハッシュ（描画の指紋）を取り始める（D-3 ゴールデン回帰）。
-// per-frame sha1 のコストがあるため任意。冪等。
+// EnableVideoDigest starts taking the chained frame hash (a fingerprint of the
+// rendering) (D-3 golden regression). Optional because of the per-frame sha1 cost.
+// Idempotent.
 func (e *Emu) EnableVideoDigest() error {
 	if e.vdigest != nil {
 		return nil
 	}
-	d, err := digest.NewVideo(e.TV) // TV に PixelRenderer として自己登録する
+	d, err := digest.NewVideo(e.TV) // self-registers on the TV as a PixelRenderer
 	if err != nil {
 		return err
 	}
@@ -89,14 +94,15 @@ func (e *Emu) EnableVideoDigest() error {
 	return nil
 }
 
-// ResetVideoDigest はハッシュ連鎖をゼロから取り直す（warmup を除外して決定的にするため）。
+// ResetVideoDigest restarts the hash chain from zero (to exclude warmup and stay
+// deterministic).
 func (e *Emu) ResetVideoDigest() {
 	if e.vdigest != nil {
 		e.vdigest.ResetDigest()
 	}
 }
 
-// VideoHash は現在までのフレーム連鎖ハッシュを返す（未有効なら ""）。
+// VideoHash returns the chained frame hash so far ("" if not enabled).
 func (e *Emu) VideoHash() string {
 	if e.vdigest == nil {
 		return ""
@@ -104,13 +110,14 @@ func (e *Emu) VideoHash() string {
 	return e.vdigest.Hash()
 }
 
-// EnableAudioDigest は音声の連鎖ハッシュ（音の指紋）を取り始める（A-2 ゴールデン音声回帰）。
-// 映像 digest と同型・別チャンネル。冪等。
+// EnableAudioDigest starts taking the chained audio hash (a fingerprint of the sound)
+// (A-2 golden audio regression). Same shape as the video digest, separate channel.
+// Idempotent.
 func (e *Emu) EnableAudioDigest() error {
 	if e.adigest != nil {
 		return nil
 	}
-	d, err := digest.NewAudio(e.TV) // TV に AudioMixer として自己登録する
+	d, err := digest.NewAudio(e.TV) // self-registers on the TV as an AudioMixer
 	if err != nil {
 		return err
 	}
@@ -118,14 +125,15 @@ func (e *Emu) EnableAudioDigest() error {
 	return nil
 }
 
-// ResetAudioDigest は音声ハッシュ連鎖をゼロから取り直す（warmup 除外で決定的化）。
+// ResetAudioDigest restarts the audio hash chain from zero (excludes warmup for
+// determinism).
 func (e *Emu) ResetAudioDigest() {
 	if e.adigest != nil {
 		e.adigest.ResetDigest()
 	}
 }
 
-// AudioHash は現在までの音声連鎖ハッシュを返す（未有効なら ""）。
+// AudioHash returns the chained audio hash so far ("" if not enabled).
 func (e *Emu) AudioHash() string {
 	if e.adigest == nil {
 		return ""
@@ -133,14 +141,16 @@ func (e *Emu) AudioHash() string {
 	return e.adigest.Hash()
 }
 
-// stepInstr は VCS を 1 ステップ進め、実際に 1 命令が実行された場合だけその実サイクル数を
-// 累積へ加えて executed=true を返す。
+// stepInstr advances the VCS one step and, only when one instruction actually
+// executed, adds its real cycle count to the accumulator and returns executed=true.
 //
-// 肝: CPU は WSYNC stall 中（RdyFlg=false）だと ExecuteInstruction が命令を進めず
-// cycleCallback を 1 回呼ぶだけで返り、LastResult は据え置かれる（Gopher2600 cpu.go:614）。
-// よって「Step 直前に RdyFlg が true だった時だけ」が実命令の実行ステップ＝加算すべき点。
-// stall ステップを数えると直前命令のサイクル数を多重加算してしまう（WSYNC を使う全 ROM で過大）。
-// この規約で cpuCycles は「実行した命令サイクルの総和」になる（WSYNC の空転は含めない）。
+// The key point: while the CPU is in a WSYNC stall (RdyFlg=false), ExecuteInstruction
+// does not advance an instruction — it calls cycleCallback once and returns, leaving
+// LastResult untouched (Gopher2600 cpu.go:614). So "only when RdyFlg was true just
+// before Step" identifies a real instruction-execution step = the point to add at.
+// Counting stall steps would add the previous instruction's cycle count multiple
+// times (an overcount on every ROM that uses WSYNC). Under this convention cpuCycles
+// is "the sum of executed instruction cycles" (WSYNC idling not included).
 func (e *Emu) stepInstr() (executed bool, err error) {
 	ready := e.VCS.CPU.RdyFlg
 	// The bank the next instruction is FETCHED from, captured BEFORE the step. A
@@ -150,7 +160,7 @@ func (e *Emu) stepInstr() (executed bool, err error) {
 	if e.cov != nil && ready {
 		fetchBank = e.VCS.Mem.Cart.GetBank(e.VCS.CPU.PC.Value()).Number
 	}
-	if err := e.VCS.Step(e.elemCB); err != nil { // elemCB=nil のとき従来どおり（ゼロコスト）
+	if err := e.VCS.Step(e.elemCB); err != nil { // with elemCB=nil, behaves as before (zero cost)
 		return false, err
 	}
 	if e.watching {
@@ -165,7 +175,7 @@ func (e *Emu) stepInstr() (executed bool, err error) {
 	if ready {
 		lr := e.VCS.CPU.LastResult
 		e.cpuCycles += int64(lr.Cycles)
-		if e.cov != nil && lr.Defn != nil { // VV-3: 命令完了時だけ記録（nil=無効でゼロコスト）
+		if e.cov != nil && lr.Defn != nil { // VV-3: record only on instruction completion (nil=disabled, zero cost)
 			e.cov.record(fetchBank, lr.Address, lr.Defn.IsBranch(), lr.BranchSuccess)
 		}
 		return true, nil
@@ -173,26 +183,29 @@ func (e *Emu) stepInstr() (executed bool, err error) {
 	return false, nil
 }
 
-// EnableCoverage は PC/分岐カバレッジ記録を有効化する（以後の実行を記録）。冪等。
+// EnableCoverage enables PC/branch coverage recording (records execution from here
+// on). Idempotent.
 func (e *Emu) EnableCoverage() {
 	if e.cov == nil {
 		e.cov = newCoverage()
 	}
 }
 
-// Coverage は記録したカバレッジを返す（EnableCoverage していなければ nil）。
+// Coverage returns the recorded coverage (nil unless EnableCoverage was called).
 func (e *Emu) Coverage() *Coverage { return e.cov }
 
-// LastCycles は直近に完了した 1 命令のサイクル数を返す。
+// LastCycles returns the cycle count of the most recently completed instruction.
 func (e *Emu) LastCycles() int { return e.VCS.CPU.LastResult.Cycles }
 
-// TotalCycles は ROM ロード以降に実行した CPU サイクルの累積を返す。
+// TotalCycles returns the cumulative CPU cycles executed since ROM load.
 func (e *Emu) TotalCycles() int64 { return e.cpuCycles }
 
-// CyclesSinceMark は直近の MarkCycles 以降に実行した CPU サイクル数を返す（区間計測）。
+// CyclesSinceMark returns the CPU cycles executed since the last MarkCycles
+// (interval measurement).
 func (e *Emu) CyclesSinceMark() int64 { return e.cpuCycles - e.cycleMark }
 
-// MarkCycles は区間計測の基準点を現在に揃える（以後 CyclesSinceMark は 0 から数え直す）。
+// MarkCycles aligns the interval-measurement baseline to now (CyclesSinceMark counts
+// from 0 again afterwards).
 func (e *Emu) MarkCycles() { e.cycleMark = e.cpuCycles }
 
 // New は指定 TV 仕様（"NTSC" / "PAL" / "AUTO" 等）で headless な VCS を作る。

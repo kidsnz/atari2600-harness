@@ -11,29 +11,29 @@ package guidedfuzz
 
 import "math/rand"
 
-// Action は 1 フレームに与える入力（行動名と押下状態）。
+// Action is the input given for one frame (action name and pressed state).
 type Action struct {
 	Name    string
 	Pressed bool
 }
 
-// Evaluator は入力列を先頭から実行し、踏んだカバレッジ標識（比較可能キー）の集合を返す。
+// Evaluator runs an input sequence from the start and returns the set of coverage markers (comparable keys) it stepped on.
 type Evaluator func(seq []Action) (map[uint64]bool, error)
 
-// Config は探索設定。決定論的（Seed 固定で再現可能）。
+// Config is the search configuration. Deterministic (reproducible for a fixed Seed).
 type Config struct {
 	Seed       int64
-	Iterations int      // 変異試行回数
-	MaxLen     int      // 入力列の最大長（＝走らせるフレーム数の上限）
-	Actions    []string // 変異で選ぶ行動プール
+	Iterations int      // number of mutation attempts
+	MaxLen     int      // maximum input-sequence length (= upper bound on frames run)
+	Actions    []string // pool of actions mutations pick from
 }
 
-// Result は探索の結果。
+// Result is the outcome of a search.
 type Result struct {
-	Iterations int      // 実行した試行回数
-	CorpusSize int      // interesting と判定して保持した入力列の数
-	Markers    int      // 発見したカバレッジ標識の総数
-	Best       []Action // 最大の標識数を出した入力列（再現可能）
+	Iterations int      // number of attempts executed
+	CorpusSize int      // number of input sequences kept as interesting
+	Markers    int      // total number of coverage markers discovered
+	Best       []Action // the input sequence that produced the most markers (reproducible)
 }
 
 func clone(s []Action) []Action {
@@ -42,7 +42,7 @@ func clone(s []Action) []Action {
 	return c
 }
 
-// mutate は親列から子列を作る（末尾追加 / 行動差し替え / 押下反転）。
+// mutate derives a child sequence from a parent (append at the end / replace an action / flip pressed).
 func (cfg Config) mutate(rng *rand.Rand, parent []Action) []Action {
 	child := clone(parent)
 	pick := func() Action {
@@ -50,18 +50,18 @@ func (cfg Config) mutate(rng *rand.Rand, parent []Action) []Action {
 	}
 	switch {
 	case len(child) == 0 || (len(child) < cfg.MaxLen && rng.Intn(2) == 0):
-		child = append(child, pick()) // 末尾追加（列を伸ばす）
+		child = append(child, pick()) // append at the end (extend the sequence)
 	default:
-		child[rng.Intn(len(child))] = pick() // 既存の 1 フレームを差し替え
+		child[rng.Intn(len(child))] = pick() // replace one existing frame
 	}
 	return child
 }
 
-// RunGuided は coverage-guided 探索を行う。新しい標識を増やした子だけを corpus に残す。
+// RunGuided performs the coverage-guided search. Only children that add new markers are kept in the corpus.
 func RunGuided(cfg Config, eval Evaluator) (Result, error) {
 	rng := rand.New(rand.NewSource(cfg.Seed))
 	global := map[uint64]bool{}
-	corpus := [][]Action{{}} // 空列から開始（決定的なシード）
+	corpus := [][]Action{{}} // start from the empty sequence (deterministic seed)
 
 	seedCov, err := eval(nil)
 	if err != nil {
@@ -90,7 +90,7 @@ func RunGuided(cfg Config, eval Evaluator) (Result, error) {
 	return Result{Iterations: cfg.Iterations, CorpusSize: len(corpus), Markers: len(global), Best: best}, nil
 }
 
-// RunBlind は比較用のベースライン：corpus フィードバック無しのランダム探索。
+// RunBlind is the baseline for comparison: random search with no corpus feedback.
 func RunBlind(cfg Config, eval Evaluator) (Result, error) {
 	rng := rand.New(rand.NewSource(cfg.Seed))
 	global := map[uint64]bool{}

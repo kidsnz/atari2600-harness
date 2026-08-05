@@ -7,15 +7,15 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
 
-// TestFitWrapAndSaturation は折返し（160）と左端飽和の混じった点列でも傾きを正しく復元することを確認する。
+// TestFitWrapAndSaturation checks that the slope is recovered correctly even from a point series mixing wraparound (160) and left-edge saturation.
 func TestFitWrapAndSaturation(t *testing.T) {
 	var pts []Point
 	for d := 2; d <= 11; d++ {
 		pts = append(pts, Point{Delay: d, X: 15*d - 18}) // 12,27,...,147
 	}
-	pts = append(pts, Point{Delay: 12, X: (15*12 - 18) % 160}) // 162 -> 2（折返し）
-	pts = append(pts, Point{Delay: 13, X: 3})                  // 飽和
-	pts = append(pts, Point{Delay: 14, X: 3})                  // 飽和
+	pts = append(pts, Point{Delay: 12, X: (15*12 - 18) % 160}) // 162 -> 2 (wraparound)
+	pts = append(pts, Point{Delay: 13, X: 3})                  // saturated
+	pts = append(pts, Point{Delay: 14, X: 3})                  // saturated
 
 	r, err := Fit(pts, 5)
 	if err != nil {
@@ -33,14 +33,15 @@ func TestFitWrapAndSaturation(t *testing.T) {
 }
 
 func TestFitDegenerate(t *testing.T) {
-	pts := []Point{{2, 50}, {3, 50}, {4, 50}} // 動かない
+	pts := []Point{{2, 50}, {3, 50}, {4, 50}} // no movement
 	if _, err := Fit(pts, 5); err == nil {
 		t.Errorf("expected error for no movement")
 	}
 }
 
-// TestSweepFitLitmus は実機検証済み litmus_pos を掃引フィットし、横位置の傾きが 3 px/CPU-cycle
-// （権威値, docs/litmus-results.md）になることを実 ROM で再現する（B-4 の本旨＝再現可能化）。
+// TestSweepFitLitmus sweep-fits the hardware-verified litmus_pos and reproduces on a real ROM
+// that the horizontal-position slope is 3 px/CPU-cycle (authoritative value,
+// docs/litmus-results.md) — the whole point of B-4: making the calibration reproducible.
 func TestSweepFitLitmus(t *testing.T) {
 	t.Chdir("../..")
 	e, err := emu.New("NTSC")

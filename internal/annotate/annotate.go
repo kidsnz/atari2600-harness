@@ -1,9 +1,11 @@
-// Package annotate は捕捉フレーム（160×可視高さ）に TIA 実座標のグリッド・軸ラベル・
-// スプライト位置マーカーを重ね、人間可読サイズに拡大した画像を作る。
+// Package annotate overlays a captured frame (160 x visible height) with a grid in real TIA
+// coordinates, axis labels, and sprite position markers, and produces an image upscaled to a
+// human-readable size.
 //
-// これは Claude 専用の補助ではなく**ユーザー↔Claude の通信回線**。ユーザーが画像を見て
-// 「P0 を clock 80 へ」と指示でき、その clock 値が register 操作へ直結するよう、グリッドは
-// TIA 実座標（横 clock 0..159 / 縦 可視 scanline）で校正する。
+// This is not a Claude-only aid but **the user↔Claude communication channel**. So that the user
+// can look at the image and say "move P0 to clock 80" and that clock value maps directly onto
+// register operations, the grid is calibrated to real TIA coordinates (horizontal clock 0..159 /
+// vertical visible scanlines).
 package annotate
 
 import (
@@ -17,14 +19,14 @@ import (
 	"golang.org/x/image/font/basicfont"
 )
 
-// Marker は 1 オブジェクトの横位置マーカー。Clock は可視 0..159（HmovedPixel）。負なら描かない。
+// Marker is the horizontal position marker for one object. Clock is visible 0..159 (HmovedPixel). Negative means it is not drawn.
 type Marker struct {
 	Label string
 	Clock int
 	Col   color.RGBA
-	// S-4: プレイヤーの現在 GRP ビットパターン（0=無し）。Reflect で左右反転、Wide は
-	// ピクセル倍率（NUSIZ 1x/2x/4x）。注釈画像のマーカー位置に「いま GRP に入っている絵」
-	// の 1 行ぶんを実寸で重ねる。
+	// S-4: the player's current GRP bit pattern (0 = none). Reflect mirrors it horizontally,
+	// Wide is the pixel multiplier (NUSIZ 1x/2x/4x). One row of "the picture currently in GRP"
+	// is overlaid at actual size at the marker position in the annotated image.
 	Gfx     uint8
 	Reflect bool
 	Wide    int
@@ -40,38 +42,42 @@ type Marker struct {
 }
 
 const (
-	leftMargin = 30 // y 軸ラベル用
-	topMargin  = 16 // x 軸ラベル用
+	leftMargin = 30 // for y-axis labels
+	topMargin  = 16 // for x-axis labels
 	rightPad   = 10
-	botPad     = 30 // マーカーラベル 2 段用
+	botPad     = 30 // for the two rows of marker labels
 )
 
-// LeftMargin/TopMargin は Render の作図原点（TIA (0,0) が乗る画素位置の算出用に公開）。
+// LeftMargin/TopMargin are Render's drawing origin (exported so the pixel position where TIA (0,0) lands can be computed).
 const (
 	LeftMargin = leftMargin
 	TopMargin  = topMargin
 )
 
 var (
-	// 注意: Go の color.RGBA はアルファ事前乗算。チャネル > アルファ（例 {255,255,255,30}）は
-	// 不正値で、明るい背景上の合成が壊れる（黒背景では偶然無害＝v1.14.1 まで潜伏したバグ）。
-	// 半透明は setLine 側で dc.SetRGBA（非乗算 0..1）を使う。
+	// Note: Go's color.RGBA is alpha-premultiplied. A channel > alpha (e.g. {255,255,255,30}) is
+	// an invalid value and breaks compositing on a bright background (harmless by luck on a black
+	// background = a bug that stayed hidden until v1.14.1).
+	// For translucency, setLine uses dc.SetRGBA (non-premultiplied 0..1) instead.
 	gridMinorA = 30.0 / 255
 	gridMajorA = 70.0 / 255
 	labelCol   = color.RGBA{205, 215, 225, 255}
 )
 
-// GridScanline は画像行 row に対してグリッドが描く y ラベル＝絶対 scanline を返す。
-// GridRow はその逆。この2つが read_row / decompose_row の引数規約の唯一の定義であり、
-// 「スクリーンショットで見えた y をそのまま渡せる」という約束はここ1か所に集約されている。
-// 以前は同じ式が Render と emu.ReadRow に別々に書かれていた（v1.4.0 で一度ズレて修正済み）。
+// GridScanline returns the y label the grid draws for image row `row`, i.e. the absolute
+// scanline. GridRow is its inverse. These two are the single definition of the argument
+// convention for read_row / decompose_row; the promise "you can pass the y you saw in a
+// screenshot as-is" is concentrated in this one place.
+// The same formula used to be written separately in Render and emu.ReadRow (it drifted once and
+// was fixed in v1.4.0).
 func GridScanline(visibleTop, row int) int { return visibleTop + row }
 
-// GridRow は GridScanline の逆変換。
+// GridRow is the inverse transform of GridScanline.
 func GridRow(visibleTop, scanline int) int { return scanline - visibleTop }
 
-// Render は注釈付き画像を返す。scale は整数倍率（×3〜4 推奨）。visibleTop は
-// 縦ラベルを絶対 scanline で出すための起点（クロップ y=0 の絶対 scanline）。
+// Render returns the annotated image. scale is an integer magnification (×3〜4 recommended).
+// visibleTop is the origin for printing the vertical labels as absolute scanlines (the absolute
+// scanline of crop y=0).
 func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.RGBA {
 	fw := frame.Bounds().Dx() // 160
 	fh := frame.Bounds().Dy()
@@ -93,7 +99,7 @@ func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.R
 	left := float64(leftMargin)
 	right := float64(leftMargin + fw*scale)
 
-	// 縦グリッド（clock）。10 刻み・40 ごとに強調＋ラベル。右端 159 もラベル。
+	// Vertical grid lines (clock). Every 10, emphasized + labeled every 40. The right edge, 159, is labeled too.
 	for c := 0; c <= fw; c += 10 {
 		major := c%40 == 0
 		setLine(dc, c == 0 || major)
@@ -107,20 +113,21 @@ func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.R
 	dc.SetColor(labelCol)
 	dc.DrawStringAnchored("159", right, top-4, 0.5, 1)
 
-	// 横グリッド（可視 scanline 行）。20 刻み・40 ごとに強調＋絶対 scanline ラベル。
+	// Horizontal grid lines (visible scanline rows). Every 20, emphasized + labeled with the absolute scanline every 40.
 	for r := 0; r <= fh; r += 20 {
 		major := r%40 == 0
 		setLine(dc, major)
 		dc.DrawLine(left, cy(r), right, cy(r))
 		dc.Stroke()
-		if major && r != 0 { // r=0 は左上の clock ラベルと衝突するため省略
+		if major && r != 0 { // r=0 is omitted because it collides with the top-left clock label
 			dc.SetColor(labelCol)
 			dc.DrawStringAnchored(fmt.Sprintf("%d", GridScanline(visibleTop, r)), left-3, cy(r), 1, 0.5)
 		}
 	}
 
-	// スプライトマーカー（縦線＋数値ラベル）。可視分を clock 順にソートし、順位の偶奇で
-	// ラベルを 2 段に振る＝画面で隣り合うラベルが必ず別段になり重なりを回避。
+	// Sprite markers (vertical line + numeric label). Sort the visible ones by clock and assign
+	// labels to two rows by rank parity = labels adjacent on screen always land on different
+	// rows, avoiding overlap.
 	// An object that drew nothing gets no marker. It still has a position — every TIA
 	// object always does — but a labelled line over a picture that does not contain
 	// the object is a false statement about the ROM, and this image is how the user
@@ -140,7 +147,7 @@ func Render(frame *image.RGBA, visibleTop, scale int, markers []Marker) *image.R
 		dc.Stroke()
 		ly := bottom + 7 + float64((rank%2)*12)
 		dc.DrawStringAnchored(fmt.Sprintf("%s:%d", m.Label, m.Clock), cx(m.Clock), ly, 0.5, 0.5)
-		// S-4: 現在の GRP パターンをマーカー位置の直上に実寸で表示（D7 が最左、REFP は反転）
+		// S-4: show the current GRP pattern at actual size just above the marker position (D7 is leftmost; REFP mirrors it)
 		if m.Gfx != 0 {
 			w := m.Wide
 			if w <= 0 {
@@ -173,7 +180,7 @@ func setLine(dc *gg.Context, major bool) {
 	dc.SetLineWidth(1)
 }
 
-// upscale は nearest-neighbor で整数倍拡大（ピクセルを鮮明に保つ）。
+// upscale performs integer-factor nearest-neighbor scaling (keeps pixels crisp).
 func upscale(src *image.RGBA, scale int) *image.RGBA {
 	b := src.Bounds()
 	dst := image.NewRGBA(image.Rect(0, 0, b.Dx()*scale, b.Dy()*scale))

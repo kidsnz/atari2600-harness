@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""bin/harness の逐次スモークテスト（go-sdk は並行処理なので応答を待ってから次を送ること）。
-使い方: python3 scripts/mcp_smoke.py  （harness/ から実行）"""
+"""Sequential smoke test of bin/harness (the go-sdk is concurrent, so wait for each response before sending the next).
+Usage: python3 scripts/mcp_smoke.py  (run from harness/)"""
 import subprocess, json, sys
 p = subprocess.Popen(["./bin/harness"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
 def call(i, name, args):
@@ -27,7 +27,7 @@ r=call(6,"trace_clocks",{"max_instructions":4})
 assert not r["result"].get("isError"), r
 r=call(7,"run_scenario",{"paths":["roms/litmus/scenarios/hmove_mid.json"]})
 assert r["result"]["structuredContent"]["all_pass"], r
-# U-M9: srcmap — assemble_and_load 経由なら予算超過の at にソース位置が載る
+# U-M9: srcmap — via assemble_and_load, a budget overrun's `at` carries the source location
 r=call(8,"assemble_and_load",{"asm_path":"roms/litmus/litmus_overrun.asm","bin_path":"/tmp/smoke_overrun.bin"})
 assert r["result"]["structuredContent"]["ok"], r
 r=call(9,"assert_line_budget",{"budget":76,"max_frames":2})

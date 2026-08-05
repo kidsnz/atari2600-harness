@@ -1,10 +1,10 @@
-; litmus_pos.asm — 横位置 litmus test 用 ROM（欠落 B の検証）
-; player0 を「WSYNC 同期点から N CPU サイクル後に RESP0 ストローブ」で位置決めする。
-; 遅延ユニットは RAM $80 で外部から poke 可能 → 再アセンブル無しで N をスイープできる。
+; litmus_pos.asm — horizontal-position litmus test ROM (verification of gap B)
+; Positions player0 by "strobe RESP0 N CPU cycles after the WSYNC sync point".
+; The delay units live in RAM $80, poke-able from outside -> N can be swept without reassembling.
 ;
-; 粗調整ループ: 1 反復 = SBC(2) + BCS(3) = 5 CPU サイクル = 15 カラークロック = 15px。
-; よって $80 を 1 増やすと ResetPixel が 15px 動く想定。これをハーネスの read_tia で実測検証。
-; HMOVE は使わない（HMCLR で動きレジスタを 0 に）。微調整(±1px)の HMOVE 検証は次段。
+; Coarse-adjust loop: 1 iteration = SBC(2) + BCS(3) = 5 CPU cycles = 15 color clocks = 15px.
+; So incrementing $80 by 1 should move ResetPixel by 15px. Measured with the harness's read_tia.
+; HMOVE is not used (HMCLR zeroes the motion registers). HMOVE verification of fine adjust (±1px) is the next stage.
 
         processor 6502
 
@@ -18,7 +18,7 @@ RESP0   = $10
 HMCLR   = $2B
 GRP0    = $1B
 
-DELAY   = $80           ; 粗調整ループ回数（poke で書き換える）
+DELAY   = $80           ; coarse-adjust loop count (rewritten via poke)
 
         org $F000
 
@@ -34,13 +34,13 @@ ClearMem:
         bne ClearMem
 
         lda #6
-        sta DELAY       ; 初期遅延ユニット（後で poke で上書き）
+        sta DELAY       ; initial delay units (overwritten later via poke)
         lda #$0E
-        sta COLUP0      ; player0 白
+        sta COLUP0      ; player0 white
         lda #$FF
-        sta GRP0        ; player0 全点灯（8px 幅）
+        sta GRP0        ; player0 all pixels lit (8px wide)
         lda #0
-        sta NUSIZ0      ; 標準サイズ・1コピー
+        sta NUSIZ0      ; standard size, 1 copy
 
 MainLoop:
 ; --- VSYNC: 3 lines ---
@@ -53,25 +53,25 @@ MainLoop:
         lda #0
         sta VSYNC
 
-; --- VBLANK: 37 lines。最後のラインで player0 を位置決め ---
+; --- VBLANK: 37 lines. Position player0 on the last line ---
         ldx #37
 VBlankLoop:
         sta WSYNC
         dex
         bne VBlankLoop
 
-        ; ---- 位置決めカーネル ----
-        ; WSYNC で次ラインの先頭（HBLANK 開始）にビームを合わせる
-        sta WSYNC               ; 同期点
-        sta HMCLR               ; 動きレジスタ 0（3）
-        lda DELAY               ; 遅延ユニット取得（3, zp）
-        sec                     ; キャリーセット（2）
+        ; ---- positioning kernel ----
+        ; WSYNC aligns the beam to the start of the next line (HBLANK start)
+        sta WSYNC               ; sync point
+        sta HMCLR               ; motion registers to 0 (3)
+        lda DELAY               ; fetch delay units (3, zp)
+        sec                     ; set carry (2)
 DelayLoop:
         sbc #1                  ; 2
-        bcs DelayLoop           ; 3（taken,同ページ）→ 1反復5サイクル
-        sta RESP0               ; player0 位置確定ストローブ（3）
+        bcs DelayLoop           ; 3 (taken, same page) -> 5 cycles per iteration
+        sta RESP0               ; player0 position-latch strobe (3)
         lda #0
-        sta VBLANK              ; 可視へ
+        sta VBLANK              ; into visible
 
 ; --- Visible: 192 lines ---
         ldx #192

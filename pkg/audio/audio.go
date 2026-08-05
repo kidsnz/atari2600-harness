@@ -1,7 +1,7 @@
-// Package audio は Atari 2600 TIA 音声の普遍知識（公開・再利用可）。
-// 出典: Paul Slocum "Atari 2600 Music And Sound Programming Guide" v1.02（権威・ローカル保有）、
-// Eckhard Stolberg "frequency and waveform guide"、Stella Programmer's Guide。
-// 検証: harness の audio capture（生サンプル→周期測定, internal/emu）で数値裏取り（V2-14/15）。
+// Package audio holds universal knowledge of Atari 2600 TIA sound (public, reusable).
+// Source: Paul Slocum "Atari 2600 Music And Sound Programming Guide" v1.02 (authoritative, held locally),
+// Eckhard Stolberg "frequency and waveform guide", Stella Programmer's Guide.
+// Verification: numbers cross-checked with the harness audio capture (raw samples -> period measurement, internal/emu) (V2-14/15).
 package audio
 
 import (
@@ -10,12 +10,12 @@ import (
 	"strings"
 )
 
-// BaseClockNTSC は TIA 音声クロック（Hz）。カラークロック/114 = 2 サンプル/scanline。
+// BaseClockNTSC is the TIA audio clock (Hz). Color clock/114 = 2 samples/scanline.
 const BaseClockNTSC = 3579545.0 / 114.0 // ≈ 31399.5
-// BaseClockPAL は PAL の音声クロック（≈13 セント低い）。
+// BaseClockPAL is the PAL audio clock (≈13 cents lower).
 const BaseClockPAL = 3546894.0 / 114.0 // ≈ 31113.1
 
-// Name は AUDC 値の通称（Slocum 命名）。重複は正準値の名を返す。
+// Name is the common name of an AUDC value (Slocum's naming). Duplicates return the canonical value's name.
 func Name(audc int) string {
 	switch Canonical(audc) {
 	case 0:
@@ -44,10 +44,10 @@ func Name(audc int) string {
 	return "unknown"
 }
 
-// Canonical は重複 AUDC（{0,11} {4,5} {6,10} {7,9} {12,13}）を正準値へ畳む。
-// 注（V2-14 実測, Gopher2600）: {0,11} {4,5} {12,13} は【サンプル一致】の完全重複。
-// {6,10} と {7,9} は【同調律・同周期だが波形が論理反転】（hi/lo が相補）＝耳には同じ、サンプル列は別。
-// 文書（Stolberg/Slocum）の「重複」は調律の意味では正しいが、サンプル単位では2種類に分かれる。
+// Canonical folds duplicate AUDC values ({0,11} {4,5} {6,10} {7,9} {12,13}) into the canonical value.
+// Note (V2-14 measured, Gopher2600): {0,11} {4,5} {12,13} are complete duplicates [sample-identical].
+// {6,10} and {7,9} are [same tuning and period but logically inverted waveforms] (hi/lo complementary) = identical to the ear, different sample sequences.
+// The documents' (Stolberg/Slocum) "duplicates" are correct in the tuning sense, but at the sample level they split into two kinds.
 func Canonical(audc int) int {
 	switch audc & 0x0F {
 	case 11:
@@ -64,8 +64,8 @@ func Canonical(audc int) int {
 	return audc & 0x0F
 }
 
-// Divisor は AUDC 波形の繰り返し長 D（音声クロック tick 単位）。周波数 = base/(AUDF+1)/D。
-// 0/11 は DC（無音）= 0。8 はノイズ（511bit poly, 音程感なし）。
+// Divisor is the repeat length D of the AUDC waveform (in audio-clock ticks). Frequency = base/(AUDF+1)/D.
+// 0/11 is DC (silence) = 0. 8 is noise (511-bit poly, no sense of pitch).
 func Divisor(audc int) int {
 	switch Canonical(audc) {
 	case 1:
@@ -86,7 +86,7 @@ func Divisor(audc int) int {
 	return 0
 }
 
-// Freq は (AUDC, AUDF) の基本周波数（Hz）。音程の無いモード（DC/ノイズ）は 0。
+// Freq is the fundamental frequency (Hz) of (AUDC, AUDF). Pitchless modes (DC/noise) return 0.
 func Freq(audc, audf int, baseClock float64) float64 {
 	d := Divisor(audc)
 	if d == 0 || Canonical(audc) == 8 {
@@ -95,7 +95,7 @@ func Freq(audc, audf int, baseClock float64) float64 {
 	return baseClock / float64(audf+1) / float64(d)
 }
 
-// PeriodSamples は (AUDC, AUDF) の理論周期（サンプル数=音声クロック tick 数）。
+// PeriodSamples is the theoretical period of (AUDC, AUDF) (in samples = audio-clock ticks).
 func PeriodSamples(audc, audf int) int {
 	d := Divisor(audc)
 	if d == 0 {
@@ -104,8 +104,9 @@ func PeriodSamples(audc, audf int) int {
 	return (audf + 1) * d
 }
 
-// MeasurePeriod は生サンプル列から支配的な繰り返し周期（サンプル数）を測る（矩形波系向け:
-// 値の遷移間隔の平均×2）。遷移が 3 未満なら 0（無音/DC）。
+// MeasurePeriod measures the dominant repeat period (in samples) from a raw sample sequence
+// (for square-wave-like signals: mean interval between value transitions x 2). Fewer than 3
+// transitions returns 0 (silence/DC).
 func MeasurePeriod(samples []uint8) float64 {
 	if len(samples) < 4 {
 		return 0
@@ -119,14 +120,14 @@ func MeasurePeriod(samples []uint8) float64 {
 	if len(transitions) < 3 {
 		return 0
 	}
-	// 遷移間隔の平均 = 半周期
+	// mean transition interval = half period
 	first, last := transitions[0], transitions[len(transitions)-1]
 	half := float64(last-first) / float64(len(transitions)-1)
 	return half * 2
 }
 
-// IsPeriodic は samples が厳密に period で繰り返すか（s[i]==s[i+period]）を最低 minPeriods 周期ぶん検査する。
-// poly 波形（saw/pitfall/engine 等＝遷移が多く MeasurePeriod が使えない波形）の周期検証はこちらを使う。
+// IsPeriodic checks that samples repeat exactly with the given period (s[i]==s[i+period]) for at least minPeriods periods.
+// Use this to verify the period of poly waveforms (saw/pitfall/engine etc. = too many transitions for MeasurePeriod).
 func IsPeriodic(samples []uint8, period, minPeriods int) bool {
 	if period <= 0 || len(samples) < period*(minPeriods+1) {
 		return false
@@ -140,14 +141,14 @@ func IsPeriodic(samples []uint8, period, minPeriods int) bool {
 	return true
 }
 
-// NoteByte は Sequencer Kit / slocum-tracker 互換の音符バイト（上位3bit=音色 idx, 下位5bit=AUDF）。
-// idx は soundTypeArray のインデックス（既定: 4,6,7,8,15,12,1,3）。$FF は休符。
-// 形式固有の曖昧さ: (idx=7, AUDF=31) は $FF＝休符と衝突するため使用不可（フォーマットの仕様）。
+// NoteByte is a Sequencer Kit / slocum-tracker compatible note byte (upper 3 bits = sound-type idx, lower 5 bits = AUDF).
+// idx is an index into soundTypeArray (default: 4,6,7,8,15,12,1,3). $FF is a rest.
+// Format-specific ambiguity: (idx=7, AUDF=31) collides with $FF = rest and is therefore unusable (a property of the format).
 func NoteByte(soundTypeIdx, audf int) uint8 {
 	return uint8((soundTypeIdx&0x07)<<5 | (audf & 0x1F))
 }
 
-// DecodeNoteByte は音符バイトを (音色 idx, AUDF) に戻す。$FF は (-1, -1)（休符）。
+// DecodeNoteByte converts a note byte back to (sound-type idx, AUDF). $FF is (-1, -1) (rest).
 func DecodeNoteByte(b uint8) (soundTypeIdx, audf int) {
 	if b == 0xFF {
 		return -1, -1
@@ -155,7 +156,7 @@ func DecodeNoteByte(b uint8) (soundTypeIdx, audf int) {
 	return int(b >> 5), int(b & 0x1F)
 }
 
-// --- 音名 → TIA（R7: 作曲セッション支援）---
+// --- Note name -> TIA (R7: composition-session support) ---
 
 var noteOffsets = map[string]int{
 	"C": -9, "C#": -8, "DB": -8, "D": -7, "D#": -6, "EB": -6, "E": -5,
@@ -163,7 +164,7 @@ var noteOffsets = map[string]int{
 	"A#": 1, "BB": 1, "B": 2,
 }
 
-// NoteFreq は 12 平均律の音名（"C4", "F#3", "Bb2" 等, A4=440Hz）を周波数へ。
+// NoteFreq converts a 12-tone equal-temperament note name ("C4", "F#3", "Bb2" etc., A4=440Hz) to a frequency.
 func NoteFreq(name string) (float64, error) {
 	n := strings.ToUpper(strings.TrimSpace(name))
 	if len(n) < 2 {
@@ -183,8 +184,8 @@ func NoteFreq(name string) (float64, error) {
 	return 440.0 * math.Pow(2, semis/12.0), nil
 }
 
-// FindNote は音名に最も近い (AUDC, AUDF) を返す（セント誤差つき）。
-// types を空にすると実用音色 {4(square), 6(bass), 7(buzz), 12(lead)} から探す。
+// FindNote returns the (AUDC, AUDF) closest to a note name (with the error in cents).
+// If types is empty, it searches the practical sound types {4(square), 6(bass), 7(buzz), 12(lead)}.
 func FindNote(name string, types []int, baseClock float64) (audc, audf int, cents float64, err error) {
 	target, err := NoteFreq(name)
 	if err != nil {
@@ -209,15 +210,16 @@ func FindNote(name string, types []int, baseClock float64) (audc, audf int, cent
 	return audc, audf, best, nil
 }
 
-// NearestNote は周波数に最も近い 12 平均律の音名（"D6" 等, A4=440Hz）とセント誤差を返す
-// （FindNote の逆方向＝採譜用）。freq<=0 は無音として空文字を返す。
+// NearestNote returns the 12-tone equal-temperament note name closest to a frequency
+// ("D6" etc., A4=440Hz) and the error in cents (the inverse of FindNote = for transcription).
+// freq<=0 is treated as silence and returns the empty string.
 func NearestNote(freq float64) (name string, cents float64) {
 	if freq <= 0 {
 		return "", 0
 	}
-	semis := 12 * math.Log2(freq/440.0) // A4 からの半音数
+	semis := 12 * math.Log2(freq/440.0) // semitones from A4
 	n := int(math.Round(semis))
-	idx := n + 57 // C0 起点の半音インデックス（A4 = 57）
+	idx := n + 57 // semitone index from C0 (A4 = 57)
 	if idx < 0 {
 		idx = 0
 		n = -57
@@ -227,16 +229,16 @@ func NearestNote(freq float64) (name string, cents float64) {
 	return fmt.Sprintf("%s%d", names[idx%12], idx/12), 1200 * math.Log2(freq/exact)
 }
 
-// --- SFX ヘルパ（U-M2: 効果音をフレーム列として生成・数値検証可能） ---
+// --- SFX helpers (U-M2: generate sound effects as frame sequences, numerically verifiable) ---
 
-// SFXFrame は 1 フレームぶんの音声レジスタ指定。
+// SFXFrame is the audio-register specification for one frame.
 type SFXFrame struct {
-	C uint8 // AUDC（音色）
-	F uint8 // AUDF（分周）
-	V uint8 // AUDV（音量）
+	C uint8 // AUDC (sound type)
+	F uint8 // AUDF (frequency divider)
+	V uint8 // AUDV (volume)
 }
 
-// PitchSweep は AUDF を fStart→fEnd へ線形補間するスイープ（fEnd 大=下降音）。
+// PitchSweep is a sweep that linearly interpolates AUDF from fStart to fEnd (larger fEnd = descending pitch).
 func PitchSweep(audc, fStart, fEnd, vol, frames int) []SFXFrame {
 	out := make([]SFXFrame, frames)
 	for i := range out {
@@ -249,7 +251,7 @@ func PitchSweep(audc, fStart, fEnd, vol, frames int) []SFXFrame {
 	return out
 }
 
-// NoiseBurst はノイズ（既定 AUDC=8）の減衰バースト。vol→0 へ線形減衰。
+// NoiseBurst is a decaying burst of noise (default AUDC=8). Linear decay from vol to 0.
 func NoiseBurst(audc, audf, vol, frames int) []SFXFrame {
 	out := make([]SFXFrame, frames)
 	for i := range out {
@@ -259,7 +261,7 @@ func NoiseBurst(audc, audf, vol, frames int) []SFXFrame {
 	return out
 }
 
-// Blip は単発の短音。
+// Blip is a single short tone.
 func Blip(audc, audf, vol, frames int) []SFXFrame {
 	out := make([]SFXFrame, frames)
 	for i := range out {
@@ -268,7 +270,7 @@ func Blip(audc, audf, vol, frames int) []SFXFrame {
 	return out
 }
 
-// Arpeggio は AUDF 列を framesPer フレームずつ順に鳴らす（ピックアップ音等）。
+// Arpeggio plays a sequence of AUDF values in order, framesPer frames each (pickup sounds etc.).
 func Arpeggio(audc int, audfs []int, framesPer, vol int) []SFXFrame {
 	var out []SFXFrame
 	for _, f := range audfs {
@@ -277,7 +279,7 @@ func Arpeggio(audc int, audfs []int, framesPer, vol int) []SFXFrame {
 	return out
 }
 
-// EmitSFX は SFX フレーム列を dasm の .byte 表（2バイト/フレーム: AUDC<<4|AUDV, AUDF）へ。
+// EmitSFX converts an SFX frame sequence into a dasm .byte table (2 bytes/frame: AUDC<<4|AUDV, AUDF).
 func EmitSFX(label string, frames []SFXFrame) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: ; %d frames (2 bytes each: AUDC<<4|AUDV, AUDF)\n", label, len(frames))

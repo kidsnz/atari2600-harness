@@ -16,21 +16,21 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/scenario"
 )
 
-// Mutation は ROM の 1 バイトを Value に書き換える故障注入。
+// Mutation is a fault injection that rewrites one ROM byte to Value.
 type Mutation struct {
 	Offset int
 	Value  byte
 }
 
-// Result は 1 つの mutant の評価結果。
+// Result is the evaluation result of one mutant.
 type Result struct {
 	Mutation Mutation
 	OrigByte byte
-	Killed   bool   // scenario 集合の少なくとも1つが fail / 実行不能（＝検査が捕まえた）
-	By       string // killed したシナリオのパス（survived なら空）
+	Killed   bool   // at least one of the scenario set failed / could not run (= the checks caught it)
+	By       string // path of the scenario that killed it (empty if survived)
 }
 
-// writeMutant は base をコピーして Offset のバイトを Value にした一時ファイルを作る。
+// writeMutant copies base and writes a temp file with the byte at Offset set to Value.
 func writeMutant(base []byte, m Mutation, dir string) (string, error) {
 	b := make([]byte, len(base))
 	copy(b, base)
@@ -39,8 +39,9 @@ func writeMutant(base []byte, m Mutation, dir string) (string, error) {
 	return p, os.WriteFile(p, b, 0o644)
 }
 
-// EvalOne は 1 つの mutation を全シナリオに評価し、どれかが fail/実行不能なら killed とする。
-// scenario の Rom は mutant の .bin に差し替える（元が .asm でもコンパイル後を変異させられる）。
+// EvalOne evaluates one mutation against all scenarios; killed if any of them fails or cannot
+// run. The scenario's Rom is swapped for the mutant's .bin (so even if the original is a .asm,
+// the post-assembly image can be mutated).
 func EvalOne(base []byte, m Mutation, scenarioPaths []string, dir string) (Result, error) {
 	res := Result{Mutation: m, OrigByte: base[m.Offset]}
 	mp, err := writeMutant(base, m, dir)
@@ -54,11 +55,11 @@ func EvalOne(base []byte, m Mutation, scenarioPaths []string, dir string) (Resul
 		}
 		s.Rom = mp
 		r, runErr := scenario.Run(s, false)
-		if runErr != nil { // mutant が実行不能＝検出された（kill）
+		if runErr != nil { // mutant could not run = detected (kill)
 			res.Killed, res.By = true, sp+" (run error)"
 			return res, nil
 		}
-		if !r.Pass { // どれかのアサーションが落ちた＝kill
+		if !r.Pass { // some assertion failed = kill
 			res.Killed, res.By = true, sp
 			return res, nil
 		}
@@ -66,8 +67,8 @@ func EvalOne(base []byte, m Mutation, scenarioPaths []string, dir string) (Resul
 	return res, nil
 }
 
-// EvalRandom は seed から count 個のランダム mutation（既存値と異なるバイト）を生成・評価する。
-// 戻りの Result 列から kill 率＝検査スイートの強さが分かる。
+// EvalRandom generates and evaluates count random mutations from seed (bytes differing from the
+// existing value). The returned Result slice yields the kill rate = the strength of the check suite.
 func EvalRandom(romPath string, count int, seed int64, scenarioPaths []string) ([]Result, error) {
 	base, err := os.ReadFile(romPath)
 	if err != nil {
@@ -87,7 +88,7 @@ func EvalRandom(romPath string, count int, seed int64, scenarioPaths []string) (
 	for i := 0; i < count; i++ {
 		off := rng.Intn(len(base))
 		val := byte(rng.Intn(256))
-		if val == base[off] { // 必ず実際に変化させる
+		if val == base[off] { // always force an actual change
 			val ^= 0xFF
 		}
 		r, err := EvalOne(base, Mutation{Offset: off, Value: val}, scenarioPaths, dir)
@@ -99,9 +100,10 @@ func EvalRandom(romPath string, count int, seed int64, scenarioPaths []string) (
 	return out, nil
 }
 
-// CoveredOffsets は romPath を frames フレーム実行（PC カバレッジ有効）し、実際に命令を
-// 実行した ROM ファイルオフセットの集合を返す（VV-11）。アドレス→オフセットは ROM 長の
-// マスク（2の冪）で写す。命令フェッチは必ず ROM 空間なので安全。
+// CoveredOffsets runs romPath for frames frames (with PC coverage enabled) and returns the set
+// of ROM file offsets where instructions actually executed (VV-11). Address → offset is mapped
+// via a mask of the ROM length (a power of two). Instruction fetches are always in ROM space, so
+// this is safe.
 func CoveredOffsets(romPath, spec string, frames int) (map[int]bool, error) {
 	base, err := os.ReadFile(romPath)
 	if err != nil {
@@ -143,10 +145,11 @@ func CoveredOffsets(romPath, spec string, frames int) (map[int]bool, error) {
 	return out, nil
 }
 
-// EvalRandomCovered は coverage-filtered mutation testing（VV-11）。EvalRandom と違い、
-// 故障注入を「実際に実行されたコード」のオフセットだけに限定する＝**正直な kill 率**。
-// 一度も実行されないコード（デッドパディング等）の mutant は原理上 kill 不能で、ナイーブな
-// kill 率を不当に下げる。frames は covered 集合を作る基準実行のフレーム数。
+// EvalRandomCovered is coverage-filtered mutation testing (VV-11). Unlike EvalRandom, it
+// restricts fault injection to offsets of "code that actually executed" = the **honest kill
+// rate**. A mutant in code that never runs (dead padding etc.) is unkillable in principle and
+// unfairly drags down the naive kill rate. frames is the frame count of the baseline run that
+// builds the covered set.
 func EvalRandomCovered(romPath string, count int, seed int64, scenarioPaths []string, frames int) ([]Result, error) {
 	base, err := os.ReadFile(romPath)
 	if err != nil {
@@ -188,7 +191,7 @@ func EvalRandomCovered(romPath string, count int, seed int64, scenarioPaths []st
 	return out, nil
 }
 
-// KillRate は Result 列の kill 率（0.0〜1.0）。
+// KillRate is the kill rate (0.0〜1.0) of a Result slice.
 func KillRate(rs []Result) float64 {
 	if len(rs) == 0 {
 		return 0

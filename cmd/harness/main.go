@@ -1613,18 +1613,18 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 	return result, out, nil
 }
 
-// --- analyze_image: スクリーンショット → TIA データ（ingest パイプライン） ---
+// --- analyze_image: screenshot → TIA data (the ingest pipeline) ---
 
 type AnalyzeImageIn struct {
-	Path  string   `json:"path,omitempty" jsonschema:"ONE screenshot PNG (grade A = Stella F12, unmodified). A flickered object will appear only partially — use paths instead"`  // 解析する PNG（A ランク = Stella F12 無加工）
-	Paths []string `json:"paths,omitempty" jsonschema:"2-3 CONSECUTIVE shots of the same scene. Runs the multi-frame pipeline instead: static/dynamic separation, union tracks, flicker report (the multi field). The only way to analyse a multiplexed or flickered sprite"`  // 複数枚（同一シーンの連続 F12）→ マルチフレーム分離
-	Scale int      `json:"scale,omitempty" jsonschema:"integer zoom for the returned TIA-grid overlay image (default 3)"`  // overlay の拡大率（既定 3）
+	Path  string   `json:"path,omitempty" jsonschema:"ONE screenshot PNG (grade A = Stella F12, unmodified). A flickered object will appear only partially — use paths instead"`  // PNG to analyze (grade A = unmodified Stella F12)
+	Paths []string `json:"paths,omitempty" jsonschema:"2-3 CONSECUTIVE shots of the same scene. Runs the multi-frame pipeline instead: static/dynamic separation, union tracks, flicker report (the multi field). The only way to analyse a multiplexed or flickered sprite"`  // multiple shots (consecutive F12 of the same scene) → multi-frame separation
+	Scale int      `json:"scale,omitempty" jsonschema:"integer zoom for the returned TIA-grid overlay image (default 3)"`  // overlay zoom factor (default 3)
 }
 
 type AnalyzeImageOut struct {
-	Report      *ingest.Report      `json:"report"`          // 単一フレーム or 静的層の解析
-	Multi       *ingest.MultiReport `json:"multi,omitempty"` // 複数枚のとき: フレーム毎+union+flicker
-	OverlayPath string              `json:"overlay_path"`    // グリッド付きオーバーレイの固定パス（毎回上書き）
+	Report      *ingest.Report      `json:"report"`          // single-frame analysis, or the static layer
+	Multi       *ingest.MultiReport `json:"multi,omitempty"` // when multiple shots: per-frame + union + flicker
+	OverlayPath string              `json:"overlay_path"`    // fixed path of the grid overlay (overwritten every call)
 }
 
 func handleAnalyzeImage(ctx context.Context, req *mcp.CallToolRequest, in AnalyzeImageIn) (*mcp.CallToolResult, AnalyzeImageOut, error) {
@@ -1693,16 +1693,16 @@ func handleAnalyzeImage(ctx context.Context, req *mcp.CallToolRequest, in Analyz
 	return result, AnalyzeImageOut{Report: rep, Multi: multi, OverlayPath: ovPath}, nil
 }
 
-// --- run_scenario: 回帰シナリオを live ループから実行 ---
+// --- run_scenario: run regression scenarios from the live loop ---
 
 type RunScenarioIn struct {
-	Paths []string `json:"paths"` // scenario JSON のパス（複数可）
+	Paths []string `json:"paths"` // scenario JSON path(s)
 }
 
 type ScenarioResult struct {
 	Path   string   `json:"path"`
 	Pass   bool     `json:"pass"`
-	Detail []string `json:"detail,omitempty"` // 失敗アサーションの説明
+	Detail []string `json:"detail,omitempty"` // descriptions of the failed assertions
 }
 
 type RunScenarioOut struct {
@@ -1738,7 +1738,7 @@ func handleRunScenario(ctx context.Context, req *mcp.CallToolRequest, in RunScen
 	return nil, out, nil
 }
 
-// --- analyze_screen: 現在のエミュレータフレームに ingest を直接適用（ファイル不要） ---
+// --- analyze_screen: apply ingest directly to the current emulator frame (no file needed) ---
 
 type AnalyzeScreenIn struct {
 	Scale int `json:"scale,omitempty"`
@@ -1780,19 +1780,19 @@ func handleAnalyzeScreen(ctx context.Context, req *mcp.CallToolRequest, in Analy
 	return result, AnalyzeImageOut{Report: rep, OverlayPath: ovPath}, nil
 }
 
-// --- watch_ram: RAM 変化トラップ ---
+// --- watch_ram: RAM-change trap ---
 
 type WatchRAMIn struct {
-	Addr      int `json:"addr"`                 // 監視する RAM アドレス（$80-$FF）
-	MaxFrames int `json:"max_frames,omitempty"` // 打ち切り（既定 60）
+	Addr      int `json:"addr"`                 // RAM address to watch ($80-$FF)
+	MaxFrames int `json:"max_frames,omitempty"` // cutoff (default 60)
 }
 
 type WatchRAMOut struct {
 	Changed bool   `json:"changed"`
 	Old     int    `json:"old"`
 	New     int    `json:"new"`
-	PC      string `json:"pc,omitempty"` // 変化を起こした命令のアドレス
-	At      string `json:"at,omitempty"` // 同・ソース位置（assemble_and_load 経由時のみ）
+	PC      string `json:"pc,omitempty"` // address of the instruction that caused the change
+	At      string `json:"at,omitempty"` // its source location (only when loaded via assemble_and_load)
 	Coords  Coords `json:"coords"`
 }
 
@@ -1819,10 +1819,10 @@ func handleWatchRAM(ctx context.Context, req *mcp.CallToolRequest, in WatchRAMIn
 	return nil, out, nil
 }
 
-// --- trace_clocks: 命令毎のビーム解剖（step_clock の観測版） ---
+// --- trace_clocks: per-instruction beam anatomy (the observation-only version of step_clock) ---
 
 type TraceClocksIn struct {
-	MaxInstructions int `json:"max_instructions,omitempty"` // 既定 16
+	MaxInstructions int `json:"max_instructions,omitempty"` // default 16
 }
 
 type TraceClocksOut struct {

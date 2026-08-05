@@ -1,7 +1,8 @@
-// Package srcmap は DASM のリスティング（-l）とシンボル表（-s）から
-// 「PC → ソース行・直近ラベル+オフセット」の対応を作る（U-M9: ソース行デバッグ）。
-// assemble_and_load 経由でロードした ROM に対し、trace_clocks / watch_ram /
-// assert_line_budget / read_cpu の出力へ `at Label+2 (file.asm:123)` を併記するための基盤。
+// Package srcmap builds a "PC → source line / nearest label+offset" mapping from DASM's
+// listing (-l) and symbol table (-s) (U-M9: source-line debugging).
+// It is the foundation for printing `at Label+2 (file.asm:123)` alongside the output of
+// trace_clocks / watch_ram / assert_line_budget / read_cpu for a ROM loaded via
+// assemble_and_load.
 // Scope, corrected to what the code does (2026-08-04). Map itself is FLAT 2K/4K only:
 // DASM's listing address column is the PHYSICAL ROM OFFSET rather than the RORG'd CPU
 // address, so on a banked image Parse drops bank 0's rows entirely (they are below
@@ -24,13 +25,13 @@ import (
 	"strings"
 )
 
-// Map は 1 本の .asm に対する PC 対応表。
+// Map is the PC mapping table for a single .asm file.
 type Map struct {
-	File   string // 表示用ファイル名（ベース名）
+	File   string // file name for display (base name)
 	lines  map[uint16]int
-	labels []label           // アドレス昇順・ROM 域（$1000+）のみ＝Locate 用
-	syms   map[string]uint16 // 全シンボル（RAM equate 含む）＝Symbol 用（watch/patch のシンボル解決）
-	bank   *BankMap          // バンク切替イメージのときだけ非 nil（AttachBanked）
+	labels []label           // ascending by address, ROM range ($1000+) only = for Locate
+	syms   map[string]uint16 // all symbols (incl. RAM equates) = for Symbol (symbol resolution for watch/patch)
+	bank   *BankMap          // non-nil only for a bank-switched image (AttachBanked)
 }
 
 // AttachBanked gives this Map a per-bank companion. Callers that know the image is
@@ -78,7 +79,7 @@ type label struct {
 var lstRe = regexp.MustCompile(`^\s*(\d+)\s+([0-9a-fA-F]{4})\s`)
 var symRe = regexp.MustCompile(`^(\S+)\s+([0-9a-fA-F]{4})\s*`)
 
-// Parse はリスティングとシンボル表のテキストから Map を作る。
+// Parse builds a Map from the listing and symbol-table text.
 func Parse(lst, sym, asmPath string) *Map {
 	m := &Map{File: filepath.Base(asmPath), lines: map[uint16]int{}}
 	for _, ln := range strings.Split(lst, "\n") {
@@ -91,11 +92,11 @@ func Parse(lst, sym, asmPath string) *Map {
 			continue
 		}
 		addr := uint16(addr64)
-		if addr < 0x1000 { // TIA/RIOT equ 等は除外（コードは $F000 域）
+		if addr < 0x1000 { // exclude TIA/RIOT equ etc. (code lives in the $F000 range)
 			continue
 		}
 		srcLine, _ := strconv.Atoi(g[1])
-		if _, seen := m.lines[addr]; !seen { // 最初の出現（マクロ展開等の重複は先勝ち）
+		if _, seen := m.lines[addr]; !seen { // first occurrence wins (duplicates from macro expansion etc.)
 			m.lines[addr] = srcLine
 		}
 	}
@@ -111,10 +112,10 @@ func Parse(lst, sym, asmPath string) *Map {
 		}
 		addr := uint16(addr64)
 		if _, seen := m.syms[g[1]]; !seen {
-			m.syms[g[1]] = addr // RAM equate（<$1000）も保持＝watch/poke のシンボル解決用
+			m.syms[g[1]] = addr // RAM equates (<$1000) are kept too = for watch/poke symbol resolution
 		}
 		if addr < 0x1000 {
-			continue // Locate の直近ラベル探索は ROM 域のみ（TIA/RIOT equ がコード位置を汚さない）
+			continue // Locate's nearest-label search covers the ROM range only (TIA/RIOT equ must not pollute code locations)
 		}
 		m.labels = append(m.labels, label{addr, g[1]})
 	}
@@ -122,8 +123,8 @@ func Parse(lst, sym, asmPath string) *Map {
 	return m
 }
 
-// Symbol はシンボル表のラベル名からアドレスを返す（patch/watch オプションの symbol 指定用）。
-// ROM ラベルに加え RAM equate（BallRow=$83 等）も引ける。
+// Symbol returns the address for a label name from the symbol table (for the symbol form of the
+// patch/watch options). Besides ROM labels, RAM equates (BallRow=$83 etc.) can be looked up too.
 func (m *Map) Symbol(name string) (uint16, bool) {
 	if m == nil {
 		return 0, false
@@ -132,7 +133,7 @@ func (m *Map) Symbol(name string) (uint16, bool) {
 	return a, ok
 }
 
-// Line は PC に対応するソース行番号（1 起点）を返す。対応が無ければ ok=false。
+// Line returns the source line number (1-based) for a PC. ok=false when there is no mapping.
 func (m *Map) Line(pc uint16) (int, bool) {
 	if m == nil {
 		return 0, false
@@ -141,14 +142,15 @@ func (m *Map) Line(pc uint16) (int, bool) {
 	return ln, ok
 }
 
-// Locate は PC を「Label+off (file:line)」へ。対応が無ければ空文字。
-// ROM ミラー（$F000 域以外の PC）は下位 13bit を $E000|… に正規化せず素朴に直照合のみ。
+// Locate renders a PC as "Label+off (file:line)". Empty string when there is no mapping.
+// ROM mirrors (a PC outside the $F000 range) are matched naively as-is, without normalizing the
+// low 13 bits to $E000|….
 func (m *Map) Locate(pc uint16) string {
 	if m == nil {
 		return ""
 	}
 	line, okLine := m.lines[pc]
-	// 直近の先行ラベル
+	// nearest preceding label
 	best := -1
 	for i, l := range m.labels {
 		if l.addr <= pc {

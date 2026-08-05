@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-// Stolberg のスポット値と式の一致（出典: frequency and waveform guide）。
+// Agreement between Stolberg's spot values and the formula (source: frequency and waveform guide).
 func TestFreqSpotChecks(t *testing.T) {
 	// AUDC=4 (square), AUDF=14 → ≈1047Hz (C6)
 	f := Freq(4, 14, BaseClockNTSC)
 	if math.Abs(f-1046.65) > 1.0 {
 		t.Fatalf("square AUDF14 = %.2f, want ≈1046.65", f)
 	}
-	// AUDC=12 (lead), AUDF=4 → 同じく ≈C6（divider 6: 31399.5/5/6）
+	// AUDC=12 (lead), AUDF=4 → likewise ≈C6 (divider 6: 31399.5/5/6)
 	f2 := Freq(12, 4, BaseClockNTSC)
 	if math.Abs(f2-1046.65) > 1.0 {
 		t.Fatalf("lead AUDF4 = %.2f, want ≈1046.65", f2)
@@ -22,7 +22,7 @@ func TestFreqSpotChecks(t *testing.T) {
 	if math.Abs(f3-2093.3) > 2.0 {
 		t.Fatalf("saw AUDF0 = %.2f, want ≈2093.3", f3)
 	}
-	// PAL は NTSC より低い
+	// PAL is lower than NTSC
 	if Freq(4, 14, BaseClockPAL) >= f {
 		t.Fatal("PAL must be flatter than NTSC")
 	}
@@ -44,7 +44,7 @@ func TestNoteByteRoundtrip(t *testing.T) {
 	for idx := 0; idx < 8; idx++ {
 		for audf := 0; audf < 32; audf++ {
 			if idx == 7 && audf == 31 {
-				continue // $FF=休符と衝突（フォーマット固有の曖昧さ・doc 参照）
+				continue // collides with $FF = rest (format-specific ambiguity, see doc)
 			}
 			b := NoteByte(idx, audf)
 			i2, f2 := DecodeNoteByte(b)
@@ -59,7 +59,7 @@ func TestNoteByteRoundtrip(t *testing.T) {
 }
 
 func TestMeasurePeriodSynthetic(t *testing.T) {
-	// 周期 30（15 high / 15 low）の合成矩形波
+	// synthetic square wave with period 30 (15 high / 15 low)
 	var s []uint8
 	for i := 0; i < 600; i++ {
 		if (i/15)%2 == 0 {
@@ -72,7 +72,7 @@ func TestMeasurePeriodSynthetic(t *testing.T) {
 	if math.Abs(p-30) > 0.5 {
 		t.Fatalf("measured %.2f, want 30", p)
 	}
-	// DC は 0
+	// DC is 0
 	if MeasurePeriod(make([]uint8, 100)) != 0 {
 		t.Fatal("DC must measure 0")
 	}
@@ -87,14 +87,14 @@ func TestNoteFreqAndFind(t *testing.T) {
 	if math.Abs(f-261.63) > 0.1 {
 		t.Fatalf("C4=%f", f)
 	}
-	// C6 は square AUDF14 が ≈1047Hz（既存スポット値と整合）
+	// C6: square AUDF14 is ≈1047Hz (consistent with the existing spot value)
 	c, fr, cents, err := FindNote("C6", []int{4}, BaseClockNTSC)
 	if err != nil || c != 4 || fr != 14 || math.Abs(cents) > 10 {
 		t.Fatalf("C6 -> audc=%d audf=%d cents=%f err=%v", c, fr, cents, err)
 	}
 }
 
-// NearestNote は NoteFreq の逆（往復で音名が戻り、セント誤差 0）。
+// NearestNote is the inverse of NoteFreq (a round trip returns the note name with 0 cents error).
 func TestNearestNoteRoundTrip(t *testing.T) {
 	for _, name := range []string{"C4", "F#3", "D6", "A4", "G5"} {
 		f, err := NoteFreq(name)
@@ -109,14 +109,14 @@ func TestNearestNoteRoundTrip(t *testing.T) {
 			t.Errorf("cents for %s = %f, want 0", name, cents)
 		}
 	}
-	// TIA 実音: AUDC=4 AUDF=12 ≈ D6 +48 cents（G1 ファンファーレの主音）
+	// Actual TIA tone: AUDC=4 AUDF=12 ≈ D6 +48 cents (the main note of the G1 fanfare)
 	name, cents := NearestNote(Freq(4, 12, BaseClockNTSC))
 	if name != "D6" || cents < 40 || cents > 55 {
 		t.Errorf("Freq(4,12) -> %s %+.1f cents, want D6 ≈ +48", name, cents)
 	}
 }
 
-// SFX ヘルパ: スイープは単調・バーストは 0 で終わる・長さが正しい。
+// SFX helpers: the sweep is monotonic, the burst ends at 0, lengths are correct.
 func TestSFXHelpers(t *testing.T) {
 	laser := PitchSweep(4, 4, 20, 12, 12)
 	if len(laser) != 12 {

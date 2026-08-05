@@ -2,9 +2,9 @@ package mutate
 
 import "testing"
 
-// TestEvalRandomKillsSome は smoke.bin にランダム故障を注入すると、smoke シナリオ
-// （ram.0x80==66 ＋ 262 ライン）が少なくとも一部を捕まえる（kill 率 > 0）こと、
-// かつ同一 seed が決定論的（再現可能）であることを確認する。
+// TestEvalRandomKillsSome checks that injecting random faults into smoke.bin gets at least some
+// of them caught by the smoke scenario (ram.0x80==66 plus 262 lines) (kill rate > 0), and that
+// the same seed is deterministic (reproducible).
 func TestEvalRandomKillsSome(t *testing.T) {
 	t.Chdir("../..")
 	scen := []string{"roms/litmus/scenarios/smoke.json"}
@@ -15,7 +15,7 @@ func TestEvalRandomKillsSome(t *testing.T) {
 	if KillRate(rs1) <= 0 {
 		t.Fatalf("expected the suite to catch at least one mutation, kill rate = 0")
 	}
-	// 決定論: 同一 seed は同一結果。
+	// Determinism: same seed, same result.
 	rs2, err := EvalRandom("roms/litmus/smoke.bin", 30, 1, scen)
 	if err != nil {
 		t.Fatal(err)

@@ -1,13 +1,15 @@
-// dissect — 実行トレース × ROM 照合によるアセット抽出（S4, v1.38.0）。
-// 画素解析の上位互換となる「ROM がある時の本命」: 実行中に TIA 描画レジスタへ store された
-// 値列（PC・scanline 付き）を記録し、ROM バイト列の中から一致するテーブル（正順/逆順）を
-// 探して特定する。画面に映った瞬間だけでなく**テーブル全体**（全アニメフレーム等）に到達できる。
+// dissect — asset extraction by matching an execution trace against the ROM (S4, v1.38.0).
+// The superset of pixel analysis and the tool of choice when the ROM is available: records the
+// value sequences stored to the TIA drawing registers during execution (with PC and scanline),
+// then searches the ROM byte stream for a matching table (forward/reversed) to pinpoint it.
+// Reaches the **whole table** (all animation frames etc.), not just what was on screen at the moment.
 //
 //	go run ./cmd/dissect -rom game.bin [-frames 3] [-warmup 150] [-out dir]
-//	                     [-distella path/to/distella]   ; あれば注釈付き逆アセンブルも出力
+//	                     [-distella path/to/distella]   ; if present, also emits an annotated disassembly
 //
-// クリーンルーム方針: 商用 ROM の解析結果は学習・解析専用（inbox/reference 限定、公開リポへ
-// コミットしない）。技として一般化したものだけを自前実装で techniques カタログへ。
+// Clean-room policy: analysis results of commercial ROMs are for study/analysis only (confined to
+// inbox/reference, never committed to the public repo). Only what is generalized into a technique
+// goes into the techniques catalog, in our own implementation.
 package main
 
 import (
@@ -74,7 +76,7 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 		return err
 	}
 
-	// --- 実行トレース: TIA 描画レジスタへの store を記録 ---
+	// --- execution trace: record stores to the TIA drawing registers ---
 	var stores []store
 	startF := e.Coords().Frame
 	for e.Coords().Frame < startF+frames {
@@ -118,7 +120,7 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 		}
 	}
 
-	// --- ストリーム化: レジスタ毎に scanline 連続（gap≤2）の値列へ ---
+	// --- streaming: per register, fold into value sequences of consecutive scanlines (gap≤2) ---
 	type stream struct {
 		reg        string
 		frame      int
@@ -153,7 +155,7 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 		return streams[i].fromL < streams[j].fromL
 	})
 
-	// --- ROM 照合: 値列（と逆順）を ROM から探す ---
+	// --- ROM matching: search the ROM for each value sequence (and its reverse) ---
 	find := func(seq []uint8) (int, bool, bool) { // offset, found, reversed
 		if idx := bytesIndex(romBytes, seq); idx >= 0 {
 			return idx, true, false
@@ -167,7 +169,7 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 		}
 		return -1, false, false
 	}
-	dedup := func(vals []uint8) []uint8 { // 行倍化（連続同値）を 1 つに畳んだ版も試す
+	dedup := func(vals []uint8) []uint8 { // also try a version with row doubling (consecutive equal values) collapsed to one
 		var out []uint8
 		for i, v := range vals {
 			if i == 0 || v != out[len(out)-1] {
@@ -176,7 +178,7 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 		}
 		return out
 	}
-	trim := func(vals []uint8) []uint8 { // 前後の 0（消灯行）を落とした版＝スプライト本体
+	trim := func(vals []uint8) []uint8 { // version with leading/trailing 0s (blank rows) dropped = the sprite body proper
 		a, b := 0, len(vals)
 		for a < b && vals[a] == 0 {
 			a++
@@ -211,10 +213,10 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 	if banked {
 		fmt.Fprintf(&rep, "%s\n", geom.describe(len(romBytes)))
 	}
-	annots := map[int]string{} // ROM offset → 注釈
+	annots := map[int]string{} // ROM offset → annotation
 	for _, st := range streams {
 		fmt.Fprintf(&rep, "\n%s frame%d rows %d-%d (%d values): ", st.reg, st.frame, st.fromL, st.toL, len(st.vals))
-		if c := dedup(trim(st.vals)); len(c) <= 1 { // 全行同値＝テーブルではなく即値（ROM 検索すると偽陽性になる）
+		if c := dedup(trim(st.vals)); len(c) <= 1 { // all rows equal = an immediate, not a table (a ROM search would false-positive)
 			v := uint8(0)
 			if len(c) == 1 {
 				v = c[0]
@@ -263,7 +265,7 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 		}
 	}
 
-	// --- 音声採譜（任意）: レジスタをフレーム粒度でサンプル → jingle 記法へ ---
+	// --- music transcription (optional): sample the audio registers at frame granularity → jingle notation ---
 	if audioN > 0 {
 		music, err := transcribe(rom, audioN)
 		if err != nil {
@@ -272,7 +274,7 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 		rep.WriteString(music)
 	}
 
-	// --- distella 注釈付き逆アセンブル（任意・2K/4K のみ）---
+	// --- distella annotated disassembly (optional; 2K/4K only) ---
 	if distella != "" && banked {
 		fmt.Fprintf(&rep, "\n(distella annotation skipped: DiStella v2.10 supports 2K/4K only; this is a %dK banked cart)\n",
 			len(romBytes)/1024)
@@ -280,8 +282,9 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 	}
 	if distella != "" {
 		if outAsm, err := exec.Command(distella, "-a", rom).Output(); err == nil {
-			// 注釈先＝「対象アドレス以下で最も近いラベル行」。テーブルは基準オフセット参照
-			// されがちで一致開始アドレス自体にラベルが立たないことが多いため。
+			// Annotation target = the nearest label line at or below the target address.
+			// Tables tend to be referenced from a base offset, so the match's start
+			// address itself often carries no label.
 			lines := strings.Split(string(outAsm), "\n")
 			type lbl struct {
 				line int
@@ -296,12 +299,12 @@ func run(rom string, warmup, frames int, out, distella string, audioN int) error
 					}
 				}
 			}
-			ins := map[int][]string{} // 行番号 → 挿入コメント
+			ins := map[int][]string{} // line number → comments to insert
 			hits := 0
 			for off, note := range annots {
 				addr := addrOf(off)
 				best := -1
-				for bi, l := range lbls { // distella 出力はアドレス昇順
+				for bi, l := range lbls { // distella output is in ascending address order
 					if l.addr <= addr {
 						best = bi
 					} else {
@@ -416,10 +419,10 @@ func artRow(v uint8) string {
 	return strings.NewReplacer("0", ".", "1", "X").Replace(s)
 }
 
-// transcribe は ROM をリセットから audioN フレーム走らせ、TIA 音声レジスタの状態系列から
-// 各チャンネルのメロディを jingle 記法（"D6:20 R:6 ..."）へ採譜する。
-// レジスタ上は同音の連続（レガート）と 1 音の持続が区別できないため、同音連続は 1 音に併合される
-// （音響的には同一）。
+// transcribe runs the ROM for audioN frames from reset and transcribes each channel's
+// melody into jingle notation ("D6:20 R:6 ...") from the TIA audio-register state series.
+// At the register level a run of repeated identical notes (legato) is indistinguishable from
+// one sustained note, so consecutive identical notes are merged into one (acoustically the same).
 func transcribe(rom string, audioN int) (string, error) {
 	e, err := emu.New("AUTO")
 	if err != nil {
@@ -454,7 +457,7 @@ func transcribe(rom string, audioN int) (string, error) {
 			a := get(st)
 			key := a
 			if a.Volume == 0 {
-				key = emu.AudioChannel{} // 休符は (c,f) を無視して併合
+				key = emu.AudioChannel{} // rests merge regardless of (c,f)
 			}
 			if n := len(evs); n > 0 && evs[n-1].c == key.Control && evs[n-1].f == key.Freq && evs[n-1].v == key.Volume {
 				evs[n-1].frames++
@@ -462,7 +465,7 @@ func transcribe(rom string, audioN int) (string, error) {
 			}
 			evs = append(evs, ev{key.Control, key.Freq, key.Volume, 1})
 		}
-		// 前後の休符をトリム
+		// trim leading/trailing rests
 		for len(evs) > 0 && evs[0].v == 0 {
 			evs = evs[1:]
 		}

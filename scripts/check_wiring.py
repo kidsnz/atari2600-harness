@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
-"""check_wiring.py — 知識の「持ち腐れ」を構造的に防ぐ配線チェック。
+"""check_wiring.py — wiring check that structurally prevents knowledge from rotting unused.
 
-検査は2本立て:
-  ① docs/*.md が入口（CLAUDE.md routing / authoring-protocol.md）から辿れるか。
-  ② roms/litmus/*.asm が「回帰の網」に入っているか＝シナリオ or コード/テストから参照されているか。
-  ③ docs/verified-coverage.md が名指しする ROM が実在し、②の網に入っているか。
+The inspection has three parts:
+  (1) Is every docs/*.md reachable from an entrypoint (CLAUDE.md routing / authoring-protocol.md)?
+  (2) Is every roms/litmus/*.asm inside the "regression net" = referenced by a scenario or by code/tests?
+  (3) Do the ROMs that docs/verified-coverage.md names exist, and are they inside the net of (2)?
 
-②の理由（2026-07-30 実測）: litmus は 91 本あり、42 本にシナリオが無い。うち 40 本は Go テストが
-直接使っているので健全だが、**2 本（cb_roll / litmus_color）はどこからも参照されていなかった**。
-cb_roll はその間に主張が腐った——「cb_clean と画素完全一致」と書いてあったが実測では 192 行中 1 行違う。
-検証用 ROM が誰にも実行されないのは、検証していないのと同じ。
+Reason for (2) (measured 2026-07-30): there are 91 litmus ROMs, 42 with no scenario. 40 of those are
+used directly by Go tests, so they are healthy, but **2 of them (cb_roll / litmus_color) were referenced
+by nothing at all**. In the meantime cb_roll's claim rotted — its header said "pixel-identical to
+cb_clean", but measurement shows 1 of 192 rows differs. A verification ROM that nobody runs is the
+same as not verifying.
 
-ルール（[[knowledge-activation-architecture]]）：harness の知識は**入口から辿れて初めて機能する**。
-`docs/*.md`（公開・英語）が **CLAUDE.md の routing** か **docs/authoring-protocol.md（制作の背骨）** の
-どちらかから参照されていなければ「孤立 doc ＝発火しない持ち腐れ予備軍」とみなして CI を落とす。
-＝「知識を足したら必ず入口に繋ぐ」を機械強制する（provenance/traps lint と同型）。
+Rule ([[knowledge-activation-architecture]]): harness knowledge **only functions once it is reachable
+from an entrypoint**. If a `docs/*.md` (public, English) is referenced by neither **CLAUDE.md's
+routing** nor **docs/authoring-protocol.md (the authoring backbone)**, it is treated as an "orphaned
+doc = knowledge that will never fire" and CI fails.
+= Machine-enforces "when you add knowledge, always wire it to an entrypoint" (same shape as the
+provenance/traps lints).
 
-使い方:
+Usage:
     cd harness && python3 scripts/check_wiring.py
 """
 import glob
@@ -26,26 +29,28 @@ import sys
 
 HARNESS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-# 入口ファイル（ここから辿れれば「配線済み」）。
+# Entrypoint files (reachable from here = "wired").
 ENTRYPOINTS = ["CLAUDE.md", os.path.join("docs", "authoring-protocol.md")]
-# 入口自身・索引/履歴系は対象外（参照する側）。
+# The entrypoints themselves and index/history docs are exempt (they are the referencing side).
 SKIP = {"authoring-protocol.md", "mining-digest.md", "provenance.md"}
 
 
-# 検証 ROM を置くディレクトリ。roms/carts は「TIA でなくカートリッジ形式を検査する」別コーパス
-# （Stella TIA オラクルの対象外＝roms/carts/README.md に理由）。別コーパスにしたことで配線検査から
-# 外れては本末転倒なので、ここで同じ網に入れる。
+# Directories holding verification ROMs. roms/carts is a separate corpus that "inspects cartridge
+# formats rather than the TIA" (outside the Stella TIA oracle's scope = reason in roms/carts/README.md).
+# It would defeat the purpose if making it a separate corpus dropped it out of the wiring check, so it
+# goes into the same net here.
 ROM_DIRS = ["litmus", "carts"]
 
 
 def litmus_orphans():
-    """回帰の網の外にいる検証 ROM を返す。網＝シナリオ or コード/テスト/スクリプトからの参照。"""
+    """Return the verification ROMs outside the regression net. Net = a scenario, or a reference from code/tests/scripts."""
     rom_dirs = [os.path.join(HARNESS, "roms", d) for d in ROM_DIRS]
     rom_dirs = [d for d in rom_dirs if os.path.isdir(d)]
     if not rom_dirs:
         return [], 0, 0, 0
 
-    # 参照側テキストを一度だけ集める（ROM 自身と CHANGELOG は除く＝履歴は「使っている」ではない）。
+    # Collect the referencing-side text once (excluding the ROMs themselves and the CHANGELOG =
+    # history is not "using").
     # THIS FILE IS EXCLUDED, and the reason is a defect it had for ten minutes: the
     # docstring above names cb_roll and litmus_color as examples, the scan read every
     # *.py including this one, and both ROMs came back "referenced". A checker that
@@ -83,13 +88,13 @@ def litmus_orphans():
 
 
 def coverage_doc_roms():
-    """docs/verified-coverage.md が名指しする litmus ROM を返す（表の 2 列目）。
+    """Return the litmus ROMs that docs/verified-coverage.md names (2nd column of the table).
 
-    この表は冒頭で「全項目が litmus ROM で検証され、シナリオで回帰固定され、push ごとに CI で
-    走る」と断言している。実測（2026-07-30）では 35 本中 7 本がシナリオではなく Go テストで
-    守られていた——無防備な項目は 0 だったが、断言のほうが事実と違っていた。ここが検査するのは
-    「表が名指しした ROM が実在し、②の網に入っていること」＝将来この表に、誰も走らせない ROM が
-    書き足されたら落ちる。
+    That table opens by asserting "every entry is verified by a litmus ROM, pinned for regression
+    by a scenario, and runs in CI on every push". Measured (2026-07-30): 7 of the 35 were guarded
+    by a Go test rather than a scenario — zero entries were unguarded, but the assertion itself
+    did not match the facts. What this inspects is "the ROMs the table names exist and are inside
+    the net of (2)" = it fails if a ROM that nobody runs is ever added to this table in the future.
     """
     path = os.path.join(HARNESS, "docs", "verified-coverage.md")
     if not os.path.isfile(path):
@@ -119,7 +124,7 @@ def main():
         fn = os.path.basename(p)
         if fn.endswith(".ja.md") or fn in SKIP:
             continue
-        # ファイル名（拡張子有/無）で参照されているか。
+        # Is it referenced by file name (with or without the extension)?
         if fn in entry_text or fn[:-3] in entry_text:
             continue
         orphans.append("docs/" + fn)

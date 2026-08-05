@@ -1,12 +1,12 @@
 ; multicolor48 — 48px multicolor graphic with per-row color (technique: multicolor48, AA2-209137)
-; 系譜: AtariAge topic/209137（SeaGtGruff の 76cy 多色 48px カーネル）を score6/bitmap48 の
-; 検証済み 6-store 振付に載せた完全形:
-;   ・48px = NUSIZ $03（3 copies close）× P0/P1 ＋ P1 を +8px ＋ VDEL ダブルバッファ。
-;   ・**各行で COLUP0/COLUP1 を ColorTab から書き換え**＝48px 画像が縦方向に多色化。
-;   ・色書き換えは HBLANK 内（最初の GRP0 ストア前）で済ませ、6-store 本体は score6 と同一振付。
-;   ・1 行 = 1 走査線、行内予算 76cy 未満（色 10cy ＋ 6-store）。
-;   ・描く絵 = レインボーのハート（縦に色が変わる＝多色が一目で分かる）。
-;   ・各行の実効色を RAM ミラー（colhi/collo）へ退避＝シナリオが「≥2 色」を数値検証できる。
+; Lineage: AtariAge topic/209137 (SeaGtGruff's 76cy multicolor 48px kernel) mounted on the
+; verified 6-store choreography of score6/bitmap48 — the full form:
+;   - 48px = NUSIZ $03 (3 copies close) on P0/P1 + P1 shifted +8px + VDEL double buffering.
+;   - **COLUP0/COLUP1 rewritten from ColorTab on every row** = the 48px image gains vertical multicolor.
+;   - The color rewrite finishes inside HBLANK (before the first GRP0 store); the 6-store body is the same choreography as score6.
+;   - 1 row = 1 scanline, in-row budget under 76cy (color 10cy + 6-store).
+;   - Picture drawn = a rainbow heart (color changes vertically = multicolor is obvious at a glance).
+;   - Each row's effective color is saved to RAM mirrors (colhi/collo) = a scenario can numerically verify ">=2 colors".
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
@@ -26,14 +26,14 @@ VDELP1  = $26
 HMOVE   = $2A
 HMCLR   = $2B
 
-HEIGHT  = 16        ; 画像の行数
+HEIGHT  = 16        ; number of image rows
 
 row     = $80
 tmp     = $81
-colfst  = $82       ; 先頭行（row=HEIGHT-1）の色ミラー
-collst  = $83       ; 末尾行（row=0）の色ミラー
+colfst  = $82       ; color mirror of the first row (row=HEIGHT-1)
+collst  = $83       ; color mirror of the last row (row=0)
 fcnt    = $84
-p0      = $90       ; 列ポインタ ×6（hi は初期化で固定・1 ページ内）
+p0      = $90       ; column pointers x6 (hi fixed at init, all within one page)
 p1      = $92
 p2      = $94
 p3      = $96
@@ -56,7 +56,7 @@ Clr:    sta $00,x
         lda #1
         sta VDELP0
         sta VDELP1
-        lda #>Col0          ; 列テーブルは 1 ページ内（ORG で保証）
+        lda #>Col0          ; column tables sit within one page (guaranteed by ORG)
         sta p0+1
         sta p1+1
         sta p2+1
@@ -86,7 +86,7 @@ NextFrame:
         sta VSYNC
         lda #2
         sta VBLANK
-        ; 影クリア（決定化）
+        ; clear the shadow registers (determinism)
         lda #0
         sta GRP0
         sta GRP1
@@ -96,7 +96,7 @@ NextFrame:
 VB:     sta WSYNC
         dex
         bne VB
-        ; --- 位置決め（score6 と同一: P0=87 / P1=95） ---
+        ; --- Positioning (same as score6: P0=87 / P1=95) ---
         sta WSYNC
         ds 13, $EA          ; SLEEP 26
         ds 9, $EA           ; SLEEP 18
@@ -112,20 +112,20 @@ VB:     sta WSYNC
         lda #0
         sta VBLANK
 
-        ; ===== 多色 48px カーネル（HEIGHT 行・色＋6-store・1 行/走査線） =====
+        ; ===== Multicolor 48px kernel (HEIGHT rows, color + 6-store, 1 row/scanline) =====
         lda #HEIGHT-1
         sta row
 Krow:   sta WSYNC          ; @lines 2 — each data row spans 2 visible scanlines (loop-back ~79cy>76); verified stable 262
         ldy row             ; 3
-        lda ColorTab,y      ; 7   行毎の色
+        lda ColorTab,y      ; 7   per-row color
         sta COLUP0          ; 10
         sta COLUP1          ; 13
         lda (p0),y          ; 18
-        sta GRP0            ; 21  B0→P0新
+        sta GRP0            ; 21  B0->P0 new
         lda (p1),y          ; 23
-        sta GRP1            ; 26  B1→P1新, B0→P0影(表示)
+        sta GRP1            ; 26  B1->P1 new, B0->P0 shadow (shown)
         lda (p2),y          ; 31
-        sta GRP0            ; 34  B2→P0新, B1→P1影(表示)
+        sta GRP0            ; 34  B2->P0 new, B1->P1 shadow (shown)
         lda (p3),y          ; 39
         sta tmp             ; 42
         lda (p4),y          ; 47
@@ -133,19 +133,19 @@ Krow:   sta WSYNC          ; @lines 2 — each data row spans 2 visible scanline
         lda (p5),y          ; 54
         tay                 ; 56
         lda tmp             ; 59
-        sta GRP1            ; 62  B3→P1新, B2→P0影
-        stx GRP0            ; 65  B4→P0新, B3→P1影
-        sty GRP1            ; 68  B5→P1新, B4→P0影
-        sta GRP0            ; 71  junk,    B5→P1影
+        sta GRP1            ; 62  B3->P1 new, B2->P0 shadow
+        stx GRP0            ; 65  B4->P0 new, B3->P1 shadow
+        sty GRP1            ; 68  B5->P1 new, B4->P0 shadow
+        sta GRP0            ; 71  junk,    B5->P1 shadow
         dec row             ; 76
-        bpl Krow            ; (行内完結後の次行 WSYNC で揃う)
+        bpl Krow            ; (the next row's WSYNC realigns after the in-row work completes)
 
-        ; 消灯（影まで）
+        ; blank the players (shadows included)
         lda #0
         sta GRP0
         sta GRP1
         sta GRP0
-        ; 色ミラー記録（検証用: 先頭行=HEIGHT-1, 末尾行=0）
+        ; record the color mirrors (for verification: first row=HEIGHT-1, last row=0)
         lda ColorTab+HEIGHT-1
         sta colfst
         lda ColorTab+0
@@ -164,17 +164,17 @@ OS:     sta WSYNC
         bne OS
         jmp NextFrame
 
-; ===== 行毎カラー（下の行が先＝Y=HEIGHT-1..0 で参照・レインボー） =====
-; 末尾(row0,画面最下)→先頭(row15,画面最上) の順。視覚的に虹。
+; ===== Per-row colors (bottom rows first = indexed with Y=HEIGHT-1..0; a rainbow) =====
+; Order: last (row0, bottom of screen) -> first (row15, top of screen). Visually a rainbow.
 ColorTab:
-        byte $44,$44,$46,$46,$48,$48,$1A,$1A   ; row 0..7  : 赤→橙→黄緑
-        byte $BA,$BA,$98,$98,$76,$76,$64,$64   ; row 8..15 : 水→青→紫→桃
+        byte $44,$44,$46,$46,$48,$48,$1A,$1A   ; row 0..7  : red -> orange -> yellow-green
+        byte $BA,$BA,$98,$98,$76,$76,$64,$64   ; row 8..15 : cyan -> blue -> purple -> pink
 
-; ===== 画像（列優先 6×HEIGHT・下の行が先・1 ページ内）= ハート =====
+; ===== Image (column-major 6 x HEIGHT, bottom rows first, within one page) = heart =====
         org $FE00
-; 各バイト = 8px。6 列で 48px。row0 が画面最下、row15 が最上。
-; ハート: 上部に2山、下部はV字に絞る。
-Col0:   ; 左端 8px
+; Each byte = 8px. 6 columns = 48px. row0 is the bottom of the screen, row15 the top.
+; Heart: 2 lobes at the top, narrowing to a V at the bottom.
+Col0:   ; leftmost 8px
         byte $00,$00,$00,$01,$03,$07,$0F,$0F   ; row0..7
         byte $1F,$1F,$0F,$0E,$00,$00,$00,$00   ; row8..15
 Col1:
@@ -189,7 +189,7 @@ Col3:
 Col4:
         byte $00,$00,$00,$00,$00,$80,$C0,$E0   ; row0..7
         byte $F0,$F0,$F8,$78,$3C,$3C,$00,$00   ; row8..15
-Col5:   ; 右端 8px
+Col5:   ; rightmost 8px
         byte $00,$00,$00,$00,$00,$00,$00,$00   ; row0..7
         byte $00,$00,$00,$00,$00,$00,$00,$00   ; row8..15
 

@@ -1,6 +1,6 @@
 #!/bin/bash
-# check_gopher_pin.sh — ローカルの Gopher2600 クローンが CI のピンと一致するか確認（F-2）
-# 使い方: scripts/check_gopher_pin.sh   （harness/ から実行）
+# check_gopher_pin.sh — check that the local Gopher2600 clone matches the CI pin (F-2)
+# Usage: scripts/check_gopher_pin.sh   (run from harness/)
 set -eu
 cd "$(dirname "$0")/.."
 PIN=$(grep -o 'checkout [0-9a-f]\{40\}' .github/workflows/*.yml | head -1 | awk '{print $2}')
