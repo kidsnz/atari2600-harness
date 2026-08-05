@@ -1,6 +1,7 @@
-// Command harness は Gopher2600 ベースの Atari 2600 検証ハーネスを MCP (stdio) で
-// 露出する。Claude が load_rom → step → read で「やったこと＝結果」を数値で観測する。
-// 仕様は docs/mcp-tools.md（全 API 裏取り済み）。数値ファースト＝画像は Phase 2.3。
+// Command harness exposes the Gopher2600-based Atari 2600 verification harness over
+// MCP (stdio). Claude observes "what it did = the result" numerically via
+// load_rom → step → read. Spec: docs/mcp-tools.md (every API verified against the
+// source). Numbers first = images are Phase 2.3.
 package main
 
 import (
@@ -33,15 +34,16 @@ import (
 	"github.com/kidsnz/atari2600-harness/pkg/audio"
 )
 
-// --- グローバル状態（stdio は逐次だが念のため mutex 保護）---
+// --- global state (stdio is sequential, but mutex-guarded to be safe) ---
 
-// curMap は assemble_and_load 経由ロード時の PC→ソース行対応（load_rom ではクリア）。
+// curMap maps PC → source line when the ROM was loaded via assemble_and_load
+// (cleared by load_rom).
 var curMap *srcmap.Map
 
-// curROMPath は現在ロード中の ROM ファイル（patch オプションの復元先）。
+// curROMPath is the ROM file currently loaded (what the patch option restores to).
 var curROMPath string
 
-// locate は PC をソース位置文字列へ（対応なしは空文字）。
+// locate turns a PC into a source-location string (empty when there is no mapping).
 func locate(pc uint16) string { return curMap.Locate(pc) }
 
 var (
@@ -49,7 +51,7 @@ var (
 	current *emu.Emu
 )
 
-// get はロード済みの Emu を返す。未ロードならエラー。
+// get returns the loaded Emu. Errors when nothing is loaded.
 func get() (*emu.Emu, error) {
 	if current == nil {
 		return nil, fmt.Errorf("no ROM loaded: call load_rom first")
@@ -57,12 +59,12 @@ func get() (*emu.Emu, error) {
 	return current, nil
 }
 
-// --- 共通戻り値 ---
+// --- common return values ---
 
 type Coords struct {
 	Frame    int `json:"frame"`
 	Scanline int `json:"scanline"`
-	Clock    int `json:"clock"` // Gopher2600規約: HBLANK −68..−1 / 可視 0..159（可視px0=clock0）
+	Clock    int `json:"clock"` // Gopher2600 convention: HBLANK −68..−1 / visible 0..159 (visible px0 = clock 0)
 }
 
 func coordsOf(e *emu.Emu) Coords {
@@ -97,8 +99,8 @@ func handleLoadROM(ctx context.Context, req *mcp.CallToolRequest, in LoadROMIn) 
 		return nil, LoadROMOut{}, fmt.Errorf("load rom: %w", err)
 	}
 	current = e
-	resetSlots() // 別 ROM の状態を復元させない
-	curMap = nil // .bin 直ロードはソース対応なし
+	resetSlots() // don't let another ROM's state be restored
+	curMap = nil // a direct .bin load has no source mapping
 	curROMPath = in.Path
 	return nil, LoadROMOut{
 		Coords:  coordsOf(e),
@@ -106,7 +108,7 @@ func handleLoadROM(ctx context.Context, req *mcp.CallToolRequest, in LoadROMIn) 
 	}, nil
 }
 
-// --- assemble_and_load（P3: edit→dasm→load を 1 ショット化）---
+// --- assemble_and_load (P3: edit→dasm→load in one shot) ---
 
 type AssembleIn struct {
 	AsmPath string `json:"asm_path" jsonschema:"path to .asm source"`
@@ -114,11 +116,11 @@ type AssembleIn struct {
 	TVSpec  string `json:"tv_spec,omitempty" jsonschema:"NTSC|PAL|AUTO (default NTSC)"`
 }
 type AssembleOut struct {
-	Ok         bool   `json:"ok"`          // dasm 成功
-	BinPath    string `json:"bin_path"`    // 出力 .bin
-	DasmOutput string `json:"dasm_output"` // dasm の stdout+stderr（失敗時は失敗行を含む）
-	Loaded     bool   `json:"loaded"`      // 成功して VCS にロードしたか
-	Coords     Coords `json:"coords"`      // ロード時のみ有効
+	Ok         bool   `json:"ok"`          // dasm succeeded
+	BinPath    string `json:"bin_path"`    // output .bin
+	DasmOutput string `json:"dasm_output"` // dasm stdout+stderr (on failure, includes the failing line)
+	Loaded     bool   `json:"loaded"`      // whether it assembled and was loaded into the VCS
+	Coords     Coords `json:"coords"`      // valid only when loaded
 }
 
 func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in AssembleIn) (*mcp.CallToolResult, AssembleOut, error) {
@@ -133,13 +135,14 @@ func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in Ass
 		bin = build.BinPathFor(in.AsmPath)
 	}
 
-	// dasm -f3（-l/-s 付き）。失敗行を含む診断をそのまま返す。
+	// dasm -f3 (with -l/-s). Return the diagnostics verbatim, failing line included.
 	out, lst, sym, err := build.AssembleWithListing(in.AsmPath, bin)
 	if err != nil {
-		// アセンブル失敗は MCP エラーにせず Ok=false＋dasm 出力で構造化返却（Claude が失敗行を見て直す）。
+		// An assembly failure is not an MCP error: return it structured, as Ok=false +
+		// the dasm output (Claude reads the failing line and fixes it).
 		return nil, AssembleOut{Ok: false, BinPath: bin, DasmOutput: out}, nil
 	}
-	curMap = srcmap.Parse(lst, sym, in.AsmPath) // U-M9: 以後のツール出力に at を併記
+	curMap = srcmap.Parse(lst, sym, in.AsmPath) // U-M9: later tool output also reports at
 
 	spec := in.TVSpec
 	if spec == "" {
@@ -153,7 +156,7 @@ func handleAssembleAndLoad(ctx context.Context, req *mcp.CallToolRequest, in Ass
 		return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: out}, fmt.Errorf("assembled ok but load failed: %w", err)
 	}
 	current = e
-	resetSlots() // 別 ROM の状態を復元させない
+	resetSlots() // don't let another ROM's state be restored
 	curROMPath = bin
 	return nil, AssembleOut{Ok: true, BinPath: bin, DasmOutput: out, Loaded: true, Coords: coordsOf(e)}, nil
 }
@@ -185,7 +188,7 @@ func handleStepFrame(ctx context.Context, req *mcp.CallToolRequest, in StepFrame
 	return nil, StepFrameOut{Coords: coordsOf(e)}, nil
 }
 
-// --- step_instruction / step_scanline（B-2: フレーム内粒度）---
+// --- step_instruction / step_scanline (B-2: sub-frame granularity) ---
 
 type StepInstructionOut struct {
 	LastInstructionCycles int    `json:"last_instruction_cycles"`
@@ -207,7 +210,7 @@ func handleStepInstruction(ctx context.Context, req *mcp.CallToolRequest, _ stru
 }
 
 type StepScanlineOut struct {
-	CyclesConsumed int64  `json:"cycles_consumed"` // この scanline 区間で実行した CPU サイクル
+	CyclesConsumed int64  `json:"cycles_consumed"` // CPU cycles executed in this scanline interval
 	Coords         Coords `json:"coords"`
 }
 
@@ -238,7 +241,7 @@ type CPUFlags struct {
 	C bool `json:"c"`
 }
 
-// --- read_bank（bankswitch ROM の現在バンク。4K 非バンクでは常に 0/false）---
+// --- read_bank (current bank of a bankswitched ROM. Always 0/false on a flat 4K) ---
 
 type ReadBankOut struct {
 	Bank   int    `json:"bank" jsonschema:"current cartridge bank at PC"`
@@ -260,7 +263,7 @@ func handleReadBank(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (
 
 type ReadCPUOut struct {
 	PC     uint16   `json:"pc"`
-	At     string   `json:"at,omitempty"` // ソース位置（assemble_and_load 経由時のみ）
+	At     string   `json:"at,omitempty"` // source location (only when loaded via assemble_and_load)
 	A      uint8    `json:"a"`
 	X      uint8    `json:"x"`
 	Y      uint8    `json:"y"`
@@ -296,15 +299,15 @@ func handleReadCPU(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*
 	}, nil
 }
 
-// --- read_cycles（鉄則2: サイクルはシミュレータから取る）---
+// --- read_cycles (iron rule 2: get cycles from the simulator) ---
 
 type ReadCyclesIn struct {
 	Reset bool `json:"reset,omitempty" jsonschema:"mark a new measurement baseline before reading (cycles_since_mark resets to 0)"`
 }
 type ReadCyclesOut struct {
-	LastInstructionCycles int    `json:"last_instruction_cycles"` // 直近 1 命令のサイクル数
-	CyclesSinceMark       int64  `json:"cycles_since_mark"`       // 直近 mark 以降の累積
-	TotalCycles           int64  `json:"total_cycles"`            // ROM ロード以降の累積
+	LastInstructionCycles int    `json:"last_instruction_cycles"` // cycles of the most recent instruction
+	CyclesSinceMark       int64  `json:"cycles_since_mark"`       // total since the last mark
+	TotalCycles           int64  `json:"total_cycles"`            // total since the ROM was loaded
 	Coords                Coords `json:"coords"`
 }
 
@@ -354,7 +357,7 @@ func handleReadRAM(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*
 	return nil, ReadRAMOut{Base: 0x80, Hex: sb.String(), Coords: coordsOf(e)}, nil
 }
 
-// --- read_tia (litmus test の中核) ---
+// --- read_tia (the core of the litmus test) ---
 
 type Sprite struct {
 	ResetPixel  int `json:"reset_pixel"`
@@ -390,7 +393,7 @@ func handleReadTIA(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*
 	}, nil
 }
 
-// --- read_tia_registers（P1: 書込専用レジスタの現在値を実測）---
+// --- read_tia_registers (P1: measure the current value of the write-only registers) ---
 
 type ReadTIARegsOut struct {
 	emu.TIARegisters
@@ -408,15 +411,15 @@ func handleReadTIARegisters(ctx context.Context, req *mcp.CallToolRequest, _ str
 	return nil, ReadTIARegsOut{TIARegisters: e.ReadTIARegisters(), Coords: coordsOf(e)}, nil
 }
 
-// --- read_audio（R-2: 音声レジスタを数値で）---
+// --- read_audio (R-2: the audio registers as numbers) ---
 
 type ChannelNote struct {
-	Note  string  `json:"note,omitempty"`  // 12 平均律の最近接音名（無音/非楽音は空）
-	Cents float64 `json:"cents,omitempty"` // その音名からの誤差
+	Note  string  `json:"note,omitempty"`  // nearest 12-TET note name (empty when silent/non-pitched)
+	Cents float64 `json:"cents,omitempty"` // deviation from that note name
 }
 type ReadAudioOut struct {
 	emu.AudioState
-	Note0  ChannelNote `json:"note0"` // ch0 の音名（A-1 回収: 耳でなく名前で議論できる）
+	Note0  ChannelNote `json:"note0"` // ch0 note name (closes A-1: argue by name, not by ear)
 	Note1  ChannelNote `json:"note1"`
 	Coords Coords      `json:"coords"`
 }
@@ -442,16 +445,16 @@ func handleReadAudio(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) 
 	return nil, ReadAudioOut{AudioState: st, Note0: noteOf(st.Channel0), Note1: noteOf(st.Channel1), Coords: coordsOf(e)}, nil
 }
 
-// --- read_audio_trace（音の時系列＝read_audio の read_motion 版。音の包絡を一括で採る）---
+// --- read_audio_trace (sound as a time series = the read_motion of read_audio. Takes a whole envelope in one call) ---
 
 type AudioTraceIn struct {
 	Frames int `json:"frames,omitempty" jsonschema:"frames to trace (default 40); ADVANCES the emulator this many frames"`
 }
 type AudioChannelTrace struct {
-	// ★[]int（[]uint8 は Go が JSON で base64 文字列にエンコード＝配列にならず schema 検証に落ちる）
-	Control []int `json:"control"` // AUDC per frame（波形/音色）
-	Freq    []int `json:"freq"`    // AUDF per frame（分周＝音程）
-	Volume  []int `json:"volume"`  // AUDV per frame（音量＝包絡）
+	// ★[]int (Go encodes []uint8 as a base64 JSON string = not an array, so schema validation fails)
+	Control []int `json:"control"` // AUDC per frame (waveform/timbre)
+	Freq    []int `json:"freq"`    // AUDF per frame (divider = pitch)
+	Volume  []int `json:"volume"`  // AUDV per frame (volume = envelope)
 }
 type AudioTraceOut struct {
 	Frames   int               `json:"frames"`
@@ -488,14 +491,14 @@ func handleReadAudioTrace(ctx context.Context, req *mcp.CallToolRequest, in Audi
 	return nil, AudioTraceOut{Frames: frames, Channel0: c0, Channel1: c1, Coords: coordsOf(e)}, nil
 }
 
-// --- read_ram_trace（任意 RAM の時系列＝step+peek ループを1発に。AI位置/タイマ/モード等の推移を数値で採る）---
+// --- read_ram_trace (arbitrary RAM as a time series = a step+peek loop in one call. Takes AI position/timer/mode etc. as numbers) ---
 
 type RamTraceIn struct {
 	Addrs  []int `json:"addrs" jsonschema:"RAM addresses to trace, each $80-$FF (128-255); 1-16 addresses"`
 	Frames int   `json:"frames,omitempty" jsonschema:"frames to trace (default 60); ADVANCES the emulator this many frames"`
 }
 type RamTraceOut struct {
-	// ★[]int（[]uint8 は Go が JSON で base64 文字列にエンコード＝配列にならず schema 検証に落ちる）
+	// ★[]int (Go encodes []uint8 as a base64 JSON string = not an array, so schema validation fails)
 	Frames int     `json:"frames"`
 	Addrs  []int   `json:"addrs"`  // echoed, same order as traces
 	Traces [][]int `json:"traces"` // traces[i][f] = value of Addrs[i] at frame f (0-based from the call)
@@ -547,7 +550,7 @@ func handleReadRAMTrace(ctx context.Context, req *mcp.CallToolRequest, in RamTra
 	return nil, RamTraceOut{Frames: frames, Addrs: in.Addrs, Traces: traces, Coords: coordsOf(e)}, nil
 }
 
-// --- read_collisions（P1: CXxx を構造化）---
+// --- read_collisions (P1: CXxx, structured) ---
 
 type ReadCollisionsOut struct {
 	emu.Collisions
@@ -569,15 +572,15 @@ func handleReadCollisions(ctx context.Context, req *mcp.CallToolRequest, _ struc
 	return nil, ReadCollisionsOut{Collisions: cx, Coords: coordsOf(e)}, nil
 }
 
-// --- read_row（playfield 点灯列 / per-scanline 色を数値で読む）---
+// --- read_row (read the lit playfield columns / per-scanline colours as numbers) ---
 
 type ReadRowIn struct {
 	Scanline int `json:"scanline" jsonschema:"ABSOLUTE scanline — the y label on the annotated grid, NOT 0-based from the top of the visible area. NTSC accepts roughly 29..242; scanline=0 is an error, and an off-by-visibleTop request succeeds silently and returns the wrong row"`
 }
 type ReadRowOut struct {
 	Scanline int          `json:"scanline"`
-	Width    int          `json:"width"` // 可視幅（通常 160）
-	Runs     []emu.RowRun `json:"runs"`  // 横方向の連長エンコード {clock,len,hex}
+	Width    int          `json:"width"` // visible width (normally 160)
+	Runs     []emu.RowRun `json:"runs"`  // horizontal run-length encoding {clock,len,hex}
 	Coords   Coords       `json:"coords"`
 }
 
@@ -601,15 +604,15 @@ func handleReadRow(ctx context.Context, req *mcp.CallToolRequest, in ReadRowIn) 
 	}, nil
 }
 
-// --- decompose_row（各ピクセルを "どの TIA オブジェクトが描いたか" で分解。AT-5）---
+// --- decompose_row (break each pixel down by "which TIA object drew it". AT-5) ---
 
 type DecomposeRowIn struct {
 	Scanline int `json:"scanline" jsonschema:"ABSOLUTE scanline — same coordinate as read_row and the annotated grid y label, NOT 0-based from the top of the visible area. NTSC accepts roughly 29..242"`
 }
 type DecomposeRowOut struct {
 	Scanline int           `json:"scanline"`
-	Width    int           `json:"width"` // 可視幅（通常 160）
-	Runs     []emu.ElemRun `json:"runs"`  // 連長エンコード {clock,len,element}: BG/PF/P0/P1/M0/M1/BL
+	Width    int           `json:"width"` // visible width (normally 160)
+	Runs     []emu.ElemRun `json:"runs"`  // run-length encoding {clock,len,element}: BG/PF/P0/P1/M0/M1/BL
 	Coords   Coords        `json:"coords"`
 }
 
@@ -633,7 +636,7 @@ func handleDecomposeRow(ctx context.Context, req *mcp.CallToolRequest, in Decomp
 	}, nil
 }
 
-// --- read_motion（オブジェクトの動きの滑らかさ＝judder/ブルブルを数値化。VV-4）---
+// --- read_motion (an object's motion smoothness = judder as a number. VV-4) ---
 
 type ReadMotionIn struct {
 	Object string `json:"object,omitempty" jsonschema:"object to track: P0 M0 P1 M1 BL (default BL)"`
@@ -732,7 +735,7 @@ func handleReadMotion(ctx context.Context, req *mcp.CallToolRequest, in ReadMoti
 	return nil, out, nil
 }
 
-// --- spritey（オブジェクトの縦位置 Y を数値で。read_tia=Xのみ・read_motion top=小missile不可 の穴埋め。弾の軌道/リコシェを数値化）---
+// --- spritey (an object's vertical position Y as a number. Fills the gap left by read_tia = X only and read_motion top = no good on a small missile. Bullet trajectory/ricochet as numbers) ---
 
 type SpriteYIn struct {
 	Object string `json:"object,omitempty" jsonschema:"object: P0 M0 P1 M1 BL (default M0)"`
@@ -821,7 +824,7 @@ func handleSpriteY(ctx context.Context, req *mcp.CallToolRequest, in SpriteYIn) 
 	return nil, out, nil
 }
 
-// --- set_input（ジョイスティック注入。poke は入力に効かない）---
+// --- set_input (joystick injection. poke has no effect on input) ---
 
 type SetInputIn struct {
 	Player  int     `json:"player,omitempty" jsonschema:"player port (0 left/P0 default, 1 right/P1)"`
@@ -860,7 +863,7 @@ func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn
 		if err := e.SetPaddle(in.Player, in.Value); err != nil {
 			return nil, SetInputOut{}, err
 		}
-	case "reset", "select", "color", "p0pro", "p1pro": // コンソールパネルのスイッチ
+	case "reset", "select", "color", "p0pro", "p1pro": // console panel switches
 		if err := e.SetPanel(in.Action, in.Pressed); err != nil {
 			return nil, SetInputOut{}, err
 		}
@@ -933,7 +936,7 @@ func handlePoke(ctx context.Context, req *mcp.CallToolRequest, in PokeIn) (*mcp.
 	return nil, PokeOut{Coords: coordsOf(e)}, nil
 }
 
-// --- breakif（ビーム位置で停止）---
+// --- breakif (halt at a beam position) ---
 
 type BreakIfIn struct {
 	MaxFrames     int `json:"max_frames,omitempty" jsonschema:"upper bound on frames to run (default 1)"`
@@ -941,7 +944,7 @@ type BreakIfIn struct {
 	UntilClock    int `json:"until_clock" jsonschema:"beam clock in the read_row/beamtrace coordinate system: HBLANK -68..-1, visible 0..159. Halts at the first instruction boundary AT OR PAST this position, not on an exact match — the CPU is only observed every 3 colour clocks, and a WSYNC kernel only a handful of times per line (measured: 7 points on a visible line, all inside HBLANK), so an exact match silently never fires for most values. Out of range is an error, not a silent no-halt"`
 }
 type BreakIfOut struct {
-	Halted bool   `json:"halted"` // true=条件で停止 / false=フレーム上限に到達
+	Halted bool   `json:"halted"` // true = halted on the condition / false = hit the frame limit
 	Coords Coords `json:"coords"`
 }
 
@@ -964,18 +967,20 @@ func handleBreakIf(ctx context.Context, req *mcp.CallToolRequest, in BreakIfIn) 
 	return nil, BreakIfOut{Halted: halted, Coords: coordsOf(e)}, nil
 }
 
-// --- assert_line_budget（B-3: per-scanline サイクル予算ガード）---
+// --- assert_line_budget (B-3: per-scanline cycle-budget guard) ---
 
-// PatchSpec は測定専用の一時 ROM パッチ（PONG-C2: XTable 差替儀式の構造的解消）。
-// symbol は直近 assemble_and_load のシンボル表から解決。パッチは ROM のコピーに適用され、
-// 測定後に元 ROM を再ロードして復元する（復元忘れという事故クラスを消す）。
+// PatchSpec is a measurement-only temporary ROM patch (PONG-C2: structurally retires
+// the XTable-swap ritual). symbol is resolved from the symbol table of the last
+// assemble_and_load. The patch is applied to a COPY of the ROM, and the original ROM
+// is reloaded afterwards to restore it (this erases the forgot-to-restore class of
+// accident).
 type PatchSpec struct {
 	Symbol string `json:"symbol,omitempty" jsonschema:"DASM symbol from the last assemble_and_load (e.g. XTable)"`
 	Addr   int    `json:"addr,omitempty" jsonschema:"absolute ROM address (e.g. 61522 = $F052); used when symbol is empty"`
 	Bytes  string `json:"bytes" jsonschema:"hex byte string to write at the location (e.g. 0e0e090e0e)"`
 }
 
-// PokeSpec は（再）起動直後・実行前に適用する RAM poke。
+// PokeSpec is a RAM poke applied right after (re)boot, before running.
 type PokeSpec struct {
 	Addr  int `json:"addr" jsonschema:"RAM address"`
 	Value int `json:"value" jsonschema:"byte value"`
@@ -988,15 +993,16 @@ type BudgetIn struct {
 	Pokes     []PokeSpec  `json:"pokes,omitempty" jsonschema:"RAM pokes applied after boot, before running (only with patch)"`
 }
 type BudgetOut struct {
-	Over       bool   `json:"over"`         // true=ある論理ラインが予算超過（ロール要因）で停止
-	At         string `json:"at,omitempty"` // 停止時 PC のソース位置（assemble_and_load 経由時のみ）
-	AtScanline int    `json:"at_scanline"`  // 超過した論理ラインの開始 scanline（over=true 時）
-	LineCycles int    `json:"line_cycles"`  // そのラインが消費した概算 machine cycle（消費ライン数×76）
+	Over       bool   `json:"over"`         // true = halted because a logical line overran the budget (a roll cause)
+	At         string `json:"at,omitempty"` // source location of the PC at halt (only via assemble_and_load)
+	AtScanline int    `json:"at_scanline"`  // starting scanline of the overrunning logical line (when over=true)
+	LineCycles int    `json:"line_cycles"`  // approximate machine cycles that line consumed (lines consumed × 76)
 	Coords     Coords `json:"coords"`
 }
 
-// applyTempPatch は現 ROM のコピーへ patch を適用して差し替えロードし、復元関数を返す。
-// 呼び出し側は必ず defer restore() すること（＝復元忘れの構造的防止が存在理由）。
+// applyTempPatch applies patch to a copy of the current ROM, loads that copy in its
+// place, and returns a restore function. Callers MUST defer restore() (= preventing a
+// forgotten restore structurally is this function's reason to exist).
 func applyTempPatch(e emuLike, patches []PatchSpec) (restore func(), err error) {
 	if curROMPath == "" {
 		return nil, fmt.Errorf("patch: no ROM path tracked (load via load_rom/assemble_and_load first)")
@@ -1056,12 +1062,12 @@ func applyTempPatch(e emuLike, patches []PatchSpec) (restore func(), err error) 
 	}
 	orig := curROMPath
 	return func() {
-		_ = e.LoadROM(orig) // 元 ROM を必ず復元（フレッシュブート状態になる）
+		_ = e.LoadROM(orig) // always restore the original ROM (leaves a fresh-boot state)
 		os.Remove(tmpPath)
 	}, nil
 }
 
-// emuLike は applyTempPatch が必要とする最小 interface。
+// emuLike is the minimal interface applyTempPatch needs.
 type emuLike interface{ LoadROM(path string) error }
 
 func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetIn) (*mcp.CallToolResult, BudgetOut, error) {
@@ -1076,14 +1082,14 @@ func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetI
 	if maxFrames <= 0 {
 		maxFrames = 1
 	}
-	if len(in.Patch) > 0 { // PONG-C2: 一時パッチ（コピーに適用→測定→自動復元）
+	if len(in.Patch) > 0 { // PONG-C2: temporary patch (apply to a copy → measure → auto-restore)
 		restore, err := applyTempPatch(e, in.Patch)
 		if err != nil {
 			return nil, BudgetOut{}, err
 		}
 		defer restore()
-		// フレッシュブートの Reset 初期化＋VSYNC 安定化を先に済ませてから pokes を適用する
-		// （順序を誤ると Reset の RAM クリアと RunUntilBudget の warmup が pokes を食い潰す）。
+		// Let the fresh boot's Reset init + VSYNC settle FIRST, then apply the pokes
+		// (get the order wrong and Reset's RAM clear plus RunUntilBudget's warmup eat them).
 		if err := e.RunFrames(2); err != nil {
 			return nil, BudgetOut{}, fmt.Errorf("warmup: %w", err)
 		}
@@ -1104,7 +1110,7 @@ func handleBudgetGuard(ctx context.Context, req *mcp.CallToolRequest, in BudgetI
 	return nil, out, nil
 }
 
-// --- profile_line_budget（PONG-C3: assert_line_budget の定量版＝行別ワースト実測）---
+// --- profile_line_budget (PONG-C3: the quantitative form of assert_line_budget = measured per-line worst case) ---
 
 type ProfileLinesIn struct {
 	MaxFrames int         `json:"max_frames,omitempty" jsonschema:"frames to profile (default 30)"`
@@ -1114,27 +1120,29 @@ type ProfileLinesIn struct {
 	Pokes     []PokeSpec  `json:"pokes,omitempty" jsonschema:"RAM pokes applied after boot, before profiling (only with patch)"`
 }
 type ProfileLine struct {
-	At            string         `json:"at,omitempty"` // 開き STA WSYNC のソース位置（assemble_and_load 経由時）
-	PC            string         `json:"pc"`           // 開き STA WSYNC の PC（hex）
-	WorstCycles   int            `json:"worst_cycles"` // 実測ワースト CPU cy（≤76 なら1ラインに収まっている）
-	WorstLines    int            `json:"worst_lines"`  // ワースト時の消費物理ライン数
-	Count         int            `json:"count"`        // 計測区間数
+	At            string         `json:"at,omitempty"` // source location of the opening STA WSYNC (via assemble_and_load)
+	PC            string         `json:"pc"`           // PC of the opening STA WSYNC (hex)
+	WorstCycles   int            `json:"worst_cycles"` // measured worst CPU cy (≤76 = it fits in one line)
+	WorstLines    int            `json:"worst_lines"`  // physical lines consumed in the worst case
+	Count         int            `json:"count"`        // number of intervals measured
 	WorstFrame    int            `json:"worst_frame"`
 	WorstScanline int            `json:"worst_scanline"`
-	Watch         map[string]int `json:"watch,omitempty"` // ワースト区間開始時点の watch RAM 値
-	// Bank は開き strobe を実行したバンク（バンク切替カートのみ）。ポインタなので
-	// 平坦 ROM では欄自体が出ず、"バンク0" と "バンクの概念なし" が混ざらない。
+	Watch         map[string]int `json:"watch,omitempty"` // watched RAM values at the start of the worst interval
+	// Bank is the bank that executed the opening strobe (bank-switched carts only). It
+	// is a pointer, so on a flat ROM the field is absent entirely and "bank 0" is never
+	// confused with "no such thing as a bank".
 	Bank *int `json:"bank,omitempty"`
 }
 type ProfileLinesOut struct {
 	Lines  []ProfileLine `json:"lines"`
 	Coords Coords        `json:"coords"`
-	// CrossFrameDropped は座標式が成り立たないため集計しなかった区間数。0 でも出す：
-	// 欄が無いことを「そんな区間は無かった」と読まれるのを防ぐ。
+	// CrossFrameDropped is the number of intervals not counted because the coordinate
+	// formula does not hold across them. Reported even when 0: an absent field must not
+	// be read as "there were no such intervals".
 	CrossFrameDropped int `json:"cross_frame_dropped"`
 }
 
-// resolveRAMRef は "$A8" / "0x84" / "132" / DASMシンボル を RAM アドレスへ解決する。
+// resolveRAMRef resolves "$A8" / "0x84" / "132" / a DASM symbol to a RAM address.
 func resolveRAMRef(s string) (uint16, error) {
 	if a, ok := curMap.Symbol(s); ok {
 		return a, nil
@@ -1169,7 +1177,7 @@ func handleProfileLines(ctx context.Context, req *mcp.CallToolRequest, in Profil
 		}
 		watchAddrs[i] = a
 	}
-	if len(in.Patch) > 0 { // C2 と同じ一時パッチ規律（コピーに適用→測定→自動復元）
+	if len(in.Patch) > 0 { // same temporary-patch discipline as C2 (apply to a copy → measure → auto-restore)
 		restore, err := applyTempPatch(e, in.Patch)
 		if err != nil {
 			return nil, ProfileLinesOut{}, err
@@ -1218,10 +1226,11 @@ func handleProfileLines(ctx context.Context, req *mcp.CallToolRequest, in Profil
 	return nil, out, nil
 }
 
-// --- assert_edge_coincidence（PONG-C1: Nエッジ同一Y整列の worst-path fuzz）---
-// エッジ比較カーネル（cpy <edge> の束）の真の worst path＝「全エッジ変数が同じ Y に揃う」
-// を能動的に作って予算をassertする。free-run では数百フレーム踏まないことがある
-// 1cy 超過（known-traps "N-edge coincidence"）を数秒で網羅検出する。
+// --- assert_edge_coincidence (PONG-C1: worst-path fuzz for N edges aligned on the same Y) ---
+// Actively constructs the true worst path of an edge-comparison kernel (a bundle of
+// `cpy <edge>`) = "every edge variable lines up on the same Y" and asserts the budget
+// against it. Exhaustively finds, in seconds, a 1cy overrun (known-traps "N-edge
+// coincidence") that a free run may not hit for hundreds of frames.
 
 type EdgeCoinIn struct {
 	Addrs      []int       `json:"addrs" jsonschema:"zero-page RAM addresses of the edge variables to align (poked to Y+offset each case)"`
@@ -1234,12 +1243,12 @@ type EdgeCoinIn struct {
 	Patch      []PatchSpec `json:"patch,omitempty" jsonschema:"optional temporary ROM patches (e.g. lightweight positioning table) applied for the sweep, auto-restored"`
 }
 type EdgeCoinOut struct {
-	Over       bool   `json:"over"`                  // true=少なくとも1つの整列Yで予算超過
-	FailYs     []int  `json:"fail_ys,omitempty"`     // 超過した整列Y（最大32個まで記録）
-	TestedYs   int    `json:"tested_ys"`             // 試行した整列Yの数
-	FirstAt    string `json:"first_at,omitempty"`    // 最初の超過のソース位置
-	FirstY     int    `json:"first_y,omitempty"`     // 最初の超過Y
-	LineCycles int    `json:"line_cycles,omitempty"` // 最初の超過ラインの消費（消費ライン×76）
+	Over       bool   `json:"over"`                  // true = the budget was overrun at at least one alignment Y
+	FailYs     []int  `json:"fail_ys,omitempty"`     // alignment Ys that overran (up to 32 recorded)
+	TestedYs   int    `json:"tested_ys"`             // number of alignment Ys tried
+	FirstAt    string `json:"first_at,omitempty"`    // source location of the first overrun
+	FirstY     int    `json:"first_y,omitempty"`     // Y of the first overrun
+	LineCycles int    `json:"line_cycles,omitempty"` // cycles the first overrunning line consumed (lines × 76)
 	Coords     Coords `json:"coords"`
 }
 
@@ -1276,7 +1285,7 @@ func handleEdgeCoincidence(ctx context.Context, req *mcp.CallToolRequest, in Edg
 		}
 		defer restore()
 	}
-	// フレッシュブート安定化を掃引前に済ませる（各Yの poke を Reset/warmup に食わせない）
+	// Let the fresh boot settle before the sweep (so each Y's poke isn't eaten by Reset/warmup)
 	if err := e.RunFrames(2); err != nil {
 		return nil, EdgeCoinOut{}, fmt.Errorf("warmup: %w", err)
 	}
@@ -1312,7 +1321,7 @@ func handleEdgeCoincidence(ctx context.Context, req *mcp.CallToolRequest, in Edg
 	return nil, out, nil
 }
 
-// --- prove_line_budget（VV-2: 静的に全到達パスの per-scanline 予算を証明＝assert_line_budget の ∀ 版）---
+// --- prove_line_budget (VV-2: statically PROVES the per-scanline budget over all reachable paths = the ∀ form of assert_line_budget) ---
 
 type ProveLineBudgetIn struct {
 	AsmPath string `json:"asm_path" jsonschema:"path to the kernel .asm to prove (relative to the harness working dir)"`
@@ -1499,7 +1508,7 @@ func handleSpritepos(ctx context.Context, req *mcp.CallToolRequest, in Spritepos
 	return nil, SpriteposOut{Solution: sol, Snippet: spritepos.Snippet(obj, sol.InputA)}, nil
 }
 
-// --- get_screen_annotated（ユーザー↔Claude 通信回線）---
+// --- get_screen_annotated (the user↔Claude comms channel) ---
 
 type ScreenIn struct {
 	Scale int `json:"scale,omitempty" jsonschema:"integer upscale factor (default 3)"`
@@ -1515,7 +1524,7 @@ type ScreenIn struct {
 }
 type SpritePos struct {
 	Label string `json:"label"`
-	Clock int    `json:"clock"` // HmovedPixel, 可視 0..159
+	Clock int    `json:"clock"` // HmovedPixel, visible 0..159
 	// Drawn says whether the object painted a visible pixel in this frame, measured
 	// from the per-pixel attribution buffer. An object always HAS a position, so a
 	// caller reading Clock alone cannot tell a sprite on screen from one parked
@@ -1526,9 +1535,9 @@ type SpritePos struct {
 type ScreenOut struct {
 	Width   int         `json:"width"`
 	Height  int         `json:"height"`
-	Sprites []SpritePos `json:"sprites"` // 各オブジェクトの横位置（画像と同じ数値）
+	Sprites []SpritePos `json:"sprites"` // horizontal position of each object (same numbers as on the image)
 	Coords  Coords      `json:"coords"`
-	PNGPath string      `json:"png_path"` // 人間が開ける固定パス（毎回上書き）
+	PNGPath string      `json:"png_path"` // fixed path a human can open (overwritten every call)
 }
 
 func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in ScreenIn) (*mcp.CallToolResult, ScreenOut, error) {
@@ -1559,10 +1568,11 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 		return nil, ScreenOut{}, fmt.Errorf("encode png: %w", err)
 	}
 
-	// 人間が開ける固定パスへ毎回上書き保存（ユーザー↔Claude 通信回線）。
-	// MCP のインライン画像を描画しないクライアントでも、このファイルを開けば最新フレームが見られる。
-	// VS Code の画像プレビューはファイル変更で自動リロード＝タブを開きっぱなしで往復可能。
-	// 保存先は env ATARI2600_SCREEN_PATH で指定（未設定なら OS temp）。
+	// Overwrite a fixed path a human can open, every call (the user↔Claude comms channel).
+	// Even on a client that does not render MCP inline images, opening this file shows
+	// the latest frame. VS Code's image preview auto-reloads on file change = leave the
+	// tab open and the round trip works. The destination is set by env
+	// ATARI2600_SCREEN_PATH (OS temp when unset).
 	pngPath := os.Getenv("ATARI2600_SCREEN_PATH")
 	if pngPath == "" {
 		pngPath = filepath.Join(os.TempDir(), "atari2600_screen.png")
@@ -1587,7 +1597,7 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 		sprites = append(sprites, SpritePos{Label: m.Label, Clock: m.Clock, Drawn: m.Drawn})
 	}
 
-	// 画像（人間向け）＋ 数値（Claude 向け structured Out）を両方返す。
+	// Return both: the image (for the human) and the numbers (structured Out, for Claude).
 	result := &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.ImageContent{Data: buf.Bytes(), MIMEType: "image/png"},

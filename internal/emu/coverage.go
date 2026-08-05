@@ -22,14 +22,15 @@ type covKey struct {
 	addr uint16
 }
 
-// Coverage は実行で踏んだ命令アドレスと分岐エッジを記録する（VV-3）。テスト網羅度の軸＝
-// 「どの命令／どちらの分岐方向を実際に実行したか」を数で出す。EnableCoverage で有効化する
-// まで Emu.cov は nil＝ゼロコスト（毎命令フックを通らない）。
+// Coverage records the instruction addresses and branch edges a run stepped on (VV-3). It
+// puts a number on the test-coverage axis = "which instruction / which branch direction did
+// we actually execute". Until EnableCoverage turns it on, Emu.cov is nil = zero cost (the
+// per-instruction hook is never entered).
 type Coverage struct {
-	pcSeen   map[covKey]bool // 実行された命令（バンク＋先頭アドレス）
-	brTaken  map[covKey]bool // 分岐命令→taken エッジを踏んだ
-	brNot    map[covKey]bool // 分岐命令→fall-through エッジを踏んだ
-	branches map[covKey]bool // 分岐命令と判明したもの（全体集合）
+	pcSeen   map[covKey]bool // instructions executed (bank + start address)
+	brTaken  map[covKey]bool // branch instruction → the taken edge was stepped on
+	brNot    map[covKey]bool // branch instruction → the fall-through edge was stepped on
+	branches map[covKey]bool // instructions found to be branches (the whole set)
 }
 
 func newCoverage() *Coverage {
@@ -41,10 +42,10 @@ func newCoverage() *Coverage {
 	}
 }
 
-// record は完了した 1 命令を取り込む（stepInstr から、命令完了時だけ呼ばれる）。
-// bank は命令を FETCH したバンク。完了後に問い合わせてはいけない: ホットスポットに触れる
-// 命令はその完了と同時にマッピングを変えるので、後から訊くと「切り替えた先」のバンクに
-// 帰属してしまう。
+// record takes in one completed instruction (called from stepInstr, only on instruction
+// completion). bank is the bank the instruction was FETCHED from. It must not be asked for
+// after completion: an instruction that touches a hotspot changes the mapping as it
+// completes, so asking afterwards attributes it to the bank it switched TO.
 func (c *Coverage) record(bank int, addr uint16, isBranch, taken bool) {
 	k := covKey{bank, addr}
 	c.pcSeen[k] = true
@@ -58,10 +59,11 @@ func (c *Coverage) record(bank int, addr uint16, isBranch, taken bool) {
 	}
 }
 
-// PCCount は踏んだ相異なる命令数（バンク込み）。
+// PCCount is the number of distinct instructions stepped on (bank included).
 func (c *Coverage) PCCount() int { return len(c.pcSeen) }
 
-// SeenIn はその (バンク, アドレス) の命令を実行したか。これが唯一の「踏んだか」問い合わせ。
+// SeenIn reports whether the instruction at that (bank, address) was executed. This is the
+// only "was it stepped on" query there is.
 //
 // A bank-blind Seen(addr) — "executed at this address in SOME bank" — used to sit
 // beside this one and was deleted 2026-07-31. It had exactly one shipped consumer,
@@ -76,10 +78,11 @@ func (c *Coverage) PCCount() int { return len(c.pcSeen) }
 // byte-for-byte unchanged.
 func (c *Coverage) SeenIn(bank int, addr uint16) bool { return c.pcSeen[covKey{bank, addr}] }
 
-// BranchCount は分岐命令として観測した数（バンク込み）。
+// BranchCount is the number of instructions observed to be branches (bank included).
 func (c *Coverage) BranchCount() int { return len(c.branches) }
 
-// dedupeAddrs は (bank,addr) 集合を昇順のアドレス列に潰す（外向き API の形を保つため）。
+// dedupeAddrs collapses a (bank,addr) set into an ascending address list (to keep the shape
+// of the outward-facing API).
 func dedupeAddrs(keys map[covKey]bool) []uint16 {
 	seen := map[uint16]bool{}
 	out := make([]uint16, 0, len(keys))
@@ -93,7 +96,7 @@ func dedupeAddrs(keys map[covKey]bool) []uint16 {
 	return out
 }
 
-// sortedSites は (bank,addr) 集合を (バンク, アドレス) 昇順の対の列にする。
+// sortedSites turns a (bank,addr) set into a list of (bank, address) pairs, ascending.
 func sortedSites(keys map[covKey]bool) [][2]int {
 	out := make([][2]int, 0, len(keys))
 	for k := range keys {
@@ -124,11 +127,13 @@ func sortedSites(keys map[covKey]bool) [][2]int {
 // address in two banks. There is no bank-blind branch query left.
 func (c *Coverage) BranchSites() [][2]int { return sortedSites(c.branches) }
 
-// EdgeCount は踏んだ分岐エッジの総数（最大 = BranchCount*2＝両方向踏破）。
+// EdgeCount is the total number of branch edges stepped on (max = BranchCount*2 = both
+// directions covered).
 func (c *Coverage) EdgeCount() int { return len(c.brTaken) + len(c.brNot) }
 
-// OneSidedBranchSites は片側エッジしか踏んでいない分岐を (バンク, アドレス) 昇順で返す
-// （taken だけ／not だけ＝その分岐の裏側がテストされていないサイン）。
+// OneSidedBranchSites returns the branches where only one edge was stepped on, as (bank,
+// address) ascending (taken only / not only = a sign that the other side of that branch is
+// untested).
 //
 // Bank-aware since 2026-07-31. The address-only OneSidedBranches() it replaced
 // reported "one-sided in SOME bank", which merged a fully exercised branch in one
@@ -138,17 +143,18 @@ func (c *Coverage) EdgeCount() int { return len(c.brTaken) + len(c.brNot) }
 func (c *Coverage) OneSidedBranchSites() [][2]int {
 	oneSided := map[covKey]bool{}
 	for k := range c.branches {
-		if c.brTaken[k] != c.brNot[k] { // ちょうど片方だけ true
+		if c.brTaken[k] != c.brNot[k] { // exactly one of the two is true
 			oneSided[k] = true
 		}
 	}
 	return sortedSites(oneSided)
 }
 
-// Signature は coverage-guided fuzz のフィードバック用に、踏んだ「カバレッジ標識」を比較可能な
-// キー集合で返す（命令アドレス＋分岐エッジ taken/not）。新しい標識が増える入力＝interesting。
-// バンクを含めるので、8K イメージでは別バンクの同アドレスが別の標識として数えられる
-// （含めないと、片方のバンクを歩いただけで「新しい被覆なし」に見えて探索が止まる）。
+// Signature returns the "coverage markers" stepped on as a comparable key set, for
+// coverage-guided fuzz feedback (instruction address + branch edge taken/not). An input that
+// adds a new marker = interesting. The bank is included, so on an 8K image the same address
+// in a different bank is counted as a different marker (without it, having walked only one
+// of the banks looks like "no new coverage" and the search stalls).
 func (c *Coverage) Signature() map[uint64]bool {
 	sig := make(map[uint64]bool, len(c.pcSeen)+len(c.brTaken)+len(c.brNot))
 	mark := func(tag uint64, k covKey, edge uint64) uint64 {
@@ -166,17 +172,20 @@ func (c *Coverage) Signature() map[uint64]bool {
 	return sig
 }
 
-// SeenSites は踏んだ命令を (バンク, アドレス) の対で昇順に返す。ROM ファイル内のオフセットに
-// 変換したい呼び手はこちらを使うこと: アドレスだけでは 8K イメージのどちらの 4K 面かが決まらず、
-// `addr & (len(rom)-1)` は $Fxxx を必ず上位面に畳む。実測 2026-07-30、その畳み方で exerciser の
-// 覆われたオフセット 278 個は全部が上位 4K に落ち、バンク 0 のバイトは 1 つも選ばれなかった。
+// SeenSites returns the instructions stepped on as (bank, address) pairs, ascending. A
+// caller that wants to convert these into offsets inside the ROM file must use this one: the
+// address alone does not decide which 4K face of an 8K image it is, and
+// `addr & (len(rom)-1)` always folds $Fxxx onto the upper face. Measured 2026-07-30: under
+// that folding all 278 covered offsets of the exerciser landed in the upper 4K, and not one
+// byte of bank 0 was picked.
 func (c *Coverage) SeenSites() [][2]int { return sortedSites(c.pcSeen) }
 
-// SeenPCs は踏んだ命令アドレスを昇順で返す（dump 用）。
+// SeenPCs returns the instruction addresses stepped on, ascending (for dumps).
 func (c *Coverage) SeenPCs() []uint16 { return dedupeAddrs(c.pcSeen) }
 
-// Reset は記録を空に戻す（guidedfuzz が 1 評価ごとに再ロードせず再利用するため。
-// signature 同一性を検証した上で warmup=200 で約 100 倍速）。
+// Reset empties the record (so guidedfuzz can reuse one machine instead of reloading for
+// every evaluation; signature identity was verified first, and at warmup=200 it is about
+// 100x faster).
 func (c *Coverage) Reset() {
 	c.pcSeen = map[covKey]bool{}
 	c.brTaken = map[covKey]bool{}

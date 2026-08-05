@@ -1,10 +1,12 @@
-; litmus_overrun.asm — per-scanline 予算ガード（B-3）の検証用 ROM
-; 目的: 「ある可視ラインが 76 CPU サイクル予算を超えて物理スキャンラインを食い込む」状況を
-;   わざと作り、assert_line_budget が over=true でその行を捕まえることを数値で裏取りする。
-; 仕掛け: smoke と同じ正常フレーム構成だが、可視領域のちょうど中央付近に「重いライン」を 1 本だけ仕込む。
-;   重いライン = WSYNC の前に ~100 CPU サイクルのビジーループを回す → work > 76cy → その論理ラインが
-;   2 物理スキャンラインを消費する（WSYNC が次のラインに食い込む）＝ロール要因。
-; include は使わず自己完結。
+; litmus_overrun.asm — ROM for verifying the per-scanline budget guard (B-3)
+; Purpose: deliberately construct the situation "a visible line overruns the 76 CPU cycle budget and eats
+;   into the next physical scanline", and confirm numerically that assert_line_budget catches that line
+;   with over=true.
+; Mechanism: the same well-formed frame structure as smoke, but with exactly one "heavy line" planted near
+;   the middle of the visible area.
+;   Heavy line = spin a busy loop of ~100 CPU cycles before WSYNC → work > 76cy → that logical line
+;   consumes 2 physical scanlines (WSYNC eats into the next line) = a roll cause.
+; No includes; self-contained.
 
         processor 6502
 
@@ -47,7 +49,7 @@ VBlankLoop:
         lda #0
         sta VBLANK
 
-; --- Visible: 上半分 96 ライン（正常）---
+; --- Visible: top half, 96 lines (normal) ---
         lda #$1E
         sta COLUBK
         ldx #96
@@ -56,14 +58,14 @@ TopLoop:
         dex
         bne TopLoop
 
-; --- 重いライン 1 本: WSYNC の前に ~100cy 浪費（予算 76 を超過）---
+; --- one heavy line: waste ~100cy before WSYNC (overruns the budget of 76) ---
         ldy #20
 Burn:
         dey             ; 2cy
-        bne Burn        ; 3cy（成立時）→ 約 20*5 = 100cy > 76 ＝この論理ラインは 2 物理ラインを消費
+        bne Burn        ; 3cy (when taken) → about 20*5 = 100cy > 76 = this logical line consumes 2 physical lines
         sta WSYNC
 
-; --- Visible: 下半分 95 ライン（正常）---
+; --- Visible: bottom half, 95 lines (normal) ---
         ldx #95
 BotLoop:
         sta WSYNC

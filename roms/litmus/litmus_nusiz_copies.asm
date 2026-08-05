@@ -1,9 +1,9 @@
-; litmus_nusiz_copies — NUSIZ 多コピーの実機裏取り（S-2 検証拡張）
-; 8px の solid スプライトを player0・NUSIZ0=$03（ThreeCopiesClose）で描く。3 コピーが横に並ぶ。
-; 3 コピー近接なら base / base+16 / base+32 px に 8px 白が 3 つ出る。
-; 検証: read_row でスプライト行に 8px 白が 3 スパン（コピー間隔16px）。
-; 実機裏取り済（Gopher2600）: read_row(可視96)=clock 3/19/35 に 8px 白が 3 スパン（コピー間隔16px）。
-; 回帰固定 = roms/litmus/scenarios/nusiz_copies.json。
+; litmus_nusiz_copies — hardware verification of NUSIZ multiple copies (S-2 verification extension)
+; Draws an 8px solid sprite with player0 and NUSIZ0=$03 (ThreeCopiesClose). Three copies line up horizontally.
+; With three close copies there is 8px of white at base / base+16 / base+32 px.
+; Check: read_row shows three 8px white spans on the sprite rows (copy spacing 16px).
+; Hardware-verified (Gopher2600): read_row(visible 96)=three 8px white spans at clock 3/19/35 (copy spacing 16px).
+; Regression-locked = roms/litmus/scenarios/nusiz_copies.json.
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
@@ -26,7 +26,7 @@ Clr:    sta $00,x
         bne Clr
         lda #$0E
         sta COLUP0
-        lda #$03          ; NUSIZ0 = ThreeCopiesClose（pkg/sprite.NUSIZPlayer(ThreeCopiesClose)）
+        lda #$03          ; NUSIZ0 = ThreeCopiesClose (pkg/sprite.NUSIZPlayer(ThreeCopiesClose))
         sta NUSIZ0
         lda #0
         sta COLUBK
@@ -68,10 +68,10 @@ OScan:  sta WSYNC
         bne OScan
         jmp NextFrame
 
-; スプライトは（カーネル基準）可視 88..95＝Gopher2600 可視 96..103。8 行とも solid $FF。
+; The sprite occupies (in kernel terms) visible 88..95 = Gopher2600 visible 96..103. All 8 rows are solid $FF.
 GfxLine:
         ds 96, 0
-        .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF     ; idx 96..103（可視 95..88）
+        .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF     ; idx 96..103 (visible 95..88)
         ds 88, 0
 
         org $FFFC

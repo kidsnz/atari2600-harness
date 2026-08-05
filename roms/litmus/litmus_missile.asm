@@ -1,8 +1,8 @@
-; litmus_missile — missile0 / ball の位置を実機裏取り（検証カバレッジ深化）
-; missile0 と ball を可視域の別位置にストローブ配置し有効化。read_tia で各位置、read_row で縦線として読める。
-; プレイヤー位置（litmus_pos, X=3N-54）に対し、ミサイル/ボール系（X=3N-55）の位置読み取りを裏取りする。
-; 実機裏取り済（Gopher2600）: read_tia missile0=38 / ball=140、read_row(100) で各 clock に 1px 白。
-; 回帰固定 = roms/litmus/scenarios/missile.json。
+; litmus_missile — hardware verification of missile0 / ball positions (deepening verification coverage)
+; missile0 and ball are strobed to different positions in the visible area and enabled. read_tia gives each position, read_row shows them as vertical lines.
+; Against the player position (litmus_pos, X=3N-54), this verifies the position readout of the missile/ball family (X=3N-55).
+; Hardware-verified (Gopher2600): read_tia missile0=38 / ball=140, and read_row(100) shows 1px of white at each clock.
+; Regression-locked = roms/litmus/scenarios/missile.json.
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
@@ -27,13 +27,13 @@ Clr:    sta $00,x
         dex
         bne Clr
         lda #$0E
-        sta COLUP0      ; missile0 白
-        sta COLUPF      ; ball 白
+        sta COLUP0      ; missile0 white
+        sta COLUPF      ; ball white
         lda #0
         sta COLUBK
         lda #2
-        sta ENAM0       ; missile0 有効
-        sta ENABL       ; ball 有効
+        sta ENAM0       ; missile0 enabled
+        sta ENABL       ; ball enabled
 
 NextFrame:
         lda #2
@@ -44,16 +44,16 @@ NextFrame:
         sta WSYNC
         lda #0
         sta VSYNC
-        ; VBLANK line 1: 位置決め（可視域でストローブ）
+        ; VBLANK line 1: positioning (strobe in the visible area)
         sta WSYNC
         ldy #6
 DM:     dey
-        bne DM          ; ~29cy ディレイ
-        sta RESM0       ; missile0 を可視域へ
+        bne DM          ; ~29cy delay
+        sta RESM0       ; missile0 into the visible area
         ldy #6
 DB:     dey
-        bne DB          ; さらに ~29cy
-        sta RESBL       ; ball をさらに右へ
+        bne DB          ; another ~29cy
+        sta RESBL       ; ball further right
         ldx #36
 VBlank: sta WSYNC
         dex

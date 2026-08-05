@@ -1,9 +1,9 @@
-; litmus_nusiz — NUSIZ 倍幅の実機裏取り（hardening-roadmap S-2）
-; 8px の solid スプライト（GRP=$FF 8 行）を player0・NUSIZ0=$05（DoubleWidth）で描く。
-; 倍幅なら各 design px が画面 2px になり、8px→16px 幅の連続白として出る。
-; 検証: read_row でスプライト行が 16px 幅（通常幅なら 8px）＝pkg/sprite.DoubleWidth セマンティクスの裏取り。
-; 実機裏取り済（Gopher2600）: read_row(可視96)=clock 4-19 が白 len16（=16px）／read_tia_registers player0.nusiz=5。
-; 回帰固定 = roms/litmus/scenarios/nusiz.json（nusiz アサート＋golden）。
+; litmus_nusiz — hardware verification of NUSIZ double width (hardening-roadmap S-2)
+; Draws an 8px solid sprite (GRP=$FF for 8 rows) with player0 and NUSIZ0=$05 (DoubleWidth).
+; At double width each design px becomes 2px on screen, so it comes out as continuous white 8px→16px wide.
+; Check: read_row shows the sprite rows 16px wide (8px at normal width) = verification of the pkg/sprite.DoubleWidth semantics.
+; Hardware-verified (Gopher2600): read_row(visible 96)=clock 4-19 white, len16 (=16px) / read_tia_registers player0.nusiz=5.
+; Regression-locked = roms/litmus/scenarios/nusiz.json (nusiz assert + golden).
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
@@ -26,7 +26,7 @@ Clr:    sta $00,x
         bne Clr
         lda #$0E
         sta COLUP0
-        lda #$05          ; NUSIZ0 = DoubleWidth（pkg/sprite.NUSIZPlayer(DoubleWidth)）
+        lda #$05          ; NUSIZ0 = DoubleWidth (pkg/sprite.NUSIZPlayer(DoubleWidth))
         sta NUSIZ0
         lda #0
         sta COLUBK
@@ -68,10 +68,10 @@ OScan:  sta WSYNC
         bne OScan
         jmp NextFrame
 
-; スプライトは（カーネル基準）可視 88..95＝Gopher2600 可視 96..103。8 行とも solid $FF。
+; The sprite occupies (in kernel terms) visible 88..95 = Gopher2600 visible 96..103. All 8 rows are solid $FF.
 GfxLine:
         ds 96, 0
-        .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF     ; idx 96..103（可視 95..88）
+        .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF     ; idx 96..103 (visible 95..88)
         ds 88, 0
 
         org $FFFC

@@ -1,27 +1,32 @@
 #!/usr/bin/env python3
-"""check_memory.py — 永続メモリ（~/.claude/.../memory/）の構造検査。
+"""check_memory.py — structural check of the persistent memory (~/.claude/.../memory/).
 
-なぜ要るか（2026-07-30 実測）: `docs/` には check_wiring / check_provenance があり、両方とも
-実際に穴を見つけた。**memory には検査が1つも無かった。** 38 本・1,786 行が、誰にも確かめられない
-まま毎セッション読み込まれていた。整理（統合・書き直し）はここから始めるべきで、ゲートの無い
-まま書き直すのは、このプロジェクトが一晩かけて潰していた「網の外にあるものが壊れる」そのもの。
+Why it is needed (measured 2026-07-30): `docs/` had check_wiring and check_provenance, and both
+of them actually found holes. **memory had no check at all.** 38 files / 1,786 lines were being
+loaded every session with nobody able to verify them. Tidying (consolidating, rewriting) should
+start here, and rewriting with no gate in place is exactly the "whatever is outside the net
+breaks" failure this project had spent a night stamping out.
 
-検査するもの:
-  ① [[wiki-link]] が実在する memory **または** harness/docs のファイルを指しているか
-  ② 全ファイルが MEMORY.md に **ちょうど1行** あり、索引の行も実在ファイルを指しているか
-  ③ frontmatter が揃っているか（name / description / metadata.type）かつ name == ファイル名
-  ④ 1ファイルの行数上限（再肥大の防止）
-  ⑥ harness/docs と CLAUDE.md からの [[link]] が現役の memory を指しているか
-     — 2026-07-30 実測: memory を1本 _archive/ に移した直後、docs/authoring-protocol.md:5 の
-       [[feedback-authoring-loop-system]] が宙に浮いた。memory→docs だけ見ていて逆向きを
-       見ていなかったので、最初の版はこれを見逃した。片方向の検査は検査の半分。
-  ⑤ ★正本ルールが「事件」を保っているか＝具体物（ファイル名・テスト名・数値）を一定数引いているか
-     — ルールが噛むのは抽象論ではなく具体例。整理すると見出しだけ残って事例が落ちる。それを機械で止める。
+What is checked:
+  (1) Does each [[wiki-link]] point at a memory file that exists **or** a harness/docs file?
+  (2) Does every file have **exactly one** line in MEMORY.md, and does each index line point at
+      a file that exists?
+  (3) Is the frontmatter complete (name / description / metadata.type) and name == filename?
+  (4) The per-file line ceiling (to prevent re-bloat).
+  (6) Do the [[link]]s from harness/docs and CLAUDE.md point at live memory files?
+     — measured 2026-07-30: right after one memory file was moved to _archive/, the
+       [[feedback-authoring-loop-system]] link at docs/authoring-protocol.md:5 was left dangling.
+       The first version missed it because it looked only at memory->docs and not the reverse
+       direction. A one-way check is half a check.
+  (5) ★ Are the canonical rule files still holding onto their INCIDENTS — that is, do they cite a
+      minimum number of concrete things (filenames, test names, numbers)?
+     — what makes a rule bite is the concrete example, not the abstraction. Tidying tends to leave
+       the headings and drop the cases. This stops that mechanically.
 
-使い方:
+Usage:
     cd harness && python3 scripts/check_memory.py
     MEMORY_DIR=/path/to/memory python3 scripts/check_memory.py
-memory ディレクトリが無い環境では skip（exit 0）。
+On a machine with no memory directory this skips (exit 0).
 """
 import os
 import re
@@ -31,41 +36,53 @@ DEFAULT = os.path.expanduser(
     "~/.claude/projects/-Users-shinji-Documents-2D-260609-atari2600-dev/memory")
 MEM = os.environ.get("MEMORY_DIR", DEFAULT)
 
-# 1ファイルの上限。実測(2026-07-30)の最大は project-next-session-todo.md=321、
-# 次が feedback-verification-standard.md=197。上限はその間ではなく「正本として読める長さ」で引く。
+# The per-file ceiling. Measured (2026-07-30), the largest was project-next-session-todo.md=321
+# and the next feedback-verification-standard.md=197. The ceiling is not drawn between those two
+# but at "a length that still reads as a canonical rule".
 MAX_LINES = 250
 
-# 上限の明示的な例外。**理由を書かないと通らない**（黙って緩めない）。
-# 借金は隠すのでなく grep できる形にする — roms 側の `@rom-write-ok` と同じ流儀。
+# Explicit exceptions to the ceiling. **You do not get one without writing the reason**
+# (no silent loosening). Debt is kept greppable rather than hidden — the same convention as
+# `@rom-write-ok` on the roms side.
 OVERSIZE_EXEMPT = {
-    # 2026-07-30: 唯一の例外だった project-next-session-todo.md は解消済み（322 -> 34 行）。
-    # 履歴17節は memory/_archive/project-next-session-todo-history.md へ保管し、STATUS.md に
-    # 無かった3節は STATUS.md へ移設（20節すべての所在を1件ずつ確認・行方不明0）。8,361文字あった
-    # description は1行へ戻した。表を空で残すのは、次に超えたとき理由を書く場所を示すため。
+    # 2026-07-30: project-next-session-todo.md, the only exception there was, is resolved
+    # (322 -> 34 lines). The 17 history sections were stored in
+    # memory/_archive/project-next-session-todo-history.md and the 3 sections that were not in
+    # STATUS.md were moved into STATUS.md (all 20 sections were accounted for one by one; none
+    # went missing). The description, which had run to 8,361 characters, was put back to one line.
+    # The table is left empty deliberately: it shows where to write the reason next time one
+    # exceeds the ceiling.
 }
 
-# 正本ルール。ここは中身を薄くしてはいけない側。
+# The canonical rules. This is the side that must NOT be thinned out.
 CANONICAL = [
     "feedback-verification-standard.md",
     "feedback-goal-standard.md",
     "feedback-execution-discipline.md",
     "feedback-work-tracking.md",
 ]
-MIN_CONCRETE = 3  # 正本が引くべき具体物の最少数
+MIN_CONCRETE = 3  # the minimum number of concrete things a canonical rule must cite
 
-# 「具体物」= リポジトリの実在物やテスト名や測定値。抽象論だけの正本を落とすための指標。
+# A "concrete thing" = something that really exists in the repo, a test name, or a measured value.
+# The metric that fails a canonical rule which has become pure abstraction.
+#
+# NOTE: the unit alternatives below are deliberately Japanese. This regex is the one thing in
+# scripts/ that reads a NON-repo tree: the memory files under ~/.claude/.../memory/ are the
+# author's own notes and are written in Japanese by design. Translating these alternatives would
+# stop the check finding measured values and silently weaken gate (5).
 CONCRETE = re.compile(
-    r"`[^`]*\.(?:asm|go|py|json|md|bin)`"      # ファイル名
-    r"|`?Test[A-Z][A-Za-z0-9_]+`?"              # Go テスト名
-    r"|\b[0-9a-f]{7}\b"                         # コミットハッシュ
-    r"|\b\d+\s*(?:件|本|行|回|cy|サイクル|px)\b"  # 単位つきの実測値
+    r"`[^`]*\.(?:asm|go|py|json|md|bin)`"      # a filename
+    r"|`?Test[A-Z][A-Za-z0-9_]+`?"              # a Go test name
+    r"|\b[0-9a-f]{7}\b"                         # a commit hash
+    r"|\b\d+\s*(?:件|本|行|回|cy|サイクル|px)\b"  # a measured value with its unit
 )
 LINK = re.compile(r"\[\[([^\]]+)\]\]")
 HARNESS_DOCS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs")
 
 
 def INDEX_ENTRY(fname):
-    """索引の1項目 = 行頭の `- [Title](file.md)`。本文中の参照とは形が違う。"""
+    """One index entry = `- [Title](file.md)` at the start of a line. A different shape from a
+    reference in the prose."""
     return re.compile(r"^- \[[^\]]*\]\(" + re.escape(fname) + r"\)", re.M)
 
 FM_NAME = re.compile(r"^name:\s*(\S+)\s*$", re.M)
@@ -74,11 +91,13 @@ FM_TYPE = re.compile(r"^\s*type:\s*(user|feedback|project|reference)\s*$", re.M)
 
 
 def inbound(stem, files, index_text, repo):
-    """stem を指している箇所を数えて返す。MEMORY.md の索引行（全ファイルが必ず1本持つ）は除く。
+    """Count and return the places that point at stem, excluding the MEMORY.md index line
+    (every file has exactly one, so it carries no information).
 
-    2026-07-30 の実測でこれが要ると分かった: あるメモリの被参照を「正本1ファイルの1行」と
-    報告して archive しようとしたが、実際は 3 箇所から参照されていた。統合の前に**全数を機械で
-    数える**のでなければ、張り忘れた参照が宙に浮く。
+    A measurement on 2026-07-30 showed this was needed: the inbound references to one memory file
+    were reported as "one line in one canonical file" and it was about to be archived on that
+    basis, when in fact 3 places referenced it. Unless you **count them all mechanically** before
+    consolidating, the references nobody re-pointed are left dangling.
     """
     hits = []
     pats = [re.compile(r"\[\[" + re.escape(stem) + r"\]\]"),
@@ -97,7 +116,8 @@ def inbound(stem, files, index_text, repo):
         n = sum(len(pat.findall(body)) for pat in pats)
         if n:
             hits.append(f"{label}x{n}" if n > 1 else label)
-    # 索引は「本文中の相互参照」だけ数える（項目行は全ファイルが持つので情報量ゼロ）
+    # In the index, count only cross-references in the prose (every file has an entry line, so
+    # those carry zero information).
     body = index_text
     n = sum(len(pat.findall(body)) for pat in pats) - len(INDEX_ENTRY(stem + ".md").findall(body))
     if n > 0:
@@ -106,8 +126,9 @@ def inbound(stem, files, index_text, repo):
 
 
 def report():
-    """統合候補を選ぶための表。被参照0＝落とせる可能性がある、というだけで、
-    固有情報が無いことは別途1本ずつ確かめる必要がある（数を目標にしない）。"""
+    """The table used to pick consolidation candidates. Zero inbound references only means a file
+    COULD possibly be dropped; that it holds no unique information has to be confirmed separately,
+    one file at a time (do not make the count a target)."""
     files = sorted(f for f in os.listdir(MEM) if f.endswith(".md") and f != "MEMORY.md")
     index = open(os.path.join(MEM, "MEMORY.md"), encoding="utf-8").read()
     repo = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -119,7 +140,7 @@ def report():
     rows.sort()
     print(f"{'refs':>4} {'lines':>5}  file")
     for n, lines, f, hits in rows:
-        mark = "  ← 被参照0" if n == 0 else ""
+        mark = "  ← 0 inbound" if n == 0 else ""
         print(f"{n:>4} {lines:>5}  {f}{mark}")
         if hits:
             print(f"            {', '.join(hits)}")
@@ -164,7 +185,7 @@ def main():
         if not FM_TYPE.search(text):
             errors.append(f"{f}: no `metadata.type:` of user/feedback/project/reference")
 
-        # ④ 上限
+        # (4) the ceiling
         if lines > MAX_LINES and f not in OVERSIZE_EXEMPT:
             errors.append(f"{f}: {lines} lines, over the {MAX_LINES} cap — split it rather than let "
                           f"one file accrete (one fact per file). If it must stay, add it to "
@@ -174,9 +195,9 @@ def main():
                           f"the debt was paid, so drop the exemption rather than leave a licence "
                           f"nobody needs")
 
-        # ① リンク。memory 同士だけでなく harness/docs も正当な行き先なので、
-        # 禁じるのではなく「どちらかに実在するか」を検査する（実測: feedback-verification-standard
-        # は [[known-traps]] で docs/known-traps.md を指していた）。
+        # (1) links. harness/docs is as legitimate a destination as another memory file, so this
+        # does not forbid it — it checks that the target exists in ONE OF THE TWO (measured:
+        # feedback-verification-standard used [[known-traps]] to point at docs/known-traps.md).
         for target in LINK.findall(text):
             if target in stems:
                 continue
@@ -185,8 +206,8 @@ def main():
                 continue
             errors.append(f"{f}: [[{target}]] resolves to neither a memory nor a harness doc")
 
-        # ② 索引。数えるのは **索引項目の行** だけ。本文中の相互参照
-        # （「正本＝[x](x.md)」など）は正当な書き方なので数に入れない。
+        # (2) the index. Count **index entry lines** only. Cross-references in the prose
+        # (e.g. "canonical = [x](x.md)") are a legitimate way to write and are not counted.
         n = len(INDEX_ENTRY(f).findall(index))
         if n == 0:
             errors.append(f"{f}: absent from MEMORY.md — a memory nobody indexes is not recalled")
@@ -195,7 +216,7 @@ def main():
 
         concrete_counts[f] = len(set(CONCRETE.findall(text)))
 
-    # ⑥ 逆向き: harness の docs / CLAUDE.md から memory を指すリンク
+    # (6) the reverse direction: links from the harness docs / CLAUDE.md that point at memory
     repo = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     sources = [os.path.join(repo, "CLAUDE.md")]
     for base, _, fs in os.walk(os.path.join(repo, "docs")):
@@ -218,12 +239,12 @@ def main():
             why = "it was archived" if arch else "no such memory or doc"
             errors.append(f"{rel}: [[{target}]] resolves to nothing ({why})")
 
-    # 索引が実在しないファイルを指していないか
+    # does the index point at a file that does not exist?
     for ref in re.findall(r"\(([a-z0-9-]+\.md)\)", index):
         if ref not in files:
             errors.append(f"MEMORY.md links to {ref}, which does not exist")
 
-    # ⑤ 正本の具体性
+    # (5) concreteness of the canonical rules
     for c in CANONICAL:
         if c not in files:
             errors.append(f"canonical rule file {c} is missing")

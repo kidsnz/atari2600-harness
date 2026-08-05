@@ -6,9 +6,10 @@ import (
 	"github.com/jetsetilly/gopher2600/hardware/television/signal"
 )
 
-// audioCapture は生の音声サンプル列をチャンネル別に蓄積する AudioMixer（V2-15）。
-// TIA は 1 scanline あたり 2 サンプル生成（≈31.4kHz NTSC）。digest がハッシュしか持たないのに対し、
-// こちらは波形そのもの＝ゼロ交差/自己相関で「音程」を数値測定できる（Slocum 音程表の反証可能化）。
+// audioCapture is an AudioMixer that accumulates the raw audio sample stream per channel
+// (V2-15). The TIA generates 2 samples per scanline (≈31.4kHz NTSC). Where a digest holds
+// only a hash, this holds the waveform itself = "pitch" can be measured numerically by
+// zero-crossing / autocorrelation (which makes Slocum's pitch table falsifiable).
 type audioCapture struct {
 	ch0 []uint8
 	ch1 []uint8
@@ -25,7 +26,7 @@ func (c *audioCapture) SetAudio(sig []signal.AudioSignalAttributes) error {
 func (c *audioCapture) EndMixing() error { return nil }
 func (c *audioCapture) Reset()           { c.ch0 = c.ch0[:0]; c.ch1 = c.ch1[:0] }
 
-// EnableAudioCapture は生サンプルの取得を開始する（冪等）。
+// EnableAudioCapture starts collecting raw samples (idempotent).
 func (e *Emu) EnableAudioCapture() error {
 	if e.acap != nil {
 		return nil
@@ -38,14 +39,14 @@ func (e *Emu) EnableAudioCapture() error {
 	return nil
 }
 
-// ResetAudioCapture は蓄積済みサンプルを破棄する（warmup 除外用）。
+// ResetAudioCapture discards the samples accumulated so far (to exclude the warmup).
 func (e *Emu) ResetAudioCapture() {
 	if e.acap != nil {
 		e.acap.Reset()
 	}
 }
 
-// AudioSamples は取得済みの生サンプル（ch0, ch1）を返す。
+// AudioSamples returns the raw samples collected so far (ch0, ch1).
 func (e *Emu) AudioSamples() (ch0, ch1 []uint8) {
 	if e.acap == nil {
 		return nil, nil

@@ -10,13 +10,14 @@ import (
 	"github.com/jetsetilly/gopher2600/hardware/television/specification"
 )
 
-// capture は television.PixelRenderer を実装し、最新フレームを image.RGBA に取り込む。
-// 実装は Gopher2600 の thumbnailer/image.go の確立パターンを踏襲（signal→RGB 変換、
-// frameInfo.Crop() で可視域クロップ）。
+// capture implements television.PixelRenderer and takes the latest frame into an image.RGBA.
+// The implementation follows the established pattern of Gopher2600's thumbnailer/image.go
+// (signal→RGB conversion, crop to the visible area with frameInfo.Crop()).
 //
-// クロップ画像の座標規約（litmus / Crop() 実装で裏取り済み）:
-//   - x = 可視 clock 0..159（スプライトの HmovedPixel と同一）
-//   - y = 絶対 scanline − VisibleTop（可視先頭が y=0）
+// Coordinate convention of the cropped image (corroborated against litmus and the Crop()
+// implementation):
+//   - x = visible clock 0..159 (identical to a sprite's HmovedPixel)
+//   - y = absolute scanline − VisibleTop (the first visible line is y=0)
 type capture struct {
 	img       *image.RGBA
 	cropImg   *image.RGBA
@@ -27,12 +28,13 @@ func newCapture() *capture {
 	c := &capture{}
 	c.img = image.NewRGBA(image.Rect(0, 0, specification.ClksScanline, specification.AbsoluteMaxScanlines))
 	c.clear()
-	// 初期クロップを NTSC で確定（force=true）。以後フレーム仕様が安定したら更新。
+	// Fix the initial crop as NTSC (force=true). Updated later, once the frame spec is stable.
 	c.resize(frameinfo.NewCurrent(specification.SpecNTSC), true)
 	return c
 }
 
-// clear は全ピクセルを黒・alpha=255 に。SetPixels は RGB のみ書くため alpha を先に立てる。
+// clear sets every pixel to black with alpha=255. SetPixels writes only RGB, so alpha is
+// raised up front.
 func (c *capture) clear() {
 	for i := 0; i < len(c.img.Pix); i += 4 {
 		c.img.Pix[i], c.img.Pix[i+1], c.img.Pix[i+2], c.img.Pix[i+3] = 0, 0, 0, 255
@@ -46,7 +48,7 @@ func (c *capture) resize(fi frameinfo.Current, force bool) {
 	c.frameInfo = fi
 }
 
-// --- television.PixelRenderer 実装 ---
+// --- television.PixelRenderer implementation ---
 
 func (c *capture) NewFrame(fi frameinfo.Current) error {
 	c.resize(fi, false)
@@ -81,8 +83,9 @@ func (c *capture) colorRGBA(code uint8) color.RGBA {
 	return c.frameInfo.Spec.GetColor(signal.ColorSignal(code))
 }
 
-// snapshot は最新フレームの可視域を独立した image.RGBA コピーで返す（以後の駆動で
-// 上書きされない）。visibleTop は縦座標マッピング用（クロップ y=0 の絶対 scanline）。
+// snapshot returns the visible area of the latest frame as an independent image.RGBA copy
+// (later driving does not overwrite it). visibleTop is for mapping vertical coordinates (the
+// absolute scanline of crop y=0).
 func (c *capture) snapshot() (img *image.RGBA, visibleTop int) {
 	src := c.cropImg
 	dst := image.NewRGBA(image.Rect(0, 0, src.Bounds().Dx(), src.Bounds().Dy()))

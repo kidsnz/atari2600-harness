@@ -10,46 +10,53 @@ import (
 	"github.com/jetsetilly/gopher2600/rewind"
 )
 
-// State は「この瞬間の機械まるごと」のスナップショット。SaveState で作り RestoreState で戻す。
-// 用途は分岐探索 = 同一局面から N 通りの入力/RAM 値を試して結果を比べる（毎回 load_rom からの
-// 再実行を不要にする）。同一 State は何度でも復元できる（Plumb 側が内部で再スナップショットする）。
+// State is a snapshot of "the whole machine at this instant". SaveState makes one,
+// RestoreState goes back to it. The use is branch search = trying N different inputs / RAM
+// values from the same position and comparing the outcomes (no re-run from load_rom every
+// time). The same State can be restored any number of times (Plumb re-snapshots internally
+// on its side).
 //
-// 中身は 3 層:
-//   - vcs / tv : Gopher2600 の hardware.State / television.State（CPU・RAM・TIA・RIOT・カート・TV）
-//   - pix      : capture の最新フレーム画像（下記の理由で必須）
-//   - counters : 本ラッパが持つ CPU サイクル累積（read_cycles の出典）
+// The contents are three layers:
+//   - vcs / tv : Gopher2600's hardware.State / television.State (CPU, RAM, TIA, RIOT, cart, TV)
+//   - pix      : capture's latest frame image (required, for the reason below)
+//   - counters : the accumulated CPU cycles this wrapper holds (where read_cycles comes from)
 //
-// ★ pix を持つ理由（実測 2026-07-23, sandbox/experiments/monet-frogger/monet_anim.bin）:
-// television.Plumb は tv.state を差し替えるだけで **PixelRenderer には一切触らない**
-// （Gopher2600 hardware/television/television.go）。実測でも復元時に capture.Reset() は呼ばれず、
-// 復元直後のフレームバッファには **分岐先で描かれた古い絵がそのまま残る**（ハッシュが保存時と
-// 不一致・分岐時と一致）。つまり pix を戻さないと「RAM は戻ったのに get_screen だけ未来の絵」
-// という再現しにくい嘘になる。ここで一緒に戻すことで復元は画面まで含めて一貫する。
+// ★ Why pix is held (measured 2026-07-23, sandbox/experiments/monet-frogger/monet_anim.bin):
+// television.Plumb only swaps tv.state and **never touches the PixelRenderer at all**
+// (Gopher2600 hardware/television/television.go). Measured, capture.Reset() is indeed not
+// called on restore, and the framebuffer right after a restore **still holds the stale
+// picture that was drawn down the branch** (its hash does not match the one at save time and
+// does match the one at branch time). So without restoring pix you get the hard-to-reproduce
+// lie of "the RAM went back but get_screen alone shows the future". Restoring it here makes
+// a restore consistent all the way to the screen.
 //
-// 覆わないもの（正直な限界。いずれも「加算されるだけの記録器」で、機械の状態ではない）:
-//   - EnableVideoDigest / EnableAudioDigest の連鎖ハッシュ（巻き戻らない）
-//   - EnableCoverage の PC/分岐カバレッジ（巻き戻らない = 累積カバレッジのまま）
-//   - EnableAudioCapture の生サンプル列（巻き戻らない）
+// Not covered (the honest limits; every one of them is a recorder that only ever accumulates,
+// not machine state):
+//   - the chained hashes of EnableVideoDigest / EnableAudioDigest (do not rewind)
+//   - EnableCoverage's PC/branch coverage (does not rewind = stays cumulative)
+//   - EnableAudioCapture's raw sample stream (does not rewind)
 type State struct {
 	vcs *hardware.State
 	tv  *television.State
 
-	pix       []uint8           // capture.img.Pix の独立コピー
-	frameInfo frameinfo.Current // クロップ矩形の出典
-	cropRect  image.Rectangle   // 復元時に cropImg を張り直すための矩形
+	pix       []uint8           // an independent copy of capture.img.Pix
+	frameInfo frameinfo.Current // where the crop rectangle comes from
+	cropRect  image.Rectangle   // rectangle for re-making cropImg on restore
 
 	cpuCycles     int64
 	cycleMark     int64
 	paddlePlugged [2]bool
 }
 
-// Coords は State が指す TV 座標（frame/scanline/clock）。保存時点の識別に使う。
+// Coords is the TV coordinate the State points at (frame/scanline/clock). Used to identify
+// the point at which it was saved.
 func (s *State) Coords() (frame, scanline, clock int) {
 	c := s.tv.GetCoords()
 	return c.Frame, c.Scanline, c.Clock
 }
 
-// SaveState は現在の機械状態を丸ごと保存する。emulator は進めない（副作用なし）。
+// SaveState saves the whole of the current machine state. It does not advance the emulator
+// (no side effects).
 func (e *Emu) SaveState() *State {
 	pix := make([]uint8, len(e.cap.img.Pix))
 	copy(pix, e.cap.img.Pix)
@@ -71,7 +78,8 @@ func (e *Emu) SaveState() *State {
 	}
 }
 
-// RestoreState は SaveState で作った状態へ戻す。同一 State から何度でも戻せる。
+// RestoreState goes back to a state made by SaveState. The same State can be gone back to
+// any number of times.
 func (e *Emu) RestoreState(s *State) error {
 	if s == nil {
 		return fmt.Errorf("restore state: nil state")
@@ -82,8 +90,9 @@ func (e *Emu) RestoreState(s *State) error {
 
 	rewind.Plumb(e.VCS, &rewind.State{VCS: s.vcs, TV: s.tv}, false)
 
-	// ★ フレームバッファを戻す（上のコメント参照）。cropImg は img.Pix を共有する SubImage
-	// なので、img.Pix を書き戻せば同時に戻る。矩形だけは frameInfo ごと張り直す。
+	// ★ Restore the framebuffer (see the comment above). cropImg is a SubImage that shares
+	// img.Pix, so writing img.Pix back restores it at the same time. Only the rectangle has to
+	// be re-made, together with frameInfo.
 	copy(e.cap.img.Pix, s.pix)
 	e.cap.frameInfo = s.frameInfo
 	e.cap.cropImg = e.cap.img.SubImage(s.cropRect).(*image.RGBA)
