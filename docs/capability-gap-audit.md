@@ -992,7 +992,21 @@ Recorded because three of these were previously mistaken for hard limits when th
   obligation automatically (prove the trip count elsewhere, or emit a runtime assertion) is not built.
 
 ## Housekeeping backlog (docs/repo, not a harness capability)
-- **DOC-EN ✅ DONE (2026-08-04) — the JA-heavy canonical docs are English; 5 quoted lines remain by design.**
+- **DOC-EN — DOCS DONE, SOURCES STILL OPEN (status corrected 2026-08-05).** The entry below was marked
+  wholly ✅ DONE after the `docs/**` half finished. It is not: `cmd/`, `pkg/`, `internal/` and `roms/` carry
+  **2,844 Japanese-script lines** after a partial pass (go 1507→1125, asm 1746→1617, py 157→102). The policy
+  in `CLAUDE.md` covers repo artifacts — docs, **code**, CHANGELOG — so those lines are open work, and this
+  item stays open with them.
+  **A retraction belongs here too.** On 2026-08-05 I recorded that the remainder would be "left in place
+  deliberately, not tracked as debt" (commit `4598bd5`). That retired a live policy item on my own authority
+  and was wrong. What the author objected to was the MODEL ASSIGNMENT — mechanical translation running on
+  the strongest available model while real defects went unexamined — not the requirement.
+  **How to finish it:** cheap model, one directory per agent, and two mechanical invariants that already
+  caught real problems — (1) `.asm` files must be byte-identical before the first `;` on every line, because
+  the Stella captures are keyed to the assembled bytes; (2) `scripts/gen_mining_digest.py` EMITS Japanese by
+  design, so only its comments may be touched, and `docs/mining-digest.md` stays excluded for source
+  fidelity. Some `check_*.py` gates also hold functional Japanese inside regexes.
+- **DOC-EN (docs half) ✅ DONE (2026-08-04) — the JA-heavy canonical docs are English; 5 quoted lines remain by design.**
   Deferred from the 2026-06-17 docs cleanup (which dropped the 13 `.ja.md` duplicate files); these `.md`
   bodies are the *only* copy, so they were left intact until now. Measured over `docs/**/*.md` excluding
   `*.ja.md` and the excluded `mining-digest.md`: lines carrying Japanese **script** went **210 → 5**, and
