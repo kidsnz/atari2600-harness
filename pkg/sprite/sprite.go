@@ -112,6 +112,14 @@ func Reflect(b byte) byte {
 // 各桁 8 行・**最上段が先頭**（[d][0]=上）。グリフは 6px 幅＋右 2px 空白
 // （48px スコアカーネルではコピーが 8px ピッチで隣接するため、桁間隔をフォント側に内蔵する）。
 // kernel が Y=7→0 で参照する場合（score6.asm）は逆順で .byte 化すること。
+//
+// Digit 9 was stored in score6's RAW bottom-first order while the other nine were
+// reversed, so read as documented it drew an upside-down glyph — a 9 with the bowl at
+// the bottom, which reads as a 6. Nothing caught it: the package has no importer, and
+// TestDigitFont only asserted that the low 2 bits are clear and that no digit is blank,
+// neither of which a flipped glyph violates. The doc comment's claim of being identical
+// to score6 is now the test (TestDigitFontMatchesScore6), parsed out of the .asm, so the
+// two copies cannot drift apart again.
 func DigitFont() [10][8]byte {
 	return [10][8]byte{
 		{0x78, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0x78}, // 0
@@ -123,6 +131,6 @@ func DigitFont() [10][8]byte {
 		{0x38, 0x60, 0xC0, 0xF8, 0xCC, 0xCC, 0xCC, 0x78}, // 6
 		{0xFC, 0x0C, 0x18, 0x30, 0x60, 0x60, 0x60, 0x60}, // 7
 		{0x78, 0xCC, 0xCC, 0x78, 0xCC, 0xCC, 0xCC, 0x78}, // 8
-		{0x70, 0x18, 0x0C, 0x7C, 0xCC, 0xCC, 0xCC, 0x78}, // 9
+		{0x78, 0xCC, 0xCC, 0xCC, 0x7C, 0x0C, 0x18, 0x70}, // 9
 	}
 }

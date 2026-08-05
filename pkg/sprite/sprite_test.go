@@ -1,6 +1,10 @@
 package sprite
 
 import (
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/kidsnz/atari2600-harness/pkg/playfield"
@@ -119,6 +123,56 @@ func TestDigitFont(t *testing.T) {
 		}
 		if !lit {
 			t.Errorf("digit %d is blank", d)
+		}
+	}
+}
+
+// TestDigitFontMatchesScore6 turns DigitFont's own doc comment into a check. It claims
+// the glyphs are identical to the score6 technique's and that it returns them top-first,
+// while score6.asm stores them bottom-first for a Y=7->0 kernel — so the two tables must
+// be exact reverses of each other, digit for digit.
+//
+// Nothing asserted that before, and digit 9 was wrong: it held score6's raw bottom-first
+// bytes while the other nine were reversed, which draws an upside-down glyph. The
+// existing TestDigitFont could not see it (low-2-bits-clear and not-blank are both true
+// of a flipped glyph), and the package has no importer, so no ROM was ever going to
+// notice either. Parsing the .asm rather than restating its bytes here is deliberate: a
+// second hand-copied table would be a third copy to drift.
+func TestDigitFontMatchesScore6(t *testing.T) {
+	const asmPath = "../../roms/techniques/score6.asm"
+	src, err := os.ReadFile(asmPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", asmPath, err)
+	}
+	// Font table rows look like: `        byte $78,$CC,...,$78   ; 0`
+	row := regexp.MustCompile(`(?m)^\s*byte\s+((?:\$[0-9A-Fa-f]{2},){7}\$[0-9A-Fa-f]{2})\s*;\s*(\d)`)
+	ms := row.FindAllStringSubmatch(string(src), -1)
+	if len(ms) != 10 {
+		t.Fatalf("parsed %d font rows from %s, want 10 — the table's shape changed and this "+
+			"test would silently stop checking", len(ms), asmPath)
+	}
+	got := DigitFont()
+	for _, m := range ms {
+		d, err := strconv.Atoi(m[2])
+		if err != nil || d < 0 || d > 9 {
+			t.Fatalf("bad digit label %q", m[2])
+		}
+		var asm [8]byte
+		for i, f := range strings.Split(m[1], ",") {
+			v, err := strconv.ParseUint(strings.TrimPrefix(strings.TrimSpace(f), "$"), 16, 8)
+			if err != nil {
+				t.Fatalf("digit %d field %q: %v", d, f, err)
+			}
+			asm[i] = byte(v)
+		}
+		// score6 is bottom-first; DigitFont documents top-first.
+		var want [8]byte
+		for i := range asm {
+			want[i] = asm[7-i]
+		}
+		if got[d] != want {
+			t.Errorf("digit %d: DigitFont()=%X, reversed score6=%X — one of the two copies drifted",
+				d, got[d], want)
 		}
 	}
 }

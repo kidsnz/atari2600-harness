@@ -94,16 +94,15 @@ type LintResult struct {
 	Declined     string        `json:"declined,omitempty"` // non-empty: the ROM was not analysed at all
 }
 
-// Lint assembles asmPath and returns timing-lint warnings (proactive, static).
-func Lint(asmPath string) ([]LintWarning, error) {
-	r, err := LintDetail(asmPath)
-	if err != nil {
-		return nil, err
-	}
-	return r.Warnings, nil
-}
-
-// LintDetail is Lint plus the coverage the run achieved.
+// LintDetail assembles asmPath and returns timing-lint warnings (proactive, static)
+// TOGETHER WITH the coverage the run achieved.
+//
+// There is deliberately no warnings-only `Lint` wrapper any more. One existed, had no
+// caller anywhere (cmd/timinglint and both test helpers go through this function), and
+// all it did was discard the denominator — Banks/Instructions/PerBank/Declined — that
+// this function exists to supply. An empty warning list means "clean" or "nothing was
+// analysed", and those are opposite answers; a signature that cannot tell them apart is
+// the shape of defect this package keeps finding elsewhere.
 func LintDetail(asmPath string) (LintResult, error) {
 	bin := build.BinPathFor(asmPath)
 	out, lst, sym, err := build.AssembleWithListing(asmPath, bin)

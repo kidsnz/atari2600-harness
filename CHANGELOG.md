@@ -9,6 +9,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`pkg/sprite.DigitFont()`'s digit 9 was upside down, and the doc comment that would have caught it is now
+  the test.** The comment claims the glyphs are identical to the `score6` technique's and that they are
+  returned top-first, while `score6.asm` stores them bottom-first for a `Y=7->0` kernel — so the two tables
+  must be exact reverses. Derived independently from `roms/techniques/score6.asm:193-202`: digits 0-8 match
+  perfectly, **digit 9 held score6's raw bottom-first bytes**, so read as documented it draws a 9 with the
+  bowl at the bottom — which reads as a 6. Corrected to `{0x78,0xCC,0xCC,0xCC,0x7C,0x0C,0x18,0x70}`.
+  Nothing could have noticed: `pkg/sprite` has no importer, so no ROM renders it, and `TestDigitFont` only
+  asserted low-2-bits-clear and not-blank, both of which a flipped glyph satisfies. `TestDigitFontMatchesScore6`
+  now PARSES the `.asm` (rather than restating its bytes, which would be a third copy to drift) and asserts
+  the reversal digit for digit. Negative control: restoring the old bytes fails it with
+  `digit 9: DigitFont()=70180C7CCCCCCC78, reversed score6=78CCCCCC7C0C1870`.
+- **Deleted `cyclebound.Lint`, a caller-less wrapper whose only effect was discarding a denominator.**
+  `cmd/timinglint` and both test helpers go through `LintDetail`; nothing called `Lint`. It returned the
+  warning list alone, throwing away `Banks`/`Instructions`/`PerBank`/`Declined` — and an empty warning list
+  means either "clean" or "nothing was analysed", which are opposite answers. A signature that cannot tell
+  them apart is the defect this package keeps finding elsewhere. `CLAUDE.md`'s pointer updated with it.
 - **The divide loop's entry value now crosses the region boundary — and the backlog item that sent me looking
   was wrong in both of its premises, which is the more useful half of this entry.** The board said the prover
   mislabels pizza-boy's `SetXPos` as `kind=visible` because blank classification does not cross a JSR.
