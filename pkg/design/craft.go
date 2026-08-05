@@ -3,8 +3,24 @@ package design
 // 作画 craft（絵作り）の数値化できるルール。判断系の craft（字形の誤読・サムネ可読性など
 // 人/画像が要るもの）はコード化せず docs/design-principles.md の「機械判定不能」節に集約する。
 
-// PixelAspectRatio は 2600 の画面上 1 ピクセルの 横:縦 比（≈ 2:1・横長）。正方ピクセルの
 // プレビューを信じてはいけない＝実機アスペクトで絵を決める。〔design-principles.md / 採掘 326595〕
+// PixelAspectRatio is the width:height of one 2600 pixel on screen — the pixel is
+// WIDE, so a square shape needs more scanlines than columns.
+//
+// ★ THIS VALUE IS KNOWN TO BE TOO LARGE, and is left at 2 deliberately until someone
+// decides which display to design for. Measured against the mined sources
+// (docs/design-principles.md, threads 190154 / 169128 / 208810 / 172161 / 334673):
+// 5:3 = 1.67, 12:7 = 1.71, 20:11 = 1.82. **2.0 is above all of them.**
+//
+// The spread is not noise. A pixel's aspect is (visible width / visible height)
+// divided by the display's own 4:3, and the VISIBLE HEIGHT is the free variable —
+// 192 lines of a 262-line frame is a different picture from 210 or 228, and each
+// source picked a different one. So no single measurement arbitrates it; choosing a
+// value inside 1.67–1.82 is a decision about which overscan to design for, and it
+// belongs to whoever is drawing, not to whichever thread was read last.
+//
+// Anything that consumes this is over-tall by 10–20% today. Raising the number is a
+// one-line change; deciding WHICH number is the part that is not the code's to make.
 const PixelAspectRatio = 2
 
 // ScanlinesForSquare は、幅 widthPx のスプライト/アイコンを画面上で正方に見せるのに必要な
