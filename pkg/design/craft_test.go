@@ -2,16 +2,6 @@ package design
 
 import "testing"
 
-// TestScanlinesForSquare は横長補正（縦2倍）で正方表示になること。
-func TestScanlinesForSquare(t *testing.T) {
-	if got := ScanlinesForSquare(8); got != 16 {
-		t.Errorf("ScanlinesForSquare(8)=%d want 16", got)
-	}
-	if got := ScanlinesForSquare(0); got != 0 {
-		t.Errorf("ScanlinesForSquare(0)=%d want 0", got)
-	}
-}
-
 // TestWalkFrame は選んだビットで 50:50 に交互すること。
 func TestWalkFrame(t *testing.T) {
 	// speedBit=0 → 毎フレーム交互（0,1,0,1,...）

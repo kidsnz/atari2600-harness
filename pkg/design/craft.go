@@ -4,31 +4,24 @@ package design
 // 人/画像が要るもの）はコード化せず docs/design-principles.md の「機械判定不能」節に集約する。
 
 // プレビューを信じてはいけない＝実機アスペクトで絵を決める。〔design-principles.md / 採掘 326595〕
-// PixelAspectRatio is the width:height of one 2600 pixel on screen — the pixel is
-// WIDE, so a square shape needs more scanlines than columns.
+// The pixel-aspect pair that used to live here — `PixelAspectRatio = 2` and
+// `ScanlinesForSquare(w) = w * 2` — was DELETED on 2026-08-04. It had no caller
+// anywhere: not in this repository, not in the umbrella `sandbox/` tree that holds
+// the 54 authored PONG sources and the Pizza Boy reproduction. The only references
+// were its own definition and a test asserting that definition.
 //
-// ★ THIS VALUE IS KNOWN TO BE TOO LARGE, and is left at 2 deliberately until someone
-// decides which display to design for. Measured against the mined sources
-// (docs/design-principles.md, threads 190154 / 169128 / 208810 / 172161 / 334673):
-// 5:3 = 1.67, 12:7 = 1.71, 20:11 = 1.82. **2.0 is above all of them.**
+// It was also wrong. Measured against the mined sources, a 2600 pixel's width:height
+// lands somewhere in 1.67–1.82 (5:3 from a 4:3 screen at 200 visible lines, verified
+// on a real TV by 24 PF px reading square against 160 lines; 12:7 from Stella's
+// 320x210; 20:11 from NTSC's own 10:11 pixel ratio doubled). **2 is above all of
+// them**, so anything that had adopted it would have drawn 10–20% over-tall.
 //
-// The spread is not noise. A pixel's aspect is (visible width / visible height)
-// divided by the display's own 4:3, and the VISIBLE HEIGHT is the free variable —
-// 192 lines of a 262-line frame is a different picture from 210 or 228, and each
-// source picked a different one. So no single measurement arbitrates it; choosing a
-// value inside 1.67–1.82 is a decision about which overscan to design for, and it
-// belongs to whoever is drawing, not to whichever thread was read last.
-//
-// Anything that consumes this is over-tall by 10–20% today. Raising the number is a
-// one-line change; deciding WHICH number is the part that is not the code's to make.
-const PixelAspectRatio = 2
+// Dead code carrying a wrong constant is worse than no code: the next reader would
+// have trusted it. The measurement itself is worth keeping and lives in
+// docs/design-principles.md, where the three derivations are set out with their
+// sources. The author works in Photoshop at a 1:2 grid and has decided not to chase
+// the remaining ~16%, which on a 2600 sprite is one dot either way.
 
-// ScanlinesForSquare は、幅 widthPx のスプライト/アイコンを画面上で正方に見せるのに必要な
-// スキャンライン数を返す（横長補正＝縦に 2 倍積む）。〔採掘 326595〕
-func ScanlinesForSquare(widthPx int) int { return widthPx * PixelAspectRatio }
-
-// WalkFrame は歩行アニメの 2 フレーム 50:50 切替を返す（0 or 1）。フレームカウンタの 1 ビット
-// （speedBit）で等間隔・リセット不要に交互させる。移動中だけ counter を進めること。
 // speedBit を上げるほど切替が遅くなる（bit3 = 8 フレーム毎）。〔design-principles.md / 採掘 301861〕
 func WalkFrame(counter byte, speedBit uint) int { return int((counter >> speedBit) & 1) }
 
