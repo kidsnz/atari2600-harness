@@ -265,15 +265,22 @@ func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
 	// mapper answers false through the type assertion — while 3E+ and M-Network both
 	// overlay cartridge RAM and set banking.Information.IsRAM. Asking the narrower
 	// question left those unguarded.
-	mapsRAM, ramErr := e.MapsCartridgeRAM()
+	// Ask the full question and REPEAT ITS ANSWER. MapsCartridgeRAM delegates to
+	// CartridgeWindowNotImage and throws the reason away, and the flattened message
+	// called everything "RAM" — which is wrong about DPC, whose $1000-$107F is the
+	// data-fetcher/RNG/music REGISTER FILE. A builder told "this cartridge maps RAM"
+	// goes looking for a RAM overlay that does not exist; the bus interface knew the
+	// real reason all along, one call deeper. (G1's report filed this as the one
+	// line described but not made.)
+	notImage, why, ramErr := e.CartridgeWindowNotImage()
 	if ramErr != nil {
 		return nil, fmt.Sprintf("cartridge banks could not be enumerated to check for mapped RAM (%v); "+
 			"declining rather than folding bytes that may not be image", ramErr)
 	}
-	if mapsRAM {
-		return nil, fmt.Sprintf("cartridge is mapper %s and maps RAM into the cartridge window; "+
+	if notImage {
+		return nil, fmt.Sprintf("cartridge is mapper %s and %s; "+
 			"the image is not what the CPU reads there, so folding those bytes into a value range "+
-			"would bound a loop on data the hardware never holds", id)
+			"would bound a loop on data the hardware never holds", id, why)
 	}
 	if banks <= 1 {
 		return flat, ""

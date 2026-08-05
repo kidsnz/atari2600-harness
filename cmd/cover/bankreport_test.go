@@ -163,7 +163,7 @@ func TestSuperchipCartridgeIsRefusedRatherThanScoredZero(t *testing.T) {
 	if !strings.Contains(rep.StaticRefused, "F8SC") {
 		t.Errorf("the refusal must name the mapper the ENGINE fingerprinted; got %q", rep.StaticRefused)
 	}
-	if !strings.Contains(rep.StaticRefused, "maps RAM into the cartridge window") {
+	if !strings.Contains(rep.StaticRefused, "a superchip overlays 128 bytes of RAM") {
 		t.Errorf("the refusal must say WHY, not just that it refused; got %q", rep.StaticRefused)
 	}
 	if rep.BranchesStatic != nil || rep.EdgeCoverage != nil || rep.UnreachedBranches != nil {

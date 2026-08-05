@@ -28,11 +28,15 @@ var advCartDeclines = []struct {
 	mapper     string
 	wantReason string
 }{
-	{"cart_f6sc.bin", "F6SC", "maps RAM into the cartridge window"},
-	{"cart_f4sc.bin", "F4SC", "maps RAM into the cartridge window"},
-	{"cart_3e.bin", "3E", "maps RAM into the cartridge window"},
-	{"cart_3eplus.bin", "3E+", "maps RAM into the cartridge window"},
-	{"cart_dpc.bin", "DPC", "maps RAM into the cartridge window"},
+	{"cart_f6sc.bin", "F6SC", "a superchip overlays 128 bytes of RAM"},
+	{"cart_f4sc.bin", "F4SC", "a superchip overlays 128 bytes of RAM"},
+	{"cart_3e.bin", "3E", "publishes a cartridge-RAM bus"},
+	{"cart_3eplus.bin", "3E+", "publishes a cartridge-RAM bus"},
+	// DPC's window is NOT RAM — $1000-$107F is the data-fetcher/RNG/music
+	// register file. The old flattened message called it RAM, which sent a reader
+	// hunting for a RAM overlay that does not exist; the decline now repeats the
+	// bus interface's own words.
+	{"cart_dpc.bin", "DPC", "static-data area the CPU reads through registers"},
 }
 
 // TestAdvancedCartridgesAreDeclinedByNameAndReason grades the whole G1 fixture
