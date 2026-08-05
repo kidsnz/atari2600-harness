@@ -54,7 +54,8 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
   ],
 
   "checks": {                           // whole-run properties (measurements with side effects; evaluated after the timeline)
-    "ntsc_frame_lines": 262,            // StepFrame() == 262
+    "ntsc_frame_lines": 262,            // StepFrame() == 262 (ONE frame)
+    "frame_lines_stable": {"frames": 130, "lines": 262},  // every frame in the window has the SAME count (∀ sibling; `lines` optional)
     "max_line_budget": 76,              // budget guard is never exceeded (equivalent to assert_line_budget)
     "golden_frame": true,              // D-3: compare the rendered frame-chain hash against <scenario>.golden
     "golden_audio": true,              // A-2: compare the audio-chain hash against <scenario>.audio.golden
@@ -96,7 +97,20 @@ reused as-is for regression). **Unknown fields are an error** (typos are not swa
 | `collisions.<pair>` (p0_p1, m0_p0, p0_pf, bl_pf …) | `ReadCollisions` |
 | `audio.ch0\|ch1.control\|freq\|volume` | `ReadAudio` |
 
-`checks` (whole run): `ntsc_frame_lines` (`StepFrame`) / `max_line_budget` (`RunUntilBudget`) /
+- **`frame_lines_stable`** = the ∀-over-frames sibling of `ntsc_frame_lines`. That check samples **one**
+  frame and therefore certifies nothing about the next one; this one steps `frames` frames (continuing on the
+  emulator the timeline drove) and requires every frame to report the same scanline count, optionally equal to
+  `lines`. A frame total that changes between frames rolls the whole picture by that many lines on a CRT —
+  invisible to a single-frame check and to a golden hash, both of which happily stayed green while a
+  reproduction breathed 261/262. Verdicts print the full histogram (`262x129 264x1`), so the measurement is
+  in the output whether it passes or fails.
+  **A pass covers only the frames it measured, and that is not a formality:** `roms/techniques/banked_game.bin`
+  runs 264 lines on every 120th frame, so a 60-frame window passes it and a 130-frame window catches it
+  (`TestFrameLinesStable` pins both). Size the window past the ROM's slowest periodic event — bank switches,
+  scene changes, respawn timers.
+
+`checks` (whole run): `ntsc_frame_lines` (`StepFrame`) / `frame_lines_stable` (`StepFrame` × N, histogram) /
+`max_line_budget` (`RunUntilBudget`) /
 `golden_frame` (render-chain hash, below) / `golden_audio` (audio-chain hash, same mechanism via
 Gopher2600 `digest.Audio`, compared against `<scenario>.audio.golden`).
 

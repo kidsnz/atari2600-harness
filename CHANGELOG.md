@@ -8,6 +8,39 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`frame_lines_stable` — the ∀-over-frames sibling of `ntsc_frame_lines`, because sampling one frame is not
+  a claim about the frame after it.** `ntsc_frame_lines` calls `StepFrame()` exactly once, so a ROM whose
+  frame total *changes* between frames passes it whenever the sampled frame happens to be the right length.
+  That is not hypothetical: the pizza-boy reproduction renders **261 lines on 482 of 600 frames and 262 on
+  117** (plus a 40-line boot frame) while the original it reproduces holds **262 on 594 of 598**, and it
+  passed every check in the suite for as long as it existed. The frame length tracks sprite X — the
+  divide-by-15 positioning loop costs a whole extra line past X=105 (=7x15) and that cost sits **outside** the
+  region whose length is fixed — so on a CRT the whole picture steps up and down by a line. No golden hash can
+  see this: the hash is over rendered frames, not over their heights.
+  The new check steps N frames, histograms the per-frame scanline count, and passes only when every frame
+  agrees (`"frame_lines_stable": {"frames": 130, "lines": 262}`; `lines` optional). Verdicts print the whole
+  histogram — `262x129 264x1 (2 distinct; first change at frame +116)` — so the measurement is in the output
+  either way. Continues on the emulator the timeline drove, so a scenario that holds an input and then checks
+  stability measures the played state.
+- **Sweeping this repo's own corpus found the same defect in 4 of 156 ROMs, so the check ships with real
+  witnesses rather than a synthetic fixture.** 130 frames after a 3-frame warmup, every `.bin` under `roms/`:
+  **152 stable at 262, 4 breathing, 0 errors.** `roms/techniques/banked_game` 262x129 / **264x1**,
+  `roms/exerciser/exerciser` 262x128 / **264x2**, `roms/litmus/lint_bank_hazard` and `lint_bank_split`
+  262x129 / **265x1**. Every outlier is exactly periodic — banked_game at frames 120/240/360/480 over a
+  500-frame run, matching the `cmp #120` level switch declared in its own source — and the cause is
+  pizza-boy's: `banked_game.asm:51-63` does the cross-bank level load **ahead of** its fixed 37-line `ldx #37 /
+  sta WSYNC` loop, so the switch frame's extra work leaks into the frame total instead of being absorbed by it.
+  These four are left RED-capable and unfixed pending a decision; `banked_game.json` is the one technique
+  scenario not given the check.
+- `TestFrameLinesStable` locks four directions against real ROMs: a fixed-structure kernel passes,
+  `banked_game` fails over a 130-frame window, **the same ROM passes over a 60-frame window** (the window is
+  shorter than the 120-frame period — the vacuity is measured, not merely warned about, so nobody later
+  "fixes" a red check by shrinking the window), and stable-at-the-wrong-number fails a declared `lines`.
+- Wired into **30 of the 31** technique scenarios (all but `banked_game`) at `frames: 130`, the reference
+  kernels being what `docs/authoring-protocol.md` step 3 tells an author to clone. Cost measured:
+  `go run ./cmd/scenario roms/techniques/scenarios/*.json` **14s -> 29s**.
+
 ### Changed
 - **DOC-EN closed: the canonical docs are English, and the count says how much was left rather than claiming
   "done".** The 2026-06-17 cleanup dropped the 13 `.ja.md` duplicates but left the Japanese *bodies* of three

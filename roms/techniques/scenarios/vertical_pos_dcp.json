@@ -8,5 +8,6 @@
     { "at_frame": 196, "field": "ram.0x80", "op": "==", "value": 156 },
     { "at_frame": 196, "field": "ram.0x81", "op": "==", "value": 1 }
   ],
-  "checks": { "ntsc_frame_lines": 262, "golden_frame": true }
+  "checks": { "ntsc_frame_lines": 262,
+    "frame_lines_stable": { "frames": 130, "lines": 262 }, "golden_frame": true }
 }

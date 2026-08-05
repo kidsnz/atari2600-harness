@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -27,19 +28,19 @@ import (
 
 // Input はあるフレームで与えるジョイスティック操作（D-2: 入力タイムライン）。
 type Input struct {
-	Frame   int    `json:"frame"`   // シナリオ開始（warmup 後）からの 0 起点フレーム。このフレームを走らせる前に適用
-	Player  int    `json:"player"`  // 0=P0/左, 1=P1/右
-	Action  string `json:"action"`  // left|right|up|down|fire|center|paddle|reset|select|color|p0pro|p1pro
-	Pressed bool   `json:"pressed"` // 押下保持/解除（center/paddle では無視）
+	Frame   int     `json:"frame"`           // シナリオ開始（warmup 後）からの 0 起点フレーム。このフレームを走らせる前に適用
+	Player  int     `json:"player"`          // 0=P0/左, 1=P1/右
+	Action  string  `json:"action"`          // left|right|up|down|fire|center|paddle|reset|select|color|p0pro|p1pro
+	Pressed bool    `json:"pressed"`         // 押下保持/解除（center/paddle では無視）
 	Value   float64 `json:"value,omitempty"` // action=paddle の位置 0.0〜1.0（V2-4b）
 }
 
 // Assert はあるフレーム終了時点の瞬時数値条件（D-1）。副作用のある計測は Checks 側で扱う。
 type Assert struct {
-	AtFrame int    `json:"at_frame"` // このフレームを走らせた直後に評価
-	Field   string `json:"field"`    // 語彙（下記 resolve 参照）
-	Op      string `json:"op"`       // == != < <= > >= in
-	Value   int64  `json:"value"`    // 比較値（bool は 0/1）
+	AtFrame int    `json:"at_frame"`     // このフレームを走らせた直後に評価
+	Field   string `json:"field"`        // 語彙（下記 resolve 参照）
+	Op      string `json:"op"`           // == != < <= > >= in
+	Value   int64  `json:"value"`        // 比較値（bool は 0/1）
 	Lo      int64  `json:"lo,omitempty"` // op="in": got が [Lo,Hi] に入るか（範囲演算子）
 	Hi      int64  `json:"hi,omitempty"`
 }
@@ -76,12 +77,13 @@ type Fuzz struct {
 // なので重複実装せず、ここでは系列特有の3種だけを足す（docs/scenarios.md で相互参照）。
 //
 // Kind:
-//   "eventually" — P が run 開始から Within フレーム以内（先頭 Within フレーム f∈[0,Within-1]）に
-//                  少なくとも一度成立する（有界 liveness）。窓 [0,Within-1] が run 終了までに
-//                  完全に観測されないまま P が成立しなければ INCONCLUSIVE（≠pass）＝空虚な緑を禁止。
-//   "response"   — A（AField...）が成立するたび、その frame f から Within フレーム以内（g∈[f,f+Within]）
-//                  に P が成立する。各 A 発火は義務。窓が run 終了をまたぐ未充足義務は INCONCLUSIVE。
-//   "never_for"  — P が N フレーム連続して成立してはならない（安全性。観測列で完全に判定可能）。
+//
+//	"eventually" — P が run 開始から Within フレーム以内（先頭 Within フレーム f∈[0,Within-1]）に
+//	               少なくとも一度成立する（有界 liveness）。窓 [0,Within-1] が run 終了までに
+//	               完全に観測されないまま P が成立しなければ INCONCLUSIVE（≠pass）＝空虚な緑を禁止。
+//	"response"   — A（AField...）が成立するたび、その frame f から Within フレーム以内（g∈[f,f+Within]）
+//	               に P が成立する。各 A 発火は義務。窓が run 終了をまたぐ未充足義務は INCONCLUSIVE。
+//	"never_for"  — P が N フレーム連続して成立してはならない（安全性。観測列で完全に判定可能）。
 type Temporal struct {
 	Kind string `json:"kind"` // eventually | response | never_for
 
@@ -105,17 +107,42 @@ type Temporal struct {
 
 // Checks は run 全体に対する性質（副作用＝フレームを進める計測なのでタイムライン後にまとめて評価）。
 type Checks struct {
-	NTSCFrameLines *int `json:"ntsc_frame_lines,omitempty"` // StepFrame() == この値（NTSC は 262）
-	MaxLineBudget  *int `json:"max_line_budget,omitempty"`  // RunUntilBudget が超過しない（runtime・∃: ある1回の実行を観測。既定予算 76）
-	ProveLineBudget *int `json:"prove_line_budget,omitempty"` // VV-2: cyclebound が全パスの worst <= 予算を静的に証明（∀。rom が .asm のときのみ）
-	GoldenFrame    bool `json:"golden_frame,omitempty"`     // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
-	GoldenAudio    bool `json:"golden_audio,omitempty"`     // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
-	Motion         *MotionCheck `json:"motion,omitempty"`   // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
-	NoTimerWrap    *int `json:"no_timer_wrap,omitempty"`     // VV-10 T-1: この frame 数を監視し read-after-wrap(G8) が起きないことをゲート
-	NoHMOVEHazard  *int `json:"no_hmove_hazard,omitempty"`   // VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込みが無いことをゲート
-	ScoreEqualsRAM *ScoreCheck `json:"score_equals_ram,omitempty"` // VV-9: 描画された2桁BCDスコア == RAM の値
-	NoUninitRead   *int `json:"no_uninit_read,omitempty"`     // VV-10 T-3: reset から N frame、未初期化 RAM 読みが無いことをゲート
-	NoBeamRace     *BeamRaceCheck `json:"no_beam_race,omitempty"` // AT-3: object の pixel-data 書込が指定 scanline 範囲で毎行ビーム到達前か（意図を著者が宣言＝健全）
+	NTSCFrameLines   *int                   `json:"ntsc_frame_lines,omitempty"`   // StepFrame() == この値（NTSC は 262）
+	FrameLinesStable *FrameLinesStableCheck `json:"frame_lines_stable,omitempty"` // every frame in a window has the SAME line count (the ∀-over-frames sibling of ntsc_frame_lines)
+	MaxLineBudget    *int                   `json:"max_line_budget,omitempty"`    // RunUntilBudget が超過しない（runtime・∃: ある1回の実行を観測。既定予算 76）
+	ProveLineBudget  *int                   `json:"prove_line_budget,omitempty"`  // VV-2: cyclebound が全パスの worst <= 予算を静的に証明（∀。rom が .asm のときのみ）
+	GoldenFrame      bool                   `json:"golden_frame,omitempty"`       // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
+	GoldenAudio      bool                   `json:"golden_audio,omitempty"`       // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
+	Motion           *MotionCheck           `json:"motion,omitempty"`             // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
+	NoTimerWrap      *int                   `json:"no_timer_wrap,omitempty"`      // VV-10 T-1: この frame 数を監視し read-after-wrap(G8) が起きないことをゲート
+	NoHMOVEHazard    *int                   `json:"no_hmove_hazard,omitempty"`    // VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込みが無いことをゲート
+	ScoreEqualsRAM   *ScoreCheck            `json:"score_equals_ram,omitempty"`   // VV-9: 描画された2桁BCDスコア == RAM の値
+	NoUninitRead     *int                   `json:"no_uninit_read,omitempty"`     // VV-10 T-3: reset から N frame、未初期化 RAM 読みが無いことをゲート
+	NoBeamRace       *BeamRaceCheck         `json:"no_beam_race,omitempty"`       // AT-3: object の pixel-data 書込が指定 scanline 範囲で毎行ビーム到達前か（意図を著者が宣言＝健全）
+}
+
+// FrameLinesStableCheck requires every frame in a window to have the SAME scanline
+// count. `ntsc_frame_lines` samples ONE frame, so it certifies nothing about the frame
+// after it; this is its ∀-over-frames sibling. A frame total that changes between
+// frames rolls the whole picture up or down by that many lines on a CRT, which no
+// single-frame check and no golden hash can see.
+//
+// It exists because a real reproduction breathed undetected: pizza-boy renders 261
+// lines on 482 of 600 frames and 262 on 117 (plus one 40-line boot frame), while the
+// original it reproduces holds 262 on 594 of 598 — the frame length varies with sprite
+// X, because the positioning routine's divide-by-15 loop costs a whole extra line past
+// X=105 and that cost sits OUTSIDE the region whose length is fixed. Sweeping this
+// repo's own 156 ROMs found the same shape in 4 of them (banked_game, exerciser,
+// lint_bank_hazard, lint_bank_split): each runs 2-3 extra lines on exactly the frames
+// where a bank/scene switch does extra work ahead of its fixed-length WSYNC loop.
+//
+// A PASS ONLY COVERS THE FRAMES IT MEASURED, and that is not a formality: the defect in
+// banked_game recurs every 120 frames, so a 60-frame window passes it. Size Frames past
+// the ROM's slowest periodic event; the window is printed in the verdict either way, so
+// a scenario that has been gating a window too short to contain the event shows it.
+type FrameLinesStableCheck struct {
+	Frames int `json:"frames,omitempty"` // frames to measure (default 120 = two seconds of NTSC)
+	Lines  int `json:"lines,omitempty"`  // if non-zero, additionally require that shared count to equal this
 }
 
 // BeamRaceCheck is the author-supplied beam-race deadline (AT-3): object O's
@@ -126,11 +153,11 @@ type Checks struct {
 // can't be sound; see docs/capability-gap-audit AT-3). Generalises the
 // hardware-fixed no_hmove_hazard gate.
 type BeamRaceCheck struct {
-	Object   string `json:"object"`             // P0 P1 M0 M1 BL
-	LineFrom int    `json:"line_from"`           // inclusive scanline range the deadline applies to
+	Object   string `json:"object"`    // P0 P1 M0 M1 BL
+	LineFrom int    `json:"line_from"` // inclusive scanline range the deadline applies to
 	LineTo   int    `json:"line_to"`
-	Frames   int    `json:"frames,omitempty"`    // frames to scan (default 1)
-	Warmup   int    `json:"warmup,omitempty"`    // frames to settle first (default 1)
+	Frames   int    `json:"frames,omitempty"` // frames to scan (default 1)
+	Warmup   int    `json:"warmup,omitempty"` // frames to settle first (default 1)
 }
 
 // ScoreCheck は VV-9 OCR ゲート：score2 レイアウトで描画された2桁を OCR し、packed BCD が
@@ -154,14 +181,14 @@ type ScoreCheck struct {
 // supposed to travel; the measured span is printed either way, so a scenario that
 // has been quietly gating a frozen object shows it in its own output.
 type MotionCheck struct {
-	Object     string  `json:"object"`               // P0 M0 P1 M1 BL
-	Axis       string  `json:"axis,omitempty"`       // "top" (rendered vertical, default) or "x"
-	Frames     int     `json:"frames,omitempty"`     // default 40
-	Warmup     int     `json:"warmup,omitempty"`     // frames to settle before tracking
-	YTop       int     `json:"y_top,omitempty"`      // scanline search window (grid-y)
-	YBot       int     `json:"y_bot,omitempty"`      // default 260
-	MaxJerkRMS float64 `json:"max_jerk_rms"`         // gate: jerk_rms must be <= this
-	MinSpan    int     `json:"min_span,omitempty"`   // gate: max(pos)-min(pos) must be >= this (0 = not gated, and then smoothness alone proves nothing)
+	Object     string  `json:"object"`             // P0 M0 P1 M1 BL
+	Axis       string  `json:"axis,omitempty"`     // "top" (rendered vertical, default) or "x"
+	Frames     int     `json:"frames,omitempty"`   // default 40
+	Warmup     int     `json:"warmup,omitempty"`   // frames to settle before tracking
+	YTop       int     `json:"y_top,omitempty"`    // scanline search window (grid-y)
+	YBot       int     `json:"y_bot,omitempty"`    // default 260
+	MaxJerkRMS float64 `json:"max_jerk_rms"`       // gate: jerk_rms must be <= this
+	MinSpan    int     `json:"min_span,omitempty"` // gate: max(pos)-min(pos) must be >= this (0 = not gated, and then smoothness alone proves nothing)
 }
 
 // Scenario は 1 本のシナリオ定義。
@@ -528,6 +555,53 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			ok := lines == *s.Checks.NTSCFrameLines
 			res.Asserts = append(res.Asserts, AssertResult{
 				Desc: fmt.Sprintf("ntsc_frame_lines == %d", *s.Checks.NTSCFrameLines), Got: int64(lines), Pass: ok})
+			if !ok {
+				res.Pass = false
+			}
+		}
+		if s.Checks.FrameLinesStable != nil {
+			// Continues on the SAME emulator the timeline drove (like ntsc_frame_lines,
+			// whose ∀-over-frames sibling this is), so a scenario that holds an input and
+			// then checks stability measures the played state, not a fresh reset.
+			fl := s.Checks.FrameLinesStable
+			frames := fl.Frames
+			if frames == 0 {
+				frames = 120
+			}
+			hist := map[int]int{}
+			first, firstAt, prev := 0, -1, 0
+			for i := 0; i < frames; i++ {
+				n, err := e.StepFrame()
+				if err != nil {
+					return nil, err
+				}
+				hist[n]++
+				if i == 0 {
+					first = n
+				} else if firstAt < 0 && n != prev {
+					firstAt = i
+				}
+				prev = n
+			}
+			counts := make([]int, 0, len(hist))
+			for k := range hist {
+				counts = append(counts, k)
+			}
+			sort.Ints(counts)
+			table := ""
+			for _, k := range counts {
+				table += fmt.Sprintf(" %dx%d", k, hist[k])
+			}
+			ok := len(counts) == 1
+			desc := fmt.Sprintf("frame_lines_stable over %d frames:%s", frames, table)
+			if !ok {
+				desc += fmt.Sprintf(" (%d distinct; first change at frame +%d)", len(counts), firstAt)
+			} else if fl.Lines != 0 && first != fl.Lines {
+				// Stable, but stable at the wrong number.
+				ok = false
+				desc += fmt.Sprintf(" (stable but expected %d)", fl.Lines)
+			}
+			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: int64(len(counts)), Pass: ok})
 			if !ok {
 				res.Pass = false
 			}

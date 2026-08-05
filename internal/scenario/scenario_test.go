@@ -222,6 +222,69 @@ func TestBeamRaceScenario(t *testing.T) {
 	}
 }
 
+// TestFrameLinesStable locks frame_lines_stable both directions against REAL ROMs from
+// this repo — no synthetic fixture, because a corpus sweep of all 156 ROMs found the
+// defect already present in 4 of them. banked_game switches level every 120 frames
+// (`cmp #120`) and does the cross-bank load AHEAD of its fixed 37-line WSYNC loop, so
+// the switch frame runs 264 lines while every other frame runs 262.
+//
+// The third case is the one that matters most: the SAME ROM passes over a 60-frame
+// window. A stability gate certifies only the frames it measured, and this test pins
+// that so nobody later "fixes" a red check by shrinking the window.
+func TestFrameLinesStable(t *testing.T) {
+	t.Chdir("../..")
+
+	// Negative control: a ROM with a fixed frame structure must not trip the check.
+	stable := &Scenario{
+		Rom:    "roms/techniques/two_line_kernel.bin",
+		Checks: &Checks{FrameLinesStable: &FrameLinesStableCheck{Frames: 130, Lines: 262}},
+	}
+	if res, err := Run(stable, false); err != nil {
+		t.Fatal(err)
+	} else if !res.Pass {
+		t.Errorf("fixed-structure ROM must pass frame_lines_stable: %+v", res.Asserts)
+	}
+
+	// Positive control: the real breathing ROM, over a window that contains its switch.
+	breathing := &Scenario{
+		Rom:    "roms/techniques/banked_game.bin",
+		Checks: &Checks{FrameLinesStable: &FrameLinesStableCheck{Frames: 130}},
+	}
+	res, err := Run(breathing, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Pass {
+		t.Errorf("banked_game breathes at its 120-frame level switch and must FAIL: %+v", res.Asserts)
+	}
+	if got := res.Asserts[len(res.Asserts)-1].Got; got != 2 {
+		t.Errorf("got = distinct line counts: want 2 (262 and 264), got %d", got)
+	}
+
+	// A window shorter than the ROM's period passes the same ROM. This is the vacuity
+	// the doc comment warns about, measured rather than asserted.
+	short := &Scenario{
+		Rom:    "roms/techniques/banked_game.bin",
+		Checks: &Checks{FrameLinesStable: &FrameLinesStableCheck{Frames: 60}},
+	}
+	if res, err := Run(short, false); err != nil {
+		t.Fatal(err)
+	} else if !res.Pass {
+		t.Errorf("a 60-frame window cannot reach the 120-frame switch, so it must pass: %+v", res.Asserts)
+	}
+
+	// Stable at the wrong number is still a failure when `lines` is declared.
+	wrong := &Scenario{
+		Rom:    "roms/techniques/two_line_kernel.bin",
+		Checks: &Checks{FrameLinesStable: &FrameLinesStableCheck{Frames: 20, Lines: 261}},
+	}
+	if res, err := Run(wrong, false); err != nil {
+		t.Fatal(err)
+	} else if res.Pass {
+		t.Errorf("stable at 262 must FAIL a declared lines:261: %+v", res.Asserts)
+	}
+}
+
 // TestRunAsmSourceError は壊れた .asm がアセンブル段でエラーになる（握り潰さない）ことを確認する。
 func TestRunAsmSourceError(t *testing.T) {
 	t.Chdir("../..")

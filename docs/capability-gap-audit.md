@@ -3856,3 +3856,39 @@ was but not how wide. Coverage that cannot be asserted is coverage on paper. Add
 not because it is famous or complex. The corollary holds for commercial ROMs, whose value is different in
 kind — they contain shapes we would not think to write (Fishing Derby is what exposed the missile gap in
 RL-7) — but the same measurement decides which ones earn their place in CI.
+
+### `ntsc_frame_lines` samples one frame, and 4 of our own 156 ROMs breathe (2026-08-05)
+
+**A single-frame check is not a claim about the frame after it, and nothing in the suite was making that
+claim.** `ntsc_frame_lines` calls `StepFrame()` once. A ROM whose frame total varies passes it whenever the
+sampled frame happens to be the right length, and the golden hash cannot help — it hashes rendered frames,
+not their heights. The defect that exposed this is in a reproduction, not in the harness: pizza-boy renders
+**261 lines on 482 of 600 frames and 262 on 117**, against an original that holds **262 on 594 of 598**. Its
+frame length tracks sprite X, because the divide-by-15 positioning loop costs an extra line past X=105 and
+that cost sits outside the region whose length is fixed. On a CRT the picture steps up and down by a line.
+
+**Then the same shape turned up in this repo.** Sweeping every `.bin` under `roms/` for 130 frames after a
+3-frame warmup: **152 stable at 262, 4 breathing, 0 errors.**
+
+| ROM | histogram (130 frames) | period |
+|---|---|---|
+| `roms/techniques/banked_game.bin` | 262x129 **264x1** | every 120 frames |
+| `roms/exerciser/exerciser.bin` | 262x128 **264x2** | every 64 frames |
+| `roms/litmus/lint_bank_hazard.bin` | 262x129 **265x1** | every 120 frames |
+| `roms/litmus/lint_bank_split.bin` | 262x129 **265x1** | every 120 frames |
+
+Every outlier is exactly periodic — banked_game at 120/240/360/480 over a 500-frame run, matching the
+`cmp #120` level switch its own source declares — and the cause is pizza-boy's. `banked_game.asm:51-63`
+does the cross-bank level load **ahead of** its fixed 37-line `ldx #37 / sta WSYNC` loop, so the switch
+frame's extra work leaks into the frame total instead of being absorbed by it. The anti-pattern is general:
+**variable-cost work placed outside the region whose length is fixed.** `banked_game` is a technique ROM,
+which means the reference kernel has been teaching it.
+
+`frame_lines_stable` (`docs/scenarios.md`) closes the measurement gap and is wired into 30 of 31 technique
+scenarios. **The 4 ROMs above are NOT fixed** — `banked_game.json` is the one technique scenario without the
+check, and the exerciser and lint fixtures do not carry it either. Whether to repair them (move the switch
+work inside the fixed region, as pizza-boy will do) is open.
+
+**Open sub-item: a corpus-wide gate.** A sweep of all 156 ROMs at 130 frames costs **76s**, which is why it
+was not added to `go test` unilaterally. Making it a gate means an explicit named exclusion list for the 4,
+which is the right shape only once someone has decided they stay broken.
