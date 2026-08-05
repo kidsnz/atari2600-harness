@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""check_traps.py — カーネル出荷前の「実機で死ぬ罠」静的リンター。
+"""check_traps.py — a static linter for the "dies on real hardware" traps, run before a kernel ships.
 
-`docs/known-traps.md` の **static 判定可** な罠を生成/手書きの .asm に対して検出する
-（[[feedback-authoring-loop-system]] のプリフライト②・[[project-roadmap-to-pong-capstone]] の Pong 前ゲート）。
-runtime 専用の罠（RIOT タイマ wraparound 等）は scenario/`breakif` 側の責務＝ここでは扱わない。
+Detects the **statically decidable** traps from `docs/known-traps.md` in generated or hand-written
+.asm (preflight step 2 of [[feedback-authoring-loop-system]]; the pre-Pong gate of
+[[project-roadmap-to-pong-capstone]]).
+Runtime-only traps (RIOT timer wraparound and the like) are the responsibility of the
+scenario/`breakif` side = not handled here.
 
-使い方:
+Usage:
     cd harness
-    python3 scripts/check_traps.py [file.asm ...]   # 省略時 roms/techniques/*.asm を検査
-    python3 scripts/check_traps.py --selftest        # 検出器の自己テスト（bait 文字列で全検出を確認）
+    python3 scripts/check_traps.py [file.asm ...]   # with no argument, checks roms/techniques/*.asm
+    python3 scripts/check_traps.py --selftest        # self-test of the detectors (bait string confirms every detector fires)
 
-判定: ERROR が1つでもあれば exit 1（CI を落とす）。WARN は情報（exit には影響しない）。
-誤検出ゼロを最優先（既存 roms/techniques は全て clean）。低確度の罠は WARN 止まり。
+Verdict: a single ERROR means exit 1 (fails CI). WARN is informational (does not affect the exit).
+Zero false positives is the top priority (the existing roms/techniques are all clean). Low-confidence
+traps stop at WARN.
 """
 import glob
 import os
@@ -22,15 +25,15 @@ HARNESS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__
 
 
 def strip_comment(line):
-    # ; 以降を落とす（文字列リテラルは 2600 asm では稀なので簡易処理）。
+    # Drop everything from `;` onward (string literals are rare in 2600 asm, so this stays simple).
     i = line.find(";")
     return (line[:i] if i >= 0 else line)
 
 
 
-# TIA の「書込専用」レジスタ = $0E(PF1)-$2C(CXCLR)。読み出し側は $00-$0D しか無い
-# （Gopher2600 cpubus.go TIAReadRegisters は CXM0P..INPT5 の $00-$0D のみ）。そこを読むと
-# レジスタではなくバスの残留値が返る＝エミュレータでは「たまたま動く」典型。
+# The TIA's "write-only" registers = $0E(PF1)-$2C(CXCLR). On the read side there is only $00-$0D
+# (Gopher2600 cpubus.go TIAReadRegisters is just CXM0P..INPT5, $00-$0D). Reading there returns bus
+# residue rather than the register = the classic "happens to work in the emulator".
 TIA_WRITE_ONLY = {
     "PF1": 0x0E, "PF2": 0x0F, "RESP0": 0x10, "RESP1": 0x11, "RESM0": 0x12, "RESM1": 0x13,
     "RESBL": 0x14, "AUDC0": 0x15, "AUDC1": 0x16, "AUDF0": 0x17, "AUDF1": 0x18, "AUDV0": 0x19,
@@ -39,19 +42,21 @@ TIA_WRITE_ONLY = {
     "VDELP1": 0x26, "VDELBL": 0x27, "RESMP0": 0x28, "RESMP1": 0x29, "HMOVE": 0x2A,
     "HMCLR": 0x2B, "CXCLR": 0x2C,
 }
-# カートリッジ空間（$1000-$1FFF と $F000-$FFFF ミラー）への書き込み。ROM は書けないので
-# 値は消える——バンク切替ホットスポットと SuperChip の書込ポートだけが例外で、どちらも
-# 「意図してやっている」もの。意図は推測できないので宣言させる: 行末に `@rom-write-ok`。
-# 実測 2026-07-30: roms/techniques + roms/litmus の 123 本で該当は 2 件だけ、どちらも
-# litmus_6502 が「STA abs,X はページ跨ぎでも 5cy 固定」を測るためにわざと ROM を狙った行で、
-# ソース側のコメントにもそう書いてある。だから既定を ERROR にしたうえで、その 2 行に宣言を付けた。
+# Writes into cartridge space ($1000-$1FFF and the $F000-$FFFF mirror). ROM cannot be written, so
+# the value disappears — the only exceptions are bank-switch hotspots and the SuperChip write port,
+# and both of those are something you do ON PURPOSE. Intent cannot be guessed, so it has to be
+# declared: `@rom-write-ok` at the end of the line.
+# Measured 2026-07-30: across the 123 files in roms/techniques + roms/litmus there were only 2
+# matches, and both are lines where litmus_6502 aims at ROM deliberately in order to measure that
+# "STA abs,X is a fixed 5cy even across a page boundary" — the source comment says so too. So the
+# default was made ERROR and those 2 lines got the declaration.
 STORE_OP = re.compile(r"\b(sta|stx|sty)\s+\$([0-9a-fA-F]{3,4})", re.I)
 
 READ_OP = re.compile(
     r"\b(lda|ldx|ldy|bit|cmp|cpx|cpy|adc|sbc|and|ora|eor)\s+(?!#)(\$?[0-9a-zA-Z_]+)", re.I)
 
 def scan_text(asm):
-    """asm 文字列を検査して (errors, warns) の (行番号, メッセージ) リストを返す。"""
+    """Check an asm string and return (errors, warns), each a list of (line number, message)."""
     errors, warns = [], []
     has_cld = has_cleanstart = False
     lines = asm.splitlines()
