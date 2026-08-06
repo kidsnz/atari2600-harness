@@ -186,7 +186,7 @@ round trip. Also return `png_path` in JSON.
 | 4. pre-flight the kernel against the "emu-passes / HW-fails" traps | `docs/known-traps.md` → `scripts/check_traps.py` |
 | 5. verify — scenario format / litmus position+HMOVE data / what each litmus proves | `docs/scenarios.md` · `docs/litmus-results.md` · `docs/verified-coverage.md` |
 | 5b. how to *know* it's correct — the testing discipline (oracle problem, invariants, property/metamorphic/fuzz/mutation, claim-level demo) + per-build checklist | `docs/testing-playbook.md` |
-| search the whole mined corpus (forum 850 + dev-blogs 117) → principle/function it feeds | `docs/mining-digest.md` |
+| search the whole mined corpus (forum 850 + dev-blogs 150, 5 gaps recorded) → principle/function it feeds | `docs/mining-digest.md` |
 
 ### ② Reference — look up when needed
 | Task | Read |

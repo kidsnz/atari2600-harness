@@ -918,20 +918,26 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 |---|---|---|
 | `10030` | Raspberry Pi - My Next Hardware Project（blog） | [link](https://forums.atariage.com/blogs/entry/10030-rasperry-pi-my-next-hardware-project-a-bit-of-fun/) |
 | `10237` | MidiBox-TIA（Antichambre） | [link](https://forums.atariage.com/blogs/entry/10237-im-proud-to-announce-the-midibox-tia/) |
+| `1024` | Enhanced Paddle Concept（supercat） | [link](https://forums.atariage.com/blogs/entry/1024-enhanced-paddle-concept/) |
 | `10334` | Learning and working in Assembly（Kiwi） | [link](https://forums.atariage.com/blogs/entry/10334-learning-and-working-in-assembly/) |
 | `10401` | Colecovision's sprites theories（Kiwi） | [link](https://forums.atariage.com/blogs/entry/10401-colecovisions-sprites-theories/) |
+| `1042` | Vertical Ball Control（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/1042-vertical-ball-control/) |
 | `10437` | Once a collector, always a collector?（blog） | [link](https://forums.atariage.com/blogs/entry/10437-once-a-collector-always-a-collector-how-to-prevent-problems-loss-and-regret-when-collecting/) |
 | `10489` | My game's been announced on Collector Vision forums（Kiwi） | [link](https://forums.atariage.com/blogs/entry/10489-my-games-been-announced-on-collector-vision-forums/) |
 | `10515` | Medieval Mayhem - Atari 2600（Marc Oberhäuser） | [link](https://forums.atariage.com/blogs/entry/10515-medieval-mayhem-atari-2600/) |
 | `10640` | Stay Frosty 2 Teaser Screenshots（SpiceWare, 2011） | [link](https://forums.atariage.com/blogs/entry/10640-stay-frosty-2-teaser-screenshots/) |
 | `10690` | My Gameboy Collection（Robin Gravel） | [link](https://forums.atariage.com/blogs/entry/10690-my-gameboy-collection/) |
 | `10721` | Didj collecting（atari2600land） | [link](https://forums.atariage.com/blogs/entry/10721-didj-collecting/) |
+| `1073` | Four Fast Paddles（supercat） | [link](https://forums.atariage.com/blogs/entry/1073-four-fast-paddles/) |
+| `1075` | Of Mice and Minikernels（blog） | [link](https://forums.atariage.com/blogs/entry/1075-of-mice-and-minikernels/) |
 | `10750` | New Kernel tested（SpiceWare / Frantic, 2014） | [link](https://forums.atariage.com/blogs/entry/10750-new-kernel-tested/) |
 | `10777` | Sprite driver rewritten（SpiceWare / Frantic, 2014） | [link](https://forums.atariage.com/blogs/entry/10777-sprite-driver-rewritten/) |
+| `10832` | Hex to BCD Conversion 0-99（blog） | [link](https://forums.atariage.com/blogs/entry/10832-hex-to-bcd-conversion-0-99/) |
 | `10890` | Slick Kernel（SpiceWare / Space Rocks→Draconian, 2014） | [link](https://forums.atariage.com/blogs/entry/10890-slick-kernel/) |
 | `10896` | Announcing Draconian（SpiceWare, 2014） | [link](https://forums.atariage.com/blogs/entry/10896-announcing-draconian/) |
 | `10903` | Collecting 101 Panel at SuperBitCon（MegaManFan） | [link](https://forums.atariage.com/blogs/entry/10903-collecting-101-panel-at-superbitcon/) |
 | `10919` | Some love for Frantic（SpiceWare, 2014） | [link](https://forums.atariage.com/blogs/entry/10919-some-love-for-frantic/) |
+| `11011` | Reading Paddles（blog） | [link](https://forums.atariage.com/blogs/entry/11011-reading-paddles/) |
 | `11015` | Faster Initialization（Omegamatrix） | [link](https://forums.atariage.com/blogs/entry/11015-faster-initialization/) |
 | `11046` | DPC+ Version of ChipOff Is Finally Done（Random Terrain） | [link](https://forums.atariage.com/blogs/entry/11046-dpc-version-of-chipoff-for-the-atari-2600-is-finally-done/) |
 | `11052` | Bob DeCrescenzo Collection - Atari 7800（Marc Oberhäuser） | [link](https://forums.atariage.com/blogs/entry/11052-bob-decrescenzo-collection-atari-7800/) |
@@ -944,6 +950,7 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 | `11369` | Updated assembly-6502 and batari BASIC mode files（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11369-updated-assembly-6502-and-batari-basic-mode-files/) |
 | `11376` | Compile and Run 2600 assembly code from jEdit（SpiceWare） | [link](https://forums.atariage.com/blogs/entry/11376-compile-and-run-2600-assembly-code-from-jedit/) |
 | `1140` | TIA AGN part 3（EricBall） | [link](https://forums.atariage.com/blogs/entry/1140-tia-agn-part-3/) |
+| `1152` | Read Paddles in Your Spare Time（supercat） | [link](https://forums.atariage.com/blogs/entry/1152-read-paddles-in-your-spare-time/) |
 | `11543` | The Story of Stay Frosty 2, Part 1（SpiceWare, 2008） | [link](https://forums.atariage.com/blogs/entry/11543-the-story-of-stay-frosty-2-part-1/) |
 | `1155` | Exponential Odyssey（Chronogamer） | [link](https://forums.atariage.com/blogs/entry/1155-exponential-odyssey/) |
 | `11552` | The Story of Stay Frosty 2, Part 2（SpiceWare, 2009-2010） | [link](https://forums.atariage.com/blogs/entry/11552-the-story-of-stay-frosty-2-part-2/) |
@@ -979,6 +986,7 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 | `11982` | Almost | [link](https://forums.atariage.com/blogs/entry/11982-almost-jag-collecting-quitting-time/) |
 | `11985` | DPC+ARM Part 11 | [link](https://forums.atariage.com/blogs/entry/11985-dpcarm-part-11-beginnings-of-the-arena-kernel/) |
 | `11988` | DPC+ARM Part 12 | [link](https://forums.atariage.com/blogs/entry/11988-dpcarm-part-12-gamepad-support/) |
+| `12057` | Hex to BCD Conversion 0-99, Part Trois（blog） | [link](https://forums.atariage.com/blogs/entry/12057-hex-to-bcd-conversion-0-99-part-trois/) |
 | `12061` | Economical Initialization（SpiceWare 経由, Omegamatrix 作, 2015頃） | [link](https://forums.atariage.com/blogs/entry/12061-economical-initialization/) |
 | `12209` | Overscan Jitter 2 | [link](https://forums.atariage.com/blogs/entry/12209-overscan-jitter-2-dpc-jitter/) |
 | `1235` | Archon kernel for 3F or 4A50（2600 in 2006） | [link](https://forums.atariage.com/blogs/entry/1235-archon-kernel-for-3f-or-4a50/) |
@@ -1014,6 +1022,7 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 | `13186` | Simple Assembly Part 11 | [link](https://forums.atariage.com/blogs/entry/13186-part-11-simple-assembly-for-atari-basic-the-end/) |
 | `13212` | A8 Hardware Project Literature | [link](https://forums.atariage.com/blogs/entry/13212-a8-hardware-project-literature/) |
 | `13234` | Mucking Around with iOS SpriteKit | [link](https://forums.atariage.com/blogs/entry/13234-mucking-around-with-ios-spritekit/) |
+| `13238` | expanding-my-nintendo-64-collection-part-1（blog） | [link](https://forums.atariage.com/blogs/entry/13238-expanding-my-nintendo-64-collection-part-1/) |
 | `13269` | MIDI Computer Blues | [link](https://forums.atariage.com/blogs/entry/13269-midi-computer-blues-setting-up-the-hardware/) |
 | `13283` | My Jack-o-Lantern Collection | [link](https://forums.atariage.com/blogs/entry/13283-my-jack-olantern-collection/) |
 | `13289` | Programming iOS using SpriteKit Ch.3 | [link](https://forums.atariage.com/blogs/entry/13289-programming-ios-using-spritekit-chapter-3/) |
@@ -1024,7 +1033,9 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 | `1350` | Bankswitching and Paddle Driven Menu（SpiceWare, 2006） | [link](https://forums.atariage.com/blogs/entry/1350-bankswitching-and-paddle-driven-menu/) |
 | `13507` | Extra Hardware | [link](https://forums.atariage.com/blogs/entry/13507-extra-hardware/) |
 | `13680` | My Humble PC Software Collection | [link](https://forums.atariage.com/blogs/entry/13680-my-humble-pc-software-collection/) |
+| `13726` | software-collection-part-ii（blog） | [link](https://forums.atariage.com/blogs/entry/13726-software-collection-part-ii/) |
 | `13755` | Sprite Engine Back in Play | [link](https://forums.atariage.com/blogs/entry/13755-sprite-engine-back-in-play/) |
+| `13763` | Resizable Ball（SpiceWare / Space Rocks 系） | [link](https://forums.atariage.com/blogs/entry/13763-resizable-ball/) |
 | `1386` | More Atari hardware in my house（javiero） | [link](https://forums.atariage.com/blogs/entry/1386-more-atari-hardware-in-my-house/) |
 | `13884` | Collect Tutorial Index | [link](https://forums.atariage.com/blogs/entry/13884-collect-tutorial-index/) |
 | `13894` | Sprite Engine Rebooted | [link](https://forums.atariage.com/blogs/entry/13894-sprite-engine-rebooted/) |
@@ -1032,6 +1043,28 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 | `13898` | The Collection So Far and a Welcome | [link](https://forums.atariage.com/blogs/entry/13898-the-collection-so-far-and-a-welcome/) |
 | `13903` | Hardware | [link](https://forums.atariage.com/blogs/entry/13903-hardware/) |
 | `13936` | wav2tia Redux | [link](https://forums.atariage.com/blogs/entry/13936-wav2tia-redux/) |
+| `14096` | whats-inside-mega-man-legacy-collection-2（blog） | [link](https://forums.atariage.com/blogs/entry/14096-whats-inside-mega-man-legacy-collection-2/) |
+| `14111` | unboxing-rockman-legacy-2-collectors-edition（blog） | [link](https://forums.atariage.com/blogs/entry/14111-unboxing-rockman-legacy-2-collectors-edition/) |
+| `14115` | sonic-mania-collectors-edition-unboxing（blog） | [link](https://forums.atariage.com/blogs/entry/14115-sonic-mania-collectors-edition-unboxing/) |
+| `14193` | unboxing-marvel-vs-capcom-infinite-collectors-edition（blog） | [link](https://forums.atariage.com/blogs/entry/14193-unboxing-marvel-vs-capcom-infinite-collectors-edition/) |
 | `14240` | NES Sprite Programming | [link](https://forums.atariage.com/blogs/entry/14240-nes-sprite-programming/) |
+| `1466` | Paddle Reading is Done（blog / 実制作の記録） | [link](https://forums.atariage.com/blogs/entry/1466-paddle-reading-is-done/) |
+| `1513` | Vertical Ball Pt II（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/1513-vertical-ball-pt-ii/) |
+| `1744` | Ball Horizontal Correction（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/1744-ball-horizontal-correction/) |
+| `1754` | Score Counter（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/1754-score-counter/) |
+| `18176` | 2600 Display Kernels（blog） | [link](https://forums.atariage.com/blogs/entry/18176-2600-display-kernels/) |
+| `19519` | 6-Digit Score Returns（blog / Game Gear の話だが発想が効く） | [link](https://forums.atariage.com/blogs/entry/19519-6-digit-score-returns/) |
+| `2550` | The Kernel's Secret Recipe（blog） | [link](https://forums.atariage.com/blogs/entry/2550-the-kernels-secret-recipe/) |
+| `3129` | Ball Horizontal Control Part 2（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/3129-ball-horizontal-control-part-2/) |
+| `3147` | Ball Horizontal Proposal（DanBoris' Tech Blog） | [link](https://forums.atariage.com/blogs/entry/3147-ball-horizontal-proposal/) |
+| `3195` | Ball Horizontal Control Proposal 2（DanBoris' Tech Blog） | [link](https://forums.atariage.com/blogs/entry/3195-ball-horizontal-control-proposal-2/) |
+| `4692` | Score Kernel Revisited（Chris Walton 系 / テキスト表示カーネル） | [link](https://forums.atariage.com/blogs/entry/4692-score-kernel-revisited/) |
+| `505` | Score Part 1（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/505-score-part-1/) |
+| `508` | Score Part 2（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/508-score-part-2/) |
+| `643` | Score Segment Decoder（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/643-score-segment-decoder/) |
+| `658` | Ball Horizontal Counter（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/658-ball-horizontal-counter/) |
+| `684` | Collision Detection（Chris Walton / Prince of Persia 2600 制作記） | [link](https://forums.atariage.com/blogs/entry/684-collision-detection/) |
+| `882` | Ball Horizontal Control (Part 1)（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/882-ball-horizontal-control-part-1/) |
+| `9156` | New Score/Lives Kernel（blog） | [link](https://forums.atariage.com/blogs/entry/9156-new-scorelives-kernel/) |
 
-(117 dev-blog entries)
+(150 dev-blog entries)

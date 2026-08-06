@@ -9,6 +9,40 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **The blog mine's PONG core was the part that had never been distilled, and the harvest had been dropping
+  every article body.** The ledger said "157 items mined". Measured: **155 directories — 117 distilled, 38
+  raw-only, 2 completely empty.** Worse, every one of those 38 `entry.txt` files contained **only reader
+  comments**; the article itself was missing, so distilling from them would have produced notes about what
+  commenters said, attributed to the author. The page is Invision Community — body and comments are all
+  `ipsType_richText` blocks and the FIRST is the body, which the original extractor skipped.
+  **Nothing needed re-fetching: 26 of the 38 bodies were already on disk.** `reference/atariage/_tools/aa_blog_body.py`
+  re-extracts them into BODY + comments, preserving the SOURCE/WAYBACK provenance lines.
+  Dev-blog notes **117 -> 150**; `docs/mining-digest.md` regenerated from them, and this table's count in
+  `CLAUDE.md` corrected with it.
+- **What the 38 turned out to be is the finding.** They are almost entirely the PONG core: ball, paddle,
+  score, collision. DanBoris's reverse-engineering of the **original arcade PONG circuit** gives mechanics
+  ground truth in numbers, which is clean-room legitimate (a circuit analysis, not anyone's 2600 source):
+  ball **4px x 4px**; horizontal motion is **per-scanline phase drift**, not a per-frame add (456/455/454/453
+  counts against the line's 454); the paddle's **16px face is 8 regions of 2px** mapping to
+  up-fast/medium/slow / none / none / down-slow/medium/fast, with hits on the top or bottom **reversing
+  direction and keeping speed**; the vertical slip counter's load values **7..13 -> 248..242 counts against
+  245 visible lines**, so **10 is exactly "no vertical motion"**; the ball **speeds up at volley 4 and 12 —
+  three speeds, no more**; scoring is detected **not by collision but by "graphics present during HBLANK"**,
+  because the ball is the only object that can leave the screen; and the game ends at **11 or 15** by switch.
+  Also carried off: a **26-cycle, branchless, 22-byte hex->BCD 0-99** routine with its 7-byte table, and
+  supercat's **26/32-cycle four-paddle read** plus the observation that **the paddle reset need not happen at
+  a fixed point each frame** — time it so the timeout lands where the kernel can afford to poll.
+- **Two entries disagree and the note says so instead of picking one.** `658` and `882` give opposite
+  Aa/Bb-to-direction mappings, and `1744` is the author's own correction of `882` (he had `/HIT1` and `/HIT2`
+  reversed — found by noticing the score was being credited to the wrong player, which is the same "check it
+  against something downstream" discipline this repo runs on). Both are recorded, unresolved, to be settled by
+  measurement when PONG is built.
+- **The tail is now fully accounted for: 150 distilled, 5 gaps, 0 unexplained.** Six entries are marked
+  deliberately out of scope with the reason (unboxings and collection posts), so they stop reading as unfinished
+  work. The 5 remaining gaps carry a GAP.txt saying what is missing and why it is worth re-fetching — two of
+  them (`8429-bounding-box`, `8431-pixel-perfect`) are the direct continuation of `684-collision-detection`,
+  whose author had just measured pixel-perfect collision as too slow on the 2600 and fallen back to bounding
+  boxes.
 - **The Stella capture queue is empty for the first time since it was created.** Captured during a window when
   the author was away from the machine, which is the only time it may run — the write-only TIA registers live
   in Stella's debugger GUI, so each capture takes the screen for ~13s. `litmus_jsr_stack`, `framelines_trap`,
