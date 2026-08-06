@@ -1038,23 +1038,48 @@ type writeBlock struct {
 // finishes at cycle 7i = colour clock 21i, i.e. visible clock 21i-68. One
 // iteration costs `sta WSYNC` (3) + 7 per block + `iny`/`cpy #n`/`bne` (7).
 //
-// The block COUNT is capped at what `cyclebound` can certify, not at what the
-// hardware would tolerate, and the two differ. Every table is `align 256` and the
-// index never exceeds 255, so `lda TABLE,y` never crosses a page and really costs
-// 4 — nine blocks run in 3+7*9+7 = 73 of the 76 cycles, and a nine-block clone was
-// measured at 262 scanlines with its picture improved. But the static prover
-// cannot assume the alignment, bounds `lda abs,y` at 5, and scores the same kernel
-// at 3+8*9+7 = 82 against a 76 budget: `certified:false`, a violation on the
-// visible `Kern` region. Eight blocks score 74 and certify (measured on the Outlaw
-// clone). Emitting only kernels the project's own prover accepts is worth the slot
-// — a generated artifact that trips the repo's line-budget gate is a landmine, and
-// RL-7b exists because exactly that kind of unseen overrun shipped once already.
+// The block COUNT is capped at what `cyclebound` can certify. It used to be capped
+// LOWER than that, and the gap cost a write block on every scanline.
+//
+// Every table is `align 256` and the index never exceeds 255, so `lda TABLE,y`
+// cannot cross a page and costs 4. This code charged 5 anyway and capped at 8
+// blocks, because the prover "cannot assume the alignment" — true when it was
+// written, and fixed in the prover on 2026-08-01: `pagePenalty` now returns 0 for an
+// absolute,X/absolute,Y read whose base has a zero low byte, which needs no index
+// analysis at all (a 6502 index is 0..255, so $NN00+idx stays in $NN's page).
+//
+// Re-measured 2026-08-05 before changing anything: the eight-block Fishing Derby
+// clone certifies at **worst 66 cycles**, which is 3+7*8+7 — the prover was already
+// counting the blocks at 7. The constant was the only thing still counting them at
+// 8, and it was throwing away the ninth block against a limitation that no longer
+// existed. Nine blocks are 3+7*9+7 = 73 of 76.
+//
+// The caution that produced the old cap stays worth keeping: emit only kernels this
+// repo's own prover accepts, because a generated artifact that trips the line-budget
+// gate is a landmine, and RL-7b exists because exactly that shipped once. So the cap
+// is still the prover's number — it is just no longer a stale copy of it.
 const (
-	kernBlockCycles     = 7 // real cost: lda abs,y (4, tables are page-aligned) + sta zp (3)
-	kernProvedBlockCost = 8 // cyclebound's conservative cost: lda abs,y bounded at 5
-	kernFixedCycles     = 3 + 7
-	kernMaxBlocks       = (76 - kernFixedCycles) / kernProvedBlockCost
+	kernBlockCycles = 7 // lda abs,y (4, tables are page-aligned) + sta zp (3)
+	kernFixedCycles = 3 + 7
+	// kernBlockCeiling is the most blocks a scanline can hold: 3+7*9+7 = 73 of 76.
+	kernBlockCeiling = (76 - kernFixedCycles) / kernBlockCycles
 )
+
+// kernMaxBlocks is SEARCHED, not fixed, because more blocks is not monotonically
+// better and that was measured rather than assumed.
+//
+// Raising the cap from 8 to the prover's true ceiling of 9 on Fishing Derby bought
+// M1 outright — 0 of 43 cells to 43 of 43 — and cost 2,025 background cells, because
+// the ninth slot let a playfield write be scheduled past the beam it governs: PF went
+// from drawing 6,872 cells to 8,829 against a target of 6,888. Net element match fell
+// 33,637 -> 31,680. On other targets the ninth block helps; the old comment here
+// recorded a nine-block clone whose picture improved.
+//
+// So the count joins the content shift, the VBLANK top and the frame length as
+// something this tool CALIBRATES against the target instead of deriving. Both
+// candidates certify under cyclebound (66 and 73 cycles against 76), so the choice is
+// purely about the picture, and the search reports what it picked and what it beat.
+var kernMaxBlocks = kernBlockCeiling
 
 func blockLands(i int) int { return 21*(i+1) - 68 } // i is 0-based
 
@@ -1573,8 +1598,10 @@ func planKernel(fd *frameData) (blocks []writeBlock, notes []string) {
 			}
 		}
 		kept := want
-		notes = append(notes, fmt.Sprintf("NOT REPRODUCED: per-line %s. The kernel would need %d write blocks and only %d fit — 3+%d*n+7 CPU cycles against a 76-cycle scanline, counting each block at %d because a static prover bounds `lda abs,y` at 5 rather than assume the tables' page alignment (the hardware would run 9 blocks at 3+%d*9+7 = %d, but the emitted clone would then fail cyclebound at 82)",
-			strings.Join(dropped, " and "), needed, kernMaxBlocks, kernProvedBlockCost, kernProvedBlockCost, kernBlockCycles, 3+kernBlockCycles*9+7))
+		notes = append(notes, fmt.Sprintf("NOT REPRODUCED: per-line %s. The kernel would need %d write blocks and only %d fit — 3+%d*n+7 CPU cycles against a 76-cycle scanline, so %d blocks cost %d and %d would cost %d. The tables are `align 256`, so `lda TABLE,y` cannot cross a page and is costed at 4 by both the hardware and (since 2026-08-01) this repo's prover; the cap is the prover's own number, not a safety margin on top of it",
+			strings.Join(dropped, " and "), needed, kernMaxBlocks, kernBlockCycles,
+			kernMaxBlocks, 3+kernBlockCycles*kernMaxBlocks+7,
+			kernMaxBlocks+1, 3+kernBlockCycles*(kernMaxBlocks+1)+7))
 		want = kept
 	}
 	// Earliest deadline first: every write has to land before the pixels it
@@ -2152,6 +2179,70 @@ func main() {
 		}
 	}
 	fmt.Printf("  chosen content shift: %+d\n", bestS)
+
+	// Write-block count: the same measure-don't-derive treatment. The ceiling is what
+	// the prover certifies; whether the last block HELPS is a property of the target,
+	// so try each count and keep the picture that matches best.
+	bestB, bestBM := kernMaxBlocks, bestM
+	seenPlan := map[int]bool{len(fd.kern): true}
+	for b := kernBlockCeiling; b >= 4; b-- {
+		if b == kernMaxBlocks {
+			fmt.Printf("  block cap %d: element match %d / %d (ceiling; kernel uses %d)\n", b, bestM, fd.h*160, len(fd.kern))
+			continue
+		}
+		// A cap above what the target actually needs plans the same kernel, so only
+		// caps that change the PLAN are worth rendering. Without this the loop spends
+		// five renders re-scoring one kernel on every target that needs 8 or fewer.
+		{
+			savedCap := kernMaxBlocks
+			kernMaxBlocks = b
+			probe, _ := planKernel(fd)
+			kernMaxBlocks = savedCap
+			if seenPlan[len(probe)] {
+				continue
+			}
+			seenPlan[len(probe)] = true
+		}
+		// planKernel is what CONSUMES the cap, and it runs once before this search
+		// and stores its answer in fd.kern — so the count has to be re-planned, not
+		// just re-emitted. Getting that wrong is silent: every candidate renders the
+		// kernel that was already chosen and scores identically, which is exactly
+		// what the first version of this loop reported before the plan was moved in.
+		savedCap, savedKern := kernMaxBlocks, fd.kern
+		kernMaxBlocks = b
+		kern, _ := planKernel(fd)
+		fd.kern = kern
+		m := -1
+		if src := emit(fd.shifted(bestS), zin, vblankAdj, osAdj); true {
+			if grid, _, _, _, err := renderGrid(src, *spec, *frames); err == nil {
+				m = matchCount(fd.tgtElem, grid)
+			}
+		}
+		kernMaxBlocks, fd.kern = savedCap, savedKern
+		if m < 0 {
+			fmt.Printf("  block cap %d: did not render\n", b)
+			continue
+		}
+		fmt.Printf("  block cap %d: element match %d / %d (kernel uses %d)\n", b, m, fd.h*160, len(kern))
+		// TIES GO TO THE SMALLER KERNEL. The loop counts DOWN from the ceiling, so
+		// `>=` hands a tie to the lower count — same picture, fewer cycles spent. On
+		// the technique corpus most targets score identically at 9 and 8, and taking
+		// the ceiling there would emit a 73-cycle kernel to draw what a 66-cycle one
+		// draws, handing the author 7 cycles less headroom for nothing.
+		if m >= bestBM {
+			bestBM, bestB = m, b
+		}
+	}
+	kernMaxBlocks = bestB
+	if kern, _ := planKernel(fd); true {
+		fd.kern = kern
+	}
+	// Report the CAP and the kernel it produced separately. They are not the same
+	// number and conflating them reads as a regression: `bullets` plans 8 blocks at
+	// 66 cycles whatever the cap is, and printing "chosen kernel blocks: 9" for it
+	// says the kernel got bigger when nothing about it changed.
+	fmt.Printf("  chosen block cap: %d — kernel uses %d write blocks, %d of 76 CPU cycles (element match %d / %d)\n",
+		bestB, len(fd.kern), kernFixedCycles+kernBlockCycles*len(fd.kern), bestBM, fd.h*160)
 
 	src := emit(fd.shifted(bestS), zin, vblankAdj, osAdj)
 

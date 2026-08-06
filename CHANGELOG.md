@@ -9,6 +9,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`framegen` was capping its kernel against a prover limitation that had been fixed four days earlier, and
+  the fix turned out to be worth measuring rather than taking.** `kernProvedBlockCost = 8` carried the comment
+  "the static prover cannot assume the alignment, bounds `lda abs,y` at 5" — true when written, and repaired in
+  `pagePenalty` on 2026-08-01 (a base with a zero low byte cannot be crossed by an 8-bit index, no index
+  analysis needed). Re-measured before touching anything: the eight-block Fishing Derby clone certifies at
+  **worst 66 cycles = 3+7*8+7**, so the prover was already counting blocks at 7 and the constant was the only
+  thing still counting them at 8.
+- **Raising the cap to the true ceiling of 9 made the picture WORSE on Fishing Derby, which is why the count is
+  now SEARCHED.** Nine blocks bought M1 outright (**0 of 43 cells to 43 of 43**) and cost 2,025 background
+  cells, because the ninth slot let a playfield write be scheduled past the beam it governs — PF drew 8,829
+  cells against a target of 6,888. Net element match fell **33,637 -> 31,680**. More blocks is not
+  monotonically better, so the count joins the content shift, the VBLANK top and the frame length as something
+  this tool calibrates against the target: plan at each cap, render, score, keep the best picture. Both
+  candidates certify (66 and 73 cycles against 76), so the choice is purely about the picture.
+  **Ties go to the smaller kernel** — same picture, 7 more cycles of headroom for the author.
+- **Two ways this search could have been silently vacuous, both caught by measurement.** `planKernel` consumes
+  the cap and runs ONCE before the search, storing its answer in `fd.kern`, so the first version re-emitted the
+  already-chosen kernel and scored every candidate identically (31,680 six times) — the plan has to be redone
+  per candidate, not just the emit. And a cap above what the target needs plans the same kernel, so candidates
+  are now skipped unless they change the plan: two renders instead of six.
+  The verdict line also conflated the cap with the kernel — it printed "chosen kernel blocks: 9" for `bullets`,
+  whose kernel is 8 blocks at 66 cycles whatever the cap is, which reads as a regression that did not happen.
+  It now reports both.
+- **No regression on the corpus, measured rather than assumed**: sweeping all 31 technique ROMs gives
+  **22/31 pixel-exact and 31/31 at 262 scanlines**, the same as the recorded figures, in 99s.
+
+### Fixed
 - **A past session implemented ARCADE Pong's numbers in a VIDEO OLYMPICS reproduction, and the guard against
   that is now mechanical.** There is no standalone Pong cartridge for the 2600 — Pong is one variant inside
   **Video Olympics (CX2621, 1977)**, which is what `sandbox/practice/pong` reproduces against the real ROM.
