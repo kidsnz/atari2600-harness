@@ -8,6 +8,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **The Stella capture queue is empty for the first time since it was created.** Captured during a window when
+  the author was away from the machine, which is the only time it may run — the write-only TIA registers live
+  in Stella's debugger GUI, so each capture takes the screen for ~13s. `litmus_jsr_stack`, `framelines_trap`,
+  `framelines_clean`, `litmus_divpre` and `litmus_divctx` each agree with Gopher2600 on **37/37** write-only
+  registers at frame 5. Four of those are this session's new witnesses, so the fixtures now gating frame
+  stability and the divide-loop bound are themselves cross-checked against the reference emulator rather than
+  trusted. Corpus: **161 captured ROMs, 5,957 register readings.**
+- **`zone_multiplex` was the flagship technique scored by a hash alone; it now states what it claims.**
+  Its scenario held `ntsc_frame_lines`, `frame_lines_stable` and `golden_frame` — nothing that says the
+  technique WORKS. A golden hash fails identically whether a zone moved one pixel or the multiplexer collapsed
+  to a single sprite. Added 22 behavioural assertions derived from what the ROM claims (6 zones x P0/P1 = 12
+  sprites on a 2-sprite machine, P0 drifting right and P1 left, X wrapping at 128 via `and #$7F`):
+  **12 asserts** pinning every zone's X at frame 12 — measured, not derived, and all twelve values are
+  distinct, which IS the technique; **6 invariants** that each X stays in 0..127 over 60 frames (a mask
+  regression); **2 monotonic** (P0 zone 0 up, P1 zone 5 down — the movement claim, over a window chosen to
+  precede either one's wrap); and **1 temporal** `eventually ram.0x84 < 10 within 20` for the wrap itself,
+  which is a sequence property no per-frame invariant can state (held at frame 14).
+  Negative control: reversing P0's drift to `sbc #1` fails three independent ways —
+  `monotonic ram.0x80 up [broke@frame 1: 17->16]`, the pinned values, and the temporal wrap.
+  The golden was regenerated because `frames: 60` lengthens the observed window; the ROM is untouched and its
+  rendering byte-identical, verified by re-running the original short window against the OLD golden first.
+
 ### Fixed
 - **K6 — the divide loop's entry value is now the CONTEXT's, and pizza-boy certifies. The umbrella's
   known-failing list is empty for the first time: 16 of 16 scenarios pass, 0 known-red.**
