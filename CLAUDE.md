@@ -157,6 +157,15 @@ not by eye).
 **poke quirk** — `poke` is for RAM. Write-only TIA registers ($0D PF0 etc.) don't persist stably under poke →
 change rendering with a `sta` in the ROM/kernel.
 
+**PONG on the 2600 IS Video Olympics — there is no standalone Pong cartridge.** Atari's Pong is a 1972
+DISCRETE-LOGIC arcade machine (and later a dedicated home console); the 2600's Pong is one variant inside
+**Video Olympics (CX2621, 1977)**. The reproduction target for `sandbox/practice/pong/` is Video Olympics,
+measured against the real ROM at `reference/roms-study/VideoOlympics.bin` — the source's `VO実測仕様$3C`,
+`VO流`, `VO直伝` comments are those measurements. `reference/atariage/blogs/` also holds DanBoris's
+reverse-engineering of the ARCADE circuit (ball 4x4px, paddle-face 8 regions, volley speed-ups at 4 and 12,
+11/15 point games); every one of those notes carries a warning banner, because they describe a DIFFERENT
+GAME and are design reference only. **Where the arcade spec and a VO measurement disagree, VO wins.**
+
 **Image input contract (user → Claude)** — for pixel-exact extraction ask for **Stella F12 snapshots
 (PNG, unmodified, TV effects off)** = guaranteed integer scale, Retina-proof. OS screenshots are
 conversation-grade only (non-integer scale → warnings). Hand-off point = umbrella `inbox/` (belongs to no repo). Size = any integer multiple of 160 (auto-detected). **Best input = the ROM file itself** (`cmd/fieldtest` self-drives Gopher2600 → full multi-frame analysis; drop ROMs in `inbox/`). F12 shots (2-3 consecutive for movement) are the fallback. Details: `docs/ingest.md`.

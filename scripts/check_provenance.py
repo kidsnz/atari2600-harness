@@ -248,6 +248,44 @@ def write_list():
     print("wrote docs/provenance.md")
 
 
+
+# --- Arcade-Pong / Video Olympics confusion guard -----------------------------------
+# There is NO standalone Pong cartridge for the Atari 2600. Pong on the 2600 is one
+# variant inside Video Olympics (CX2621, 1977), and that is what sandbox/practice/pong
+# reproduces, measured against reference/roms-study/VideoOlympics.bin. The blog mine also
+# holds DanBoris's reverse-engineering of the 1972 DISCRETE-LOGIC arcade machine, which is
+# a DIFFERENT GAME with different numbers — arcade accelerates at volley 4 and 12 (three
+# speeds), Video Olympics at 4/8/16 with +/-1 steps capped at +/-4.
+#
+# This is not hypothetical: a past session implemented the arcade thresholds in the VO
+# reproduction and labelled them "原典アーケード仕様" (the original arcade spec), and the
+# code ended up matching neither game. Comments rot; this does not. Any note that talks
+# about the arcade machine must carry the warning banner that says which game it is about.
+ARCADE_MARKERS = ("アーケード PONG", "アーケード Pong", "arcade PONG", "arcade Pong")
+BANNER_MARKER = "対象の取り違え注意"
+
+
+def check_arcade_pong_banners():
+    """Every blog note about the ARCADE machine must say it is not the reproduction target."""
+    blogs = os.path.normpath(os.path.join(HARNESS, "..", "reference", "atariage", "blogs"))
+    if not os.path.isdir(blogs):
+        return []  # umbrella not present (CI); nothing to check, and say so upstream
+    bad = []
+    for name in sorted(os.listdir(blogs)):
+        note = os.path.join(blogs, name, "notes.ja.md")
+        if not os.path.isfile(note):
+            continue
+        text = open(note, encoding="utf-8", errors="ignore").read()
+        if not any(m in text for m in ARCADE_MARKERS):
+            continue
+        if BANNER_MARKER not in text:
+            bad.append("reference/atariage/blogs/%s/notes.ja.md discusses the ARCADE Pong "
+                       "machine without the 対象の取り違え注意 banner — a reader will take "
+                       "its numbers for Video Olympics, which is the actual reproduction "
+                       "target" % name)
+    return bad
+
+
 def main():
     if "--list" in sys.argv:
         write_list()
@@ -277,6 +315,7 @@ def main():
     for doc, path in unresolved:
         missing.append("%s cites `%s`, which exists under neither the harness nor the "
                        "umbrella above it" % (doc, path))
+    missing.extend(check_arcade_pong_banners())
     for path in stale:
         missing.append("KNOWN_ABSENT lists `%s`, but it now resolves — delete the entry "
                        "so the list keeps meaning something" % path)

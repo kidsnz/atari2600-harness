@@ -8,6 +8,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **A past session implemented ARCADE Pong's numbers in a VIDEO OLYMPICS reproduction, and the guard against
+  that is now mechanical.** There is no standalone Pong cartridge for the 2600 — Pong is one variant inside
+  **Video Olympics (CX2621, 1977)**, which is what `sandbox/practice/pong` reproduces against the real ROM.
+  The 1972 arcade machine is discrete logic and a different game. This repo's own primary source (a self-made
+  distella + live-observation analysis) records BOTH, and even labels the arcade section "文脈知識" (context):
+  **VO accelerates every 4/8/16 hits** via a mask table `$F6BC{$FF,$03,$07,$0F}`, +/-1 steps capped at +/-4;
+  **the arcade accelerates at volley 4 and 12**, three speeds. The reproduction's comments cited
+  "原典アーケード仕様" — the context section, implemented as if it were the spec — and the code matched
+  **neither**: 4/8/**12** in four fractional tiers.
+  Every "原典" label is gone; the source now names Video Olympics as the target, states VO's measured
+  behaviour, and records 4/8/12 as a DELIBERATE deviation (it exists to kill a +100% speed shock) with the
+  exact edit that would make it VO-faithful. Two further claims — `11点先取` and "loser receives" — are marked
+  **unverified against VO** rather than left looking measured. No behaviour changed; both scenarios still pass.
+- **`check_provenance.py` now fails if a blog note discusses the arcade machine without the
+  target-confusion banner.** Comments rot and banners get dropped; this does not. All 12 arcade notes carry it,
+  and the guard names the file when one loses it (negative control run). The invariant is also burned into
+  `CLAUDE.md`, which is loaded every session: **where the arcade spec and a VO measurement disagree, VO wins.**
+
 ### Added
 - **The blog mine's PONG core was the part that had never been distilled, and the harvest had been dropping
   every article body.** The ledger said "157 items mined". Measured: **155 directories — 117 distilled, 38
