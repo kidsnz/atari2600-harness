@@ -3949,3 +3949,17 @@ both are required — removing either leaves `litmus_divctx` NOT CERTIFIED:
 scenarios pass, 0 known-red.** Soundness: observed <= proven on 1408 regions across 173 ROMs.
 `divCtxEntryUsed` counts uses of the new path; it read 0 over the corpus before `litmus_divctx` was added,
 which is why that ROM exists.
+
+**Re-measured after K6 (2026-08-05).** Making divide-loop bounds context-sensitive moved the shipped figure
+from **47.1% (295/626) to 49.4% (309/626)** — 14 more addresses proven in EVERY call context.
+
+The ceiling numbers above are unchanged, and that is the point: they were measured by FORCING each obstacle
+to pass, so they state where an axis ends rather than how far along it the prover currently is. K6 moved the
+shipped figure ALONG the trip-count axis — **2.3 of that axis's 7.0 points** (47.1 -> 49.4 against a 54.1
+ceiling). The remaining 4.7 are loop shapes whose trip count is still unestablished, and they are NOT the
+`sec/sbc #N/bcs` divide, which K6 covers.
+
+This also retires the "single measures move nothing" reading of the earlier entry. That was true of the three
+repairs measured on 2026-08-03/04, each worth ~zero. K6 is the first single change since to move the number,
+and it moved it because it attacked a whole idiom (every shared positioning routine) rather than one refusal
+reason. `coverageFloor` raised 0.47 -> 0.49 so the gain cannot be given back silently.

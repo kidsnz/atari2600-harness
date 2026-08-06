@@ -8,7 +8,7 @@ package cyclebound
 // Counting those rows gives "626 of 958 = 65.3%", which is not a fact about the ROM:
 // an address is only USEFULLY proven when EVERY context proves it, because a builder
 // asking "does this line fit in 76 cycles?" gets a refusal if any context refuses.
-// By that measure the same corpus reads 295 of 626 = 47.1%.
+// By that measure the same corpus reads 309 of 626 = 49.4% (was 295 = 47.1% before K6).
 //
 // Both numbers are true about what they count. Only the second is true about the
 // question. This test pins the second.
@@ -16,11 +16,17 @@ package cyclebound
 // WHAT THE CEILING IS, measured by forcing each obstacle to pass (unsound, done once
 // by hand, recorded in docs/capability-gap-audit.md):
 //
-//	47.1%   as shipped
+//	49.4%   as shipped (was 47.1% before K6 made divide-loop bounds context-sensitive)
 //	54.1%   if every trip count were established
 //	47.1%   if WSYNC-in-body were ignored          <- ZERO on its own
 //	47.1%   if call-or-jump-in-body were ignored   <- ZERO on its own
 //	60.2%   if all three were
+//
+// THE CEILINGS ARE UNCHANGED AND THAT IS THE POINT. They were measured by FORCING each
+// obstacle to pass, so they do not depend on how many the prover currently clears —
+// they say where the axis ends. K6 moved the shipped figure ALONG the trip-count axis:
+// 47.1 -> 49.4 of the 54.1 available, i.e. it captured 2.3 of that axis's 7.0 points.
+// The remaining 4.7 are other loop shapes whose trip count is still unestablished.
 //
 // The two that are worth nothing alone are worth 6.1 points together with the first.
 // THE OBSTACLES ARE NOT INDEPENDENT: a loop blocked by two of them shows up in
@@ -36,7 +42,7 @@ import (
 // coverageFloor is the fraction of addresses proven in EVERY call context. It is a
 // floor, not a target: a change that raises it should raise this constant, and a
 // change that lowers it has taken something away from a builder and must say so.
-const coverageFloor = 0.47
+const coverageFloor = 0.49
 
 func TestProverCoverageOnTheCommercialCorpus(t *testing.T) {
 	// THE CORPUS IS NOT IN THIS REPOSITORY. The commercial cartridges live in the

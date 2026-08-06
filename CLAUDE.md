@@ -305,3 +305,11 @@ went CI-red on a flaky parallel-test file race that local build+test never showe
 against it, not a proxy, before every push. A tracked **pre-push hook** automates this: `scripts/git-hooks/pre-push`
 runs the mirror (vet + `test -p 1` + the fast `check_*`) and blocks a red push — enable once per clone with
 `git config core.hooksPath scripts/git-hooks` (emergency bypass: `git push --no-verify`).
+
+> **The hook is the ONLY gate on the authored ROMs, and that is by design.** `sandbox/` is local-only with no
+> remote, so GitHub Actions cannot see the 16 scenarios under `sandbox/practice/**` — `TestTheAuthoredROMsStillPass`
+> SKIPS there with the reason printed rather than passing silently. On this machine the tree IS present, the
+> hook's `go test -p 1 ./...` runs it, and a red authored ROM blocks the push. That test also fails when a
+> scenario listed in its `knownFailing` map starts PASSING, so the list cannot rot into a permission slip.
+> Consequence to remember: `git push --no-verify`, or a push from a clone without the umbrella, ships those
+> 16 ungated. Nothing else covers them.
