@@ -3997,3 +3997,36 @@ The fix is partial following: follow an object through the boundaries that fit a
 not, pinning it at its last good X for the remainder and reporting the lines given up. That is a change to the
 zone model rather than to a predicate — zone boundaries are global while "stopped following" is per object —
 so it is recorded here with the measurement rather than attempted at the end of a long session.
+
+**RL-8c attempted and REVERTED, with the diagnosis it bought (2026-08-07).** Partial following was
+implemented — `zstop[5]int` on `frameData`, `tryZones` retiring an object at an unservable boundary instead of
+failing the plan, `zoneGRP` and the ENABLE tables gated past the retirement, `shifted` carrying `zstop`. It
+works, and it is a **net regression**, so it is not shipped:
+
+| element | baseline | with partial following |
+|---|---|---|
+| BG | 26666 | 26414 |
+| PF | 6872 | 6719 |
+| P0 | 50 | **78** |
+| P1 | 49 | **58** |
+| **total** | **33637** | **33269** |
+
+The players improve by 37 cells and the background loses 405. The reason is in the same report: the clone
+draws **220 P0 cells and matches 78**, **266 P1 cells and matches 58** — the sprites are being drawn, in the
+wrong places, over background the single-position kernel got right. Following an object is not the hard part;
+**landing it per zone is**, and the per-zone calibration does not converge here (`z1P0` wanted 9 and read
+3 → 7 → 9 across iterations, `z0P0` read NOT-DRAWN for four).
+
+**A real latent bug was found on the way and is worth recording even though its fix is a no-op today.** The
+zone is PINNED from `bx` and its anchor is read from `lx`, and those are different measurements — `bx` can be
+notDrawn on a line where `lx` still reports a leftmost run. So a line can sit inside a zone, contribute
+nothing to the pin, and still win the anchor. Measured: Fishing Derby's z1 (L27-213) came out anchored at
+**29**, the retired x29 band's position, instead of **135** for the x134 band it actually reproduces — which
+made every GRP byte in the zone wrong. Tying the anchor to the zone's pinned X fixes it (P1 25 → 58).
+Alone the tie changes **nothing** (FD byte-identical), because without partial following `pin` guarantees
+every line in a zone agrees with it — so it is not shipped either, under the same no-unwitnessed-changes rule.
+
+**What the next attempt needs, stated so it is not re-derived**: per-zone sprite calibration that converges,
+not more zone bookkeeping. Until `z1P0 want 9` reads 9 on the first iteration rather than the fourth, partial
+following will keep trading background for misplaced sprites. The WIP is preserved in
+`git stash` ("RL-8c partial following WIP") on this machine.
