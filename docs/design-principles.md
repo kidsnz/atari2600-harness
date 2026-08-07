@@ -76,6 +76,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   not survive editing; a reference has to name the rule.)
 
 ## Multiplexing and flicker
+- **★Flicker multiplexing DISABLES the TIA's hardware collision detection, and the reason is a miss rather than
+  an inaccuracy**: two objects that are colliding may never be drawn on the SAME FRAME, so `CXPPMM` and friends
+  simply never latch. The player sees "I hit it and nothing happened". Choosing flicker therefore decides the
+  collision architecture too — it has to move into software. Cheapest first step, from the same source: test
+  collisions **only for a sprite that MOVED this frame**, since most sprites are stationary; the cost is that
+  an overlap present the moment a screen appears goes unnoticed until something moves. 〔blogs 8429 SpiceWare/Frantic〕 `→ design.HardwareCollisionUsable`
 - Beyond 2 objects, multiplex by Y band; a horizontal repositioning costs one scanline; **an empty Y lane is mandatory**; the price is 30Hz flicker. 〔Bumbershoot〕 `→ design.NeedsFlicker/NeedsEmptyYLane/RepositionCostScanlines`
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
 - **Multi-kernel = reuse one object per region**: switch `REFP` / position / picture per Y band and reuse a single player for different purposes (Stay Frosty). Match a "never overlap on the same line" placement constraint with an AI that "never enters an occupied column" and flicker is zero. 〔mining 303364, 318140, 164247〕

@@ -40,3 +40,18 @@ const RepositionCostScanlines = 1
 // NeedsEmptyYLane は帯多重化で再配置を挟む時に空 Y レーンが必須かを返す。再配置が
 // 1 走査線消費するため、別形状を Y 帯で切り替えるなら境界に空き行が要る。
 func NeedsEmptyYLane(sameYSprites int) bool { return NeedsFlicker(sameYSprites) }
+
+// HardwareCollisionUsable reports whether the TIA's own collision latches (CXxx) can
+// be trusted for an object that is drawn with flicker multiplexing.
+//
+// They cannot, and the reason is a MISS rather than an inaccuracy: two objects that are
+// colliding may never be drawn on the SAME FRAME, so `CXPPMM` and its siblings simply
+// never latch. To the player that is "I hit it and nothing happened" — the failure is
+// silent and intermittent, which is the worst shape a collision bug can take.
+//
+// So the choice to flicker also decides the collision architecture: it has to move into
+// software. The cheapest first step, from the same source, is to test collisions only
+// for a sprite that MOVED this frame, since most sprites are stationary; the price is
+// that an overlap already present when a screen appears goes unnoticed until something
+// moves. 〔blogs 8429 SpiceWare/Frantic〕
+func HardwareCollisionUsable(flickered bool) bool { return !flickered }

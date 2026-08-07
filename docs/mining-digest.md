@@ -1064,7 +1064,9 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 | `643` | Score Segment Decoder（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/643-score-segment-decoder/) |
 | `658` | Ball Horizontal Counter（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/658-ball-horizontal-counter/) |
 | `684` | Collision Detection（Chris Walton / Prince of Persia 2600 制作記） | [link](https://forums.atariage.com/blogs/entry/684-collision-detection/) |
+| `8429` | Bounding Box Collision Detection（SpiceWare / Frantic, 2011） | [link](https://forums.atariage.com/blogs/entry/8429-bounding-box-collision-detection/) |
+| `8431` | Pixel Perfect Collision Detection（SpiceWare / Frantic, 2011） | [link](https://forums.atariage.com/blogs/entry/8431-pixel-perfect-collision-detection/) |
 | `882` | Ball Horizontal Control (Part 1)（DanBoris' Tech Blog / 実機 PONG 回路解析） | [link](https://forums.atariage.com/blogs/entry/882-ball-horizontal-control-part-1/) |
 | `9156` | New Score/Lives Kernel（blog） | [link](https://forums.atariage.com/blogs/entry/9156-new-scorelives-kernel/) |
 
-(150 dev-blog entries)
+(152 dev-blog entries)

@@ -8,6 +8,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **The two collision GAP entries are recovered, and one of them carries a constraint this repo had nowhere:
+  flicker multiplexing DISABLES the TIA's hardware collision detection.** Fetched Wayback-first
+  (`aa_blog_fetch.py 8429 8431`, 84KB and 97KB, both HTTP 200) and distilled; dev-blogs **150 -> 152, gaps
+  5 -> 3**.
+  The reason is a MISS, not an inaccuracy: two objects that are colliding **may never be drawn on the same
+  frame**, so `CXPPMM` and its siblings never latch, and the player experiences "I hit it and nothing
+  happened" — silent and intermittent, the worst shape a collision bug takes. Choosing flicker therefore
+  chooses software collision too. Cheapest first step from the same source: test collisions **only for a
+  sprite that MOVED this frame**, since most are stationary; the price is that an overlap already present when
+  a screen appears goes unnoticed until something moves.
+  Promoted out of the note and into `design-principles.md` plus `design.HardwareCollisionUsable`, with a test,
+  because this is the kind of rule that otherwise gets rediscovered as a bug.
+- **The pair also records two authors reaching OPPOSITE conclusions on the same question, which is worth more
+  than either alone.** `684-collision-detection` (Chris Walton, Prince of Persia) implemented pixel-perfect
+  collision, measured it as too slow, and fell back to bounding boxes. `8431` (SpiceWare, Frantic) got
+  pixel-perfect working — on a Harmony cartridge, and the same author's `10777` says outright that Frantic
+  spends ARM headroom on its sprite driver. **So the 2600-alone feasibility cannot be concluded from it**, and
+  the note says so rather than filing it as "pixel-perfect is possible".
+
 ### Fixed
 - **`framegen`'s per-line NUSIZ table carried only the player's copy mode, so every missile was reproduced at
   one fixed width.** It recorded `SizeAndCopies` — NUSIZ's low three bits — and the MISSILE width lives in
