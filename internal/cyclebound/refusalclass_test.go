@@ -104,7 +104,11 @@ func TestRefusalClassesAccountForEveryUnboundedAddress(t *testing.T) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].n > out[j].n })
 	t.Logf("addresses %d, proven in every context %d = %.1f%%", len(all), base, 100*float64(base)/float64(len(all)))
-	t.Logf("ADDRESSES WHOSE ONLY REMAINING BLOCKER IS THIS CLASS (sole-blocker worth):")
+	t.Logf("ADDRESSES WHOSE ONLY REMAINING BLOCKER IS THIS CLASS — AN UPPER BOUND, AND THE GAP TO")
+	t.Logf("REALITY CAN BE TOTAL. Removing a class does not free its addresses if a SECOND obstacle")
+	t.Logf("waits behind it. Measured on WSYNC-in-body: this table said +5.7 pt, disabling the refusal")
+	t.Logf("moved coverage by 0.0 and pushed 25 of its 36 addresses onto the trip-count analysis instead.")
+	t.Logf("Treat every row below as \"at most\", and force the obstacle before planning around it:")
 	for _, e := range out {
 		t.Logf("%5d  (+%.1f pt)  %s", e.n, 100*float64(e.n)/float64(len(all)), e.c)
 	}

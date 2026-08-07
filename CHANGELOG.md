@@ -8,6 +8,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The sole-blocker table I added an hour ago is an upper bound whose gap to reality can be TOTAL, and the
+  correction is measured rather than argued.** That table says WSYNC-in-body is worth **+5.7 pt**. Disabling
+  the refusal and re-running leaves coverage at **309 of 629 = 49.1%, unchanged to the address** — the true
+  value is **+0.0**, reproducing the old forcing experiment by a different method.
+  **Not one of the 36 addresses became provable.** Every one hit a second obstacle immediately: trip count
+  went 20 → **45**, branch-in-body 13 → 14, call/jump-in-body 11 → 13, other 6 → 14.
+  So the same caution now applies to that table's own headline — "unresolved bank switch, 145 addresses,
+  +23.1 pt" has not been forced and may be worth 23 points or nothing. The test says so in its own output
+  rather than in a doc nobody re-reads, and `capability-gap-audit.md` carries the measurement.
+- **It also demonstrates the non-independence the ceiling table only asserted.** Removing WSYNC-in-body did
+  not free addresses, it EXPOSED 25 more trip-count blockages — which is exactly why the recorded ceiling
+  reads "47.1 alone / 47.1 alone / 60.2 together". The 6.1 points exist only when the obstacles go together,
+  and here the mechanism is visible instead of inferred.
+- **Queue item E (WSYNC inside loop body) is closed as not-worth-doing on two independent measurements, and
+  nothing was written for it.**
+
 ### Added
 - **The two collision GAP entries are recovered, and one of them carries a constraint this repo had nowhere:
   flicker multiplexing DISABLES the TIA's hardware collision detection.** Fetched Wayback-first

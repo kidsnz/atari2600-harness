@@ -4071,3 +4071,35 @@ same: trip count is no longer where the leverage is.
 than 12 unbounded addresses fall into "other" — i.e. when the prover grows a refusal reason this
 classification cannot name, which is precisely how a 145-address class stayed off the ceiling table.
 Negative control: removing the bank-switch case sends "other" from 6 to 151 and the test fails by name.
+
+### The sole-blocker table is an UPPER BOUND that can be entirely illusory — measured (2026-08-07)
+
+The census two entries above lists what each refusal class is "worth alone". **For WSYNC-in-body that figure
+is +5.7 pt and the true value is +0.0**, and this is not an estimate: disabling the refusal and re-running
+leaves coverage at **309 of 629 = 49.1%, unchanged to the address**.
+
+Where the 36 went, with the refusal removed:
+
+| class | before | after |
+|---|---|---|
+| trip count | 20 | **45** |
+| branch in body | 13 | 14 |
+| call/jump in body | 11 | 13 |
+| other | 6 | 14 |
+| **coverage** | **49.1%** | **49.1%** |
+
+**Not one of the 36 became provable.** Every one hit a second obstacle immediately, and 25 of them hit the
+trip-count analysis. That reproduces the old forcing experiment's "+0 alone" exactly, by a different method.
+
+**So the table must be read as an upper bound, and the gap between it and reality can be TOTAL.** That
+applies to its own headline: "unresolved bank switch, 145 addresses, +23.1 pt" is the same kind of figure and
+has not been forced. It may be worth 23 points or it may be worth nothing, and the honest statement today is
+that nobody has measured which.
+
+**It also demonstrates the non-independence the ceiling table asserted.** Removing WSYNC-in-body did not free
+addresses; it EXPOSED 25 more trip-count blockages. That is precisely why "47.1 alone / 47.1 alone / 60.2
+together" is the shape of the recorded ceiling — the 6.1 points exist only when the obstacles go together,
+and here the mechanism is visible rather than inferred.
+
+**Item E (WSYNC inside loop body) is therefore closed as not-worth-doing, on two independent measurements.**
+Nothing was written for it.
