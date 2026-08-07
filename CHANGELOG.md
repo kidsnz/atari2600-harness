@@ -9,6 +9,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`design-principles.md`'s three remaining ambiguity flags are resolved — two by finding the answer, one by
+  admitting the claim is not checkable here.** They were left as `<!-- TODO: ambiguous original -->` comments
+  on 2026-08-04 rather than guessed at, which was right; this is the pass that settles them.
+  - **The colour-band rule welded two different numbers with an `=` that is false** ("PF-aligned colours come
+    in multiples of 4 colour clocks (= 12px)"). They are separate quantities and BOTH are already
+    machine-locked in this repo: WHERE a PF boundary may fall is 4 colour clocks (one PF pixel; 40 columns ×
+    4 = 160), pinned by `TestEveryPlayfieldColumnLandsWhereTheTableSays` over all 20 column positions; HOW WIDE
+    the narrowest band can be is 3 colour clocks per CPU cycle, pinned by `cmd/calibrate` at R² = 1.000000.
+    They compose, which is what the original was reaching for: **12 is a multiple of 4, so a 4-cycle `STx.w`
+    band is exactly 3 PF pixels and lands on the grid, while a 3-cycle `STA zp` buys 9 and cannot.**
+    `TestPFAlignedBandsAreMultiplesOfFour` pins that consequence, so "use the absolute form for a PF-aligned
+    band" is now a checked fact rather than a style note.
+  - **The dangling "at line 38" was a line number into an earlier revision of the same file.** Re-pointed at
+    the rule by name (the asymmetric-reflected-PF "PF2 at exactly cy45" deadline), with the note that line
+    numbers do not survive editing.
+  - **The Overscan/VBLANK surplus rule reads unambiguously in English already** — the Japanese original's word
+    order was the problem — so nothing about the WORDING was left to decide. What is left is that **the claim
+    cannot be verified here and is no longer implied to be**: "no picture" and "jitter" are behaviours of a
+    real television, and Gopher2600 renders an over-long Overscan and an over-long VBLANK alike. The quantity
+    this harness CAN see is the frame's line count, which is a different thing and is gated separately.
+  Side effect: `ColorClockPerColumn` was one of the 13 exports measured as referenced by nothing; the new test
+  reads it, because the alignment argument rests on it.
+
+### Fixed
 - **`framegen` was capping its kernel against a prover limitation that had been fixed four days earlier, and
   the fix turned out to be worth measuring rather than taking.** `kernProvedBlockCost = 8` carried the comment
   "the static prover cannot assume the alignment, bounds `lda abs,y` at 5" — true when written, and repaired in

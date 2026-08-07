@@ -118,3 +118,49 @@ func TestInterlaceColorsSafe(t *testing.T) {
 		t.Error("luminance-differing interlace should be unsafe")
 	}
 }
+
+// TestPFAlignedBandsAreMultiplesOfFour pins the composition the design doc's colour
+// rule states, because that rule used to weld the two numbers with an "=" that is
+// false ("multiples of 4 colour clocks (= 12px)").
+//
+// They are different quantities. WHERE a playfield-aligned boundary may fall is a
+// property of the TIA — one PF pixel is 4 colour clocks, 40 columns x 4 = 160 — and is
+// pinned at the pixel by emu's TestEveryPlayfieldColumnLandsWhereTheTableSays. HOW WIDE
+// the narrowest band can be is a property of the 6502 and the beam: 3 colour clocks per
+// CPU cycle, pinned by cmd/calibrate at R^2 = 1.000000. This test pins what falls out of
+// putting them together, which is the part an author actually uses:
+//
+//	a 4-cycle STx.w buys 12 clocks = exactly 3 PF pixels, and lands on the grid
+//	a 3-cycle STA zp buys 9 clocks, which is not a multiple of 4 and cannot
+//
+// So "use the absolute form for a PF-aligned band" is a consequence, not a style note.
+func TestPFAlignedBandsAreMultiplesOfFour(t *testing.T) {
+	const pfPixelClocks = 4 // one playfield pixel; 40 columns x 4 = 160 visible clocks
+	for _, c := range []struct {
+		cycles  int
+		wantPx  int
+		aligned bool
+		why     string
+	}{
+		{3, 9, false, "STA zp — 9 clocks is not a multiple of 4, so a band this narrow cannot start and end on the PF grid"},
+		{4, 12, true, "STx.w — 12 clocks is exactly 3 PF pixels"},
+		{5, 15, false, "15 clocks straddles the grid the same way 9 does"},
+		{6, 18, false, "the ~6cy arbitrary-colour band the doc quotes is NOT PF-aligned either"},
+		{8, 24, true, "24 clocks is 6 PF pixels"},
+	} {
+		got := MinColorBandWidthPx(c.cycles)
+		if got != c.wantPx {
+			t.Errorf("MinColorBandWidthPx(%d) = %d, want %d", c.cycles, got, c.wantPx)
+		}
+		if aligned := got%pfPixelClocks == 0; aligned != c.aligned {
+			t.Errorf("%dcy -> %d clocks: PF-aligned = %v, want %v — %s",
+				c.cycles, got, aligned, c.aligned, c.why)
+		}
+	}
+	// The 160 visible clocks really are 40 PF pixels of 4, which is what makes the
+	// modulo above mean anything.
+	if ColorClockPerColumn != pfPixelClocks {
+		t.Errorf("ColorClockPerColumn = %d, want %d — the whole alignment argument rests on it",
+			ColorClockPerColumn, pfPixelClocks)
+	}
+}

@@ -15,8 +15,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **Hold colour as a register value / symbolic name (hue = upper nibble × lum = lower nibble), never as RGB**. Don't scatter raw hex.
   Luminance is effectively 8 steps (bit0 has no effect). Design goal for PAL/NTSC = two parallel sets (N_xx/P_xx) switchable in one line. 〔Davie S11, symbolic-color-names〕
 - **Add colours VERTICALLY = rewrite COLUPx per scanline** (one colour horizontally). **Horizontal multi-colour is expensive** (only the fakes: PF score / Chronocolour / flicker / stacking). 〔Hugg, Davie S21〕
-  - **Minimum width of a horizontal colour band = store-instruction cycles × 3px**. PF-aligned colours come in multiples of 4 colour clocks (= 12px, `STx.w`); an arbitrary colour costs ~6cy per band (about 8 bands per line is the ceiling). There is also the trick of borrowing SP (`txs`/`tsx`) as a 4th colour register. 〔170018 multiple-colors-per-scanline〕 `→ design.MinColorBandWidthPx/CheckColorBands`
-    <!-- TODO: ambiguous original: 「PF 整列の色は 4色クロック（=12px, `STx.w`）の倍数」 — "4 colour clocks" and "= 12px" disagree (4 colour clocks is 4px; 12px is what a 4-CYCLE `STx.w` buys at 3px/cycle). Translated literally; the 12px / `STx.w` figure is the one the surrounding rule uses. -->
+  - **Minimum width of a horizontal colour band = store-instruction cycles × 3 colour clocks**. An arbitrary
+    colour costs ~6cy per band (about 8 bands per line is the ceiling). There is also the trick of borrowing SP
+    (`txs`/`tsx`) as a 4th colour register. 〔170018 multiple-colors-per-scanline〕 `→ design.MinColorBandWidthPx/CheckColorBands`
+  - **Two separate numbers govern a PF-aligned band, and the source welded them with an `=` that is false**
+    (resolved 2026-08-06; it read "multiples of 4 colour clocks (= 12px)"). Both figures are right about their
+    own thing, and both are already machine-locked in this repo rather than taken from the thread:
+    - **WHERE a boundary can fall: multiples of 4 colour clocks.** One playfield pixel is 4 colour clocks wide
+      (40 columns × 4 = 160), so a PF-aligned edge cannot land anywhere else. Pinned at the pixel by
+      `TestEveryPlayfieldColumnLandsWhereTheTableSays` — `litmus_pf_allcols` lights one column per band and all
+      20 column positions are re-measured, not the leftmost-bit-of-each-register sample the older `litmus_pf` took.
+    - **HOW WIDE the narrowest band can be: 3 colour clocks per CPU cycle**, so a 4-cycle `STx.w` buys 12.
+      Pinned by `cmd/calibrate`'s sweep of `litmus_pos`: slope 3px per CPU cycle, R² = 1.000000.
+    **The two compose, which is what the original was reaching for**: 12 is a multiple of 4, so a band written
+    with a 4-cycle `STx.w` is automatically on the PF grid — 12 colour clocks is exactly 3 PF pixels. A 3-cycle
+    `STA zp` buys 9 clocks, which is NOT a multiple of 4 and therefore cannot start and end on the grid.
 - **There is no "one correct RGB"**: Stella generates the palette from YIQ dynamically, so the same register value differs by a dozen up to 0x20 between emulators and settings.
   For us the running table `internal/ingest/palette_stella.go` is authoritative (100% match against Stella). 〔rgb-color-values, 118495〕
 - **hue ↔ colour map**: hue1 = yellow / hue4 = red / hue8 = blue / hue12 = green (hue15 ≈ hue1). hue1 is the standard choice for yellow. 〔132561〕
@@ -53,8 +66,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **A free 2-colour PF = CTRLPF D1 (the score bit)**: set bit1 and **the left half of the PF takes COLUP0, the right half COLUP1**, independently coloured (no asymmetric write timing needed). The staple for score display, but also a cheap way to colour the left and right of a background differently. 〔w11/Asym2scrol〕 `→ design.ScoreModeTwoColor`
 - **The saving trade of giving up PF0**: not drawing PF0 (on top platforms and the like) forces PF2 to be written at **exactly cycle 48** instead, but it frees **12cy per line + 18 bytes of RAM**, and lets the player fall off both edges of the screen (an advantage of the reflected PF). 〔mining blog SpiceWare Stay Frosty〕
 - **Vertically moving platforms use two zones of complementary height**: build the upper and lower band heights so that "when one grows the other shrinks by the same amount" and the total line count stays constant = a stable picture (mismatched, you get motion blur). 〔mining blog SpiceWare〕
-- **Visible delay on a PF register write**: an `sta` to PF0/PF1/PF2 takes effect **2–3 colour clocks late** (colour registers are immediate). Complete the centre boundary of a reflected PF at **exactly cycle 48** (measured in mining 149228 = consistent with the cy45 deadline at line 38; clone consoles are +1cy). Do the timing arithmetic for a horizontally multi-coloured PF with this delay included. 〔mining 149228 PF write-timing table〕
-  <!-- TODO: ambiguous original: 「line 38 の cy45 締切と整合」 — "line 38" is an unqualified line reference (this document's line? a scanline? a line of the cited thread?) and no longer points at the cy45 rule, which now sits a few lines above. Translated literally rather than re-pointed. -->
+- **Visible delay on a PF register write**: an `sta` to PF0/PF1/PF2 takes effect **2–3 colour clocks late**
+  (colour registers are immediate). Complete the centre boundary of a reflected PF at **exactly cycle 48**
+  (measured in mining 149228; clone consoles are +1cy) — consistent with the **"PF2 at exactly cy45"** deadline
+  in the asymmetric-reflected-PF rule above, the 3-clock write delay being the difference. Do the timing
+  arithmetic for a horizontally multi-coloured PF with this delay included. 〔mining 149228 PF write-timing table〕
+  (The dangling "at line 38" this sentence used to carry is resolved 2026-08-06: it was a line number into an
+  earlier revision of THIS file, and the rule it pointed at is the cy45 one now cited by name. Line numbers do
+  not survive editing; a reference has to name the rule.)
 
 ## Multiplexing and flicker
 - Beyond 2 objects, multiplex by Y band; a horizontal repositioning costs one scanline; **an empty Y lane is mandatory**; the price is 30Hz flicker. 〔Bumbershoot〕 `→ design.NeedsFlicker/NeedsEmptyYLane/RepositionCostScanlines`
@@ -70,7 +89,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **76cy per line is the ceiling.** Decide the line count first, then allocate features out of the remaining budget. 〔splendidnut〕 `→ design.LineBudget/RemainingCycles`
 - **★RIOT 6532 timer wrap-around bug (the "Stella passes / real hardware rolls" trap)**: write `TIM64T`/`TIM1024T` on **exactly the cycle** the timer wraps around and the divider silently degenerates to **1T**, wrecking the frame length so the picture rolls on hardware. **The fix = a double write (double-write TIM64T).** Easy to miss because it is emulator-dependent = a direct hit on the harness's core mission (gap B). Diagnosed in that thread by Gopher2600's author (JetSetIlly). 〔mining 303277 "To Roll or not to Roll"〕 (harness-hardening candidate = an assert that detects a timer write on the wrap-around cycle)
 - **Hard lower bounds on the vertical budget, and asymmetric failure modes**: given that the total scanline count is held constant, the lower bound of each region = VSYNC ≥ 3 / Overscan ≥ 3 / VBLANK ≥ 15 (even for PAL). **Overstretching Overscan = no picture / overstretching VBLANK = jitter** — the failures show up differently, so do not absorb the surplus on the VBLANK side (a jitter source). 〔mining 171270〕
-  <!-- TODO: ambiguous original: 「余りは Overscan でなく VBLANK 側で吸収しない」 — self-contradictory as written ("the surplus, not Overscan, do not absorb on the VBLANK side"). Translated as "do not absorb the surplus in VBLANK", which is what the two stated failure modes imply. -->
+  (Ambiguity resolved 2026-08-06. The Japanese original's word order read as a contradiction; the sentence
+  above is the only reading its own two failure modes support, so nothing is left to decide about the WORDING.
+  **The CLAIM, though, is not verifiable here and is not treated as measured**: "no picture" and "jitter" are
+  behaviours of a real television, and an emulator shows neither — Gopher2600 renders an over-long Overscan and
+  an over-long VBLANK alike. What this harness can see is the frame's line count, which is a different
+  quantity, gated by `frame_lines_stable` and `TestNoRomBreathesAcrossFrames`. Cited to 〔mining 171270〕 and
+  left there.)
 - **WSYNC semantics**: `sta WSYNC` halts the CPU until **the start of the next HBLANK** (68 colour clocks = 22⅔ CPU cycles). Choose where to write with the register-update delays in mind (colour = immediate / PF = 2-3 clocks / VBLANK = +1 line / note length = delayed). 〔mining 192183 register-update delay table〕
 - State = one GameState variable + a kernel per state. A title picture is padding top and bottom + a central PF table, clearing GRP/PF at the end. 〔title-to-game-transition〕
 - Cycle saving = the unofficial ISC/ISB opcodes + borrowing SP as a line counter (needs litmus backing). 〔5cycle-color-cycling, illegal-opcodes〕
