@@ -32,21 +32,33 @@ func TestGeneratedCloneCellCounts(t *testing.T) {
 		// GRP1 part-way along one scanline, leaving a 10-pixel run that a once-per-line
 		// HBLANK write can draw as 8 or 12 and never as 10.
 		{"../../roms/litmus/litmus_nusiz_all.bin", 2, "differences remain"},
-		// Every missile and ball width, and VDELBL. Measured, not assumed: M0 and M1
-		// match exactly (728/728, 720/720) but the ball is NOT reproduced and the
-		// missiles are drawn on MORE lines than the target draws them (clone 1544 vs
-		// target 728), so this ROM is a partial reproduction. Recorded at its measured
-		// value so an improvement is visible as a change rather than hidden by a
-		// hopeful expectation — I first wrote "pixel-exact" here from assumption and
-		// the test caught me.
-		{"../../roms/litmus/litmus_objsizes.bin", 2568, "partial reproduction"},
+		// Every missile and ball width, and VDELBL. This number was 2568 and is now 160,
+		// and the drop is the whole point of recording it: the missiles used to be drawn
+		// on 1544 and 1536 cells against targets of 728 and 720, because the per-line
+		// NUSIZ table carried only `SizeAndCopies` — NUSIZ's low three bits, the player's
+		// copy mode — and the MISSILE width lives in bits 4-5. All 214 lines therefore
+		// read nz0 = 0, the table looked constant, and no NUSIZ replay block was emitted.
+		// Measuring the full NUSIZ byte leaves M1 exact (720/720), M0 seven cells out,
+		// and the 146 the ball still needs. Recorded at the measured value so the next
+		// change has to say which way it moved.
+		{"../../roms/litmus/litmus_objsizes.bin", 160, "partial reproduction"},
 		// A sprite repositioned per zone (RL-8b).
 		{"../../roms/techniques/zone_multiplex.bin", 0, "pixel-exact"},
 		// Missiles and ball on every line, positioned once (RL-8a).
 		{"../../roms/techniques/shared_setxpos.bin", 16, "differences remain"},
 	}
 
-	cellRe := regexp.MustCompile(`(\d+) of \d+ visible cells`)
+	// THE OLD REGEX READ A PHRASE THAT ONLY ONE VERDICT PRINTS. "differences remain"
+	// says "N of 34240 visible cells are drawn by a different element"; "partial
+	// reproduction" says no such thing, so `cells` stayed 0 for those cases and the
+	// maxCells comparison could never fail. litmus_objsizes was pinned at 2568 and that
+	// number was never once read — it dropped to 160 and the test noticed nothing.
+	//
+	// Counting from the per-element table instead works for every verdict: the mismatch
+	// is the visible area minus everything matched, and each element line carries its
+	// own matched count.
+	matchedRe := regexp.MustCompile(`(?m)^\s+\w+ target\s+\d+\s+matched\s+(\d+)`)
+	areaRe := regexp.MustCompile(`visible (\d+) lines`)
 	lineRe := regexp.MustCompile(`frame length: (\d+) scanlines`)
 
 	for _, c := range cases {
@@ -63,8 +75,17 @@ func TestGeneratedCloneCellCounts(t *testing.T) {
 			t.Errorf("%s: RESULT does not contain %q", c.rom, c.want)
 		}
 		cells := 0
-		if m := cellRe.FindStringSubmatch(s); m != nil {
-			cells, _ = strconv.Atoi(m[1])
+		if am := areaRe.FindStringSubmatch(s); am != nil {
+			h, _ := strconv.Atoi(am[1])
+			total := 0
+			for _, m := range matchedRe.FindAllStringSubmatch(s, -1) {
+				n, _ := strconv.Atoi(m[1])
+				total += n
+			}
+			cells = h*160 - total
+		} else {
+			t.Errorf("%s: no \"visible N lines\" in the output — cannot compute the mismatch, "+
+				"and a check that cannot compute its own number is a check that passes on nothing", c.rom)
 		}
 		if cells > c.maxCells {
 			t.Errorf("%s: %d mismatched cells, was %d — the reproduction got WORSE. "+

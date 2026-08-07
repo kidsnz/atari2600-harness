@@ -8,6 +8,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`framegen`'s per-line NUSIZ table carried only the player's copy mode, so every missile was reproduced at
+  one fixed width.** It recorded `SizeAndCopies` — NUSIZ's low three bits — and the MISSILE width lives in
+  bits 4-5. On `litmus_objsizes`, the ROM whose whole job is to exercise every missile and ball width, all 214
+  lines read `nz0 = 0`, the table looked constant, no NUSIZ replay block was emitted, and the missiles came
+  out drawn on **1544 and 1536 cells against targets of 728 and 720**. Those 1632 extra cells land on
+  background, and 1632 was exactly the background shortfall the report showed. The kernel had five spare write
+  blocks at the time (4 of 9 used), so this was never a budget problem.
+  Measuring the full NUSIZ byte takes the ROM from **2568 mismatched cells to 160** — M1 exact (720/720), M0
+  seven cells out, and the 146 the ball still needs. `nusizWidth`/`nusizStartShift` already mask with `&0x07`,
+  so the player paths are unchanged. No regression: 22/31 technique ROMs pixel-exact, 31/31 at 262 scanlines.
+- **The test that pinned 2568 had never once read it.** `TestGeneratedCloneCellCounts` scraped
+  `"N of 34240 visible cells"`, a phrase only the "differences remain" verdict prints — for a "partial
+  reproduction" the count stayed 0 and the `maxCells` comparison could not fail. So the number dropped from
+  2568 to 160 and the test noticed nothing, which is the "passes while covering nothing" defect this repo
+  keeps finding, sitting in the file written to stop exactly that. It now computes the mismatch from the
+  per-element table (visible area minus every `matched` figure), which works for both verdicts, and errors
+  outright if it cannot find the area to compute from. Negative control: reverting the NUSIZ fix now fails by
+  name with **1778 mismatched cells against the pinned 160**.
+
 ### Added
 - **The prover's ceiling table was missing its two biggest obstacles, and the census that says so is now a
   gate.** The recorded ceiling measured three axes and put the combined figure at 60.2%. Classifying all

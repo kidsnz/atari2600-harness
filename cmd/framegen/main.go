@@ -113,7 +113,19 @@ type lineState struct {
 func measureLines(e *emu.Emu) (map[int]lineState, error) {
 	regs := e.ReadTIARegisters()
 	mk := e.Markers()
-	cur := lineState{regs.Player0.SizeAndCopies, regs.Player1.SizeAndCopies, mk[0].Clock, mk[2].Clock}
+	// THE FULL NUSIZ BYTE, not SizeAndCopies. That field is the low three bits — the
+	// player's copy mode — and NUSIZ's bits 4-5 are the MISSILE's width, which this
+	// table therefore never carried. Measured on litmus_objsizes, the ROM whose whole
+	// job is to exercise every missile and ball width: all 214 lines read nz0 = 0, the
+	// table was constant, no NUSIZ replay block was emitted, and both missiles came out
+	// at one fixed width — drawn on 1544 and 1536 cells against targets of 728 and 720.
+	// Every one of those 1632 extra cells lands on background, and 1632 is exactly the
+	// background shortfall the report showed. The kernel had five spare write blocks at
+	// the time (4 used of 9), so this was never a budget problem.
+	//
+	// nusizWidth/nusizStartShift already mask with &0x07, so the wider value is safe for
+	// the player paths and now reaches the emitted NUSIZ writes for the missiles.
+	cur := lineState{regs.Player0.Nusiz, regs.Player1.Nusiz, mk[0].Clock, mk[2].Clock}
 	out := map[int]lineState{}
 	start := e.Coords().Frame
 	maxSl := 0
@@ -130,7 +142,7 @@ func measureLines(e *emu.Emu) (map[int]lineState, error) {
 		}
 		regs := e.ReadTIARegisters()
 		mk := e.Markers()
-		cur = lineState{regs.Player0.SizeAndCopies, regs.Player1.SizeAndCopies, mk[0].Clock, mk[2].Clock}
+		cur = lineState{regs.Player0.Nusiz, regs.Player1.Nusiz, mk[0].Clock, mk[2].Clock}
 		out[c.Scanline] = cur
 	}
 	// Fill the gaps forward: a scanline whose HBLANK held no instruction boundary
