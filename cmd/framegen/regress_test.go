@@ -80,3 +80,48 @@ func TestGeneratedCloneCellCounts(t *testing.T) {
 		}
 	}
 }
+
+// TestHeldRunGeneralisesTheBlankRule pins what a positioning block may occupy.
+//
+// The planner used to demand BACKGROUND-ONLY lines. On this corpus every zone failure
+// reported "have=0", and that number was not merely conservative, it was wrong about the
+// target: at Fishing Derby's line-27 boundary the old rule saw 0 usable lines where 7
+// exist. Real kernels draw something on every line, so "blank" was almost never true.
+//
+// What a positioning block actually needs is lines the HELD registers reproduce. The
+// replay loop is stopped during the block, so GRP0/GRP1/PF keep whatever the last
+// replayed line left, and the target matches exactly when those lines repeat it. That
+// generalises the old rule instead of replacing it: an all-background run IS a run of
+// identical lines, so everything the blank test accepted is still accepted.
+func TestHeldRunGeneralisesTheBlankRule(t *testing.T) {
+	row := func(s string) []string {
+		out := make([]string, len(s))
+		for i, c := range s {
+			out[i] = map[rune]string{'B': "BG", 'P': "PF", '0': "P0"}[c]
+		}
+		return out
+	}
+	fd := &frameData{tgtElem: [][]string{
+		row("BBBB"), // 0 blank
+		row("BBBB"), // 1 blank
+		row("PPBB"), // 2 a picture row...
+		row("PPBB"), // 3 ...repeated
+		row("PPBB"), // 4 ...and again
+		row("P0BB"), // 5 different
+	}}
+	for _, c := range []struct {
+		y    int
+		want int
+		why  string
+	}{
+		{1, 2, "two all-background lines — the case the old rule handled"},
+		{4, 3, "three IDENTICAL picture rows — the case it could not see, and where Fishing Derby's 7 live"},
+		{2, 1, "a picture row whose predecessor differs: the run is itself only"},
+		{5, 1, "a unique row holds nothing"},
+		{-1, 0, "out of range"},
+	} {
+		if got := fd.heldRun(c.y); got != c.want {
+			t.Errorf("heldRun(%d) = %d, want %d — %s", c.y, got, c.want, c.why)
+		}
+	}
+}

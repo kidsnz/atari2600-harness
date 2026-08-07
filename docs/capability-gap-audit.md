@@ -3963,3 +3963,37 @@ This also retires the "single measures move nothing" reading of the earlier entr
 repairs measured on 2026-08-03/04, each worth ~zero. K6 is the first single change since to move the number,
 and it moved it because it attacked a whole idiom (every shared positioning routine) rather than one refusal
 reason. `coverageFloor` raised 0.47 -> 0.49 so the gain cannot be given back silently.
+
+### RL-8c — the zone planner's real wall is all-or-nothing following, not the blank-line rule (2026-08-07)
+
+**What was measured first.** The planner required BACKGROUND-ONLY lines for a repositioning block, and on the
+whole corpus every zone failure reported `have=0`:
+
+| ROM | boundary | blank lines | identical lines | needed |
+|---|---|---|---|---|
+| Fishing Derby | line 27 | 0 | **7** | 6 |
+| Fishing Derby | line 195 | 0 | 1 | 6 |
+| road | line 9 | 0 | 2 | 5–7 |
+| dyn_multisprite | line 142 | 0 | 2 | 4 |
+| litmus_objsizes | line 8 | 0 | 1 | 7 |
+
+`have=0` was not conservative, it was **wrong about the target**: at Fishing Derby's line-27 boundary there are
+seven usable lines. A positioning block does not need a blank target — the replay loop is stopped during it, so
+GRP0/GRP1/PF hold what the last replayed line left and the target matches exactly when those lines REPEAT it.
+`heldRun` states that, generalises the old rule (an all-background run is a run of identical lines) and is
+pinned by `TestHeldRunGeneralisesTheBlankRule`.
+
+**A second candidate fix was measured and NOT built.** `zonePosLines` charges one line per PLACEABLE object
+rather than per object that actually moves at that boundary, so a one-object move pays for four. Every failure
+above has `have=0` under the old rule, so cheapening the block would have unlocked **nothing** on its own —
+measured before writing it.
+
+**The wall that remains, stated with its numbers.** With `heldRun`, Fishing Derby's line-27 boundary now fits.
+The picture is unchanged anyway, because `planZones` is ALL-OR-NOTHING per object: P1 changes X at line 27 AND
+at line 195, the second does not fit (1 holdable line against 6), and the object is dropped entirely — losing
+the **33-line L27-59 band that was achievable** in order to avoid the 7-line L195-201 band that was not.
+
+The fix is partial following: follow an object through the boundaries that fit and STOP at the first that does
+not, pinning it at its last good X for the remainder and reporting the lines given up. That is a change to the
+zone model rather than to a predicate — zone boundaries are global while "stopped following" is per object —
+so it is recorded here with the measurement rather than attempted at the end of a long session.

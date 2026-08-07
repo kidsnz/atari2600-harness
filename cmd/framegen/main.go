@@ -180,8 +180,8 @@ type frameData struct {
 	pf0L, pf1L, pf2L []uint8
 	pf0R, pf1R, pf2R []uint8
 	grp0, grp1       []uint8
-	nz0, nz1         []uint8     // per-visible-line NUSIZ, measured (see measureLines)
-	tgtElem          [][]string  // target's per-visible-line object attribution (for content-shift search)
+	nz0, nz1         []uint8    // per-visible-line NUSIZ, measured (see measureLines)
+	tgtElem          [][]string // target's per-visible-line object attribution (for content-shift search)
 	// obj holds the measured facts for all five movable objects, indexed by
 	// objIndex: P0, P1, M0, M1, BL. The missiles and the ball were absent from
 	// this array for as long as the kernel could not draw them, which is exactly
@@ -382,26 +382,42 @@ func runList(rs []xRun, max int) string {
 	return strings.Join(parts, " ")
 }
 
-// blankLine reports that the target drew nothing but background on visible line y.
-// A positioning line is a scanline the replay loop does not run on, so the picture
-// it shows is whatever the registers were left holding; the only content that can
-// be reproduced there without a table read is none at all.
-func (fd *frameData) blankLine(y int) bool {
+// heldRun counts consecutive target lines ending at y that a positioning block could
+// occupy: lines the HELD registers already reproduce.
+//
+// The planner used to demand background-only lines, and on this corpus every failure
+// reported have=0 — real kernels draw something on every line, so the requirement was
+// almost never satisfiable. But a positioning line does not need a blank target. During
+// the block the replay loop is not running, so GRP0/GRP1/PF hold whatever the last
+// replayed line left, and the target matches iff those lines are IDENTICAL to that line.
+// A repeated row is exactly that, and repeated rows are everywhere: Fishing Derby's water
+// gives 7 of them where the old test saw 0.
+//
+// This generalises the old rule rather than replacing it — an all-background run is a run
+// of identical lines, so everything blankRun accepted, this accepts too.
+//
+// The anchor is included on purpose. The block owns [y-n+1, y] and the registers it holds
+// come from the line before it, so every line in the block AND that source line have to
+// agree; counting the run back from y is what makes "n >= posLines+1" say that.
+func (fd *frameData) heldRun(y int) int {
 	if y < 0 || y >= len(fd.tgtElem) {
-		return false
+		return 0
 	}
-	for _, e := range fd.tgtElem[y] {
-		if e != "BG" {
-			return false
+	n := 1
+	for p := y - 1; p >= 0; p-- {
+		if len(fd.tgtElem[p]) != len(fd.tgtElem[y]) {
+			break
 		}
-	}
-	return true
-}
-
-// blankRun counts consecutive background-only target lines ending at y (inclusive).
-func (fd *frameData) blankRun(y int) int {
-	n := 0
-	for ; y >= 0 && fd.blankLine(y); y-- {
+		same := true
+		for i := range fd.tgtElem[y] {
+			if fd.tgtElem[p][i] != fd.tgtElem[y][i] {
+				same = false
+				break
+			}
+		}
+		if !same {
+			break
+		}
 		n++
 	}
 	return n
@@ -1224,10 +1240,11 @@ func tryZones(fd *frameData, follow [5]bool) ([]zone, int, string) {
 		// replay loop runs, and it is what leaves GRP0/GRP1/PF at 0 so the
 		// positioning lines show background rather than the previous zone's picture.
 		ps := y - posLines
-		if have := fd.blankRun(y - 1); have < posLines+1 {
+		if have := fd.heldRun(y - 1); have < posLines+1 {
 			return nil, posLines, fmt.Sprintf("%s changes reset X from %d to %d at visible line %d, "+
-				"but only %d of the %d background-only lines the move needs are there (%d objects to place at one "+
-				"scanline each + 1 HMOVE line + 1 replayed blank line to clear GRP/PF)",
+				"but only %d of the %d holdable lines the move needs are there (%d objects to place at one "+
+				"scanline each + 1 HMOVE line + 1 line whose registers the block then holds). A holdable line is "+
+				"one the target repeats, since the replay loop is stopped during the block",
 				objNames[conflict], cur.x[conflict], fd.bx[conflict][y], y, have, posLines+1, posLines-1)
 		}
 		if ps-1 < cur.start {
@@ -1370,9 +1387,9 @@ var moveRegs = [5]string{"HMP0", "HMP1", "HMM0", "HMM1", "HMBL"}
 // The delay chain also has no branch, so there is no page-crossing cycle to
 // account for; `nop` is one byte and two cycles wherever it sits.
 const (
-	zoneNopCycles   = 2                        // one nop
-	zoneStrobeFixed = 3                        // sta.w RESxx write, relative to the end of the chain
-	zoneTailCycles  = 8                        // lda #nib 2 + sta HMxx 3 + sta WSYNC 3
+	zoneNopCycles   = 2 // one nop
+	zoneStrobeFixed = 3 // sta.w RESxx write, relative to the end of the chain
+	zoneTailCycles  = 8 // lda #nib 2 + sta HMxx 3 + sta WSYNC 3
 	zoneMaxNops     = (75 - zoneStrobeFixed - zoneTailCycles) / zoneNopCycles
 	// zoneInputMax: the input is in pixels (see zoneCoarseFine), 6 per nop plus the
 	// 0..5 the HMxx nibble covers.

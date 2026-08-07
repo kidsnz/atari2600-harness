@@ -9,6 +9,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`framegen`'s zone planner was refusing on a rule that was wrong about the target, not merely strict.** It
+  required BACKGROUND-ONLY lines for a repositioning block, and every zone failure on the corpus reported
+  `have=0` — real kernels draw something on every line. But a positioning block does not need a blank target:
+  the replay loop is stopped during it, so GRP0/GRP1/PF hold what the last replayed line left, and the target
+  matches exactly when those lines REPEAT it. At Fishing Derby's line-27 boundary the old test saw **0 usable
+  lines where 7 exist**. `heldRun` states the real condition and generalises the old one (an all-background run
+  IS a run of identical lines), pinned by `TestHeldRunGeneralisesTheBlankRule`. `blankLine`/`blankRun` were
+  left with no callers and deleted.
+- **A second candidate fix was measured and deliberately NOT built.** `zonePosLines` charges one line per
+  PLACEABLE object rather than per object that actually moves at the boundary, so a one-object move pays for
+  four. Every failure has `have=0` under the old rule, so cheapening the block would have unlocked **nothing**
+  on its own — measured before writing it, which is the third time this session that a plausible fix was
+  checked against the corpus first and two of those came back zero.
+- **The wall that remains is named with its numbers, and it is not the predicate.** With `heldRun` the line-27
+  boundary fits, and the picture is still unchanged, because `planZones` is ALL-OR-NOTHING per object: P1
+  changes X at line 27 **and** at line 195, the second does not fit (1 holdable line against 6), so the object
+  is dropped whole — giving up the **33-line band that was achievable** to avoid the 7-line one that was not.
+  The fix is partial following, which is a change to the zone model rather than to a predicate (boundaries are
+  global; "stopped following" is per object), recorded as RL-8c rather than attempted in a hurry.
+  No regression: 22/31 technique ROMs pixel-exact, 31/31 at 262 scanlines.
+
+### Fixed
 - **`design-principles.md`'s three remaining ambiguity flags are resolved — two by finding the answer, one by
   admitting the claim is not checkable here.** They were left as `<!-- TODO: ambiguous original -->` comments
   on 2026-08-04 rather than guessed at, which was right; this is the pass that settles them.
