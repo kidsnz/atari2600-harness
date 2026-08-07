@@ -8,6 +8,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **The prover's ceiling table was missing its two biggest obstacles, and the census that says so is now a
+  gate.** The recorded ceiling measured three axes and put the combined figure at 60.2%. Classifying all
+  **320 unbounded regions across 16 commercial cartridges** by the refusal each reports, and counting the
+  ADDRESSES whose only remaining blocker is that class, says those three are not the big ones:
+  **unresolved bank switch 145 addresses (+23.1 pt) and multiple back-edges 42 (+6.7 pt)** — neither on the
+  table — against **trip count 20 (+3.2 pt)**, which is the axis this work had been queued to attack.
+  Baseline in this counting: 309 of 629 = 49.1%.
+  **The concentration matters and is stated with the number**: bank switch is FIVE cartridges and Vanguard
+  alone is 69 of the 145, so it is the largest figure and the narrowest cause. Multiple back-edges is the
+  largest BROAD class — 42 addresses over TWELVE cartridges — worth double the trip-count axis.
+  `TestRefusalClassesAccountForEveryUnboundedAddress` fails when more than 12 unbounded addresses land in
+  "other", i.e. when the prover grows a refusal this classification cannot name — which is exactly how a
+  145-address class stayed unmeasured. Negative control: dropping the bank-switch case takes "other" from
+  6 to 151 and the test fails by name.
+- **The queue item that sent me here is retired by its own measurement.** "Attack the remaining 4.7 points of
+  the trip-count axis" — measured, that axis has 3.2 points left in total (20 addresses), and two unmeasured
+  classes are larger. The 4.7 came from the forcing experiment and 3.2 is the sole-blocker figure; both are
+  true and both imply the same ordering.
+
 ### Fixed
 - **`framegen`'s zone planner was refusing on a rule that was wrong about the target, not merely strict.** It
   required BACKGROUND-ONLY lines for a repositioning block, and every zone failure on the corpus reported

@@ -4030,3 +4030,44 @@ every line in a zone agrees with it — so it is not shipped either, under the s
 not more zone bookkeeping. Until `z1P0 want 9` reads 9 on the first iteration rather than the fourth, partial
 following will keep trading background for misplaced sprites. The WIP is preserved in
 `git stash` ("RL-8c partial following WIP") on this machine.
+
+### The ceiling table was missing its two biggest obstacles, and one of them is worth 23 points (2026-08-07)
+
+The recorded ceiling measured three axes — trip counts, WSYNC-in-body, call-or-jump-in-body — and put the
+combined ceiling at 60.2%. A census of the commercial corpus says those are not the big ones.
+
+**320 unbounded regions across 16 cartridges, classified by the refusal each one reports.** For each
+ADDRESS (proven only when every call context proves it — the same denominator as `coverageFloor`), the table
+below counts the addresses whose only remaining blocker is that class, i.e. what the axis is worth alone:
+
+| addresses | worth | class | on the recorded ceiling table? |
+|---|---|---|---|
+| **145** | **+23.1 pt** | **unresolved bank switch** | **NO** |
+| **42** | **+6.7 pt** | **multiple back-edges (nested loops)** | **NO** |
+| 36 | +5.7 pt | WSYNC in body | yes (measured +0 alone) |
+| 20 | +3.2 pt | trip count | yes |
+| 18 | +2.9 pt | no WSYNC reached | no |
+| 17 | +2.7 pt | BRK | no |
+| 13 | +2.1 pt | branch in body | no |
+| 11 | +1.7 pt | call/jump in body | yes (measured +0 alone) |
+| 7 | +1.1 pt | indirect JMP | no |
+| 5 | +0.8 pt | RIOT timer wait | no — and deliberately not doing it |
+
+Baseline in this counting: **309 of 629 = 49.1%** (the 626/49.4% in `coverage_test` excludes blank regions).
+
+**Read the concentration before acting on the 23 points.** Unresolved bank switch is FIVE cartridges —
+Vanguard 69, Pressure Cooker 28, Donald Duck's Speedboat 20, Aquaventure 19, Raiders 9 — and **Vanguard alone
+is half of it**. It is the largest number and the narrowest cause. **Multiple back-edges is the largest BROAD
+class**: 42 addresses over TWELVE cartridges (Chopper Command 11, Vanguard 8, Stampede 6, Barnstorming 5, …),
+worth double the trip-count axis and never measured.
+
+**This retires the plan that sent me here.** The queue said "attack the remaining 4.7 points of the
+trip-count axis". Measured, that axis has **20 addresses = 3.2 points** left in total, and two unmeasured
+classes are bigger. The 4.7 came from the forcing experiment (which also frees addresses where trip count is
+merely the FIRST obstacle); 3.2 is the sole-blocker figure. Both are true, and the ordering they imply is the
+same: trip count is no longer where the leverage is.
+
+**The census is now a gate, not a note.** `TestRefusalClassesAccountForEveryUnboundedAddress` fails when more
+than 12 unbounded addresses fall into "other" — i.e. when the prover grows a refusal reason this
+classification cannot name, which is precisely how a 145-address class stayed off the ceiling table.
+Negative control: removing the bank-switch case sends "other" from 6 to 151 and the test fails by name.
