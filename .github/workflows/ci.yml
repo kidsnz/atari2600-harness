@@ -3,6 +3,13 @@ name: CI
 on:
   push:
   pull_request:
+  # Manual trigger. Added 2026-08-06 after three pushes landed on the remote
+  # (`git ls-remote` confirmed main at ca2d2e2) without GitHub creating a single
+  # workflow run — the Actions page sat at #565 with no error banner and no quota
+  # message. With only `push` and `pull_request` there was no way to ask for a run,
+  # so a green build could not be obtained at all until GitHub decided to start
+  # listening again. `gh workflow run ci.yml` now covers that.
+  workflow_dispatch:
 
 jobs:
   build-test:
