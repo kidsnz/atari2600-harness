@@ -40,6 +40,49 @@ p3      = $96
 p4      = $98
 p5      = $9A
 
+    ; KROW {1}=row index, {2}=colour the NEXT drawn row uses.
+    ;
+    ; 71 of 76 cycles, and every number below is why the six stores work: each copy of
+    ; the 48px image is painted while a different byte sits in GRP0/GRP1, so the store
+    ; has to land in the gap before the copy it feeds. The visible clock a copy starts
+    ; at is (cycle - 22.67) * 3, which puts P0's three copies at clocks 87/103/119 and
+    ; P1's at 95/111/127 — the stores at 10/18/26 set up the first pair before the beam
+    ; arrives, and 54/57/60 land in the gaps between the later ones.
+    ;
+    ; The colour pair at the end is deliberately AFTER the picture: at cycle 65 the beam
+    ; is past clock 127, so it cannot recolour this row, and it is in place for the next.
+    MAC KROW
+        sta WSYNC
+        ldy #{1}            ; 2
+        lda Col0,y          ; 6
+        sta GRP0            ; 9   B0 -> P0 new
+        lda Col1,y          ; 13
+        sta GRP1            ; 16  B1 -> P1 new, B0 -> P0 shadow (shown)
+        nop                 ; 18  padding: absolute,Y is a cycle cheaper than the (zp),y
+                            ;     this used to use, and the six stores have to keep landing
+                            ;     in the gaps between the copies. Three nops put the LAST
+                            ;     three back on 54/57/60 exactly — the ones that feed copies
+                            ;     1 and 2. Verified by rendering, not by arithmetic.
+        lda Col2,y          ; 22
+        sta GRP0            ; 25  B2 -> P0 new, B1 -> P1 shadow (shown)
+        lda Col3,y          ; 29
+        sta tmp             ; 32
+        nop                 ; 34
+        lda Col4,y          ; 38
+        tax                 ; 40
+        lda Col5,y          ; 44
+        tay                 ; 46
+        nop                 ; 48
+        lda tmp             ; 51
+        sta GRP1            ; 54  B3 -> P1 new, B2 -> P0 shadow
+        stx GRP0            ; 57  B4 -> P0 new, B3 -> P1 shadow
+        sty GRP1            ; 60  B5 -> P1 new, B4 -> P0 shadow
+        sta GRP0            ; 63  junk,   B5 -> P1 shadow
+        lda #{2}            ; 65  next row's colour — the beam is past the picture here
+        sta COLUP0          ; 68
+        sta COLUP1          ; 71
+    ENDM
+
         org $F000
 Start:  sei
         cld
@@ -112,34 +155,52 @@ VB:     sta WSYNC
         lda #0
         sta VBLANK
 
-        ; ===== Multicolor 48px kernel (HEIGHT rows, color + 6-store, 1 row/scanline) =====
-        lda #HEIGHT-1
-        sta row
-Krow:   sta WSYNC          ; @lines 2 — each data row spans 2 visible scanlines (loop-back ~79cy>76); verified stable 262
-        ldy row             ; 3
-        lda ColorTab,y      ; 7   per-row color
-        sta COLUP0          ; 10
-        sta COLUP1          ; 13
-        lda (p0),y          ; 18
-        sta GRP0            ; 21  B0->P0 new
-        lda (p1),y          ; 23
-        sta GRP1            ; 26  B1->P1 new, B0->P0 shadow (shown)
-        lda (p2),y          ; 31
-        sta GRP0            ; 34  B2->P0 new, B1->P1 shadow (shown)
-        lda (p3),y          ; 39
-        sta tmp             ; 42
-        lda (p4),y          ; 47
-        tax                 ; 49
-        lda (p5),y          ; 54
-        tay                 ; 56
-        lda tmp             ; 59
-        sta GRP1            ; 62  B3->P1 new, B2->P0 shadow
-        stx GRP0            ; 65  B4->P0 new, B3->P1 shadow
-        sty GRP1            ; 68  B5->P1 new, B4->P0 shadow
-        sta GRP0            ; 71  junk,    B5->P1 shadow
-        dec row             ; 76
-        bpl Krow            ; (the next row's WSYNC realigns after the in-row work completes)
+        ; ===== Multicolor 48px kernel — ONE scanline per data row, 71 of 76 cycles =====
+        ;
+        ; It used to be TWO, and that broke the technique's own headline claim. The loop
+        ; carried `ldy row / lda ColorTab,y / sta COLUP0 / sta COLUP1` ahead of the six
+        ; stores and closed with `dec row / bpl`, which came to ~79 cycles. The source
+        ; said so and annotated `@lines 2` so the budget prover would accept it — but a
+        ; data row spread over two scanlines splits the six-store choreography across two
+        ; lines, and that choreography IS the 48 pixels. Measured before this change:
+        ; every scanline drew the SAME 16 pixels three times, alternating P0-only and
+        ; P1-only rows, and setting Col2 to $FF changed the screen NOT AT ALL — columns 2
+        ; through 5 never reached the picture. `score6`, same positions and same six
+        ; stores, closes at 72 and renders six distinct digits.
+        ;
+        ; Two changes buy the 8 cycles back:
+        ;   - the row loop is UNROLLED (macro KROW), so `dec row / bpl` disappears and the
+        ;     row index is an immediate;
+        ;   - the colour write moves BELOW the six stores and writes the NEXT row's colour.
+        ;     At cycle 65 the beam is past clock 127, where the last copy ends, so the
+        ;     write cannot recolour the row it sits in — it lands on the following one.
+        ;     The table is therefore consumed one row ahead, and the first row's colour is
+        ;     set before the kernel starts.
+        ;
+        ; Stores now land at 9/16/25/54/57/60 against score6's 11/19/27/55/58/64.
+        lda #$64          ; first row's colour, before the kernel
+        sta COLUP0
+        sta COLUP1
+        KROW 15, $64
+        KROW 14, $76
+        KROW 13, $76
+        KROW 12, $98
+        KROW 11, $98
+        KROW 10, $BA
+        KROW 9, $BA
+        KROW 8, $1A
+        KROW 7, $1A
+        KROW 6, $48
+        KROW 5, $48
+        KROW 4, $46
+        KROW 3, $46
+        KROW 2, $44
+        KROW 1, $44
+        KROW 0, $44
 
+        sta WSYNC           ; close the last row's region — without it the final KROW's
+                            ; interval runs on into the blanking and mirror writes and the
+                            ; budget prover sees 107 cycles for a 71-cycle row.
         ; blank the players (shadows included)
         lda #0
         sta GRP0
@@ -151,7 +212,8 @@ Krow:   sta WSYNC          ; @lines 2 — each data row spans 2 visible scanline
         lda ColorTab+0
         sta collst
 
-        ldy #161
+        ldy #176             ; the kernel is 16 lines shorter now that a data row is ONE
+                            ; scanline; the fill takes the difference back so the frame is 262
 Fill:   sta WSYNC
         dey
         bne Fill
@@ -175,23 +237,23 @@ ColorTab:
 ; Each byte = 8px. 6 columns = 48px. row0 is the bottom of the screen, row15 the top.
 ; Heart: 2 lobes at the top, narrowing to a V at the bottom.
 Col0:   ; leftmost 8px
-        byte $00,$00,$00,$01,$03,$07,$0F,$0F   ; row0..7
-        byte $1F,$1F,$0F,$0E,$00,$00,$00,$00   ; row8..15
+        byte $00,$00,$00,$00,$00,$00,$03,$0F   ; row0..7
+        byte $3F,$7F,$7F,$3F,$1F,$0F,$03,$00   ; row8..15
 Col1:
-        byte $00,$00,$00,$80,$F0,$F8,$FC,$FE   ; row0..7
-        byte $FF,$FF,$FF,$FE,$3C,$3C,$00,$00   ; row8..15
+        byte $00,$00,$00,$01,$0F,$7F,$FF,$FF   ; row0..7
+        byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$7F   ; row8..15
 Col2:
-        byte $00,$00,$00,$01,$0F,$3F,$7F,$FF   ; row0..7
-        byte $FF,$FF,$FF,$FF,$FF,$FF,$00,$00   ; row8..15
+        byte $01,$07,$3F,$FF,$FF,$FF,$FF,$FF   ; row0..7
+        byte $FF,$FF,$FF,$FF,$FE,$FC,$F0,$80   ; row8..15
 Col3:
-        byte $00,$00,$00,$80,$F0,$FC,$FE,$FF   ; row0..7
-        byte $FF,$FF,$FF,$FF,$FF,$FF,$00,$00   ; row8..15
+        byte $80,$E0,$FC,$FF,$FF,$FF,$FF,$FF   ; row0..7
+        byte $FF,$FF,$FF,$FF,$7F,$3F,$0F,$01   ; row8..15
 Col4:
-        byte $00,$00,$00,$00,$00,$80,$C0,$E0   ; row0..7
-        byte $F0,$F0,$F8,$78,$3C,$3C,$00,$00   ; row8..15
+        byte $00,$00,$00,$80,$F0,$FE,$FF,$FF   ; row0..7
+        byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FE   ; row8..15
 Col5:   ; rightmost 8px
-        byte $00,$00,$00,$00,$00,$00,$00,$00   ; row0..7
-        byte $00,$00,$00,$00,$00,$00,$00,$00   ; row8..15
+        byte $00,$00,$00,$00,$00,$00,$C0,$F0   ; row0..7
+        byte $FC,$FE,$FE,$FC,$F8,$F0,$C0,$00   ; row8..15
 
         org $FFFC
         .word Start

@@ -8,6 +8,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `cmd/audioingest` + `internal/audioingest` — reference recording -> TIA bassline data.
+  This closes a real hole rather than adding a convenience: every audio tool here
+  (`audiospec`, `pcmcheck`, `golden_audio`, `read_audio_trace`) grades a build against
+  something and so needs the build to exist first. There was no audio counterpart to
+  `analyze_image`, which meant reproducing a piece of music depended on transcribing it
+  by ear — not a capability this harness has. The tool reports tempo (onset-flux
+  autocorrelation), the sixteenth grid, and each step's fundamental mapped to the
+  nearest (AUDC, AUDF), with confidence and cents error both printed because both are
+  findings: low confidence means no bass note was heard, a large cents figure means the
+  hardware cannot play the note that is there.
+  Graded on synthesised fixtures whose answer is known exactly — pitches and rests
+  recovered within 50 cents at >=0.3 confidence, tempo within 3 BPM at 110/124/140 —
+  plus a negative control: white noise must report tempo strength <0.15, because
+  autocorrelation always has a maximum and reporting it unqualified would turn noise
+  into a tempo.
+
+### Fixed
+- `roms/techniques/scenarios/multicolor48.golden` regenerated. It had been stale since
+  the kernel was corrected to draw one data row per scanline; the recorded picture was
+  the broken one (every scanline drawing the same 16 pixels three times). The new
+  picture is verified independently of the golden: CERTIFIED at 74 cy, 262 lines,
+  `frame_lines_stable` 262x130, and rendered.
+
+## [Unreleased]
+
 ### Fixed
 - **The sole-blocker table I added an hour ago is an upper bound whose gap to reality can be TOTAL, and the
   correction is measured rather than argued.** That table says WSYNC-in-body is worth **+5.7 pt**. Disabling
