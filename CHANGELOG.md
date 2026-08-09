@@ -9,6 +9,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `cmd/keyfit`, `cmd/mixmatch`, `cmd/drumfit` (+ their `internal/` packages) — the three
+  questions that reproducing a record on this machine keeps asking, each hand-rolled
+  once before being written down.
+  - **keyfit** — which key can the TIA play a figure in? Its tests pin the findings that
+    three ROMs rest on: the source key is unusable, D and E are outside 25 cents in every
+    bass octave, exactly three registers hold a four-note line in tune on one waveform,
+    and only three pitch classes repeat across octaves within 8 cents. Writing that last
+    one loosely ("the TIA has three pitch classes") was wrong and had already reached a
+    ROM comment; the test is written the strict way so it cannot drift back.
+  - **mixmatch** — per-band dB error between a reference recording and a ROM's own mixer
+    output, with weights so a band the mix cannot reach (a fixed waveform's harmonics)
+    can be discounted rather than chased. A Hann window is not cosmetic here: without one
+    a 45 Hz sine left −19.5 dB in the 3–14 kHz band, which reads as "the record has hats"
+    when it has silence.
+  - **drumfit** — measures a drum over many onsets and fits `EnvV`/`EnvF`. Amplitude and
+    pitch need different windows and the package says so: per-frame pitch below 120 Hz is
+    worthless (one frame is under two cycles) while the amplitude from the same pass is
+    clean, so `MeasureWin` takes a separate pitch window and every point carries a
+    confidence. Negative control: white noise must not decay, or the fitter would invent
+    an envelope out of anything.
+
+
 - `cmd/audioingest` + `internal/audioingest` — reference recording -> TIA bassline data.
   This closes a real hole rather than adding a convenience: every audio tool here
   (`audiospec`, `pcmcheck`, `golden_audio`, `read_audio_trace`) grades a build against
