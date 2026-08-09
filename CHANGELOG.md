@@ -26,6 +26,23 @@ versions follow [Semantic Versioning](https://semver.org/).
   into a tempo.
 
 ### Fixed
+- **`prove_line_budget` and `cmd/cyclebound` could not see a blank-region overrun.**
+  cyclebound's `Certified` covers the VISIBLE regions only — a documented, deliberate
+  split — but the CLI headline and the scenario gate both passed that field straight
+  through. So a ROM with a 77-cycle VBLANK line printed `CERTIFIED: ... worst region 71
+  cy` and its scenario went green, while the report's own `BlankOver` list held the
+  violation. A blank overrun is not a visible tear; it is worse. The WSYNC after it
+  waits for the next line and the frame gains a scanline.
+  Found 2026-08-09 on `roms/technojacket`: two instructions added to a VBLANK line took
+  one path to 77 cycles, 5 frames in 300 came out at 263 lines, and `ntsc_frame_lines` /
+  `frame_lines_stable` were the only checks that noticed. The ∀-over-all-paths gate —
+  whose whole claim is that it does not need to catch the bad frame in a sample — was
+  green on it.
+  Both now fail on a blank overrun and say which kind it is. Witness:
+  `TestProveLineBudgetFailsOnABlankOverrun` (verified red with the fix reverted), with
+  `TestProveLineBudgetStillPassesWhenTheBlankRegionFits` as the negative control on the
+  annotated twin. `Certified` itself is unchanged, so nothing that depends on its
+  visible-only meaning moves.
 - `roms/techniques/scenarios/multicolor48.golden` regenerated. It had been stale since
   the kernel was corrected to draw one data row per scanline; the recorded picture was
   the broken one (every scanline drawing the same 16 pixels three times). The new

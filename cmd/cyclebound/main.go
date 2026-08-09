@@ -106,7 +106,24 @@ func main() {
 		}
 	}
 	if rep.Certified {
-		fmt.Fprintf(os.Stderr, "CERTIFIED: %d regions within budget (base %d cy/line; worst region %d cy, scaled per @lines)\n", rep.Regions, rep.Budget, rep.MaxWorst)
+		// `Certified` covers the VISIBLE regions only. A blank region over budget is
+		// not a visible tear, but it is not harmless either: the WSYNC after it waits
+		// for the next line and the frame comes out one scanline long. Printing a bare
+		// "CERTIFIED" while the report's own BlankOver list is non-empty told a reader
+		// the ROM was fine when the tool had already found the defect -- measured
+		// 2026-08-09 on technojacket, where a 77-cycle VBLANK line made 5 frames in
+		// 300 come out at 263 lines and only ntsc_frame_lines caught it.
+		if len(rep.BlankOver) > 0 {
+			fmt.Fprintf(os.Stderr, "NOT ROLL-FREE: every visible region is within budget, but %d BLANK region(s) "+
+				"exceed it (worst %d cy of %d). A blank overrun pushes the following WSYNC to the next line, "+
+				"so the frame gains a scanline.\n", len(rep.BlankOver), rep.BlankMaxWorst, rep.Budget)
+			for _, v := range rep.BlankOver {
+				fmt.Fprintf(os.Stderr, "  BLANK OVER %d>%d @ %s\n", v.Worst, v.Budget, v.StartLoc)
+			}
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "CERTIFIED: %d regions within budget (base %d cy/line; worst region %d cy visible, %d cy blank)\n",
+			rep.Regions, rep.Budget, rep.MaxWorst, rep.BlankMaxWorst)
 		return
 	}
 	fmt.Fprintf(os.Stderr, "NOT CERTIFIED: %d violation(s), %d unbounded region(s) (budget %d)\n",

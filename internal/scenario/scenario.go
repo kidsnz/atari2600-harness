@@ -725,11 +725,23 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				if perr != nil {
 					return nil, perr
 				}
-				res.Asserts = append(res.Asserts, AssertResult{
-					Desc: fmt.Sprintf("prove_line_budget %d: all paths certified (worst %d, %d violation(s), %d unbounded)",
-						*s.Checks.ProveLineBudget, rep.MaxWorst, len(rep.Violations), len(rep.Unbounded)),
-					Got: int64(rep.MaxWorst), Pass: rep.Certified})
-				if !rep.Certified {
+				// cyclebound's `Certified` covers the VISIBLE regions only, and this gate
+				// used to pass it straight through. A BLANK region over budget is not a
+				// visible tear, but the WSYNC after it waits for the next line, so the
+				// frame gains a scanline — measured 2026-08-09 on technojacket, where a
+				// 77-cycle VBLANK line made 5 frames in 300 come out 263 lines long.
+				// prove_line_budget was green on that ROM and ntsc_frame_lines was the
+				// only thing that caught it. A ∀-over-all-paths gate that cannot see a
+				// roll is not doing the job its name claims, so blank overruns fail too.
+				ok := rep.Certified && len(rep.BlankOver) == 0
+				desc := fmt.Sprintf("prove_line_budget %d: all paths certified (worst %d visible / %d blank, %d violation(s), %d unbounded)",
+					*s.Checks.ProveLineBudget, rep.MaxWorst, rep.BlankMaxWorst, len(rep.Violations), len(rep.Unbounded))
+				if rep.Certified && len(rep.BlankOver) > 0 {
+					desc = fmt.Sprintf("prove_line_budget %d: visible regions fit (worst %d) but %d BLANK region(s) exceed it (worst %d) — the frame gains a scanline",
+						*s.Checks.ProveLineBudget, rep.MaxWorst, len(rep.BlankOver), rep.BlankMaxWorst)
+				}
+				res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: int64(rep.MaxWorst), Pass: ok})
+				if !ok {
 					res.Pass = false
 				}
 			}
