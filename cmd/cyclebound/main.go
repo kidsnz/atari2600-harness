@@ -122,6 +122,25 @@ func main() {
 			}
 			os.Exit(1)
 		}
+		// Fitting the budget is not the same as landing in time. Certifying a kernel
+		// whose playfield writes arrive after the beam has already drawn those columns
+		// tells the author the picture is fine when it is shifted right -- measured
+		// 2026-08-09 on technojacket's cover kernel, 75 of 76 cycles and two and a half
+		// columns out. So the deadline report prints with the verdict, and a miss is a
+		// failure here, not a footnote.
+		pfd, pferr := cyclebound.CheckPFDeadlines(*asm)
+		if pferr == nil {
+			fmt.Fprintf(os.Stderr, "   %s\n", pfd.Summary())
+			if len(pfd.Late) > 0 {
+				fmt.Fprintf(os.Stderr, "NOT ON TIME: %d region(s) fit the cycle budget but %d playfield write(s) "+
+					"land after the beam has drawn the columns they govern.\n", rep.Regions, len(pfd.Late))
+				for _, d := range pfd.Late {
+					fmt.Fprintf(os.Stderr, "  LATE %s#%d at clock %d > deadline %d (by %d clocks) @ %s\n",
+						d.Reg, d.Nth, d.MaxClock, d.Deadline, d.LateBy, d.Region)
+				}
+				os.Exit(1)
+			}
+		}
 		fmt.Fprintf(os.Stderr, "CERTIFIED: %d regions within budget (base %d cy/line; worst region %d cy visible, %d cy blank)\n",
 			rep.Regions, rep.Budget, rep.MaxWorst, rep.BlankMaxWorst)
 		return

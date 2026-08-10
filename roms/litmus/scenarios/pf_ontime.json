@@ -1,0 +1,8 @@
+{
+  "rom": "roms/litmus/pf_ontime.asm",
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "prove_line_budget": 76,
+    "pf_deadlines": true
+  }
+}

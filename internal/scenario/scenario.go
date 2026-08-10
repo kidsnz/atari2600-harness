@@ -111,6 +111,7 @@ type Checks struct {
 	FrameLinesStable *FrameLinesStableCheck `json:"frame_lines_stable,omitempty"` // every frame in a window has the SAME line count (the ∀-over-frames sibling of ntsc_frame_lines)
 	MaxLineBudget    *int                   `json:"max_line_budget,omitempty"`    // RunUntilBudget が超過しない（runtime・∃: ある1回の実行を観測。既定予算 76）
 	ProveLineBudget  *int                   `json:"prove_line_budget,omitempty"`  // VV-2: cyclebound が全パスの worst <= 予算を静的に証明（∀。rom が .asm のときのみ）
+	PFDeadlines      *bool                  `json:"pf_deadlines,omitempty"`       // every playfield write lands before the beam reaches the columns it governs, over all paths (.asm only). Fitting in 76 cycles does NOT imply this.
 	GoldenFrame      bool                   `json:"golden_frame,omitempty"`       // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
 	GoldenAudio      bool                   `json:"golden_audio,omitempty"`       // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
 	Motion           *MotionCheck           `json:"motion,omitempty"`             // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
@@ -741,6 +742,33 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 						*s.Checks.ProveLineBudget, rep.MaxWorst, len(rep.BlankOver), rep.BlankMaxWorst)
 				}
 				res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: int64(rep.MaxWorst), Pass: ok})
+				if !ok {
+					res.Pass = false
+				}
+			}
+		}
+		if s.Checks.PFDeadlines != nil && *s.Checks.PFDeadlines {
+			// The sibling question to prove_line_budget, and a DIFFERENT one. That check
+			// asks "does this region fit in 76 cycles"; this asks "does each playfield
+			// write land before the beam reaches the pixels it governs". A cover kernel
+			// proved 75 of 76 and was certified while its picture sat two and a half
+			// columns to the right with the previous line wrapping in at the left
+			// (measured 2026-08-09, technojacket cover-tear-speck). The witness pair
+			// roms/litmus/pf_ontime.asm and pf_late.asm both certify; only this separates
+			// them.
+			if !strings.EqualFold(filepath.Ext(s.Rom), ".asm") {
+				res.Asserts = append(res.Asserts, AssertResult{
+					Desc: "pf_deadlines: skipped (needs .asm source)", Pass: true})
+			} else {
+				rep, perr := cyclebound.CheckPFDeadlines(s.Rom)
+				if perr != nil {
+					return nil, perr
+				}
+				// Declining is not passing. A check that says nothing must not be
+				// counted as a check that said yes.
+				ok := rep.Declined == "" && rep.Checked > 0 && len(rep.Late) == 0
+				res.Asserts = append(res.Asserts, AssertResult{
+					Desc: "pf_deadlines: " + rep.Summary(), Got: int64(len(rep.Late)), Pass: ok})
 				if !ok {
 					res.Pass = false
 				}

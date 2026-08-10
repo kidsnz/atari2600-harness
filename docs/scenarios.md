@@ -109,7 +109,23 @@ reused as-is for regression). **Unknown fields are an error** (typos are not swa
   (`TestFrameLinesStable` pins both). Size the window past the ROM's slowest periodic event — bank switches,
   scene changes, respawn timers.
 
+- **`pf_deadlines`** (`true`) = every playfield write lands **before the beam reaches the columns it
+  governs**, proven over all paths (`.asm` source only; a `.bin` scenario prints `skipped`). This is a
+  DIFFERENT question from `prove_line_budget`, and the pair `roms/litmus/pf_ontime.asm` /
+  `roms/litmus/pf_late.asm` exists to make that concrete: both draw the same 40-column asymmetric
+  playfield, both fit in 76 cycles, both are CERTIFIED, and both report 262 lines — the only check that
+  separates them is this one. `pf_late` puts three cycles of index arithmetic at the *top* of the line
+  instead of in its tail, so PF1 lands at clock 31 against a deadline of 16 and the picture comes out
+  shifted right by four columns with the previous line's right edge wrapping in at the left. That shipped
+  (technojacket `cover-tear-speck`, 2026-08-09, measured at 75 of 76 cycles) and the author found it by eye.
+  The deadlines are the machine's geometry: PF0 by clock 0, PF1 by 16, PF2 by 48, and in repeat mode the
+  right half's rewrites by 80 / 96 / 128; `COLUPF`/`COLUBK` by 0.
+  **What it cannot judge it says so about rather than passing:** a third write to the same register in one
+  line, or a register with no column rule, is counted in the `NOT checked` figure printed with the verdict,
+  and a declined analysis fails instead of passing silently.
+
 `checks` (whole run): `ntsc_frame_lines` (`StepFrame`) / `frame_lines_stable` (`StepFrame` × N, histogram) /
+`pf_deadlines` (`cyclebound.CheckPFDeadlines`, static ∀) /
 `max_line_budget` (`RunUntilBudget`) /
 `golden_frame` (render-chain hash, below) / `golden_audio` (audio-chain hash, same mechanism via
 Gopher2600 `digest.Audio`, compared against `<scenario>.audio.golden`).

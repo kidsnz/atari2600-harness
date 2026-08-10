@@ -9,6 +9,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `cyclebound.CheckPFDeadlines` + scenario check `pf_deadlines` + a verdict line in
+  `cmd/cyclebound` — **fitting in 76 cycles does not mean landing in time.** A playfield
+  write has a DEADLINE (PF0 by colour clock 0, PF1 by 16, PF2 by 48; the right half's
+  rewrites by 80 / 96 / 128), and a region can prove 75 of 76 cycles, certify, report 262
+  stable lines, and still draw the picture in the wrong place. That is not hypothetical: it
+  shipped in technojacket's `cover-tear-speck`, where three cycles of index arithmetic at
+  the top of the line pushed PF0's store to cycle 26 against a 22.67-cycle deadline and the
+  picture sat two and a half columns right with the previous line wrapping in at the left.
+  **Nothing in the repo asked the question**, though `BeamIntervals` had been computing the
+  windows it needs since v1.114.0. The author found it by eye.
+  - Witness pair `roms/litmus/pf_ontime.asm` / `pf_late.asm`: the same kernel, the same
+    data, the same 40 columns, the arithmetic moved from the line's tail to its head.
+    Measured — both CERTIFIED at 71 cy of 76, both 262 lines, `pf_ontime` clean and
+    `pf_late` 3 of 10 writes late, worst PF1 at clock 31 against 16, quantified in the
+    report as a 4-column shift. The negative control is the point: a check that flagged the
+    shape of an asymmetric playfield rather than its timing would condemn every cover ROM
+    in the tree.
+  - Reports what it CANNOT judge instead of absorbing it: a third write to a register in
+    one line, or a register with no column rule, is counted in a `NOT checked` figure that
+    prints with the verdict, and a declined analysis fails rather than passing quietly.
+  - The table test found a real crash — `pfDeadlineFor("PF0", 3)` indexed a 2-element table
+    and panicked. No kernel in the tree writes a playfield register three times in a line,
+    so only the test could have found it.
+  - Both witnesses are queued in `internal/oracle/testdata/stella_tia/CAPTURE_QUEUE`
+    (Stella capture takes over the screen; not run mid-session).
 - `cmd/keyfit`, `cmd/mixmatch`, `cmd/drumfit` (+ their `internal/` packages) — the three
   questions that reproducing a record on this machine keeps asking, each hand-rolled
   once before being written down.
