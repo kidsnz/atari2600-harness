@@ -48,6 +48,8 @@ func main() {
 	waves := flag.String("waves", "1", "comma-separated AUDC values the pattern may use")
 	rest := flag.Float64("rest", 0.25, "a step quieter than this fraction of the loudest is a rest")
 	emit := flag.String("emit", "", "also print a DASM pattern table with this name")
+	census := flag.String("census", "", "instead of reading notes, census a BAND across the whole file: \"lo-hi\" in Hz (e.g. 6000-14000). Answers whether a part EXISTS and where, before anyone reproduces it")
+	per := flag.Int("per", 8, "bars per census section")
 	flag.Parse()
 	if *wavPath == "" {
 		flag.Usage()
@@ -72,6 +74,51 @@ func main() {
 			map[bool]string{true: " -- WEAK, do not trust this", false: ""}[strength < 0.2])
 	} else {
 		fmt.Printf("tempo: %.2f BPM (given)\n", bpm)
+	}
+
+	if *census != "" {
+		var lo, hi float64
+		if _, err := fmt.Sscanf(*census, "%g-%g", &lo, &hi); err != nil {
+			fmt.Fprintf(os.Stderr, "audioingest: -census wants \"lo-hi\" in Hz, got %q\n", *census)
+			os.Exit(2)
+		}
+		beat := 60.0 / bpm
+		c, err := audioingest.SlotCensus(samples, rate, beat, *from, [2]float64{lo, hi}, *per)
+		must(err)
+		fmt.Printf("\ncensus: %.0f-%.0f Hz, %d-bar sections, phase %.3f s\n", lo, hi, *per, *from)
+		fmt.Printf("%-6s %7s  %s  %6s\n", "bar", "at", "0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15", "off/on")
+		for _, sec := range c.Sections {
+			fmt.Printf("%-6d %6.1fs ", sec.Bar0, sec.StartSec)
+			for _, v := range sec.Slot {
+				fmt.Printf("%4.2f ", v)
+			}
+			fmt.Printf(" %5.2f\n", sec.Offbeat())
+		}
+		fmt.Printf("\nlift = offbeat eighths (2,6,10,14) vs the neighbouring sixteenths; >1.15 is a part\n")
+		fmt.Printf("%s\n", c.Verdict())
+
+		// The grid is only as good as the phase it hangs on. Check it against the drum
+		// that DEFINES the phase, every time, rather than trusting -from. The first real
+		// run of this census was two sixteenths out and produced a coherent, false
+		// reading of the high band.
+		kc, err := audioingest.SlotCensus(samples, rate, beat, *from, [2]float64{30, 60}, *per)
+		if err != nil {
+			fmt.Printf("\nphase check: could not measure the 30-60 Hz band (%v)\n", err)
+			return
+		}
+		ks, conf := kc.KickSlot()
+		switch {
+		case ks == 0 && conf >= 1.5:
+			fmt.Printf("phase check: OK -- the 30-60 Hz drum is on sixteenth 0 of the beat (%.2fx an average slot)\n", conf)
+		case conf < 1.5:
+			fmt.Printf("phase check: INCONCLUSIVE -- nothing in 30-60 Hz stands out (best sixteenth %d at %.2fx). "+
+				"This grid's phase is unverified.\n", ks, conf)
+		default:
+			fmt.Printf("phase check: WRONG -- the 30-60 Hz drum is on sixteenth %d of the beat, not 0 (%.2fx an "+
+				"average slot). Every slot above is rotated by %d. Re-run with -from %.6f\n",
+				ks, conf, ks, *from+float64((4-ks)%4)*(beat/4))
+		}
+		return
 	}
 
 	var wv []int

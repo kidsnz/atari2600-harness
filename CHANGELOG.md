@@ -9,6 +9,38 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **The TIA can play a pitch it has no register for.** `roms/litmus/litmus_pitchdither.asm`
+  + `internal/audioingest/pitchdither_test.go` + `docs/techniques/pitch-dither.md`.
+  Alternating between two adjacent AUDF values every **two frames** puts the mean PERIOD
+  on the target: E1 goes from -26.9 cents (the nearest rung) to **+8.8**, measured on the
+  machine, with the out-of-note energy indistinguishable from a steady tone (0.065 against
+  0.063). Applied to "Bassline" in the record's own key the worst degree falls from +45.7
+  cents to +14.2, which is the difference between that key being playable and not.
+  - **The obvious implementation is worse than doing nothing.** Swapping every FRAME lands
+    at 40.00 Hz, 41.7 cents below E1 and outside both rungs, because a frame is 16.7 ms
+    and E1's period is 24.2 -- neither value ever completes a cycle. The rule is that the
+    alternation period must EXCEED the note's, and it is a window, not a direction.
+    That case is a test, not a footnote.
+  - Detuning two channels -- the other obvious idea -- does NOT fuse: two separate spectral
+    peaks, 3.5x the out-of-note energy, and it costs both channels. Ruled out with numbers.
+  - Five modes live in ONE ROM, selected from RAM `$80`, so every case comes off the same
+    machine instead of five builds that are assumed to be alike.
+- `audioingest.SlotCensus` + `cmd/audioingest -census` — does a part EXIST in this record,
+  and where. Per sixteenth, per section, per band, over the whole file.
+  - Measured on "Bassline": the offbeat-eighth hat is real but **enters at bar 24 (0:47)
+    and is fully open by bar 32 (1:02)**; in the opening 46 s the 6-14 kHz band is a flat
+    sixteenth texture. The ROM's hat had been an admitted invention; it turns out to be
+    right about the slots and wrong about the section.
+  - **Two defects found by running it on a real record rather than a fixture.** A breakdown
+    scored 1.09 and was reported as the file's best section -- every slot in it read 0.01
+    to 0.05, and a ratio of two near-zero numbers is not a measurement (`AudibleFloor`).
+    And the first metric divided the offbeat eighths by the DOWNBEATS, which assumes the
+    downbeat is where the drum is; a sidechained mix ducks there, so it read 4.44 for a
+    section with no offbeat part at all (`EighthLift` compares against the neighbouring
+    sixteenths instead, where the ducking cancels).
+  - `KickSlot` checks the PHASE against the drum that defines it, and `cmd/audioingest`
+    now runs it on every census and prints the correction. The first real run was two
+    sixteenths out and produced a coherent, entirely false reading of the high band.
 - `cmd/still` — render a ROM to a PNG, picking the frame by a zero-page RAM byte
   (`-trigger/-lo/-hi`) instead of by index. Promoted from a throwaway because both of
   the obvious ways to grab a frame are wrong and both reached the author before being
