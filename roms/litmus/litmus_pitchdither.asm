@@ -44,7 +44,10 @@ cur     = $86           ; 0 = flat is sounding, 1 = sharp
 delay   = $87           ; scanlines to wait before the AUDF write lands. The swap's
                         ; result turned out to depend on this, which is the difference
                         ; between a usable rule and a coincidence, so it is a parameter.
-tmp     = $88
+duty    = $88           ; frames on the SHARP rung, when the two are not held equally.
+                        ; A 1:1 swap lands on the mean period of the pair; 2:1 lands a
+                        ; third of the way, which is the only way to reach some notes.
+tmp     = $89
 
 VOL     = 8
 
@@ -63,6 +66,7 @@ Clr:    sta $00,x
         sta flat
         lda #2
         sta swap
+        sta duty
         lda #1
         sta phase
 
@@ -102,13 +106,18 @@ Frame:  lda #2
         sta AUDV1
         jmp Sharp
 
-Alt:    dec phase               ; hold each rung for `swap` frames
-        bne Keep
-        lda swap
-        sta phase
+Alt:    dec phase               ; hold the flat rung for `swap` frames, the sharp one for
+        bne Keep                ; `duty`; equal values give the plain 1:1 swap
         lda cur
         eor #1
         sta cur
+        beq AFlatH
+        lda duty
+        bne ASetPh
+        lda swap
+        jmp ASetPh
+AFlatH: lda swap
+ASetPh: sta phase
 Keep:   lda cur
         bne Sharp
 Flat:   lda flat
@@ -117,6 +126,8 @@ Sharp:  lda flat
         sec
         sbc #1
 Put:    sta tmp
+        sta WSYNC               ; the duty logic pushed the dispatch to 80 cycles of 76;
+                                ; one of the filler lines below pays for the split
 
         ldx delay               ; wait `delay` lines, write, then use up the rest, so the
         beq Now                 ; VBLANK stays the same length whatever the delay is
@@ -125,7 +136,7 @@ Wait:   sta WSYNC
         bne Wait
 Now:    lda tmp
         sta AUDF0
-        lda #31
+        lda #30
         sec
         sbc delay
         tax

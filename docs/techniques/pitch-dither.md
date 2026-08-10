@@ -77,6 +77,29 @@ Two lessons, both cheap to state and both expensive to have skipped:
   half — until the search range was narrowed around the note. A confident wrong octave looks
   identical to a confident right one.
 
+## ⚠️ A DUTY RATIO does not work, and it is the obvious next idea
+
+A 1:1 swap can only reach the midpoint of a pair of rungs. Where the target does not sit
+near that midpoint — D3 at 146.8 Hz is 119 cents from its neighbour and lands nowhere
+useful — the obvious fix is to hold one rung twice as long and land a third of the way.
+The arithmetic says that puts D3 at −7 cents.
+
+Measured, it does not. Holding the sharp rung two frames to the flat one's one gives
+**+30.6 cents**, which is the sharp rung itself (+33.6); the reverse gives −84.8, which
+is the flat rung (−85.5). At that pitch a frame holds two and a half cycles, so each
+frame is heard as its own pitch and the longer one simply wins. There is no weighted
+mean.
+
+| D3 146.832 Hz, AUDC 1, rungs 14/13 | measured | spread over 4 write positions |
+|---|---|---|
+| 1:1 | −20.8 c | 0.2 c |
+| 2:1 (sharp held longer) | +30.6 c | 0.1 c |
+| 1:2 (flat held longer) | −84.8 c | 1.0 c |
+
+So the technique gives **one** in-between pitch per pair, not a continuum, and it is the
+midpoint. A note that needs something else needs a different key or a different octave —
+`technojacket`'s `cover-fs-hi` went up a fifth rather than up an octave for exactly this.
+
 ## It costs nothing audible
 
 A modulation puts energy either side of the note. Measured as the fraction of spectral energy
