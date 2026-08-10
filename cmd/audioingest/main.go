@@ -94,6 +94,20 @@ func main() {
 			}
 			fmt.Printf(" %5.2f\n", sec.Offbeat())
 		}
+		on := c.Onsets()
+		fmt.Printf("%-6s %7s ", "ONSET", "rise")
+		for _, v := range on {
+			fmt.Printf("%4.2f ", v)
+		}
+		fmt.Println()
+		var hits []int
+		for k, v := range on {
+			if v >= 0.25 {
+				hits = append(hits, k)
+			}
+		}
+		fmt.Printf("       note onsets (rise >= 0.25 of the largest): %v  -- %d per bar\n", hits, len(hits))
+
 		fmt.Printf("\nlift = offbeat eighths (2,6,10,14) vs the neighbouring sixteenths; >1.15 is a part\n")
 		fmt.Printf("%s\n", c.Verdict())
 

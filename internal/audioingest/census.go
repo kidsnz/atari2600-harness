@@ -243,6 +243,49 @@ func (c *Census) KickSlot() (slot int, confidence float64) {
 	return best, sum[best] / (total / 4)
 }
 
+// Onsets returns, per sixteenth, how much the band's energy RISES against the previous
+// sixteenth, averaged over every audible section and normalised so the largest rise is 1.
+//
+// A note is a rise, not a level. Reading the level grid answers "where is there energy",
+// and a note that sustains for four sixteenths lights all four of them; reading the rise
+// answers "where does something START", which is the question when you are counting how
+// many notes a figure has. Measured on "Bassline" this is the difference between six
+// bright slots and four note onsets.
+//
+// Negative changes are clipped: a note ending is not an event this is looking for.
+func (c *Census) Onsets() [Slots]float64 {
+	var sum [Slots]float64
+	n := 0
+	for _, s := range c.Sections {
+		if s.Peak < AudibleFloor {
+			continue
+		}
+		for k := 0; k < Slots; k++ {
+			prev := s.Slot[(k+Slots-1)%Slots]
+			if d := s.Slot[k] - prev; d > 0 {
+				sum[k] += d
+			}
+		}
+		n++
+	}
+	if n == 0 {
+		return sum
+	}
+	peak := 0.0
+	for k := range sum {
+		sum[k] /= float64(n)
+		if sum[k] > peak {
+			peak = sum[k]
+		}
+	}
+	if peak > 0 {
+		for k := range sum {
+			sum[k] /= peak
+		}
+	}
+	return sum
+}
+
 // AudibleFloor is the fraction of the census peak a section must reach before its
 // offbeat RATIO means anything.
 //

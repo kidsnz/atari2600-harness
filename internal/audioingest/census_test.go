@@ -297,3 +297,70 @@ func TestKickSlotCatchesAWrongPhase(t *testing.T) {
 			"early; want 2, which is the correction to apply", ws)
 	}
 }
+
+// A note is a RISE, not a level. A sustained note lights every sixteenth it covers, so
+// counting bright slots counts duration; counting rises counts notes. This is the
+// difference that answered "how many notes does this figure have" on a real record.
+func TestOnsetsCountNotesAndNotDuration(t *testing.T) {
+	beat := 0.5
+	// four notes per bar, each held for three sixteenths: twelve bright slots, four onsets
+	var held []int
+	for _, k := range []int{0, 4, 8, 12} {
+		held = append(held, k, k+1, k+2)
+	}
+	x := track(32, beat, nil, held, 0, 0.8)
+	c, err := SlotCensus(x, crate, beat, 0, [2]float64{4000, 10000}, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	on := c.Onsets()
+	var hits []int
+	for k, v := range on {
+		if v >= 0.25 {
+			hits = append(hits, k)
+		}
+	}
+	if len(hits) != 4 {
+		t.Fatalf("counted %d onsets %v; the fixture has four notes each held three sixteenths, "+
+			"so a level reading would say twelve and a rise reading must say four", len(hits), hits)
+	}
+	for i, k := range hits {
+		if want := i * 4; k != want {
+			t.Errorf("onset %d is on sixteenth %d, want %d", i, k, want)
+		}
+	}
+	// and the sustained sixteenths must NOT register: they are the same note continuing
+	for _, k := range []int{1, 2, 5, 6, 9, 10, 13, 14} {
+		if on[k] >= 0.25 {
+			t.Errorf("sixteenth %d reads %.2f as an onset, but it is the middle of a held note", k, on[k])
+		}
+	}
+}
+
+// The threshold must not be where the answer comes from. On the record the seven onsets
+// score 0.41 to 1.00 and the loudest non-onset scores 0.10, so any cut between them
+// gives the same set; a fixture has to behave the same way or the count is a knob.
+func TestTheOnsetSetIsStableAcrossTheThreshold(t *testing.T) {
+	beat := 0.5
+	x := track(32, beat, nil, []int{0, 3, 6, 10, 13}, 0, 0.8)
+	c, err := SlotCensus(x, crate, beat, 0, [2]float64{4000, 10000}, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	on := c.Onsets()
+	count := func(th float64) int {
+		n := 0
+		for _, v := range on {
+			if v >= th {
+				n++
+			}
+		}
+		return n
+	}
+	for _, th := range []float64{0.15, 0.25, 0.35, 0.45} {
+		if got := count(th); got != 5 {
+			t.Errorf("threshold %.2f counts %d onsets, want 5; the count must come from the "+
+				"material and not from where the cut is put", th, got)
+		}
+	}
+}
