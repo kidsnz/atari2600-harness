@@ -9,6 +9,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `cmd/still` — render a ROM to a PNG, picking the frame by a zero-page RAM byte
+  (`-trigger/-lo/-hi`) instead of by index. Promoted from a throwaway because both of
+  the obvious ways to grab a frame are wrong and both reached the author before being
+  measured: frame 1 is not the picture (band luminance 6.00 at frame 1 against 52.39
+  from frame 7 on — a naive grab writes a near-black PNG, which is what was shown),
+  and selecting by a RAM byte only works when the byte moves across frame boundaries
+  (the first version watched one reading $00 at every boundary, so it took frame 1
+  every time and never found its second frame). It now fails loudly when the trigger
+  never reaches its value, and labels its pixel diff as colour PLUS geometry — the
+  clean control reports 6136 differing pixels because COLUPF follows the drum envelope
+  in every build.
 - `cyclebound.CheckPFDeadlines` + scenario check `pf_deadlines` + a verdict line in
   `cmd/cyclebound` — **fitting in 76 cycles does not mean landing in time.** A playfield
   write has a DEADLINE (PF0 by colour clock 0, PF1 by 16, PF2 by 48; the right half's
