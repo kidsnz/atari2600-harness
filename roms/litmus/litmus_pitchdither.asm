@@ -6,38 +6,27 @@
 ; more than 23 cents off in every bass octave on every waveform, which is what forced a
 ; reproduction of a real record into a different key from the record's.
 ;
-; This ROM exists to test, on the machine, whether two ways round it work:
+; The way round it is to write one AUDF for a few frames and the adjacent one for the
+; next few, so the tone's PERIOD alternates and the ear integrates the mean. Whether
+; that produces a pitch or a trill depends on how the swap period compares with the
+; NOTE's period, which changes with every note -- so this ROM takes the note and the
+; swap rate as parameters instead of hard-coding one case:
 ;
-;   ALTERNATION  write a different AUDF on alternate frames, so the tone's PERIOD
-;                alternates between two rungs. The mean period lands between them, and
-;                the arithmetic says that puts D and E within 8 cents. What it does to
-;                the SOUND is the question -- a 60 Hz frame rate means a 30 Hz
-;                modulation, which is squarely in the range the ear hears as roughness
-;                rather than as pitch.
+;   $80  mode   0 = hold the flat rung        (control)
+;               1 = hold the sharp rung       (control)
+;               2 = alternate between them every $84 frames
+;               3 = play both at once, one per channel
+;   $82  AUDC   the waveform
+;   $83  AUDF   the FLAT rung of the pair; the sharp one is $83-1
+;   $84  swap   frames each rung is held, for mode 2
 ;
-;   DETUNE       play the two rungs at once, one per channel. No modulation sidebands,
-;                just a beat at the difference frequency (1.7 Hz for the pair here),
-;                but it costs BOTH channels for one note.
-;
-; The mode is read from RAM $80 every frame, so a test can poke it and capture each
-; case from the same machine rather than trusting five different builds to be alike:
-;
-;   0  AUDF 24 held        40.57 Hz   the flat rung        (control)
-;   1  AUDF 23 held        42.26 Hz   the sharp rung       (control)
-;   2  23/24 every frame              alternation, 30 Hz modulation
-;   3  23/24 every 2 frames           alternation, 15 Hz modulation
-;   4  ch0 23 + ch1 24                detune, both channels
-;
-; E1 is 41.203 Hz. Mode 0 is -26.9 cents and mode 1 is +43.9; the mean period of the
-; pair is 41.396 Hz, +8.1 cents. Modes 0 and 1 are the controls that make the rest
-; meaningful: if the measurement cannot recover THEM, it cannot judge anything else.
-;
-; Every mode holds AUDV0 (and AUDV4 in mode 4) at 8, so nothing here is an envelope.
+; All four are read every frame, so one machine produces every case rather than several
+; builds that are assumed to be alike. Power-on values give the case this was written
+; for: AUDC 6, AUDF 24/23, swapping every 2 frames, which is E1.
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
 WSYNC   = $02
-COLUBK  = $09
 AUDC0   = $15
 AUDC1   = $16
 AUDF0   = $17
@@ -45,12 +34,18 @@ AUDF1   = $18
 AUDV0   = $19
 AUDV1   = $1A
 
-mode    = $80           ; poked by the test; 0..4
-frame   = $81           ; free-running frame counter, the alternation's clock
+mode    = $80
+frame   = $81           ; free-running frame counter
+audc    = $82
+flat    = $83           ; the rung BELOW the target (the larger AUDF)
+swap    = $84           ; frames per rung in mode 2
+phase   = $85           ; counts down to the next swap
+cur     = $86           ; 0 = flat is sounding, 1 = sharp
+delay   = $87           ; scanlines to wait before the AUDF write lands. The swap's
+                        ; result turned out to depend on this, which is the difference
+                        ; between a usable rule and a coincidence, so it is a parameter.
+tmp     = $88
 
-FLAT    = 24            ; the rung below the target
-SHARP   = 23            ; the rung above it
-VOICE   = 6             ; divisor 31, the voice a 2600 bassline uses
 VOL     = 8
 
         org $F000
@@ -62,8 +57,14 @@ Start:  sei
 Clr:    sta $00,x
         dex
         bne Clr
-        sta mode
-        sta frame
+        lda #6                  ; the defaults are the E1 case this was written for
+        sta audc
+        lda #24
+        sta flat
+        lda #2
+        sta swap
+        lda #1
+        sta phase
 
 Frame:  lda #2
         sta VSYNC
@@ -77,59 +78,64 @@ Frame:  lda #2
 
         inc frame
 
-        ; every mode uses the same waveform and volume on ch0; only AUDF differs
-        lda #VOICE
+        lda audc                ; ch0 carries the note in every mode
         sta AUDC0
         lda #VOL
         sta AUDV0
-        lda #0
+        lda #0                  ; ch1 is silent unless mode 3 turns it on
         sta AUDC1
         sta AUDV1
-
+        sta WSYNC               ; the mode dispatch does not fit on the same line as the
+                                ; channel setup: measured 90 cycles of 76 without this
         lda mode
-        beq M0
+        beq Flat                ; 0: the flat rung, held
         cmp #1
-        beq M1
+        beq Sharp               ; 1: the sharp rung, held
         cmp #2
-        beq M2
-        cmp #3
-        beq M3
-        ; mode 4 and anything above: both channels, one rung each
-        lda #SHARP
-        sta AUDF0
-        lda #VOICE
-        sta AUDC1
-        lda #FLAT
+        beq Alt                 ; 2: alternate
+        ; 3 and above: both rungs at once, one per channel
+        lda flat
         sta AUDF1
+        lda audc
+        sta AUDC1
         lda #VOL
         sta AUDV1
-        jmp Set
+        jmp Sharp
 
-M0:     lda #FLAT
+Alt:    dec phase               ; hold each rung for `swap` frames
+        bne Keep
+        lda swap
+        sta phase
+        lda cur
+        eor #1
+        sta cur
+Keep:   lda cur
+        bne Sharp
+Flat:   lda flat
         jmp Put
-M1:     lda #SHARP
-        jmp Put
-M2:     lda frame               ; bit 0: a new value every frame, 30 Hz
-        and #1
-        jmp Pick
-M3:     lda frame               ; bit 1: a new value every second frame, 15 Hz
-        and #2
-Pick:   beq PFlat
-        lda #SHARP
-        jmp Put
-PFlat:  lda #FLAT
-Put:    sta AUDF0
-Set:
+Sharp:  lda flat
+        sec
+        sbc #1
+Put:    sta tmp
 
-        ldx #34                 ; the rest of VBLANK
+        ldx delay               ; wait `delay` lines, write, then use up the rest, so the
+        beq Now                 ; VBLANK stays the same length whatever the delay is
+Wait:   sta WSYNC
+        dex
+        bne Wait
+Now:    lda tmp
+        sta AUDF0
+        lda #31
+        sec
+        sbc delay
+        tax
 VB:     sta WSYNC
         dex
         bne VB
         lda #0
         sta VBLANK
-        ; The picture is one flat field. There is nothing to see here; the whole ROM is
-        ; an instrument, and a kernel that drew anything would only add writes for the
-        ; cycle prover to reason about.
+        ; One flat field. The whole ROM is an instrument; a kernel that drew anything
+        ; would only add writes for the cycle prover to reason about.
         ldx #192
 Pic:    sta WSYNC
         dex

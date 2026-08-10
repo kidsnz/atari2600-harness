@@ -22,8 +22,42 @@ import (
 
 const tiaRate = 31440.0 // NTSC audio sample rate out of emu.AudioSamples
 
-// play pokes the mode, discards the settling frames, and returns the mixed samples.
-func play(t *testing.T, mode int, frames int) []float64 {
+// note names a case for the parameterised litmus: a waveform, the FLAT rung of an
+// adjacent pair, and what pitch that pair is trying to reach.
+type note struct {
+	name   string
+	audc   int
+	flat   int // the larger AUDF, i.e. the lower pitch
+	target float64
+}
+
+// E1 is the case the mechanism was found on, in the bass. D2 is the register the melody
+// of "Bassline" actually sits in, and it is a different regime: a frame is LONGER than
+// D2's period, so the swap rate that works down at E1 is not obviously the one that
+// works up here. That has to be measured, not assumed.
+var (
+	e1 = note{"E1 on AUDC 6", 6, 24, 41.203}
+	d2 = note{"D2 on AUDC 1", 1, 28, 73.416}
+	e2 = note{"E2 on AUDC 1", 1, 25, 82.407}
+	f2 = note{"F#2 on AUDC 1", 1, 22, 92.499}
+)
+
+func rung(n note, audf int) float64 {
+	div := map[int]float64{1: 15, 6: 31, 12: 6}[n.audc]
+	return tiaRate / div / float64(audf+1)
+}
+
+// play pokes the case, discards the settling frames, and returns the mixed samples.
+// swap is how many frames each rung is held (mode 2 only).
+func play(t *testing.T, mode int, n note, swap int, frames int) []float64 {
+	return playAt(t, mode, n, swap, 0, frames)
+}
+
+// playAt is play with the write POSITION inside the frame as a parameter. It exists
+// because the fast swap's result moved when an unrelated WSYNC was added to this ROM,
+// and a mechanism whose pitch depends on which scanline the store lands on is not one
+// to build a piece out of without knowing that.
+func playAt(t *testing.T, mode int, n note, swap, delay, frames int) []float64 {
 	t.Helper()
 	e, err := emu.New("NTSC")
 	if err != nil {
@@ -40,8 +74,12 @@ func play(t *testing.T, mode int, frames int) []float64 {
 			t.Fatal(err)
 		}
 	}
-	if err := e.Poke(0x80, uint8(mode)); err != nil {
-		t.Fatal(err)
+	for _, w := range []struct{ addr, val int }{
+		{0x80, mode}, {0x82, n.audc}, {0x83, n.flat}, {0x84, swap}, {0x85, 1}, {0x87, delay},
+	} {
+		if err := e.Poke(uint16(w.addr), uint8(w.val)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for i := 0; i < 20; i++ { // and let the tone settle before anything is kept
 		if _, err := e.StepFrame(); err != nil {
@@ -82,113 +120,138 @@ func cents(got, want float64) float64 { return 1200 * math.Log2(got/want) }
 // The controls. If the measurement cannot recover the two rungs the ROM holds steady,
 // nothing it says about the alternation between them means anything.
 func TestTheTwoRungsMeasureWhereTheArithmeticSaysTheyAre(t *testing.T) {
-	for _, c := range []struct {
-		mode int
-		want float64
-		name string
-	}{
-		{0, 40.568, "AUDF 24 held"},
-		{1, 42.258, "AUDF 23 held"},
-	} {
-		x := play(t, c.mode, 90)
-		hz, conf := audioingest.F0(x, tiaRate, 30, 60)
-		if conf < 0.5 {
-			t.Errorf("%s: confidence %.2f, too low to call a pitch at all", c.name, conf)
-		}
-		if e := math.Abs(cents(hz, c.want)); e > 15 {
-			t.Errorf("%s measured %.3f Hz, want %.3f (%.1f cents out); the register maps to a "+
-				"frequency by clock/31/(AUDF+1) and nothing here should move it", c.name, hz, c.want, e)
+	for _, n := range []note{e1, d2} {
+		for mode, want := range map[int]float64{0: rung(n, n.flat), 1: rung(n, n.flat-1)} {
+			hz, conf := audioingest.F0(play(t, mode, n, 2, 90), tiaRate, want*0.75, want*1.35)
+			if conf < 0.5 {
+				t.Errorf("%s mode %d: confidence %.2f, too low to call a pitch at all", n.name, mode, conf)
+			}
+			if e := math.Abs(cents(hz, want)); e > 15 {
+				t.Errorf("%s mode %d measured %.3f Hz, want %.3f (%.1f cents out)", n.name, mode, hz, want, e)
+			}
 		}
 	}
 }
 
-// THE FINDING, and it is not the obvious one. Alternating AUDF every frame FAILS: the
-// tone lands at 40.2 Hz, 41.7 cents below E1 and further out than simply holding the
-// flat rung. Alternating every TWO frames works, at +8.8 cents, which is the mean
-// period the arithmetic predicts.
+// THE FINDING, and the swap rate is not a constant. The rule is that the swap period
+// must EXCEED the note's own period, so it depends on the note:
 //
-// The rule behind it: the alternation period must EXCEED the note's own period. E1's
-// period is 24.2 ms and a frame is 16.7 ms, so a per-frame swap changes AUDF in the
-// middle of nearly every cycle and neither value ever completes one; two frames is
-// 33.4 ms and each value gets a whole cycle to itself. A slower swap on a higher note
-// would fail the other way, by becoming an audible trill, so this is a window and not
-// a direction.
-func TestAlternatingEveryTwoFramesReachesTheInBetweenPitch(t *testing.T) {
-	hz, conf := audioingest.F0(play(t, 3, 90), tiaRate, 30, 60)
-	if conf < 0.7 {
-		t.Fatalf("confidence %.2f: the result is not a pitch at all", conf)
-	}
-	if hz <= 40.568 || hz >= 42.258 {
-		t.Fatalf("measured %.3f Hz, which is not between the rungs 40.568 and 42.258", hz)
-	}
-	if e := math.Abs(cents(hz, 41.396)); e > 10 {
-		t.Errorf("measured %.3f Hz against the predicted mean period 41.396 (%.1f cents out)", hz, e)
-	}
-	if e := math.Abs(cents(hz, 41.203)); e > 15 {
-		t.Errorf("%.1f cents from E1; the point of the mechanism is that a note the machine "+
-			"has no register for becomes playable, and 15 cents is the budget", e)
+//	E1  41.2 Hz, period 24.2 ms  ->  one frame (16.7 ms) is too FAST; two frames work
+//	D2  73.4 Hz, period 13.6 ms  ->  one frame already exceeds it
+//
+// Measured below for both. The failing rate is measured too, because "swap every frame"
+// is the natural thing to write and at E1 it is worse than not swapping at all.
+func TestTheSwapRateThatWorksDependsOnTheNote(t *testing.T) {
+	for _, c := range []struct {
+		n    note
+		swap int
+	}{{e1, 2}, {d2, 1}, {e2, 1}, {f2, 1}} {
+		lo, hi := rung(c.n, c.n.flat), rung(c.n, c.n.flat-1)
+		hz, conf := audioingest.F0(play(t, 2, c.n, c.swap, 90), tiaRate, c.n.target*0.8, c.n.target*1.25)
+		mean := 2 / (1/lo + 1/hi)
+		t.Logf("%-14s swap every %d frame(s): %7.3f Hz (conf %.2f) | rungs %.2f / %.2f | "+
+			"%+6.1f c from the note, best single rung is %+6.1f",
+			c.n.name, c.swap, hz, conf, lo, hi, cents(hz, c.n.target), bestSingle(c.n))
+		if conf < 0.6 {
+			t.Errorf("%s: confidence %.2f -- the result is not a pitch", c.n.name, conf)
+		}
+		if hz <= lo || hz >= hi {
+			t.Errorf("%s: measured %.3f Hz, which is not between the rungs %.3f and %.3f",
+				c.n.name, hz, lo, hi)
+		}
+		if e := math.Abs(cents(hz, mean)); e > 12 {
+			t.Errorf("%s: measured %.3f Hz against the predicted mean period %.3f (%.1f c out)",
+				c.n.name, hz, mean, e)
+		}
+		if e, b := math.Abs(cents(hz, c.n.target)), math.Abs(bestSingle(c.n)); e >= b {
+			t.Errorf("%s: the dither lands %.1f cents from the note and the best SINGLE rung "+
+				"lands %.1f -- the mechanism has to beat doing nothing or it is not worth its state", c.n.name, e, b)
+		}
 	}
 }
 
-// The negative control, and the version that would have been built without measuring.
-// Swapping every frame is the natural thing to write and it is worse than doing
-// nothing: -41.7 cents against the flat rung's -26.9.
-func TestAlternatingEveryFrameIsWorseThanNotAlternating(t *testing.T) {
-	fast, _ := audioingest.F0(play(t, 2, 90), tiaRate, 30, 60)
-	flat, _ := audioingest.F0(play(t, 0, 90), tiaRate, 30, 60)
-	ef := math.Abs(cents(fast, 41.203))
-	e0 := math.Abs(cents(flat, 41.203))
-	t.Logf("every frame %.2f Hz (%.1f c from E1) vs the flat rung held %.2f Hz (%.1f c)", fast, ef, flat, e0)
-	if ef <= e0 {
-		t.Errorf("swapping every frame (%.1f c) is not worse than holding the flat rung (%.1f c); "+
-			"if that changes, the two-frame rule below is not the reason this works", ef, e0)
+// bestSingle is how far the nearest single rung on this waveform falls from the note,
+// which is the bar the dither has to clear.
+func bestSingle(n note) float64 {
+	best := 1e9
+	for a := 0; a < 32; a++ {
+		if c := cents(rung(n, a), n.target); math.Abs(c) < math.Abs(best) {
+			best = c
+		}
 	}
-	if fast >= 40.568 {
-		t.Errorf("every-frame alternation measured %.3f Hz, at or above the flat rung; it is "+
-			"supposed to fall BELOW both rungs, which is what makes it useless", fast)
+	return best
+}
+
+// THE SWAP RATE IS NOT FREE, and this is the test that replaced a wrong one. A first
+// version of this file asserted that swapping every frame FAILS and that two frames is
+// required. That came from one ROM at one write position, where the per-frame swap
+// measured 40.00 Hz; adding an unrelated `sta WSYNC` elsewhere in the same ROM's VBLANK
+// moved it to 41.17. Sweeping the store across five scanlines settles it: the per-frame
+// swap is the most STABLE of the three rates, and the two-frame swap is the fragile one
+// (F#2 moved 14.3 cents across the same five positions).
+//
+// A mechanism measured at a single operating point is not measured.
+func TestThePerFrameSwapIsTheStableOne(t *testing.T) {
+	lines := []int{0, 5, 11, 17, 24}
+	spread := func(n note, swap int) (float64, float64) {
+		lo, hi := math.Inf(1), math.Inf(-1)
+		for _, d := range lines {
+			hz, _ := audioingest.F0(playAt(t, 2, n, swap, d, 90), tiaRate, n.target*0.8, n.target*1.25)
+			c := cents(hz, n.target)
+			lo, hi = math.Min(lo, c), math.Max(hi, c)
+		}
+		return hi - lo, (lo + hi) / 2
+	}
+	for _, n := range []note{e1, f2} {
+		s1, m1 := spread(n, 1)
+		s2, _ := spread(n, 2)
+		t.Logf("%-14s every frame: %.1f c spread (centre %+.1f c) | every 2 frames: %.1f c spread",
+			n.name, s1, m1, s2)
+		if s1 > 3 {
+			t.Errorf("%s: the per-frame swap moves %.1f cents depending only on WHICH SCANLINE "+
+				"the store lands on; a pitch that depends on that is not usable", n.name, s1)
+		}
+		if s1 > s2 {
+			t.Errorf("%s: the per-frame swap (%.1f c spread) is less stable than the two-frame "+
+				"one (%.1f c); the piece picks per-frame on the strength of this", n.name, s1, s2)
+		}
 	}
 }
 
 // Detuning two channels does not fuse into one pitch: the spectrum keeps two separate
-// peaks and the estimator locks to one of them. It also throws 3.5x as much energy
-// outside the note as a steady tone. Recorded because it is the other obvious idea and
-// it costs both channels, so it needs to be ruled out explicitly rather than forgotten.
+// peaks and the estimator locks to one of them. Recorded because it is the other obvious
+// idea and it costs BOTH channels, so it needs ruling out explicitly.
 func TestDetuningTwoChannelsDoesNotFuse(t *testing.T) {
-	hz, _ := audioingest.F0(play(t, 4, 90), tiaRate, 30, 60)
-	t.Logf("two channels detuned: %.3f Hz, %.1f cents from E1", hz, cents(hz, 41.203))
-	if math.Abs(cents(hz, 41.396)) < 10 {
+	lo, hi := rung(e1, e1.flat), rung(e1, e1.flat-1)
+	mean := 2 / (1/lo + 1/hi)
+	hz, _ := audioingest.F0(play(t, 3, e1, 2, 90), tiaRate, e1.target*0.8, e1.target*1.25)
+	t.Logf("two channels detuned: %.3f Hz, %.1f cents from E1", hz, cents(hz, e1.target))
+	if math.Abs(cents(hz, mean)) < 10 {
 		t.Errorf("the detune measured %.3f Hz, within 10 cents of the mean period; if it DOES "+
 			"fuse then it is a second mechanism and the piece has a choice to make", hz)
 	}
 }
 
-// The part the arithmetic cannot answer: is it a PITCH or a buzz? An alternation
-// modulates the tone, and a modulation puts energy either side of the note. This
-// measures how much, against the steady rung as the control, so "it sounds rough"
-// becomes a number.
-//
-// Measured: 0.063 steady, 0.066 every frame, 0.065 every two frames, 0.218 detuned.
-// The working mechanism adds nothing audible; the one that fails and the one that
-// costs two channels are the noisy ones.
-func TestTheWorkingAlternationAddsNoRoughness(t *testing.T) {
-	steady := sidebandRatio(t, play(t, 0, 90))
-	two := sidebandRatio(t, play(t, 3, 90))
-	det := sidebandRatio(t, play(t, 4, 90))
-	t.Logf("energy outside the note -- steady %.3f | alternating every 2 frames %.3f | detuned %.3f",
-		steady, two, det)
-	if two > steady*1.5 {
-		t.Errorf("the two-frame alternation puts %.3f of its energy outside the note against the "+
-			"steady tone's %.3f; the mechanism is only usable while it stays quiet", two, steady)
-	}
-	if det <= steady*2 {
-		t.Errorf("the detune measures %.3f against steady %.3f; it is supposed to be the noisy "+
-			"option, and if it is not, ruling it out on that ground is wrong", det, steady)
+// The part the arithmetic cannot answer: is it a PITCH or a buzz? A modulation puts
+// energy either side of the note. This measures how much, against the SAME note held
+// steady as the control -- the absolute figure depends on the waveform's own harmonics
+// (AUDC 1 is a rich saw and reads 0.96 even when perfectly steady), so only the
+// steady-vs-dithered comparison means anything.
+func TestTheDitherAddsNoRoughness(t *testing.T) {
+	for _, n := range []note{e1, d2, e2, f2} {
+		steady := sidebandRatio(t, play(t, 0, n, 1, 90), n.target)
+		dith := sidebandRatio(t, play(t, 2, n, 1, 90), n.target)
+		t.Logf("%-14s energy outside the note -- steady %.3f | dithered %.3f", n.name, steady, dith)
+		if dith > steady*1.3 {
+			t.Errorf("%s: the dither puts %.3f of its energy outside the note against the steady "+
+				"tone's %.3f; the mechanism is only usable while it stays quiet", n.name, dith, steady)
+		}
 	}
 }
 
-// sidebandRatio is the fraction of spectral energy in 5..35 Hz and 55..95 Hz -- either
-// side of the note, where a clean tone has essentially none and a modulated one does.
-func sidebandRatio(t *testing.T, x []float64) float64 {
+// sidebandRatio is the fraction of spectral energy outside a fifth either side of the
+// note -- where a clean tone has essentially none and a modulated one does.
+func sidebandRatio(t *testing.T, x []float64, hz float64) float64 {
 	t.Helper()
 	n := 1 << 15
 	if len(x) < n {
@@ -208,8 +271,8 @@ func sidebandRatio(t *testing.T, x []float64) float64 {
 		}
 		return s
 	}
-	side := band(5, 35) + band(55, 95)
-	note := band(35, 55)
+	note := band(hz/1.5, hz*1.5)
+	side := band(hz/4, hz/1.5) + band(hz*1.5, hz*2.3)
 	if note <= 0 {
 		return math.Inf(1)
 	}

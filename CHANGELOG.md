@@ -8,6 +8,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The pitch-dither note said the wrong thing, and it is corrected.** It claimed that
+  swapping AUDF every frame FAILS and that two frames is required. That came from one ROM
+  at one write position, where the per-frame swap measured 40.00 Hz; adding an unrelated
+  `sta WSYNC` elsewhere in that ROM's VBLANK moved the same measurement to 41.17. Sweeping
+  the store across five scanlines settles it: **the per-frame swap is the most stable of
+  the three rates** (0.4 c spread against the two-frame swap's 14.3 c on F#2), and it is
+  what the piece uses. The litmus now takes the waveform, the rung pair, the swap rate and
+  the scanline of the store from RAM, so a claim cannot again rest on a single operating
+  point. A second error rode along: the F0 estimator returned exact subharmonics for the
+  melody register (D2's dither read as 36.8 Hz, half of 73.5) until the search was narrowed
+  around the note — a confident wrong octave looks identical to a confident right one.
+
 ### Added
 - **The TIA can play a pitch it has no register for.** `roms/litmus/litmus_pitchdither.asm`
   + `internal/audioingest/pitchdither_test.go` + `docs/techniques/pitch-dither.md`.
