@@ -108,6 +108,19 @@ func main() {
 		}
 		fmt.Printf("       note onsets (rise >= 0.25 of the largest): %v  -- %d per bar\n", hits, len(hits))
 
+		// And what pitch is on each of them, stacked over every bar in the file. One bar
+		// is not enough: on this record the same sixteenth read B1, C2 and 63.9 Hz in
+		// three consecutive bars at confidences that all looked like answers.
+		fmt.Printf("\n%-6s %10s %8s %8s %7s %6s\n", "step", "Hz", "note", "cents", "conf", "bars")
+		for _, k := range hits {
+			sn, err := audioingest.StackNote(samples, rate, beat, *from, k, 45, 130, 0.005, 0.115)
+			if err != nil {
+				fmt.Printf("%-6d %s\n", k, err)
+				continue
+			}
+			fmt.Printf("%-6d %10.3f %8s %+8.1f %7.3f %6d\n", k, sn.Hz, sn.Note, sn.Cents, sn.Conf, sn.Bars)
+		}
+
 		fmt.Printf("\nlift = offbeat eighths (2,6,10,14) vs the neighbouring sixteenths; >1.15 is a part\n")
 		fmt.Printf("%s\n", c.Verdict())
 
