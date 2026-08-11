@@ -8,6 +8,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`behavmatch` compared a paddle with a ball and called it eight mechanic
+  differences.** Video Olympics puts the ball on the BALL object and the paddles on the
+  two players; `sandbox/practice/pong` puts the ball on PLAYER 0 and the paddles on the
+  two missiles. Comparing by object INDEX therefore compared unrelated things, and every
+  axis line came back `**MECHANIC DIFF**` — a table of falsehoods in the exact shape of
+  a finding. Nothing was wrong with the measurements; the assumption that an object index
+  means the same thing in two programs was wrong, and the tool had no way to say so.
+  - `ClassifyRoles` derives a role per object from what it DOES — absent / static /
+    vertical / horizontal / free — and `CompareRoles` gates `CompareTraces`. When the
+    roles disagree the report says NOT COMPARABLE, names the objects, and **does not
+    print the per-object table at all**.
+  - On the real pair it turns out THREE of the five objects differ, not one: Video
+    Olympics never draws either missile, and the reproduction draws both.
+  - Absence is read from the trace's `Present`, not from the metric: a never-drawn
+    object still yields a zero-range metric, which classified as "static" and read as
+    agreement with an object that is merely parked. That was caught by its own test.
+  - Negative control: two ROMs that agree on every role still get the full comparison,
+    and a ROM compared with itself is clean on every line.
+
 ### Measured
 - **Both remaining unforced refusal classes were forced, and only one is real.** The
   sole-blocker table's two biggest untested rows, run by removing the refusal and

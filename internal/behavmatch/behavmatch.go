@@ -363,9 +363,10 @@ func AxisMetrics(tr *Trace, objects []int) []AxisMetric {
 
 // Diff is a behavioral comparison of a target vs a mine trace for one scenario.
 type Diff struct {
-	Scenario string
-	Lines    []string // human-readable metric comparisons
-	Match    bool
+	Scenario     string
+	Lines        []string // human-readable metric comparisons
+	Match        bool
+	RoleMismatch []RoleMismatch // non-empty = the per-object lines were NOT produced
 }
 
 // CompareTraces compares two traces (same scenario) and reports per-object axis
@@ -373,6 +374,26 @@ type Diff struct {
 // the tolerance for "same" on speed/range (in px).
 func CompareTraces(target, mine *Trace, objects []int, tol float64) *Diff {
 	d := &Diff{Scenario: target.Scenario, Match: true}
+
+	// Compare like with like, or refuse. If an object plays a different ROLE in the two
+	// programs, the lines below would compare a paddle with a ball and mark every one of
+	// them a mechanic difference -- which is what happened, and it read like a finding.
+	if mm := CompareRoles(target, mine, objects); len(mm) > 0 {
+		d.Match = false
+		d.RoleMismatch = mm
+		d.Lines = append(d.Lines,
+			"  NOT COMPARABLE: these ROMs put different things on the same objects, so a")
+		d.Lines = append(d.Lines,
+			"  per-object comparison would be measuring a paddle against a ball.")
+		for _, x := range mm {
+			d.Lines = append(d.Lines, fmt.Sprintf(
+				"    %-2s target=%-10s mine=%s", objName[x.Object], x.Target, x.Mine))
+		}
+		d.Lines = append(d.Lines,
+			"  Give the two ROMs the same object assignment, or compare by role.")
+		return d
+	}
+
 	tm := indexMetrics(AxisMetrics(target, objects))
 	mm := indexMetrics(AxisMetrics(mine, objects))
 	for _, idx := range objects {
@@ -452,4 +473,93 @@ func FormatTraceX(tr *Trace, idx int) string {
 		fmt.Fprintf(&b, "%d", s.X[idx])
 	}
 	return b.String()
+}
+
+// ROLE — what an object DOES, so two ROMs can be compared by role rather than by index.
+//
+// This exists because the comparison reported eight confident differences that were not
+// differences at all. Video Olympics puts the ball on the BALL object and the paddles on
+// the two players; the reproduction in sandbox/practice/pong puts the ball on PLAYER 0
+// and the paddles on the two missiles. Comparing P0 with P0 then compares a paddle with
+// a ball, and every line comes back "**MECHANIC DIFF**" — a table of falsehoods that
+// reads exactly like a finding.
+//
+// Nothing was wrong with the measurements. The assumption that an object index means the
+// same thing in two programs was wrong, and the tool had no way to say so.
+type Role string
+
+const (
+	RoleAbsent  Role = "absent"      // never drawn in this scenario
+	RoleStatic  Role = "static"      // drawn, never moves on either axis
+	RoleVert    Role = "vertical"    // moves on Y only — a paddle, a lift, a scrolling marker
+	RoleHoriz   Role = "horizontal"  // moves on X only
+	RoleFree    Role = "free"        // moves on both — a ball, a projectile, a walker
+)
+
+// ClassifyRoles derives one Role per object from a trace. The thresholds are
+// deliberately coarse: a single pixel of jitter is not motion, and the question being
+// answered is "is this the same KIND of thing", not "how fast does it go".
+func ClassifyRoles(tr *Trace, objects []int) map[int]Role {
+	const moved = 2 // pixels of span before an axis counts as moving
+	out := map[int]Role{}
+	m := indexMetrics(AxisMetrics(tr, objects))
+	for _, idx := range objects {
+		// Absence is a property of the TRACE, not of the metric: a never-drawn object
+		// still yields a metric whose range is zero, which classifies as "static" and
+		// reads as agreement with an object that is merely parked.
+		drawn := false
+		for _, sm := range tr.Samples {
+			if sm.Present[idx] {
+				drawn = true
+				break
+			}
+		}
+		if !drawn {
+			out[idx] = RoleAbsent
+			continue
+		}
+		x, okx := m[fmt.Sprintf("%d/X", idx)]
+		y, oky := m[fmt.Sprintf("%d/Y", idx)]
+		if !okx && !oky {
+			out[idx] = RoleAbsent
+			continue
+		}
+		mx := okx && x.Max-x.Min >= moved
+		my := oky && y.Max-y.Min >= moved
+		switch {
+		case mx && my:
+			out[idx] = RoleFree
+		case mx:
+			out[idx] = RoleHoriz
+		case my:
+			out[idx] = RoleVert
+		default:
+			out[idx] = RoleStatic
+		}
+	}
+	return out
+}
+
+// RoleMismatch names the objects whose role differs between the two ROMs. An empty
+// result means a per-object comparison is meaningful; a non-empty one means it is not,
+// and the caller must say so rather than print the differences.
+type RoleMismatch struct {
+	Object       int
+	Target, Mine Role
+}
+
+// CompareRoles is the gate CompareTraces needs in front of it.
+func CompareRoles(target, mine *Trace, objects []int) []RoleMismatch {
+	tr := ClassifyRoles(target, objects)
+	mr := ClassifyRoles(mine, objects)
+	var out []RoleMismatch
+	for _, idx := range objects {
+		// Absent-vs-absent is agreement, and absent-vs-anything is a real mismatch:
+		// an object one program uses and the other does not is exactly the case that
+		// made every line below it meaningless.
+		if tr[idx] != mr[idx] {
+			out = append(out, RoleMismatch{idx, tr[idx], mr[idx]})
+		}
+	}
+	return out
 }
