@@ -8,6 +8,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`still -frame N`** — render a ROM at a named frame, for a picture with NO moving
+  state. The `-trigger` mechanism picks a frame by watching a RAM byte change, which a
+  still picture has none of, so it fails (correctly) with "pick a trigger byte that
+  actually moves" and there was no way to get a PNG out of `still-mine`/`still-dither`
+  at all.
+  - Naming a frame reopens the trap this command exists to prevent, so `-frame` carries
+    its own guard, and **the obvious guard is the wrong one**. This file's own package
+    comment quotes a mean luminance of 6.00 for the undrawn frame against 52.39 for the
+    picture, which reads like a brightness test — but 6.00 is not that ROM's number.
+    `litmus_pf_allcols` and `litmus_48px` BOTH read exactly 6.00 at frame 1: it is the
+    emulator's undrawn frame, identical for every ROM. A brightness floor is therefore
+    either under it (and passes the very frame it was written to catch — the first
+    version, at 2.0, did) or over it (and rejects any dark picture).
+  - The guard is on the SPREAD instead. An undrawn frame is uniform: sd 0.00 on both
+    ROMs, against 52.49 and 39.58 once the picture is there. Floor 0.5.
+  - Witness + negative control + a test asserting the undrawn frame is ROM-independent,
+    which is the fact that rules the brightness measure out.
+
 ### Fixed
 - **`behavmatch` compared a paddle with a ball and called it eight mechanic
   differences.** Video Olympics puts the ball on the BALL object and the paddles on the
