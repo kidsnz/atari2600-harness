@@ -93,10 +93,18 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   (AUDC,AUDF) pairs are in tune) are transcription-ready for `pkg/audio`.
 - 📖 SFX recipes (Slocum): kick=Buzz@30, hi-hat=Noise@0 for 1 frame, snare=Noise@~8; arpeggio/echo/
   portamento patterns. Driver economics: ~400–500 cycles/frame, 600–2000 bytes ROM (Sequencer Kit).
-- ⚠️ **The audio digest cannot verify pitch** (it's a hash, not a measurement). Gopher2600's
-  `television.AddAudioMixer` exposes raw per-channel samples (2/scanline) — a capture hook + zero-crossing
-  /autocorrelation measurement is the missing capability that makes the note tables falsifiable in CI.
-  Cheap today with no new code: **duplicate-AUDC digest-equality scenarios** ({4,5} etc. must hash equal).
+- ✅ **The pitch table is measured against the machine at 330 of its 512 (AUDC,AUDF) points**
+  (`TestEveryPitchTheHardwareHasMatchesTheFormula`, 2026-08-11). Two-sided: an exact sample-for-sample
+  repeat at `(AUDF+1)×D` (which alone cannot fail a formula returning a multiple) plus autocorrelation
+  finding nothing shorter (which alone is a similarity, not an equality). Skipped and counted: 96 pitchless
+  (DC, noise), 86 too long to hold 8 cycles in 30 frames. Negative control: divisor 31→30 fails 128/330.
+- ⚠️ **`audio.MeasurePeriod` is square-like only, and fails silently.** Mean transition interval × 2 is the
+  period only with two transitions per cycle — AUDC 4 and 12, nothing else. On the poly waveforms it returns
+  a clean fraction (8× low for saw/pitfall/buzz, 64× low for engine) that looks like an ordinary number.
+  Use `audio.MeasureFundamental`. The four spot checks that stood as this table's verification were three
+  squares plus AUDC 6, the one poly waveform whose transition count coincides with its period — by luck
+  exactly the cases the broken measure could handle, which is why they stayed green.
+- ⚠️ **The audio digest cannot verify pitch** (it's a hash, not a measurement); the sweep above is what does.
 - ⚠️ slocum-tracker's default export has a comment/data mismatch (Engine slot emits 14 not 3) — check
   `soundTypeArray` on imported songs.
 

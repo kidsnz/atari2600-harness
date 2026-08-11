@@ -107,6 +107,16 @@ func PeriodSamples(audc, audf int) int {
 // MeasurePeriod measures the dominant repeat period (in samples) from a raw sample sequence
 // (for square-wave-like signals: mean interval between value transitions x 2). Fewer than 3
 // transitions returns 0 (silence/DC).
+//
+// ⚠️ SQUARE-LIKE ONLY, and the failure is silent. "Mean interval between transitions x 2"
+// is the period only when there are exactly two transitions per cycle, which is true of
+// AUDC 4 and 12 and of nothing else the TIA has. The polynomial waveforms switch many
+// times inside one cycle, so this returns a FRACTION of the period and it looks like a
+// perfectly ordinary number: measured against the formula it is 8x low for saw (AUDC 1),
+// pitfall (7/9) and buzz (15), and 64x low for engine (3). Use MeasureFundamental when
+// the waveform is not known to be square-like -- and note that the four spot checks that
+// stood as this table's verification for a year happened to be three squares and one
+// AUDC 6, the one poly waveform whose transition count coincides with its period.
 func MeasurePeriod(samples []uint8) float64 {
 	if len(samples) < 4 {
 		return 0
@@ -124,6 +134,54 @@ func MeasurePeriod(samples []uint8) float64 {
 	first, last := transitions[0], transitions[len(transitions)-1]
 	half := float64(last-first) / float64(len(transitions)-1)
 	return half * 2
+}
+
+// MeasureFundamental measures the shortest strong repeat period (in samples) of a raw
+// sample sequence, by autocorrelation over lo..hi. Returns the period and its normalised
+// correlation (1.0 = the signal repeats exactly at that lag). 0 lags or too few samples
+// return (0, 0).
+//
+// This is the measurement MeasurePeriod cannot make. Counting transitions asks "how often
+// does the signal change", which is a property of the waveform's shape; autocorrelation
+// asks "after how many samples does the signal look like itself again", which is the
+// period regardless of how convoluted one cycle is. On the TIA's nine pitched waveforms
+// it reproduces (AUDF+1)xD exactly, at r >= 0.97.
+func MeasureFundamental(samples []uint8, lo, hi int) (period int, corr float64) {
+	n := len(samples)
+	if n < 8 || lo < 1 {
+		return 0, 0
+	}
+	if hi > n/3 {
+		hi = n / 3
+	}
+	if hi < lo {
+		return 0, 0
+	}
+	mean := 0.0
+	for _, v := range samples {
+		mean += float64(v)
+	}
+	mean /= float64(n)
+	x := make([]float64, n)
+	var energy float64
+	for i, v := range samples {
+		x[i] = float64(v) - mean
+		energy += x[i] * x[i]
+	}
+	if energy == 0 {
+		return 0, 0 // DC: no period to find
+	}
+	best, bestR := 0, -2.0
+	for lag := lo; lag <= hi; lag++ {
+		var num float64
+		for i := 0; i+lag < n; i++ {
+			num += x[i] * x[i+lag]
+		}
+		if r := num / energy; r > bestR {
+			best, bestR = lag, r
+		}
+	}
+	return best, bestR
 }
 
 // IsPeriodic checks that samples repeat exactly with the given period (s[i]==s[i+period]) for at least minPeriods periods.

@@ -9,6 +9,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **The TIA pitch table is now measured against the machine at 330 of its 512 points,
+  where it stood at 4.** `pkg/audio` derives every note this project plays from
+  `f = base/(AUDF+1)/D`, and its verification was four spot checks — (4,14) (4,30)
+  (12,14) (6,9). Four cannot catch a divisor that is right across most of a waveform's
+  range and wrong at one end, which is this project's recurring failure shape.
+  - Sweeping with the existing measurement reported **145 of 338 pairs off by up to
+    7200 cents** — and that was the MEASUREMENT, not the table. `MeasurePeriod` takes
+    the mean interval between transitions × 2, which is the period only when there are
+    exactly two transitions per cycle: true of AUDC 4 and 12 and of nothing else the
+    TIA has. On the polynomial waveforms it returns a clean fraction — 8× low for saw
+    (1), pitfall (7/9) and buzz (15), 64× low for engine (3).
+  - **The four spot checks were not a random four.** Three are square-like; the fourth
+    is AUDC 6, the one polynomial waveform whose transition count happens to coincide
+    with its period. They were, by luck, exactly the cases the measurement could handle,
+    which is why a year of green never revealed its blind spot.
+  - **`audio.MeasureFundamental`** (autocorrelation) measures the period regardless of
+    how convoluted one cycle is. It reproduces `(AUDF+1)×D` exactly on all nine pitched
+    waveforms.
+  - `TestEveryPitchTheHardwareHasMatchesTheFormula` proves it **two-sidedly**, because
+    either half alone is weak: `IsPeriodic` requires an exact sample-for-sample repeat
+    at the formula's period (but cannot fail a formula returning a MULTIPLE), and
+    `MeasureFundamental` requires nothing shorter to correlate better (but is a
+    similarity, not an equality). 330 measured; 96 pitchless (DC, noise) and 86 too
+    long to hold 8 cycles in 30 frames, both skipped by a stated rule and counted.
+  - The first cycle is discarded, as a measurement rather than a fudge: without it 14
+    pairs fail, all AUDC 6/10 at long periods. The run-length histogram shows AUDC=6
+    AUDF=31 emitting runs of 416 and 576 — summing to exactly the formula's 992 — plus
+    one run of 490 at the start, because the capture begins part-way through a cycle.
+    Skipping one period makes all 14 exact for the whole remainder of the stream.
+  - Negative control: `Divisor` 31 → 30 fails 128 of 330.
 - **`still -frame N`** — render a ROM at a named frame, for a picture with NO moving
   state. The `-trigger` mechanism picks a frame by watching a RAM byte change, which a
   still picture has none of, so it fails (correctly) with "pick a trigger byte that
