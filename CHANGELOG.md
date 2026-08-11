@@ -8,6 +8,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Measured
+- **Both remaining unforced refusal classes were forced, and only one is real.** The
+  sole-blocker table's two biggest untested rows, run by removing the refusal and
+  re-measuring the corpus against a 309/626 = 49.4% baseline:
+  - **multiple back-edges: claimed +6.7 pt, worth +0.0.** 309/626, unchanged to the
+    address. This was the row the audit called "the largest BROAD class" — 42 addresses
+    over twelve cartridges — and not one of them becomes provable; every one meets a
+    second obstacle immediately, exactly as WSYNC-in-body did.
+  - **unresolved bank switch: claimed +23.1 pt, worth +15.3.** 403/623 = 64.7%. Real,
+    and smaller than claimed. Concentrated in FOUR cartridges of sixteen — Vanguard +56,
+    Aquaventure +16, Pressure Cooker +11, Donald Duck's Speedboat +11, and the other
+    twelve gain nothing. Vanguard alone is 60% of it.
+  - **Two of the three axes ever forced came back at zero**, so the table predicts the
+    wrong answer more often than the right one. It now says so in its own output.
+  - ⚠️ The forcing is UNSOUND: it certifies regions that may leave for a bank the
+    analysis did not follow. 15.3 is what a correct model could be worth, before any of
+    the work of building one.
+
 ### Fixed
 - **The pitch-dither note said the wrong thing, and it is corrected.** It claimed that
   swapping AUDF every frame FAILS and that two frames is required. That came from one ROM

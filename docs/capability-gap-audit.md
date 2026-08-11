@@ -4072,6 +4072,47 @@ than 12 unbounded addresses fall into "other" — i.e. when the prover grows a r
 classification cannot name, which is precisely how a 145-address class stayed off the ceiling table.
 Negative control: removing the bank-switch case sends "other" from 6 to 151 and the test fails by name.
 
+### Both remaining unforced classes are now forced, and only one of them is real (2026-08-11)
+
+The entry below said the sole-blocker table is an upper bound and that the two biggest rows had never been
+forced. They have been now, by the same method: remove the refusal, re-run the corpus, read the coverage.
+Baseline **309/626 = 49.4%**.
+
+| class | table said | FORCED, measured | verdict |
+|---|---|---|---|
+| WSYNC in body | +5.7 pt | +0.0 pt | already known (2026-08-07) |
+| **multiple back-edges** | **+6.7 pt** | **+0.0 pt** — 309/626, unchanged to the address | **worth nothing** |
+| **unresolved bank switch** | **+23.1 pt** | **+15.3 pt** — 403/623 = 64.7% | **real, and smaller than claimed** |
+
+**Multiple back-edges is worth nothing, and it was the row this audit called "the largest BROAD class".**
+Forty-two addresses over twelve cartridges, and removing the refusal frees not one of them: every one meets a
+second obstacle immediately, exactly as WSYNC-in-body did. Two of the three axes that have now been forced
+came back at zero. **The sole-blocker table has predicted the wrong answer twice out of three**, and it should
+be read as "at most, and possibly nothing" every time — including for any row added to it later.
+
+**Bank switching is real, and it is concentrated in four cartridges of sixteen.** Per-cartridge delta:
+
+| cartridge | baseline | forced | gain |
+|---|---|---|---|
+| Vanguard | 69/152 | 125/155 | **+56** |
+| Aquaventure | 8/33 | 24/33 | +16 |
+| Pressure Cooker | 19/59 | 30/59 | +11 |
+| Donald Duck's Speedboat | 8/36 | 19/30 | +11 |
+| *the other twelve* | | | **+0 each** |
+
+94 addresses, and **Vanguard alone is 60% of them**. So the axis is worth 15.3 points to the corpus average
+and worth nothing at all to three quarters of the cartridges in it. A builder working on a cartridge that
+does not bank-switch gains exactly zero from this work.
+
+⚠️ **The forcing is UNSOUND and the 15.3 is a ceiling, not a balance.** Removing the refusal lets the prover
+certify regions that may leave for a bank it did not follow — the very thing `TestCertificationDoesNotSurvive
+AnUnmodelledBankSwitch` exists to prevent. 15.3 is what a CORRECT model of bank switching could be worth,
+before any of the work of building one.
+
+Note the denominator moves under forcing (626 → 623): refusing changes how regions are cut, so the two runs
+are not counting quite the same set. The direction and the scale are not in doubt; the third significant
+figure is.
+
 ### The sole-blocker table is an UPPER BOUND that can be entirely illusory — measured (2026-08-07)
 
 The census two entries above lists what each refusal class is "worth alone". **For WSYNC-in-body that figure
