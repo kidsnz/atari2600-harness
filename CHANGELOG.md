@@ -120,6 +120,18 @@ versions follow [Semantic Versioning](https://semver.org/).
   inaudible as a pitch. The answer is correct and useless. "In tune" and "audible as a
   pitch" are two questions and the tool answered one; both numbers are now returned
   together, and the trap is pinned by its own test.
+- **`audio.Loudness` — AUDV is not a volume control, and every driver here wrote it as one.**
+  The output stage is a function of the SUM of the two 4-bit volumes through a hyperbolic
+  curve, so half of AUDV 15's amplitude is reached at **AUDV 6, not 7.5**; one channel at 15
+  delivers **66.7%** of the two-channel maximum; and adding a second voice at the same volume
+  adds **50%, not 100%**. A balance set so the numbers look right is not the balance a
+  listener hears, and the error is worst exactly where two voices overlap.
+  - Cross-check, stated for what it is: Thomas Jentzsch's remark that AUDV 15 "sounds only
+    about twice as loud as 6" comes out at exactly **2.0000** on this curve — a real outside
+    confirmation, since the curve is otherwise only ever checked against the emulator that
+    implements it. Two further percentage figures attributed to the same source in our mined
+    notes do **not** reproduce (a quoted +32.1% computes as +75.0%); they are recorded as
+    unreproduced rather than dropped. One confirmation is one, not four.
 - **`still -frame N`** — render a ROM at a named frame, for a picture with NO moving
   state. The `-trigger` mechanism picks a frame by watching a RAM byte change, which a
   still picture has none of, so it fails (correctly) with "pick a trigger byte that

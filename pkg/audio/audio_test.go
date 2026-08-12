@@ -142,3 +142,38 @@ func TestSFXHelpers(t *testing.T) {
 		t.Errorf("EmitSFX got %q", got)
 	}
 }
+
+// The one independent confirmation of the loudness curve that reproduces: a human ear on
+// AtariAge reporting that AUDV 15 is about twice AUDV 6. It is worth a test because the
+// curve is otherwise only ever checked against the emulator that implements it, which
+// proves consistency and not correctness.
+func TestFifteenIsTwiceAsLoudAsSix(t *testing.T) {
+	got := Loudness(15, 0) / Loudness(6, 0)
+	if math.Abs(got-2) > 0.01 {
+		t.Errorf("AUDV 15 / AUDV 6 = %.4f, want 2.00 -- the one outside observation this curve "+
+			"has been checked against", got)
+	}
+}
+
+// The three consequences a driver has to know, asserted so "AUDV is linear" cannot creep
+// back in as an assumption.
+func TestAUDVIsNotALinearVolumeControl(t *testing.T) {
+	if l := Loudness(15, 0); math.Abs(l-2.0/3) > 0.001 {
+		t.Errorf("one channel at 15 delivers %.3f of the two-channel maximum, want 0.667", l)
+	}
+	gain := Loudness(15, 15)/Loudness(15, 0) - 1
+	if math.Abs(gain-0.5) > 0.001 {
+		t.Errorf("adding a second voice at the same volume changes the output by %+.1f%%, want "+
+			"+50%% -- if this ever reads +100%% the mix has become linear", gain*100)
+	}
+	// half amplitude lands at 6, and a linear control would put it at 7.5
+	half := 0
+	for v := 0; v <= 15; v++ {
+		if math.Abs(Loudness(v, 0)-Loudness(15, 0)/2) < math.Abs(Loudness(half, 0)-Loudness(15, 0)/2) {
+			half = v
+		}
+	}
+	if half != 6 {
+		t.Errorf("half of AUDV 15's amplitude sits at AUDV %d, want 6 (linear would say 7.5)", half)
+	}
+}

@@ -280,6 +280,40 @@ func FundamentalStrength(audc int) float64 {
 	return 0 // DC and noise
 }
 
+// Loudness is the relative amplitude a pair of 4-bit volumes actually produces, on 0..1
+// where 1 is both channels at 15. It is the TIA's own output curve, normalised.
+//
+// AUDV IS NOT A LINEAR VOLUME CONTROL, and every driver in this project has written it as
+// though it were. The output stage is a function of the SUM of the two volumes through a
+// hyperbolic curve (mix.Mono: mono[c0+c1], mono[v] proportional to v/(30+v)), so:
+//
+//   - half of AUDV 15's amplitude is reached at AUDV 6, not 7.5
+//   - one channel at 15 delivers 66.7% of the two-channel maximum, so adding a SECOND
+//     voice at the same volume adds 50%, not 100%
+//   - the curve departs from a straight line by up to about 10% of full scale
+//
+// Cross-check, and read what it does and does not establish. Thomas Jentzsch's remark
+// that "15 sounds only about twice as loud as 6" comes out at exactly 2.0000 on this
+// curve, which is a real independent confirmation from a human ear. Two other percentage
+// figures attributed to the same source in our mined notes do NOT reproduce here (a
+// quoted +32.1% computes as +75.0%), so they are either about a different quantity or
+// mis-transcribed; they are recorded as unreproduced rather than quietly dropped. One
+// confirmation is one, not four.
+//
+// Consequence for balancing a mix: an AUDV chosen so the numbers look right is not the
+// balance a listener hears, and the error is worst exactly where two voices overlap.
+func Loudness(audv0, audv1 int) float64 {
+	s := audv0 + audv1
+	if s < 0 {
+		return 0
+	}
+	if s > 30 {
+		s = 30
+	}
+	const full = 30.0 / (30 + 30.0)
+	return (float64(s) / (30 + float64(s))) / full
+}
+
 // IsPeriodic checks that samples repeat exactly with the given period (s[i]==s[i+period]) for at least minPeriods periods.
 // Use this to verify the period of poly waveforms (saw/pitfall/engine etc. = too many transitions for MeasurePeriod).
 func IsPeriodic(samples []uint8, period, minPeriods int) bool {
