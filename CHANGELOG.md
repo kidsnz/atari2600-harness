@@ -18,8 +18,10 @@ versions follow [Semantic Versioning](https://semver.org/).
     7200 cents** — and that was the MEASUREMENT, not the table. `MeasurePeriod` takes
     the mean interval between transitions × 2, which is the period only when there are
     exactly two transitions per cycle: true of AUDC 4 and 12 and of nothing else the
-    TIA has. On the polynomial waveforms it returns a clean fraction — 8× low for saw
-    (1), pitfall (7/9) and buzz (15), 64× low for engine (3).
+    TIA has. On the polynomial waveforms it returns a clean fraction — exactly
+    (runs per cycle)/2, which once the shapes were measured came out as predicted to
+    three figures: 4× for saw (8 runs), 8× for rumble/pitfall/buzz (16), 64× for
+    engine (128), against observed 4.00, 8.07, 8.05, 8.05 and 64.01.
   - **The four spot checks were not a random four.** Three are square-like; the fourth
     is AUDC 6, the one polynomial waveform whose transition count happens to coincide
     with its period. They were, by luck, exactly the cases the measurement could handle,
@@ -39,6 +41,26 @@ versions follow [Semantic Versioning](https://semver.org/).
     one run of 490 at the start, because the capture begins part-way through a cycle.
     Skipping one period makes all 14 exact for the whole remainder of the stream.
   - Negative control: `Divisor` 31 → 30 fails 128 of 330.
+- **All nine pitched TIA waveforms characterised, and AUDF proved to be a pure time
+  scaling.** The pitch sweep proves the PERIOD is `(AUDF+1)×D` but says nothing about the
+  shape inside it, so a waveform that changed character across its range would have passed
+  everything this project has — and the instrument tables in every driver here pick a
+  waveform once and then vary only AUDF, which is exactly that premise.
+  - `TestAUDFScalesTheWaveformAndNeverChangesIt` normalises each run length by `(AUDF+1)`
+    and requires the sequence to be identical at every AUDF up to rotation, with exact
+    integer equality. The measured shapes are pinned as a golden, because self-consistency
+    across AUDF would still pass if the emulator changed every waveform the same way.
+  - **Only AUDC 4 and 12 are true 50% squares** (`[1 1]`, `[3 3]`). **AUDC 6 is a 13:18
+    pulse and AUDC 14 a 49:44 one** — two-level like a square but asymmetric, a different
+    harmonic series, and the reason "bass" does not sound like "square". The rest are
+    polynomial shapes: saw 8 runs, rumble/pitfall/buzz 16, engine 128.
+  - The 13:18 came out of the fourteen pairs that resisted the exact-repeat check: AUDC 6
+    emits 130+180 at AUDF 9, 286+396 at 21, 377+522 at 28, 416+576 at 31 — every one
+    exactly 13:18 after dividing by `(AUDF+1)`, ratio 0.41935 with no residual.
+  - Comparing position-for-position produced a second false alarm of the same family as
+    the one above: AUDC 7 "changed" at every AUDF, until the sequences turned out to be
+    rotations of each other. A capture begins wherever it begins; a waveform has no first
+    run. The comparison is cyclic.
 - **`still -frame N`** — render a ROM at a named frame, for a picture with NO moving
   state. The `-trigger` mechanism picks a frame by watching a RAM byte change, which a
   still picture has none of, so it fails (correctly) with "pick a trigger byte that

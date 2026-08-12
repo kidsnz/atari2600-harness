@@ -112,8 +112,10 @@ func PeriodSamples(audc, audf int) int {
 // is the period only when there are exactly two transitions per cycle, which is true of
 // AUDC 4 and 12 and of nothing else the TIA has. The polynomial waveforms switch many
 // times inside one cycle, so this returns a FRACTION of the period and it looks like a
-// perfectly ordinary number: measured against the formula it is 8x low for saw (AUDC 1),
-// pitfall (7/9) and buzz (15), and 64x low for engine (3). Use MeasureFundamental when
+// perfectly ordinary number. The factor is exactly (runs per cycle)/2, and the runs were
+// then measured: 4x low for saw (AUDC 1, 8 runs), 8x for rumble/pitfall/buzz (2/7/15, 16
+// runs), 64x for engine (3, 128 runs) -- predicted and observed to three figures. Use
+// MeasureFundamental when
 // the waveform is not known to be square-like -- and note that the four spot checks that
 // stood as this table's verification for a year happened to be three squares and one
 // AUDC 6, the one poly waveform whose transition count coincides with its period.

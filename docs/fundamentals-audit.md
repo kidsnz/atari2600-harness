@@ -98,9 +98,29 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   repeat at `(AUDF+1)×D` (which alone cannot fail a formula returning a multiple) plus autocorrelation
   finding nothing shorter (which alone is a similarity, not an equality). Skipped and counted: 96 pitchless
   (DC, noise), 86 too long to hold 8 cycles in 30 frames. Negative control: divisor 31→30 fails 128/330.
+- ✅ **All nine pitched waveforms characterised, and AUDF proved a pure time scaling**
+  (`TestAUDFScalesTheWaveformAndNeverChangesIt`, 2026-08-11). Run lengths within one cycle,
+  normalised by `(AUDF+1)` — identical at every AUDF up to rotation, exact integer equality,
+  pinned as a golden. Shapes (summing to the divisor by construction):
+
+  | AUDC | name | D | runs | shape |
+  |---|---|---|---|---|
+  | 4 | square | 2 | 2 | `1 1` — a true 50% square |
+  | 12 | lead | 6 | 2 | `3 3` — a true 50% square |
+  | 6 | bass | 31 | 2 | `13 18` — an **asymmetric** 41.9% pulse |
+  | 14 | low bass | 93 | 2 | `49 44` — an **asymmetric** 52.7% pulse |
+  | 1 | saw | 15 | 8 | `4 3 1 2 2 1 1 1` |
+  | 2 | rumble | 465 | 16 | `62 44 18 31 31 13 18 13 62 49 13 31 31 18 13 18` |
+  | 7 | pitfall | 31 | 16 | `2 1 3 1 1 1 1 4 1 2 1 1 2 2 5 3` |
+  | 15 | buzz | 93 | 16 | `5 6 4 5 10 5 3 7 4 10 6 3 6 4 9 6` |
+  | 3 | engine | 465 | 128 | (in the test log) |
+
+  Consequence for choosing an instrument: only two of the nine are symmetric squares, and
+  the asymmetry of 6 and 14 is why they have their own character rather than being a
+  quieter square.
 - ⚠️ **`audio.MeasurePeriod` is square-like only, and fails silently.** Mean transition interval × 2 is the
   period only with two transitions per cycle — AUDC 4 and 12, nothing else. On the poly waveforms it returns
-  a clean fraction (8× low for saw/pitfall/buzz, 64× low for engine) that looks like an ordinary number.
+  a clean fraction — exactly (runs per cycle)/2, i.e. 4× for saw, 8× for rumble/pitfall/buzz, 64× for engine — that looks like an ordinary number.
   Use `audio.MeasureFundamental`. The four spot checks that stood as this table's verification were three
   squares plus AUDC 6, the one poly waveform whose transition count coincides with its period — by luck
   exactly the cases the broken measure could handle, which is why they stayed green.

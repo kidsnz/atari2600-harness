@@ -21,9 +21,10 @@ import (
 // fourth is AUDC 6 -- which happens to be the one polynomial waveform whose transition
 // count coincides with its period. So they were, by luck, exactly the cases the old
 // measurement could handle. Running the sweep with it reported 145 of 338 pairs off by
-// up to 7200 cents, and those "failures" were clean factors of 8 and 64: not the formula
-// being wrong, the measurement being unable to see past a waveform's shape. See
-// audio.MeasurePeriod's comment.
+// up to 7200 cents, and those "failures" were clean factors of 4, 8 and 64: not the
+// formula being wrong, the measurement being unable to see past a waveform's shape. The
+// factor is exactly (runs per cycle)/2, confirmed once the shapes were measured -- see
+// TestAUDFScalesTheWaveformAndNeverChangesIt and audio.MeasurePeriod's comment.
 //
 // TWO-SIDED PROOF, because either half alone is weak:
 //
