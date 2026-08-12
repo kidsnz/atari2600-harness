@@ -242,3 +242,130 @@ func sameCycle(a, b []int) bool {
 	}
 	return false
 }
+
+// THE SPECTRUM, not just the pitch. The shape test above proves each waveform keeps its
+// shape across AUDF; this turns that shape into the thing an author actually chooses by.
+// A pitch table says where a waveform's fundamental sits and nothing about whether the
+// fundamental is the loudest thing in it -- and on this machine it very often is not.
+//
+// Pinned as a golden because the practical conclusions in audio.Harmonics' comment rest
+// on these figures: that AUDC 2 speaks about an octave above where Freq puts it, that
+// AUDC 4 and 12 are one timbre in two registers, and that only 6 and 14 pair a strong
+// fundamental with a bass divisor.
+//
+// Tolerance is 0.02 of normalised amplitude. It is not zero because the DFT runs over a
+// whole number of cycles of an INTEGER period and short periods leave few samples per
+// cycle -- AUDC 4 at AUDF 9 has twenty, and reads .574 where an ideally oversampled
+// reconstruction of the same run lengths gives .596. Everything with a longer period
+// agrees to three decimals.
+func TestTheWaveformSpectraAreWhatAnAuthorChoosesBy(t *testing.T) {
+	if testing.Short() {
+		t.Skip("captures audio")
+	}
+	const audf, tol = 9, 0.02
+	want := map[int][]float64{
+		4:  {.574, .000, .198, .000, .127, .000, .101, .000},
+		12: {.594, .000, .199, .000, .120, .000, .087, .000},
+		6:  {.476, .119, .119, .104, .029, .082, .014, .055},
+		14: {.512, .043, .166, .043, .094, .042, .061, .040},
+		1:  {.149, .146, .141, .133, .125, .114, .102, .090},
+		7:  {.130, .130, .129, .127, .125, .123, .120, .117},
+		15: {.083, .161, .053, .065, .184, .052, .017, .384},
+		2:  {.037, .228, .035, .223, .032, .214, .028, .202},
+	}
+	for audc, w := range want {
+		e, err := New("NTSC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := e.LoadROM(buildAudioROM(t, uint8(audc), audf, 0x0A)); err != nil {
+			t.Fatal(err)
+		}
+		if err := e.EnableAudioCapture(); err != nil {
+			t.Fatal(err)
+		}
+		warmupStable(t, e)
+		e.ResetAudioCapture()
+		if err := e.RunFrames(60); err != nil {
+			t.Fatal(err)
+		}
+		s, _ := e.AudioSamples()
+		got := audio.Harmonics(s, float64(audio.PeriodSamples(audc, audf)), 8)
+		if got == nil {
+			t.Errorf("AUDC=%d: no spectrum measured", audc)
+			continue
+		}
+		t.Logf("AUDC=%2d (%-8s) %v", audc, audio.Name(audc), round3(got))
+		for k := range w {
+			if d := got[k] - w[k]; d > tol || d < -tol {
+				t.Errorf("AUDC=%d (%s) harmonic %d: %.3f, want %.3f (tol %.2f). The timbre has "+
+					"changed, and the instrument advice in audio.Harmonics rests on it",
+					audc, audio.Name(audc), k+1, got[k], w[k], tol)
+			}
+		}
+	}
+}
+
+// The two conclusions that would change an author's choice, asserted directly so a
+// regression names them instead of pointing at a table of eight numbers.
+func TestRumbleSpeaksAnOctaveAboveWhereTheFormulaPutsIt(t *testing.T) {
+	if testing.Short() {
+		t.Skip("captures audio")
+	}
+	h := spectrumOf(t, 2, 9)
+	if h[1] < 3*h[0] {
+		t.Errorf("AUDC 2: harmonic 2 is %.3f against harmonic 1's %.3f. The whole point of "+
+			"this entry is that the second dominates -- its waveform nearly repeats at half "+
+			"period -- so a note written for it from Freq lands about an octave low", h[1], h[0])
+	}
+}
+
+func TestSquareAndLeadAreOneTimbreInTwoRegisters(t *testing.T) {
+	if testing.Short() {
+		t.Skip("captures audio")
+	}
+	a, b := spectrumOf(t, 4, 9), spectrumOf(t, 12, 9)
+	for k := range a {
+		if d := a[k] - b[k]; d > 0.03 || d < -0.03 {
+			t.Errorf("harmonic %d: AUDC 4 reads %.3f and AUDC 12 reads %.3f. These are meant to "+
+				"be the same waveform at divisors 2 and 6, so an author picking between them is "+
+				"choosing a register and not a sound", k+1, a[k], b[k])
+		}
+	}
+	if audio.Divisor(4) == audio.Divisor(12) {
+		t.Error("the two divisors are equal, so this test is comparing a waveform with itself")
+	}
+}
+
+func spectrumOf(t *testing.T, audc, audf int) []float64 {
+	t.Helper()
+	e, err := New("NTSC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.LoadROM(buildAudioROM(t, uint8(audc), uint8(audf), 0x0A)); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.EnableAudioCapture(); err != nil {
+		t.Fatal(err)
+	}
+	warmupStable(t, e)
+	e.ResetAudioCapture()
+	if err := e.RunFrames(60); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := e.AudioSamples()
+	h := audio.Harmonics(s, float64(audio.PeriodSamples(audc, audf)), 8)
+	if h == nil {
+		t.Fatalf("AUDC=%d AUDF=%d: no spectrum", audc, audf)
+	}
+	return h
+}
+
+func round3(v []float64) []float64 {
+	out := make([]float64, len(v))
+	for i, x := range v {
+		out[i] = float64(int(x*1000+0.5)) / 1000
+	}
+	return out
+}

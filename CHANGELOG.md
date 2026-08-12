@@ -61,6 +61,20 @@ versions follow [Semantic Versioning](https://semver.org/).
     the one above: AUDC 7 "changed" at every AUDF, until the sequences turned out to be
     rotations of each other. A capture begins wherever it begins; a waveform has no first
     run. The comparison is cyclic.
+- **`audio.Harmonics` — the spectrum, so a voice can be chosen by a number.** `Freq` says
+  where a waveform's fundamental sits and nothing about whether the fundamental is the
+  loudest thing in it, and on this machine it very often is not. Measured on all nine
+  pitched waveforms at AUDF 9, pinned as a golden, and derived independently a second way
+  (an ideal two-level reconstruction from the measured run lengths) agreeing to three
+  decimals. Three consequences an author needs before picking a voice:
+  - **AUDC 2 (rumble) has its 2nd harmonic six times its 1st** (.228 against .037), because
+    its waveform nearly repeats at half period — its sixteen runs split 230 and 235. A note
+    written for it from `Freq` sounds about an octave above where it was put.
+  - **AUDC 4 and 12 are the same timbre**, differing only in divisor (2 against 6). "Square"
+    and "lead" are one instrument in two registers, not two instruments.
+  - **Only AUDC 6 and 14 pair a strong fundamental (.476, .512) with a bass divisor**, which
+    is why a bass line lands on them and sounds thin on saw (.149) or pitfall (.130), whose
+    spectra are flat enough to have no fundamental to speak of.
 - **`still -frame N`** — render a ROM at a named frame, for a picture with NO moving
   state. The `-trigger` mechanism picks a frame by watching a RAM byte change, which a
   still picture has none of, so it fails (correctly) with "pick a trigger byte that

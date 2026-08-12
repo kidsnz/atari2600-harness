@@ -186,6 +186,70 @@ func MeasureFundamental(samples []uint8, lo, hi int) (period int, corr float64) 
 	return best, bestR
 }
 
+// Harmonics returns the amplitude of the first n harmonics of a captured sample stream,
+// normalised so they sum to 1. period is in samples, and only whole cycles are used.
+//
+// WHY A PITCH TABLE IS NOT ENOUGH. Freq says where a waveform's fundamental sits;
+// it says nothing about whether that fundamental is the loudest thing in it, and on this
+// machine it very often is not. Measured on the nine pitched waveforms at AUDF 9:
+//
+//	AUDC 4 square    .574 .000 .198 .000 .127 .000 .101 .000   odd only = a true square
+//	AUDC 12 lead     .594 .000 .199 .000 .120 .000 .087 .000   the SAME timbre as 4
+//	AUDC 6 bass      .476 .119 .119 .104 .029 .082 .014 .055   strong fundamental
+//	AUDC 14 low bass .512 .043 .166 .043 .094 .042 .061 .040   strong fundamental
+//	AUDC 1 saw       .149 .146 .141 .133 .125 .114 .102 .090   flat: no fundamental to speak of
+//	AUDC 7 pitfall   .130 .130 .129 .127 .125 .123 .120 .117   flatter still
+//	AUDC 15 buzz     .083 .161 .053 .065 .184 .052 .017 .384   8th harmonic is the loudest
+//	AUDC 2 rumble    .037 .228 .035 .223 .032 .214 .028 .202   EVEN harmonics only
+//
+// Three consequences an author needs before choosing a voice:
+//
+//  1. AUDC 2 (rumble) has its second harmonic SIX TIMES its first, because its waveform
+//     nearly repeats at half its period (its sixteen runs split 230 and 235). Write a note
+//     for it from Freq and it will sound about an octave above where you put it.
+//  2. AUDC 4 and AUDC 12 are the same timbre. They differ only in divisor, 2 against 6,
+//     so "square" and "lead" are one instrument in two registers, not two instruments.
+//  3. Only AUDC 6 and 14 combine a strong fundamental with a usable bass divisor, which is
+//     why a bass line lands on them and sounds thin on 1 or 7.
+//
+// Derived independently two ways and agreed to three decimals: this DFT of the machine's
+// own output, and an ideal two-level reconstruction from the measured run lengths.
+func Harmonics(samples []uint8, period float64, n int) []float64 {
+	if period < 2 || n < 1 || len(samples) < int(period) {
+		return nil
+	}
+	whole := int(float64(len(samples))/period) * int(period)
+	if whole < int(period) {
+		return nil
+	}
+	var mean float64
+	for i := 0; i < whole; i++ {
+		mean += float64(samples[i])
+	}
+	mean /= float64(whole)
+
+	out := make([]float64, n)
+	var tot float64
+	for k := 1; k <= n; k++ {
+		var re, im float64
+		for i := 0; i < whole; i++ {
+			th := 2 * math.Pi * float64(k) * float64(i) / period
+			v := float64(samples[i]) - mean
+			re += v * math.Cos(th)
+			im -= v * math.Sin(th)
+		}
+		out[k-1] = math.Hypot(re, im) / float64(whole)
+		tot += out[k-1]
+	}
+	if tot == 0 {
+		return out
+	}
+	for i := range out {
+		out[i] /= tot
+	}
+	return out
+}
+
 // IsPeriodic checks that samples repeat exactly with the given period (s[i]==s[i+period]) for at least minPeriods periods.
 // Use this to verify the period of poly waveforms (saw/pitfall/engine etc. = too many transitions for MeasurePeriod).
 func IsPeriodic(samples []uint8, period, minPeriods int) bool {
