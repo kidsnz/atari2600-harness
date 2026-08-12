@@ -100,6 +100,26 @@ versions follow [Semantic Versioning](https://semver.org/).
     against one audio hash, and on `roms/litmus/scenarios/audio.json` changing AUDV1 from 8
     to 15 leaves `golden_audio` passing while `golden_mix` fails. Controls: deterministic
     across runs, and still sensitive to channel 0.
+- **`keyfit.SweepDetuned` — a piece does not have to start on a semitone, and here that is
+  worth a quarter tone.** `Sweep` tried twelve tonics an octave, because that is where a
+  keyboard's notes are. The TIA is not a keyboard: measured on AUDC 6, its rungs sit 182.4
+  cents apart at AUDF 8→9 and still 55.0 apart at their tightest across AUDF 8..31, and
+  nothing obliges a cartridge to anchor to A440. On the F# minor bass figure this project
+  reproduced, searching tonics continuously instead of by semitone takes the worst degree
+  from **28.0 to 16.7 cents** on a single voice. Control: the detuned range contains every
+  semitone, so it can never lose — asserted over four figures.
+- **Just intonation is refuted for this machine, and recorded as a test so it is not
+  proposed again.** The ear prefers just ratios; the TIA cannot act on the preference. The
+  largest 12-TET-to-just difference is 17.6 cents (the minor seventh) against a rung
+  spacing of 55 to 182, so the target moves and the chosen register does not — measured,
+  all six degrees of the real figure pick the identical `(AUDC, AUDF)` under both tunings.
+- **`audio.FundamentalStrength` + `Fit.OneVoiceFundamental` — the most in-tune voice for a
+  bass line has no bass in it.** Asked which single waveform plays that figure most
+  accurately, `keyfit` answers AUDC 1 at 16.7 cents. AUDC 1's spectrum is `.149 .146 .141
+  .133`, flat enough to have no fundamental at all, so the line would be in tune and
+  inaudible as a pitch. The answer is correct and useless. "In tune" and "audible as a
+  pitch" are two questions and the tool answered one; both numbers are now returned
+  together, and the trap is pinned by its own test.
 - **`still -frame N`** — render a ROM at a named frame, for a picture with NO moving
   state. The `-trigger` mechanism picks a frame by watching a RAM byte change, which a
   still picture has none of, so it fails (correctly) with "pick a trigger byte that

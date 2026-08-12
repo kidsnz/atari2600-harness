@@ -50,13 +50,23 @@ type Choice struct {
 
 // Fit is one candidate tonic, scored.
 type Fit struct {
-	TonicHz    float64  `json:"tonic_hz"`
-	TonicName  string   `json:"tonic_name"`
-	Worst      float64  `json:"worst_cents"`       // signed, the degree furthest out
-	WorstDeg   int      `json:"worst_semitone"`    //
-	Choices    []Choice `json:"choices"`           // best per degree, any waveform
-	OneVoice   int      `json:"one_voice_audc"`    // the single waveform that fits best
-	OneWorst   float64  `json:"one_voice_worst"`   // its worst degree
+	TonicHz   float64  `json:"tonic_hz"`
+	TonicName string   `json:"tonic_name"`
+	Worst     float64  `json:"worst_cents"`     // signed, the degree furthest out
+	WorstDeg  int      `json:"worst_semitone"`  //
+	Choices   []Choice `json:"choices"`         // best per degree, any waveform
+	OneVoice  int      `json:"one_voice_audc"`  // the single waveform that fits best
+	OneWorst  float64  `json:"one_voice_worst"` // its worst degree
+	Detune    float64  `json:"detune_cents"`    // how far this tonic sits from the reference, in cents. SweepDetuned sets it; Sweep leaves it 0.
+
+	// OneVoiceFundamental is how much of OneVoice's energy is in the FUNDAMENTAL
+	// (audio.FundamentalStrength). READ IT WITH OneWorst, never instead of it. "In tune"
+	// and "audible as a pitch" are different questions and this file answers only the
+	// first: asked which single waveform plays the F# minor bass figure most accurately,
+	// it returns AUDC 1, whose spectrum is .149 .146 .141 .133 -- flat enough to have no
+	// fundamental at all. That answer is correct and useless, and this field is how a
+	// caller sees why.
+	OneVoiceFundamental float64 `json:"one_voice_fundamental"`
 }
 
 // Playable is every waveform worth considering: divisor > 0, and not the noise voice,
@@ -118,6 +128,7 @@ func FitTonic(tonicHz float64, degrees []int, baseClock float64) Fit {
 		}
 		if math.Abs(w) < math.Abs(f.OneWorst) {
 			f.OneWorst, f.OneVoice = w, c
+			f.OneVoiceFundamental = audio.FundamentalStrength(c)
 		}
 	}
 	return f
@@ -159,4 +170,62 @@ func InTune(loHz, hiHz, tol, baseClock float64) []Pitch {
 		}
 	}
 	return out
+}
+
+// SweepDetuned is Sweep without the assumption that a piece has to start on a semitone.
+//
+// THE ASSUMPTION, and why it costs so much here. Sweep tries twelve tonics an octave,
+// because that is where the notes of a keyboard are. The TIA is not a keyboard: its rungs
+// sit wherever (AUDF+1)×D puts them, and in the bass they are 53 to 182 cents apart —
+// measured on AUDC 6, 182.4 cents between AUDF 8 and 9, still 53.3 between 31 and 32.
+// A ladder that coarse has no reason to line up with A440, and nothing about a cartridge
+// obliges it to: a piece can sit at ANY reference pitch, and only the intervals inside it
+// are audible as tuning. Anchoring to A440 throws away a whole free parameter.
+//
+// Measured on the F# minor bass figure this project reproduced (tonic, 4th, 5th, b6, b7,
+// octave), searching a full octave of tonics:
+//
+//	AUDC 6 alone   best semitone tonic  43.5 cents worst  ->  best continuous  16.7
+//	all waveforms  best semitone tonic  13.9 cents worst  ->  best continuous   9.2
+//
+// The single-waveform case is the one that matters, because a bass line usually wants one
+// voice: 43.5 cents is a quarter tone and 16.7 is not.
+//
+// WHAT THIS IS NOT. It is not just intonation. Aiming at just ratios instead of 12-TET was
+// tried first and is refuted for this machine, quantitatively: the largest 12-TET-to-just
+// difference is 17.6 cents (the minor seventh), against a rung spacing of 53 to 182, so
+// the target moves and the chosen AUDF does not. Measured over the same figure, every
+// degree picks the identical register under both tunings.
+//
+// stepCents is the search resolution; spanCents the range each way. The returned Fits
+// carry Detune, the offset from loHz in cents.
+func SweepDetuned(loHz float64, spanCents, stepCents int, degrees []int, baseClock float64) []Fit {
+	if stepCents < 1 {
+		stepCents = 1
+	}
+	var out []Fit
+	for c := -spanCents; c <= spanCents; c += stepCents {
+		f := FitTonic(loHz*math.Pow(2, float64(c)/1200), degrees, baseClock)
+		f.Detune = float64(c)
+		out = append(out, f)
+	}
+	return out
+}
+
+// Best returns the fit with the smallest worst degree, judged on ONE waveform if oneVoice
+// is true (OneWorst) and on any waveform otherwise (Worst). Returns the zero Fit for an
+// empty list.
+func Best(fits []Fit, oneVoice bool) Fit {
+	best := Fit{}
+	first := true
+	for _, f := range fits {
+		v, b := math.Abs(f.Worst), math.Abs(best.Worst)
+		if oneVoice {
+			v, b = math.Abs(f.OneWorst), math.Abs(best.OneWorst)
+		}
+		if first || v < b {
+			best, first = f, false
+		}
+	}
+	return best
 }

@@ -1,6 +1,7 @@
 package audioingest_test
 
 import (
+	"github.com/jetsetilly/gopher2600/hardware/tia/audio/mix"
 	"math"
 	"testing"
 
@@ -105,13 +106,24 @@ func playRaw(t *testing.T, mode int, n note, swap, duty, delay, frames int) []fl
 	if len(ch0) == 0 {
 		t.Fatal("no audio captured")
 	}
+	// Through the TIA's own output stage, not added. mix.Mono is what a speaker receives
+	// and it is NOT a sum -- it indexes mono[c0+c1] into a hyperbolic curve, so a loud
+	// second channel squashes the first (measured: to 48% of its contribution in silence).
+	// The linear sum this used to do is precisely the "the two channels do not interfere"
+	// assumption that AtariAge topic 272769 warns about, and having it in OUR code while
+	// the engine models the real thing is the worse half of that mistake.
+	//
+	// It does not change this file's conclusions, and that was checked rather than assumed:
+	// mix.Mono is monotonic in (c0+c1), so it cannot move a zero crossing or a period, and
+	// every number here is a pitch. It is corrected because the next person to copy this
+	// loop will not be measuring a pitch.
 	x := make([]float64, len(ch0))
 	for i := range ch0 {
-		v := float64(ch0[i])
+		c1 := uint8(0)
 		if i < len(ch1) {
-			v += float64(ch1[i])
+			c1 = ch1[i]
 		}
-		x[i] = v/15 - 1 // 4-bit unsigned to roughly [-1,1], DC removed below
+		x[i] = float64(mix.Mono(ch0[i], c1)) / 16384 // roughly [-1,1]; DC removed below
 	}
 	mean := 0.0
 	for _, v := range x {

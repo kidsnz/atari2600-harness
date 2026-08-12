@@ -250,6 +250,36 @@ func Harmonics(samples []uint8, period float64, n int) []float64 {
 	return out
 }
 
+// FundamentalStrength is the share of the first eight harmonics that sits in the
+// FUNDAMENTAL, measured off the machine (see Harmonics). 0 for the pitchless voices.
+//
+// It exists because "in tune" and "audible as a pitch" are different questions and a
+// tuning search answers only the first. Asked which single waveform plays a bass figure
+// most accurately, keyfit picks AUDC 1 -- and AUDC 1's spectrum is .149 .146 .141 .133,
+// flat enough to have no fundamental to speak of, so the figure would be in tune and
+// have no bass in it. The two numbers have to be read together.
+func FundamentalStrength(audc int) float64 {
+	switch Canonical(audc) {
+	case 12:
+		return 0.594
+	case 4:
+		return 0.574
+	case 14:
+		return 0.512
+	case 6:
+		return 0.476
+	case 1:
+		return 0.149
+	case 7:
+		return 0.130
+	case 15:
+		return 0.083
+	case 2:
+		return 0.037
+	}
+	return 0 // DC and noise
+}
+
 // IsPeriodic checks that samples repeat exactly with the given period (s[i]==s[i+period]) for at least minPeriods periods.
 // Use this to verify the period of poly waveforms (saw/pitfall/engine etc. = too many transitions for MeasurePeriod).
 func IsPeriodic(samples []uint8, period, minPeriods int) bool {
