@@ -4144,3 +4144,42 @@ and here the mechanism is visible rather than inferred.
 
 **Item E (WSYNC inside loop body) is therefore closed as not-worth-doing, on two independent measurements.**
 Nothing was written for it.
+
+## Multi-voice software audio: measured, and it does not fit beside a picture (2026-08-11)
+
+Two AtariAge techniques were scoped for "more than the TIA's two voices": supercat's
+4-voice wavetable mixer (topic 140331) and utz's tiatune software synthesis (274172).
+Both reduce to the same arithmetic, and the arithmetic settles it.
+
+**Per-scanline cost of one software voice**, counted from a working prototype
+(a 16-bit phase accumulator, wavetable fetch, and running sum):
+
+| part | cycles |
+|---|---|
+| phase accumulate + wavetable fetch (`clc/lda/adc/sta` x2, `tax`, `lda abs,x`) | 26 |
+| accumulate into the running sum | +3 to +8 |
+| **one voice** | **29-34** |
+| the DAC write itself (`ldx out`, two linearisation fetches, two `sta AUDVx`) | 17 (+2 on a page cross) |
+
+**Against our own kernel.** `roms/technojacket/src/kernel-cover.asm` costs **57 of 76**
+cycles on its base path, leaving **19**. One voice needs **34**. It does not fit, and no
+rearrangement changes that: the deficit is larger than the whole remaining budget.
+
+**What a 4-voice mixer leaves instead.** Interleaved one voice per scanline with the DAC
+written every second line, the worst line is 34 + 17 = **51**, leaving **~25 cycles** for
+drawing — about two register writes. A 40-column asymmetric playfield needs six PF writes
+(~48 cycles) and cannot be one of them.
+
+**So the trade is explicit: four software voices, or a 40-column picture. Not both.**
+
+A prototype was built and independently checked. Its cycle budget is real — `cyclebound`
+returns max_worst **73 of 76** over all paths — but **it fails `pf_deadlines`**: PF1 lands
+at clock 40 against a deadline of 16, 24 colour clocks late, shifting the picture right by
+**6 columns**. The prototype's "picture" is two sprite bars and one playfield stripe. This
+is exactly the failure `pf_deadlines` was written for (fitting 76 cycles is a different
+question from landing in time), and it was reported as certified because only the budget
+prover had been run.
+
+**Status: not scheduled.** The technique is understood and costed; it buys voices we have
+nowhere to spend while the deliverables are picture-led. Revisit if a piece wants sound
+over image.
