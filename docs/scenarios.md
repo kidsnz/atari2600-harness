@@ -59,6 +59,11 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
     "max_line_budget": 76,              // budget guard is never exceeded (equivalent to assert_line_budget)
     "golden_frame": true,              // D-3: compare the rendered frame-chain hash against <scenario>.golden
     "golden_audio": true,              // A-2: compare the audio-chain hash against <scenario>.audio.golden
+    "golden_mix": true,                // BOTH channels through the TIA's non-linear output stage,
+                                       //   vs <scenario>.mix.golden. golden_audio hashes AudioChannel0
+                                       //   ALONE, so a ROM's second voice is invisible to it (measured:
+                                       //   byte-identical with channel 1 silent, half and full). Use this
+                                       //   whenever a ROM sounds two voices.
     "no_timer_wrap": 3,                // VV-10 T-1: watch N frames; fail if INTIM is read after the timer wrapped (G8)
     "no_hmove_hazard": 2,              // VV-10 T-2: watch N frames; fail if HMxx is written within 24cy of HMOVE
     "score_equals_ram": {"ram": "ram.0x80", "frames": 4}, // VV-9: OCR the rendered 2-digit BCD score == RAM (font from <scenario>.font)

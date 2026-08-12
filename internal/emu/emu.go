@@ -44,6 +44,7 @@ type Emu struct {
 
 	vdigest       *digest.Video // chained hash for golden-frame regression (optional; enabled via EnableVideoDigest)
 	adigest       *digest.Audio // chained hash for golden-audio regression (optional; enabled via EnableAudioDigest)
+	mdigest       *mixDigest    // chained hash of BOTH channels through the TIA mixer (EnableMixDigest); adigest cannot see channel 1
 	acap          *audioCapture // raw audio sample capture (optional; enabled via EnableAudioCapture, V2-15)
 	paddlePlugged [2]bool       // whether SetPaddle has plugged a paddle peripheral into the port (idempotency, V2-4b)
 

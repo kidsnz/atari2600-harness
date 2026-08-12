@@ -75,6 +75,31 @@ versions follow [Semantic Versioning](https://semver.org/).
   - **Only AUDC 6 and 14 pair a strong fundamental (.476, .512) with a bass divisor**, which
     is why a bass line lands on them and sounds thin on saw (.149) or pitfall (.130), whose
     spectra are flat enough to have no fundamental to speak of.
+- **`golden_mix` — the audio golden could not hear the second channel, and nothing here had
+  ever touched the mixer.** This started as a check of an AtariAge claim that emulators
+  derived from Ron Fries' 1997 audio code ignore interference between the two TIA channels,
+  which would have meant our audio verification was green against the wrong machine. **That
+  concern is void**: Gopher2600's audio is Chris Brenner's circuit-derived implementation
+  (`Gopher2600/hardware/tia/audio/doc.go:16-18` says so outright, citing pinned Stella and
+  6502.ts commits), and the Fries tables still in `polynomials.go` are dead code no caller
+  references. The investigation found three larger holes on our side instead:
+  - **`golden_audio` hashes `AudioChannel0` alone** (`Gopher2600/digest/audio.go:78`).
+    Measured on a ROM holding channel 0 fixed and sweeping channel 1 silent / half / full:
+    the hash is `44cc324ba5783a68` at all three, while the control moves correctly when
+    channel 0 changes. Seven scenarios gate on it; none can see half the sound.
+  - **Nothing outside Gopher2600 called the `mix` package.** Every audio tool here reads the
+    raw pre-mix 4-bit channels, so the output stage was exercised nowhere — and it is not a
+    sum. `mix.Mono` indexes `mono[c0+c1]` into a hyperbolic curve: superposition fails by up
+    to 25% (`Mono(15,15)`=16383 against 21844), and a full channel 1 cuts channel 0's
+    contribution to 48% of what it is in silence. That squashing IS the interference the
+    thread is about, and Gopher2600 models it.
+  - Our own `pitchdither_test.go` sums the two channels **linearly** — the very assumption
+    the thread warns against, in our code rather than the engine's.
+  - `EnableMixDigest` hashes both channels through `mix.Mono`, closing the first two
+    together. Witness at both levels: the three ch1 volumes give three distinct mix hashes
+    against one audio hash, and on `roms/litmus/scenarios/audio.json` changing AUDV1 from 8
+    to 15 leaves `golden_audio` passing while `golden_mix` fails. Controls: deterministic
+    across runs, and still sensitive to channel 0.
 - **`still -frame N`** — render a ROM at a named frame, for a picture with NO moving
   state. The `-trigger` mechanism picks a frame by watching a RAM byte change, which a
   still picture has none of, so it fails (correctly) with "pick a trigger byte that

@@ -114,6 +114,7 @@ type Checks struct {
 	PFDeadlines      *bool                  `json:"pf_deadlines,omitempty"`       // every playfield write lands before the beam reaches the columns it governs, over all paths (.asm only). Fitting in 76 cycles does NOT imply this.
 	GoldenFrame      bool                   `json:"golden_frame,omitempty"`       // D-3: タイムラインの描画連鎖ハッシュを <scenario>.golden と照合
 	GoldenAudio      bool                   `json:"golden_audio,omitempty"`       // A-2: タイムラインの音声連鎖ハッシュを <scenario>.audio.golden と照合
+	GoldenMix        bool                   `json:"golden_mix,omitempty"`         // BOTH channels through the TIA's non-linear output stage, vs <scenario>.mix.golden. golden_audio hashes AudioChannel0 ALONE and is byte-identical whether channel 1 is silent or full (measured), so a ROM's second voice is invisible to it. This is the check that hears what a speaker would.
 	Motion           *MotionCheck           `json:"motion,omitempty"`             // VV-4: ある object の動きの滑らかさ（jerk_rms）をゲート
 	NoTimerWrap      *int                   `json:"no_timer_wrap,omitempty"`      // VV-10 T-1: この frame 数を監視し read-after-wrap(G8) が起きないことをゲート
 	NoHMOVEHazard    *int                   `json:"no_hmove_hazard,omitempty"`    // VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込みが無いことをゲート
@@ -225,6 +226,7 @@ type Result struct {
 	Asserts    []AssertResult
 	GoldenHash string           // golden_frame 指定時に算出した描画連鎖ハッシュ（決定性確認用）
 	AudioHash  string           // golden_audio 指定時に算出した音声連鎖ハッシュ
+	MixHash    string           // golden_mix: the hash of both channels through the TIA mixer
 	Metrics    map[string]int64 // run 終了時に捕捉した field（metamorphic 比較用）
 	Pass       bool
 }
@@ -288,6 +290,12 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			return nil, err
 		}
 	}
+	goldenM := s.Checks != nil && s.Checks.GoldenMix
+	if goldenM {
+		if err := e.EnableMixDigest(); err != nil {
+			return nil, err
+		}
+	}
 
 	warmup := s.WarmupFrames
 	if warmup == 0 {
@@ -301,6 +309,9 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 	}
 	if goldenA {
 		e.ResetAudioDigest()
+	}
+	if goldenM {
+		e.ResetMixDigest()
 	}
 
 	// フレーム別にインデックス化。
@@ -545,6 +556,13 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			hash := e.AudioHash()
 			res.AudioHash = hash
 			if err := evalGoldenAudio(s, hash, updateGoldens, res); err != nil {
+				return nil, err
+			}
+		}
+		if goldenM {
+			hash := e.MixHash()
+			res.MixHash = hash
+			if err := evalGoldenMix(s, hash, updateGoldens, res); err != nil {
 				return nil, err
 			}
 		}
@@ -864,6 +882,10 @@ func audioGoldenPath(srcPath string) string {
 	return strings.TrimSuffix(srcPath, filepath.Ext(srcPath)) + ".audio.golden"
 }
 
+func mixGoldenPath(srcPath string) string {
+	return strings.TrimSuffix(srcPath, filepath.Ext(srcPath)) + ".mix.golden"
+}
+
 // evalGolden は描画連鎖ハッシュを <scenario>.golden と照合する（label="golden_frame"）。
 func evalGolden(s *Scenario, hash string, update bool, res *Result) error {
 	return evalGoldenFile(s.srcPath, goldenPath(s.srcPath), "golden_frame", hash, update, res)
@@ -872,6 +894,13 @@ func evalGolden(s *Scenario, hash string, update bool, res *Result) error {
 // evalGoldenAudio は音声連鎖ハッシュを <scenario>.audio.golden と照合する（label="golden_audio"）。
 func evalGoldenAudio(s *Scenario, hash string, update bool, res *Result) error {
 	return evalGoldenFile(s.srcPath, audioGoldenPath(s.srcPath), "golden_audio", hash, update, res)
+}
+
+// evalGoldenMix compares the MIXED audio hash -- both channels through the TIA's output
+// stage -- against <scenario>.mix.golden. Separate from golden_audio rather than replacing
+// it: the two answer different questions, and the seven existing audio goldens stay valid.
+func evalGoldenMix(s *Scenario, hash string, update bool, res *Result) error {
+	return evalGoldenFile(s.srcPath, mixGoldenPath(s.srcPath), "golden_mix", hash, update, res)
 }
 
 // evalGoldenFile は算出ハッシュを golden ファイルと照合する（映像・音声で共有）。ファイルが無い／

@@ -10,6 +10,7 @@
     {"at_frame": 2, "field": "audio.ch1.volume", "op": "==", "value": 8}
   ],
   "checks": {
-    "golden_audio": true
+    "golden_audio": true,
+    "golden_mix": true
   }
 }
