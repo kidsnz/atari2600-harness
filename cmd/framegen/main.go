@@ -1438,6 +1438,51 @@ func zoneCoarseFine(in int) (nops int, nib uint8) {
 	return nops, uint8((16-f)&0x0F) << 4
 }
 
+// zoneReadFor is where the zone actuator ACTUALLY puts an object for a given input, as
+// opposed to where the input says it should go. Measured on the machine over every input
+// the actuator accepts, 165 of 165 points:
+//
+//	read = 6*max(in/6, 9) + (in mod 6) - 51
+//
+// THE FIRST SIXTY INPUTS ALL LAND IN THE SAME SIX PIXELS. `zoneCoarseFine` splits the
+// input into nops and a nibble on the arithmetic that one nop is six colour clocks, and
+// 6*(in/6) + (in%6) is exactly `in` — so on paper the map has slope 1 everywhere. It does
+// not: below ten nops the RESxx strobe lands at CPU cycle 2n+3 <= 21, which is still
+// inside HBLANK (22.67), and an object cannot be placed left of the screen. Everything
+// from input 0 to 59 therefore reads 3..8, moved only by the fine nibble; from 60 up the
+// map is linear with slope 1. (The 3 rather than 0 at the bottom is HMOVE-after-WSYNC
+// extending HBLANK by eight clocks, which the constants file records independently.)
+//
+// This is why the per-zone calibration takes four iterations to place one object. Its
+// update rule is `zin += want - have`, which assumes slope 1, and every object is seeded
+// at input 40 -- dead centre of the flat region, where the slope is zero for the coarse
+// term. The first correction is therefore computed from a reading that carries the whole
+// saturation error, and is wasted. Measured on zone_multiplex: z1P1 read 7 at input 40
+// (the linear value there would be -11), want 42 gave input 75 which read 24 -- short by
+// exactly the 18 pixels of saturation -- and only the second correction landed.
+func zoneReadFor(in int) int {
+	n := in / 6
+	if n < 9 {
+		n = 9
+	}
+	return 6*n + in%6 - 51
+}
+
+// zoneInputFor is the inverse: the smallest input that puts the object at x, or the
+// smallest input outside the flat region when x is unreachable. Seeding the calibration
+// with this instead of a constant is what removes the wasted first iteration.
+func zoneInputFor(x int) int {
+	// In the linear branch 6*(in/6) + in%6 is exactly in, so read = in - 51.
+	in := x + 51
+	if in < 60 {
+		in = 60
+	}
+	if in > zoneInputMax {
+		in = zoneInputMax
+	}
+	return in
+}
+
 func zoneStrobeCycle(in int) int {
 	n, _ := zoneCoarseFine(in)
 	return zoneNopCycles*n + zoneStrobeFixed
@@ -2107,7 +2152,25 @@ func main() {
 	}
 	zin := make([][5]int, nz)
 	for k := range zin {
+		// SEEDED FROM THE ACTUATOR'S INVERSE, not from a constant. Every object used to
+		// start at input 40, and 40 is inside the zone actuator's flat region: measured
+		// over its whole domain, inputs 0..59 all land in the same six pixels because the
+		// RESxx strobe is still inside HBLANK below ten nops (see zoneReadFor). The
+		// update rule is `zin += want - have`, which assumes slope 1, so the first
+		// correction was computed from a reading carrying the entire saturation error and
+		// was thrown away -- the recorded "z1P0 want 9, read 3 -> 7 -> 9".
+		//
+		// Zone 0 and the no-zone case are placed by the PROLOGUE's div-15 routine, which
+		// is a different actuator with a different map, so they keep the old seed; only
+		// the zones the nop-chain places are seeded from its inverse.
 		zin[k] = [5]int{40, 40, 40, 40, 40}
+		if k > 0 && fd.zones != nil {
+			for i := range zin[k] {
+				if x := fd.zones[k].lt[i]; x != notDrawn {
+					zin[k][i] = zoneInputFor(x)
+				}
+			}
+		}
 	}
 	stuck := make([][5]bool, nz)
 	misses := make([][5]int, nz)

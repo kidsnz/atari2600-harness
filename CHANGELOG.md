@@ -9,6 +9,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`framegen`: the per-zone calibration's slow convergence was a seed outside the
+  actuator's working range, not a delicate loop.** RL-8c was blocked on it: "until
+  `z1P0 want 9` reads 9 on the first iteration rather than the fourth, partial following
+  will keep trading background for misplaced sprites."
+  - **The zone actuator saturates**, measured over its whole domain — **198 of 198 inputs**:
+    `read = 6*max(in/6, 9) + (in mod 6) - 51`. `zoneCoarseFine` splits the input on "one nop
+    is six colour clocks" and `6*(in/6) + in%6` is exactly `in`, so on paper the map has
+    slope 1 everywhere. Below **ten** nops the RESxx strobe lands at CPU cycle `2n+3 ≤ 21`,
+    inside HBLANK, and an object cannot go left of the screen: **inputs 0–59 all land in the
+    same six pixels**, moved only by the fine nibble. Pinned as a golden; negative control —
+    a naive `in - 51` mismatches 54 of 198.
+  - **Every object was seeded at input 40, dead centre of that flat region**, while the
+    update rule `zin += want - have` assumes slope 1. The first correction therefore carried
+    the whole saturation error and was thrown away.
+  - Seeding from the inverse (`zoneInputFor`) takes `zone_multiplex` from convergence at
+    iteration 4 to **iteration 2**, with **ten of twelve zone objects already exact at
+    iteration 0**. Still pixel-exact. Zone 0 and the no-zone case keep the old seed: they
+    are placed by the prologue's div-15 routine, a different actuator with a different map.
+
 - **`framegen`: a zone's anchor could be stolen by a line the zone is not pinned at.** The
   zone's position comes from `bx` and its anchor from `lx`, and those are two different
   measurements — `bx` can read notDrawn on a line where `lx` still reports a leftmost run,

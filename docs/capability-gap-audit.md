@@ -4046,6 +4046,41 @@ not more zone bookkeeping. Until `z1P0 want 9` reads 9 on the first iteration ra
 following will keep trading background for misplaced sprites. The WIP is preserved in
 `git stash` ("RL-8c partial following WIP") on this machine.
 
+#### The convergence was not subtle — the seed was outside the actuator's working range (2026-08-12)
+
+**The zone actuator saturates, measured over its whole domain: 198 of 198 inputs.**
+
+    read = 6*max(in/6, 9) + (in mod 6) - 51
+
+`zoneCoarseFine` splits the input into `nops = in/6` and a fine HMxx nibble on the arithmetic that one nop is
+six colour clocks, and `6*(in/6) + (in%6)` is exactly `in` — so on paper the map has slope 1 everywhere. It
+does not. Below **ten** nops the RESxx strobe lands at CPU cycle `2n+3 <= 21`, still inside HBLANK (22.67), and
+an object cannot be placed left of the screen: **inputs 0..59 all land in the same six pixels**, moved only by
+the nibble. From 60 up it is linear.
+
+| nops | inputs | reads | coarse term |
+|---|---|---|---|
+| 0–9 | **0–59** | 3–8 | **does nothing** |
+| 10–32 | 60–197 | 9–146 | slope 1 |
+
+Measured by emitting the exact block framegen emits and decomposing the scanline, every input, and pinned as a
+golden (`cmd/framegen/actuator_test.go`). Negative control: dropping the saturation term for a naive `in - 51`
+mismatches **54 of 198**. The `3` rather than `0` at the bottom is HMOVE-after-WSYNC extending HBLANK by eight
+clocks, which `CLAUDE.md` records independently.
+
+**And every object was seeded at input 40 — dead centre of the flat region.** The update rule is
+`zin += want - have`, which assumes slope 1, so the first correction was computed from a reading carrying the
+entire saturation error and was thrown away. That is the whole of "z1P0 want 9, read 3 → 7 → 9", and it was
+never about the calibration being delicate.
+
+**Seeding from the actuator's inverse (`zoneInputFor`) fixes it.** On `zone_multiplex`, convergence goes from
+iteration 4 to **iteration 2**, and at iteration 0 **ten of the twelve zone objects already read `d+0`** — the
+two that do not are the prologue-placed `z0P0` (a different actuator, which keeps the old seed) and one object
+off by 5. Still `RESULT: pixel-exact`.
+
+**This is the prerequisite the paragraph above asked for.** Partial following can now be retried against a
+calibration that lands on the first iteration instead of the fourth.
+
 ### The ceiling table was missing its two biggest obstacles, and one of them is worth 23 points (2026-08-07)
 
 The recorded ceiling measured three axes — trip counts, WSYNC-in-body, call-or-jump-in-body — and put the
