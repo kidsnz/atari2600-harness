@@ -8,6 +8,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`framegen`: a zone's anchor could be stolen by a line the zone is not pinned at.** The
+  zone's position comes from `bx` and its anchor from `lx`, and those are two different
+  measurements — `bx` can read notDrawn on a line where `lx` still reports a leftmost run,
+  so one line belonging to a band the zone does NOT reproduce could win the anchor by being
+  the smallest, and every `GRP` byte read through it was wrong. Measured on Fishing Derby
+  with partial following on: z1 (L27-213) is pinned at 134 and came out anchored at **29**,
+  the position of a band the object had already been retired from (P1 25 → 58 with the tie).
+  - `zoneLeftmost` now skips any line whose `bx` disagrees with the zone's pinned X. Witness
+    plus two controls: a zone whose object drifts inside its own band keeps all of those
+    lines, and a zone with no pin recorded behaves exactly as before.
+  - **On today's code it changes nothing** — without partial following `pin` guarantees every
+    line in a zone agrees with it — so it is witnessed at the function rather than at the
+    picture. An anchor that can disagree with its own pin is wrong whether or not anything
+    currently reads it that way, and RL-8c's partial following removes the guarantee.
+  - **The calibration's feedback loop is located and deliberately untouched.** The same
+    function is called again on the CLONE's measurements, and that call is the "read" of the
+    want/read pair; it takes the minimum over the zone, so a sprite drawn in the wrong place
+    on any line drags the read down and the next correction with it — the recorded
+    `z1P0 want 9, read 3 → 7 → 9`. Testing the clone's position against itself would close
+    the loop rather than break it.
+
 ### Added
 - **The TIA pitch table is now measured against the machine at 330 of its 512 points,
   where it stood at 4.** `pkg/audio` derives every note this project plays from

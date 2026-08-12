@@ -808,13 +808,31 @@ func leftmostDrawn(grid [][]string, name string) []int {
 // line is 2 pixels wide and whose middle line is 8 (measured on zone_multiplex:
 // widths 2,4,6,8,8,6,4 down every band) reveals its left edge only on the widest
 // lines, and anchoring on a narrow line would shift the whole band.
-func zoneLeftmost(lx [5][]int, z zone, i int) int {
+func zoneLeftmost(lx, bx [5][]int, z zone, i int) int {
 	best := notDrawn
 	if lx[i] == nil {
 		return best
 	}
 	for y := z.start; y <= z.end && y < len(lx[i]); y++ {
 		if y < 0 || lx[i][y] == notDrawn {
+			continue
+		}
+		// ONLY lines the zone is actually pinned at. The zone's position comes from bx
+		// and its anchor from lx, and those are different measurements: bx can be
+		// notDrawn on a line where lx still reports a leftmost run, so without this
+		// test a line can sit inside the zone, contribute nothing to the pin, and still
+		// win the anchor by being the smallest.
+		//
+		// Measured on Fishing Derby with partial following on: z1 (L27-213) is pinned at
+		// 134 and came out anchored at 29 -- the position of a band the object had
+		// already been retired from -- which made every GRP byte in the zone wrong.
+		// P1 went 25 -> 58 with this test in place.
+		//
+		// With following ALL-OR-NOTHING this changes nothing, because pin then guarantees
+		// every drawn line in a zone agrees with it. It is here because partial following
+		// removes that guarantee, and because an anchor that can disagree with its own
+		// pin is wrong whether or not anything currently reads it that way.
+		if bx[i] != nil && y < len(bx[i]) && z.x[i] != notDrawn && bx[i][y] != z.x[i] {
 			continue
 		}
 		if best == notDrawn || lx[i][y] < best {
@@ -1282,7 +1300,7 @@ func tryZones(fd *frameData, follow [5]bool) ([]zone, int, string) {
 	zs = append(zs, cur)
 	for k := range zs {
 		for i := range zs[k].lt {
-			zs[k].lt[i] = zoneLeftmost(fd.lx, zs[k], i)
+			zs[k].lt[i] = zoneLeftmost(fd.lx, fd.bx, zs[k], i)
 		}
 	}
 	return zs, posLines, ""
@@ -2120,7 +2138,16 @@ func main() {
 				have := got[i]
 				label := objNames[i]
 				if fd.zones != nil {
-					have = zoneLeftmost(gotlx, fd.zones[k], i)
+					// THE CLONE side is read with NO pin test, and that is deliberate
+					// for now. This call is the "read" in the calibration's want/read
+					// pair, and the clone has no trustworthy pin yet -- it is what is
+					// being calibrated. Passing its bx here would test a position
+					// against itself. It is also where the recorded non-convergence
+					// lives (z1P0 wanted 9 and read 3 -> 7 -> 9 across iterations):
+					// zoneLeftmost takes the MINIMUM over the zone, so a sprite drawn
+					// in the wrong place on any line drags the read down and the next
+					// correction with it. Under investigation; not changed blind.
+					have = zoneLeftmost(gotlx, [5][]int{}, fd.zones[k], i)
 					label = fmt.Sprintf("z%d%s", k, objNames[i])
 					if !fd.zfollow[i] && k > 0 {
 						// Not followed: one position for the whole frame. The later zones

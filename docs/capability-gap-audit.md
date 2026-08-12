@@ -4023,8 +4023,23 @@ notDrawn on a line where `lx` still reports a leftmost run. So a line can sit in
 nothing to the pin, and still win the anchor. Measured: Fishing Derby's z1 (L27-213) came out anchored at
 **29**, the retired x29 band's position, instead of **135** for the x134 band it actually reproduces — which
 made every GRP byte in the zone wrong. Tying the anchor to the zone's pinned X fixes it (P1 25 → 58).
-Alone the tie changes **nothing** (FD byte-identical), because without partial following `pin` guarantees
-every line in a zone agrees with it — so it is not shipped either, under the same no-unwitnessed-changes rule.
+Alone the tie changes **nothing** on Fishing Derby (byte-identical), because without partial following `pin`
+guarantees every line in a zone agrees with it.
+
+**The tie IS now shipped, witnessed at the function instead of at the picture.** `zoneLeftmost` takes the
+pinned X and skips any line whose `bx` disagrees with it, and three tests hold it: a zone pinned at 134 with
+one x29 line must anchor at 135 and not 29 (the shape measured on Fishing Derby); a zone whose object drifts
+inside its own band must keep every one of those lines; and a zone with no pin recorded must behave exactly as
+before, so no path without a pin can change. Removing the test makes the first fail. An anchor that can
+disagree with its own pin is wrong whether or not anything currently reads it that way, and partial following
+removes the guarantee that was hiding it.
+
+**The calibration's feedback loop is now located.** The same `zoneLeftmost` is called a second time on the
+CLONE's measurements (`have = zoneLeftmost(gotlx, …)`) and that call is the "read" of the want/read pair. It
+takes the MINIMUM over the zone, so a sprite the clone drew in the wrong place on any line drags the read down
+and the next correction with it — which is exactly the recorded `z1P0 want 9, read 3 → 7 → 9`. It is left
+alone deliberately: the clone has no trustworthy pin, it is what is being calibrated, and testing its position
+against itself would close the loop rather than break it.
 
 **What the next attempt needs, stated so it is not re-derived**: per-zone sprite calibration that converges,
 not more zone bookkeeping. Until `z1P0 want 9` reads 9 on the first iteration rather than the fourth, partial
