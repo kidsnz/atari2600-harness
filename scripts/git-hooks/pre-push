@@ -27,5 +27,6 @@ python3 scripts/check_traps.py --selftest || fail "check_traps --selftest"
 python3 scripts/check_traps.py        || fail "check_traps"
 python3 scripts/check_tests.py --selftest || fail "check_tests --selftest"
 python3 scripts/check_tests.py        || fail "check_tests"
+python3 scripts/check_instruments.py  || fail "check_instruments"
 
 echo "✓ pre-push: CI mirror green — pushing."

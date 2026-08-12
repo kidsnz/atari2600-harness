@@ -150,7 +150,14 @@ func MeasurePeriod(samples []uint8) float64 {
 // it reproduces (AUDF+1)xD exactly, at r >= 0.97.
 func MeasureFundamental(samples []uint8, lo, hi int) (period int, corr float64) {
 	n := len(samples)
-	if n < 8 || lo < 1 {
+	// lo MUST be at least 2, and refusing 1 is not pedantry. A two-level signal made of
+	// long runs correlates almost perfectly with itself at lag 1 -- adjacent samples are
+	// equal everywhere except at a transition -- so a search starting at 1 returns 1 with
+	// r above 0.98 for any waveform with a period worth measuring. Caught the day this
+	// function got a calibration: a synthetic square of period 310 measured 1 at r=0.987.
+	// Every real caller passes a fraction of the expected period, which is why the machine
+	// tests never showed it.
+	if n < 8 || lo < 2 {
 		return 0, 0
 	}
 	if hi > n/3 {

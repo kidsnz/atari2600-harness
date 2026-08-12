@@ -622,6 +622,17 @@ write→visible-pixel timeline, AT-3 beam-race/too-late-write detector, AT-4 for
     Shown on the real `multicolor48` kernel: P0 at X=87, the 48px right-side GRP0 rewrites land "LATE" at clk
     +139/+157 — **correct facts, not bugs**; an automatic detector would false-positive there. So the verdict is
     opt-in (intent supplied) and the automatic part is advisory-only.
+  - **Re-proposed and re-refuted 2026-08-12, by the session that had just been bitten by the thing it was
+    meant to catch.** Moving the 48px band's position broke `multicolor48`'s picture — the six GRP stores are
+    placed to land in the gaps before the copies they feed, and walking the band walks the copies out from
+    under them. The obvious lesson looked like "build the sprite sibling of `pf_deadlines`". It is the wrong
+    lesson, and the paragraph above already says why with a measurement: **that very kernel's right-side GRP
+    rewrites land LATE at +139/+157 and are correct**, so a deadline prover would fail the working kernel and
+    still miss the breakage. What broke was not "a write is late" but "a store no longer precedes the copy it
+    feeds", and which store feeds which copy is intent.
+    **The cheap check that WOULD have caught it already exists and was simply not used: a `golden_frame`
+    scenario on the ROM.** A kernel whose timing constants are coupled to its object positions needs a golden,
+    not a new prover. Recorded so the prover is not proposed a third time.
   - **DEFERRED, NOT CLOSED (per user, 2026-06-18):** a fully-automatic *heuristic* detector (guess intent, accept
     rare false positives, tune to minimise them on the corpus) remains a live future option should a concrete
     need appear — kept on the books deliberately rather than declared done. The substrate to revisit it

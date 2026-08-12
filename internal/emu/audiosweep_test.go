@@ -109,9 +109,13 @@ func TestEveryPitchTheHardwareHasMatchesTheFormula(t *testing.T) {
 			// Search from a quarter of the formula's period: enough room to catch the
 			// formula returning 2x or 4x the truth, which is the failure IsPeriodic
 			// cannot see.
+			// At least 2. MeasureFundamental refuses lag 1 -- a two-level signal of
+			// long runs correlates with itself at r>0.98 there, so a search from 1
+			// answers 1 for everything -- and the shortest periods here (AUDC 4 at
+			// AUDF 0 is two samples) put want/4 below it.
 			lo := want / 4
-			if lo < 1 {
-				lo = 1
+			if lo < 2 {
+				lo = 2
 			}
 			got, corr := audio.MeasureFundamental(ch0, lo, want)
 			if got != want {

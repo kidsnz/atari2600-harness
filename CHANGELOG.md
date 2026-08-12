@@ -8,6 +8,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`scripts/check_instruments.py` — a measurement that has never been checked against a
+  known answer is not a measurement.** `check_tests.py` forbids a test that cannot fail;
+  this is the same rule one level down. Every exported function whose first parameter is a
+  slice of samples and which returns a number must have a test that feeds it an input the
+  TEST BUILDS and asserts a literal answer. CI-gated, in the pre-push hook, and stated in
+  `CLAUDE.md`.
+  - **Checking a reader against the machine it reads proves the two agree; only a known
+    answer proves it right**, and the difference cost a year. `audio.MeasurePeriod` passed
+    four machine spot-checks — which happened, by luck, to be three squares and the one
+    polynomial waveform whose transition count coincides with its period — while returning
+    a clean fraction of the period on five of the TIA's nine waveforms.
+  - **It found five uncalibrated instruments on its first run, two of them written the same
+    session** (`Harmonics`, `MeasureFundamental`).
+  - **And the calibrations found two real defects immediately.** `MeasureFundamental`
+    returned **1** for a square of period 310 when the search started at lag 1: a two-level
+    signal of long runs correlates with itself at r=0.987 at lag 1, so every real waveform
+    answers 1 there. Every caller happened to pass a sensible lower bound, so the machine
+    tests never showed it; `lo < 2` is now refused with the reason recorded.
+  - **A third fell out of fixing the second.** Refusing `lo < 2` broke the 512-point pitch
+    sweep on eight pairs: it passes `want/4`, and the shortest periods on this machine
+    (AUDC 4 at AUDF 0 is two samples) put that below 2. The caller had been relying on the
+    loose behaviour. Three defects in one function in one session, and **none of them ever
+    appeared in a machine test** — every real call happened to pass a sensible bound.
+  - **The second defect was in this project's own description of the first.** "MeasurePeriod
+    breaks on asymmetric pulses" was written repeatedly today and is wrong: it returns 31.00
+    for a 13:18 pulse of period 31, correctly. Asymmetry is not the problem — TRANSITIONS
+    PER CYCLE are. Mean-interval-times-two is the period whenever a cycle has exactly two
+    runs, however lopsided, and is off by (runs/2) when it has more: saw 8, pitfall and buzz
+    16, engine 128. The calibration corrected the claim, not just the code.
+
 ### Fixed
 - **`framegen`: the per-zone calibration's slow convergence was a seed outside the
   actuator's working range, not a delicate loop.** RL-8c was blocked on it: "until

@@ -218,6 +218,13 @@ round trip. Also return `png_path` in JSON.
 
 > **Anti-rot:** every `docs/*.md` must be reachable from this table or the authoring protocol — `scripts/check_wiring.py`
 > (CI-gated) fails on orphaned knowledge, so nothing accrued ever rots unused.
+> **Anti-uncalibrated-instrument:** every exported function that turns a slice of samples into a number must
+> have a test that feeds it an input the TEST BUILDS and asserts a known answer — `scripts/check_instruments.py`
+> (CI-gated). Checking a reader against the machine it reads proves the two agree; only a known answer proves
+> it right, and the difference cost a year: `audio.MeasurePeriod` passed four machine spot-checks while
+> returning a clean fraction of the period on five of the TIA's nine waveforms. On the day this gate was added
+> it found two instruments written that same session, and its first calibration run found a real defect in one
+> of them (`MeasureFundamental` returned 1 for any long-run signal when the search started at lag 1).
 > **Anti-vacuity:** every `func TestXxx` must be able to FAIL — assert on `t`, or hand `t` to a helper that does.
 > `scripts/check_tests.py` (CI-gated, with a `--selftest`) fails on a test with no failure path. It exists
 > because the extreme case of this project's recurring defect — a check that passes while covering nothing —
