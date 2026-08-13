@@ -174,7 +174,23 @@ func TestNearestTIAPicksTheMeasuredGridPoint(t *testing.T) {
 	}
 }
 
-func TestBeatPhaseFindsTheFirstClick(t *testing.T) {
+// TestBeatPhaseFollowsAnOffsetItWasNeverTold calibrates BeatPhase by MOVING the beat and
+// checking the reading moves with it. The previous version measured one click track and
+// asserted only that the answer was outside the band 0.08..0.42 -- which `return 0`
+// satisfies, so a BeatPhase that never searched at all passed the whole package (verified
+// by mutation). One state cannot separate an instrument from a constant; this is the
+// second axis check_instruments.py now enforces.
+//
+// The known answer is constructed, not read back: silence of a known length is prepended
+// to a click track, so the beat is displaced by exactly that much and the reading must
+// follow it one-for-one.
+//
+// MEASURED AND PINNED, rather than assumed away: the reading sits a CONSTANT ~27 ms early.
+// That is the group delay of the spectral-flux envelope it is handed -- OnsetEnvelope hops
+// in 512-sample frames, and the flux peak does not land on the transient sample. The bias
+// is a property worth having in writing; what must not drift is the SLOPE, which is 1.
+func TestBeatPhaseFollowsAnOffsetItWasNeverTold(t *testing.T) {
+	const beatSec = 0.5
 	notes := make([]float64, 64)
 	for i := range notes {
 		notes[i] = 90
@@ -183,9 +199,50 @@ func TestBeatPhaseFindsTheFirstClick(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Clicks are on steps 0,4,8..., i.e. exactly on the beat, so the phase is ~0.
-	ph := BeatPhase(OnsetEnvelope(s, rate), rate, 0.5)
-	if ph > 0.08 && ph < 0.42 {
-		t.Errorf("phase %.3f s is neither near 0 nor near a beat boundary", ph)
+	// The search steps by a quarter of a 512-sample hop, so no reading can be finer.
+	step := 0.25 * 512 / float64(rate)
+
+	// Wrap a phase difference into (-beatSec/2, +beatSec/2]: a phase is modular, and
+	// "0.4731 against a prepend of 0" is -0.027, not +0.473.
+	wrap := func(d float64) float64 {
+		for d > beatSec/2 {
+			d -= beatSec
+		}
+		for d <= -beatSec/2 {
+			d += beatSec
+		}
+		return d
+	}
+
+	var biases []float64
+	for _, offSec := range []float64{0, 0.05, 0.125, 0.25, 0.375} {
+		pad := make([]float64, int(offSec*float64(rate)))
+		got := BeatPhase(OnsetEnvelope(append(pad, s...), rate), rate, beatSec)
+		bias := wrap(got - offSec)
+		biases = append(biases, bias)
+		// Slope 1: displacing the beat by offSec displaces the reading by offSec. This is
+		// the clause `return 0` cannot satisfy -- at offSec 0.05 it reports a bias of
+		// -0.05 while the others report -0.027.
+		if math.Abs(bias) > 0.04 {
+			t.Errorf("prepending %.3f s of silence moved the reading to %.4f s, a residual "+
+				"of %+.4f s; the reading is supposed to follow the beat one-for-one",
+				offSec, got, bias)
+		}
+	}
+	// The bias is constant, not merely small: spread within two search steps. A reading
+	// that wandered by a tenth of a beat while staying under the bound above would still
+	// be useless for hanging a sixteenth grid on.
+	lo, hi := biases[0], biases[0]
+	for _, b := range biases {
+		lo, hi = math.Min(lo, b), math.Max(hi, b)
+	}
+	if hi-lo > 2*step {
+		t.Errorf("bias ranged %.4f..%.4f s (spread %.4f) across five offsets; more than "+
+			"two search steps (%.4f s) means it is not a fixed group delay", lo, hi, hi-lo, 2*step)
+	}
+	if hi > 0 || lo < -0.04 {
+		t.Errorf("bias %.4f..%.4f s is outside the measured envelope; BeatPhase reads ~27 ms "+
+			"EARLY because the flux peak trails the transient, and a sign flip there would "+
+			"put every note on the wrong side of its step", lo, hi)
 	}
 }
