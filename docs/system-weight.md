@@ -125,19 +125,49 @@ walks `harness/` can see it, and it was removed when the measurement was done.
 Run before reporting a session complete:
 
 ```sh
-# 1. Worktrees — anything but the two real checkouts is debris.
-git -C harness worktree list
-git -C roms worktree list
-git -C sandbox worktree list
+# Run from the umbrella root.
+
+# 1. Worktrees — anything but the one real checkout per repo is debris.
+for r in harness roms sandbox; do echo "== $r"; git -C $r worktree list; done
 
 # 2. Untracked files, per repo. Look for stray .bin, scratch _test.go, agent leftovers.
 for r in harness roms sandbox; do echo "== $r"; git -C $r status --porcelain; done
 
-# 3. Every repository. Three today -- but count them, do not recite them (see below).
+# 3. ENUMERATE the repositories — do not recite a number (see below).
+#    NOTE THE ABSENCE OF `2>/dev/null` ON BOTH LINES. It is load-bearing.
+find . -maxdepth 2 -name .git -type d          # inside the umbrella
+find .. -maxdepth 2 -name .git -type d         # SIBLINGS — this is where the fourth one was
+
+# 4. Each repository's head, and what is not on a remote.
+#    "no upstream" is a THIRD state, not zero: sandbox is local-only by design, so
+#    nothing but this disk holds it. Printing `fatal:` on every run would train the
+#    reader to ignore step 4, so the state is named instead.
 for r in harness roms sandbox; do
-  echo "== $r  $(git -C $r log --oneline -1)  unpushed=$(git -C $r log --oneline @{u}.. 2>/dev/null | wc -l)"
+  if git -C $r rev-parse --abbrev-ref @{u} >/dev/null 2>&1; then
+    n="unpushed=$(git -C $r log --oneline @{u}.. | wc -l | tr -d ' ')"
+  else
+    n="NO UPSTREAM — this disk is the only copy"
+  fi
+  echo "== $r  $(git -C $r log --oneline -1)  $n"
 done
 ```
+
+**Why step 3 must not swallow stderr, learned by shipping it wrong earlier the same day.** The
+first version of this checklist ran `find /Users/shinji/Documents/2D -name .git 2>/dev/null`. On
+this machine macOS refuses to list that directory — and `find` prints the refusal to stderr **and
+exits 0**. With stderr discarded the step printed an empty list under a successful exit, which
+reads exactly like "there are no other repositories". A step that cannot tell *nothing is there*
+from *I was not allowed to look* is worse than reciting a number, because it looks like evidence.
+
+Run without the redirect, the sibling sweep fails loudly (`Operation not permitted`, exit 1),
+which is the correct outcome: it reports that it could not check. **Treat that refusal as an
+unfinished step, not a pass.** To make it actually run, grant the terminal Full Disk Access in
+System Settings → Privacy & Security. The umbrella-internal sweep works either way and finds the
+three.
+
+And the sibling line is the one that matters: `260811_cover-demos` lived **beside** the umbrella,
+not inside it, so an enumeration that only descends from here would have missed it exactly as the
+handoffs did.
 
 ### Count the repositories, do not recite them
 

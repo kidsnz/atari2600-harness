@@ -37,6 +37,21 @@ versions follow [Semantic Versioning](https://semver.org/).
   same day. Consequently the parked sweep optimisation is no longer optional-looking: it is the
   first place to come back to.
 
+### Fixed
+- **The shutdown checklist shipped with a step that could not fail.** Step 3 enumerated the
+  repositories with `find /Users/.../2D -name .git 2>/dev/null`. On this machine macOS refuses
+  to list that directory, and `find` prints the refusal to **stderr while exiting 0** — so with
+  stderr discarded the step printed an empty list under a successful exit, indistinguishable
+  from "there are no other repositories". A step that cannot tell *nothing is there* from *I was
+  not allowed to look* is worse than the recited number it replaced, because it looks like
+  evidence. Caught by running the checklist on the session that wrote it.
+  - Fixed by dropping the redirect, so the sweep fails loudly (`Operation not permitted`,
+    exit 1) and the refusal is read as an unfinished step. The umbrella-internal sweep is
+    separate and works regardless.
+  - **The sibling line is the one that mattered**: `260811_cover-demos` lived BESIDE the
+    umbrella, so an enumeration that only descends from the umbrella root would have missed it
+    exactly as every handoff did.
+
 ### Added
 - **`docs/gate-ledger.md` — what each gate has actually caught, and one of them was running
   nowhere.** Six `check_*.py` gates existed and nothing recorded a single defect any of them
