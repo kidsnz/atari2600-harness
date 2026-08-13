@@ -21,7 +21,7 @@ Measured from the GitHub Actions API, per step, on the runs at `3f148ad` (2026-0
 | regression scenarios | 55 s | 64 s |
 | CPU conformance (Klaus + Tom-Harte) | 3 s | 4 s |
 | the five gates | 3 s | 1 s |
-| **job total** | **446 s (7m26)** | **624 s (10m24)** |
+| **job total** | **446 s (7m26)** | **624 s (10m24)** — but see the range below |
 
 **82% of CI is one step**, and that step took +50% in a single session. Nothing else moved.
 
@@ -54,7 +54,15 @@ package, artefacts removed:
 
 ### The ceiling
 
-**15 minutes of job wall-clock.** Currently 10m24, so there is 4.5 minutes of headroom.
+**15 minutes of job wall-clock.** Observed range **10m23 - 13m15**, so the headroom is about
+**1m45 at the worst run seen**, not the 4.5 minutes this line claimed for its first few hours.
+
+That claim was a **single sample, and the fastest one** — the same defect
+`check_instruments.py` was extended to forbid on the very day this page was written. Measured
+properly over the five runs since the growth landed, on essentially the same workload: 623 s,
+623 s, 721 s, 790 s, 795 s. The spread is runner variance, not code — the run at 790 s differs
+from the run at 624 s by two sub-second calibrations. **A CI budget has to be set against the
+distribution, because the run that breaches the ceiling is the slow one.**
 
 15 was chosen against the only constraint that binds: a push-to-green loop long enough that the
 author stops waiting and context-switches is a loop that stops being run before pushing. GitHub's
@@ -95,8 +103,9 @@ It was reverted anyway, on two findings:
   mode is a silently short sweep is the wrong change to make to the test whose entire reason for
   existing is that a short sweep once passed for a year.
 
-There was no pressure to ship it: at 10m24 against a 15-minute ceiling there is 4.5 minutes of
-headroom, so the honest position is that **no cut is needed yet**. Whoever picks this up needs a
+There was no pressure to ship it at the time. That has narrowed since: against the measured
+10m23-13m15 range the headroom is ~1m45, so **the sweep is the first place to come back to** —
+safely this time. Whoever picks this up needs a
 `warmupStable`/`buildAudioROM` pair that return errors instead of touching `t`, and a located
 explanation of the race — in that order.
 
@@ -124,22 +133,28 @@ git -C sandbox worktree list
 # 2. Untracked files, per repo. Look for stray .bin, scratch _test.go, agent leftovers.
 for r in harness roms sandbox; do echo "== $r"; git -C $r status --porcelain; done
 
-# 3. All FOUR repositories, not three (see below).
-for r in harness roms sandbox ../260811_cover-demos; do
+# 3. Every repository. Three today -- but count them, do not recite them (see below).
+for r in harness roms sandbox; do
   echo "== $r  $(git -C $r log --oneline -1)  unpushed=$(git -C $r log --oneline @{u}.. 2>/dev/null | wc -l)"
 done
 ```
 
-### There are four repositories, not three
+### Count the repositories, do not recite them
 
-Every handoff in `STATUS.md` counts `harness` / `roms` / `sandbox`. There is a fourth:
-**`../260811_cover-demos`** (created 2026-08-11, one commit, pushed to
-`github.com/kidsnz/260811_cover-demos`) — a single self-contained page carrying every build of the
-jacket piece as base64 with a javatari.js emulator, kept out of search results by `robots.txt` and
-a `noindex` tag.
+For two days there were **four**, and every handoff said three. `260811_cover-demos` (created
+2026-08-11) published a browser-playable page of the technojacket builds at
+`kidsnz.github.io/260811_cover-demos/`, and it appeared in no board, no index and no memory file
+until it was found by accident on 2026-08-13 — while being the only artefact here with an
+audience.
 
-It is **published**, which makes it the one artefact here with an audience, and it appeared in no
-board, no index and no memory file until it was found by accident on 2026-08-13. Its `index.html`
-is *generated* from `roms/technojacket/tools/mkpage.py` and embeds the ROMs at generation time, so
-rebuilding a ROM does not update the page — the page is a snapshot, and a stale one is
-indistinguishable from a current one to anybody visiting the URL.
+**It is three again as of 2026-08-13**: the page had served its purpose, and the repository was
+retired. The page itself could not be rebuilt — `roms/technojacket/tools/mkpage.py` embeds the ROMs at generation
+time, and three ROMs had landed since — so it is archived at
+`roms/technojacket/_archive/2026-08-11-cover-demos/` with the exact served bytes, a `git bundle`
+of its history, and a `PROVENANCE.md` carrying the restore procedure. The bytes were nearly lost
+to a subtlety worth remembering: the identical local copy at `roms/technojacket/tools/preview.html` is **gitignored
+on purpose**, so it had never entered any git history.
+
+The lesson is not the number. It is that **the shutdown sweep must enumerate what exists rather
+than repeat a figure**, because the figure was wrong for two days and the wrong one was written
+in five places by the session that first measured it — including this page.

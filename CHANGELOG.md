@@ -8,6 +8,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **The fourth repository is retired, and the count in the shutdown sweep is replaced by an
+  enumeration.** `260811_cover-demos` published a browser-playable page of the technojacket
+  builds and had served its purpose; the repository is being taken down. The page **cannot be
+  rebuilt** — `tools/mkpage.py` embeds the ROMs at generation time and three ROMs landed after
+  it was made — so it is archived in the roms repo at
+  `technojacket/_archive/2026-08-11-cover-demos/` with the exact served bytes (cmp-verified),
+  the retired repo's README and robots.txt, a `git bundle --all` of its one-commit history
+  (verified by cloning it back), and a `PROVENANCE.md` holding the restore procedure.
+  - **The bytes were nearly lost to a deliberate `.gitignore`.** `tools/preview.html` is
+    byte-identical to the published page, and lines 31-32 exclude it and `tools/index.html`
+    from the roms repo on purpose. Those bytes had therefore never entered any git history, so
+    deleting the cover-demos repository would have left the only copy of a PUBLISHED artifact
+    untracked on one machine. The archive lives outside `tools/`, where the ignore rules do
+    not reach; checked with `git check-ignore` before staging.
+  - The checklist no longer says "all FOUR repositories". **It enumerates.** The figure was
+    wrong for two days, and the session that first measured it wrote the wrong one into five
+    places — including the page that was correcting the problem.
+- **The CI headroom figure was a single sample, and the fastest one.** `docs/system-weight.md`
+  claimed "currently 10m24, 4.5 minutes of headroom" against its 15-minute ceiling. Measured
+  over the five runs since the growth landed, on essentially the same workload: **623, 623,
+  721, 790, 795 s** — a 10m23-13m15 range, so the real headroom is **~1m45 at the worst run
+  seen**. The spread is runner variance and not code: the 790 s run differs from the 624 s run
+  by two sub-second calibrations. **A CI budget has to be set against the distribution, because
+  the run that breaches the ceiling is the slow one** — and taking one sample, at the
+  favourable end, is precisely the defect `check_instruments.py` was extended to forbid on the
+  same day. Consequently the parked sweep optimisation is no longer optional-looking: it is the
+  first place to come back to.
+
 ### Added
 - **`docs/gate-ledger.md` — what each gate has actually caught, and one of them was running
   nowhere.** Six `check_*.py` gates existed and nothing recorded a single defect any of them

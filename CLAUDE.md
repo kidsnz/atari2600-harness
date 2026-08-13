@@ -209,7 +209,7 @@ round trip. Also return `png_path` in JSON.
 | the visual CEILING — best the hardware could do for a picture (the denominator `vismatch` lacks) | `docs/visual-ceiling.md` |
 | provenance map (every technique/rule → its origin) | `docs/provenance.md` (gen: `check_provenance.py --list`) |
 | **what each `check_*.py` gate has actually caught** — catches vs compliance vs self-inflicted, per gate, with cost. Read before adding a gate or arguing one is worth keeping; `check_wiring.py` fails if a gate has no row or if a row's "Runs in" disagrees with ci.yml / pre-push | `docs/gate-ledger.md` |
-| **the CI wall-clock budget (15 min, currently 10m24) and the end-of-session debris sweep** — what to do when CI exceeds the ceiling, and why a measurement worktree goes OUTSIDE the repo. **There are FOUR repositories, not three** — the checklist names the fourth | `docs/system-weight.md` |
+| **the CI wall-clock budget (15 min; observed 10m23-13m15, so ~1m45 of headroom) and the end-of-session debris sweep** — what to do when CI exceeds the ceiling, why a measurement worktree goes OUTSIDE the repo, and why the sweep must ENUMERATE the repositories rather than recite a count (it was four for two days while every handoff said three) | `docs/system-weight.md` |
 | fundamentals audit (verified vs documented vs unknown, with sources) | `docs/fundamentals-audit.md` |
 | Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
