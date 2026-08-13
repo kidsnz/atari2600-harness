@@ -9,6 +9,104 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`docs/gate-ledger.md` — what each gate has actually caught, and one of them was running
+  nowhere.** Six `check_*.py` gates existed and nothing recorded a single defect any of them
+  had found, so a gate that earns its place could not be told from one that only looks like
+  it does. A gate with no catches is not free: the green tick is read as "this class of
+  defect is covered", which is a claim about the future it has never supported.
+  - **`check_memory.py` was invoked by nothing** — not `ci.yml`, not the pre-push hook. 275
+    lines, three real catches to its name (including one where it caught its own author's
+    silently-failed edit), and its only mention outside its own source was a line in an
+    ARCHIVED status file. Wired into the pre-push hook, which is its only possible home: it
+    reads `~/.claude/.../memory`, which a CI checkout has not got and where it skips.
+  - The ledger separates **catches** (a defect already in the tree) from **compliance** (new
+    work blocked until it complied) from **self-inflicted** (the gate was wrong and cost a
+    session or a red CI). Collapsing those three is how a gate's value gets overstated.
+    Totals: instruments 10, tests 7, provenance 6 (with 3 self-inflicted CI reds), wiring 3,
+    memory 3, **traps 0**.
+  - **`check_traps.py` has never failed on a defect** — every measurement it has reported was
+    a clean corpus. Kept, with the grounds written down rather than left to inference: it
+    costs 0.10 s, it is the only mechanical thing holding three `@rom-write-ok` declarations
+    in place, and it is a PRE-FLIGHT linter whose best case is stopping Claude mid-build,
+    which never reaches a commit and which this ledger therefore cannot see. That is an
+    argument for keeping it and explicitly not a claim that it works.
+  - **All six gates together cost 2.15 s against a 444 s suite**, so none of them is a
+    CI-time problem and none should be cut to save time.
+  - Machine-checked, because a prose table rots: `check_wiring.py` gains a fourth inspection
+    — every `scripts/check_*.py` must have a row, and the row's "Runs in" must match
+    `ci.yml` and `scripts/git-hooks/pre-push`. **Free-text parsing was tried first and was
+    wrong within the hour**: the reason beside check_memory's row reads "absent in CI, skips
+    there", and a bare search for the word matched it, so a gate that runs nowhere near CI
+    was read as claiming CI. The column is now backticked tokens (`ci` / `pre-push` /
+    `none`) — a column a checker has to interpret is one it will interpret wrongly.
+- **`docs/system-weight.md` — a CI wall-clock budget, and the end-of-session debris sweep.**
+  Every gate here measures whether the code is right; nothing measured whether the system was
+  getting heavier faster than it was getting better.
+  - **Ceiling: 15 minutes of job wall-clock**, currently 10m24 (4.5 min of headroom). Chosen
+    against the only constraint that binds — a push-to-green loop long enough that the author
+    context-switches is a loop that stops being run before pushing. When a run exceeds it the
+    next commit must make the heavy thing faster, drop it to `-short` **and record what CI
+    stopped checking**, or raise the ceiling with a reason. Trimming a sweep's point count is
+    explicitly not on the list: this project sweeps 512 pairs because four spot checks passed
+    for a year against a broken instrument.
+  - **82% of CI is one step** (`go build`+`vet`+`test -p 1`), and it took **+50% in a single
+    session** (342 s → 512 s) while nothing else moved.
+  - **The recorded reason for that growth was wrong.** It had been written down as "almost
+    all of it is the audio sweep". Measured per package at the two commits: audio is **54%**
+    of the growth and 18% of the suite. `internal/cyclebound` (+31.2 s), `internal/scenario`
+    (+17.3 s), `behavmatch` and `ceiling` account for the other 46%, none of it audio. The
+    512-point pitch sweep alone is 32% of the growth, so the instinct about that TEST was
+    right and the generalisation to "the audio work" would have aimed the first cut at the
+    wrong half.
+  - **The comparison run needed correcting twice, both times in the house style.** `go test
+    ./...` served most packages from CACHE, so the first per-package timings measured
+    nothing — CI has no cache, so `-count=1` is the only honest local mirror. Then the
+    baseline worktree lacked `bin/p6502step` and the umbrella tree, so `internal/cpudiff` and
+    `internal/ramtrace` SKIPPED there and appeared to have grown 60× — **+56 s of pure
+    artefact in two packages whose diff between the commits is empty**. Both were caught by
+    asking why a number was surprising, not by reading carefully.
+  - **The first attempt at making the heavy thing faster was measured and NOT shipped.** The
+    pitch sweep is 330 independent emulator runs writing only into their own `t.TempDir()`,
+    so none of the shared-`.bin` races that keep CI on `-p 1` apply. Taken concurrently:
+    **41.8 s → 9.7 s, same 330 pairs, agreeing with the serial run pair for pair.** Reverted
+    on two findings. (a) `go test -race` reported a race on the first run and has not
+    reproduced since — 2 further sweep runs plus 15 runs of an 8-emulator probe were clean,
+    and the report was captured through a `tail` that swallowed the WARNING block, so the
+    addresses are unknown. **One positive detection is not cancelled by clean runs**; the
+    detector does not invent happens-before violations. (b) Independently fatal: the loop
+    body calls `t.Fatal` from a worker goroutine via `warmupStable`/`buildAudioROM`, which
+    calls `runtime.Goexit()` and so kills the WORKER, not the test — the deferred
+    `wg.Done()` still fires and the pair is left unmeasured while the aggregation counts it
+    as measured. A concurrency change whose failure mode is a silently short sweep is the
+    wrong change to make to the one test that exists because a short sweep passed for a
+    year. There was no pressure to ship it: 10m24 against a 15-minute ceiling.
+  - **The debris rule, from a measured incident**: a subagent's 34 MB git worktree was left
+    INSIDE the harness directory, and `check_instruments.py` walked it as a second copy of
+    the repository and reported three uncalibrated instruments that do not exist. A
+    measurement worktree goes outside the repo; the baseline run above used one under
+    `/private/tmp` and removed it afterwards.
+  - **There are FOUR repositories, not three.** Every handoff counts harness / roms /
+    sandbox. `../260811_cover-demos` (2026-08-11, pushed, `robots.txt` + `noindex`) carries
+    every build of the jacket piece as base64 beside a javatari.js emulator. It is the one
+    artefact here with an audience, and it appeared in no board, no index and no memory file
+    until it was found by accident. Its `index.html` is GENERATED and embeds the ROMs at
+    generation time, so a stale page is indistinguishable from a current one to a visitor.
+- **`scripts/verify_claims.py` — re-run the command behind a number before believing it.**
+  Twice in one session a subagent reported a measurement that did not survive reproduction:
+  "proved on 73 of 76 regions" (the `pf_deadlines` check had never been executed at all) and
+  "four points agree" (one had been measured; the other three were asserted from the shape of
+  the first). Both were caught by reaching the number again, neither by reading the report
+  carefully, and care does not scale with the number of claims.
+  - Takes a JSON list of `{claim, command, expect}` and reports OK / MISMATCH / UNVERIFIABLE
+    per entry. `expect` holds LITERALS rather than patterns on purpose — `\d+/\d+` would have
+    passed the 73/76 report. An entry with no `command` is UNVERIFIABLE and fails the run,
+    because that is the state both failures were actually in.
+  - **What it does not catch is stated in its own docstring**: re-execution is not
+    independence. If the instrument is wrong, this agrees with it — that is the class that
+    cost a year, and `check_instruments.py` is the mechanical half of it. For a DERIVED
+    number a structurally different second route is still required.
+  - `--selftest` covers all four verdicts. Dogfooded on six of this session's own figures,
+    6/6 reproduced.
 - **`scripts/check_instruments.py` — a measurement that has never been checked against a
   known answer is not a measurement.** `check_tests.py` forbids a test that cannot fail;
   this is the same rule one level down. Every exported function whose first parameter is a
@@ -38,6 +136,40 @@ versions follow [Semantic Versioning](https://semver.org/).
     PER CYCLE are. Mean-interval-times-two is the period whenever a cycle has exactly two
     runs, however lopsided, and is off by (runs/2) when it has more: saw 8, pitfall and buzz
     16, engine 128. The calibration corrected the claim, not just the code.
+  - **SECOND AXIS (2026-08-13): the STATE.** One calibration point is not a calibration, and
+    this project paid for that in three separate places in one session — a Video Olympics
+    reading taken only in the attract screen, a frame measurement taken only at frame 1, a
+    pitch table checked at a single AUDF. Each was true where it was measured and wrong about
+    everything else, so a calibration must now exercise its instrument at **two or more
+    constructed inputs**. Counted mechanically: call sites across all of an instrument's
+    calibrations, where a call inside a `for ... range` body counts as many, so two separate
+    single-call tests (`EstimateTempo` on a click track and on noise) are two states.
+  - **Measured before the rule shipped, so it is neither vacuous nor a flood: 9 of 11
+    instruments already passed, and BOTH of the 2 that did not were hiding a live mutant.**
+    - `DominantFreq` was calibrated only at 8192 samples, a power of two — the one length
+      class for which `sampleRate/nextPow2(len)` and `sampleRate/len` agree. Production is
+      `cmd/audiospec`, which passes an emulator capture: **30,955 samples on a 60-frame run,
+      and never a power of two.** The mutant `float64(n)` → `float64(len(samples))` is EXACT
+      at the calibrated state and reads 249.1 Hz as 263.7 — **100 cents** — at the production
+      one, while passing every test in the package. Now a four-length table, asserted in
+      CENTS: 50 Hz absolute is a quarter of a bin at 4000 and 348 cents at 249, and under the
+      mutant the low case passed on the absolute window while its two neighbours failed.
+    - `BeatPhase` was calibrated on one click track, asserting only that the answer fell
+      outside the band 0.08..0.42 — which **`return 0` satisfies**, so a BeatPhase that never
+      searched at all passed the whole package (verified by mutation). Replaced with a
+      constructed-offset test: silence of known length is prepended, and the reading must
+      follow one-for-one. **A constant ~27 ms EARLY bias is pinned rather than assumed away**
+      — that is the group delay of the 512-sample flux envelope — with the slope, the spread
+      (within two search steps across five offsets) and the sign all asserted.
+    - Recorded and not fixed, because deleting it is a separate decision: **`BeatPhase` has
+      zero production callers.** `cmd/audioingest`'s phase check is `census.go`.
+  - **`--selftest`, and the parse it pins was wrong twice.** Both earlier versions of the
+    state counter mis-read a `for ... range` header containing a composite literal — first
+    `for[^{]*range[^{]*\{` could not see past `[]float64{`, then a bracket-depth scan took
+    the literal's brace because `[]` had already closed. Each reported a four-case
+    table-driven calibration as single-state, and neither was caught by running the gate:
+    it printed a plausible complaint about a real function. The block brace is the LAST `{`
+    on the header line, and seven snippets with known answers now hold that.
 
 ### Fixed
 - **`framegen`: the per-zone calibration's slow convergence was a seed outside the
