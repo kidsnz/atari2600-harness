@@ -115,3 +115,6 @@
 /timinglint
 /trajdiff
 /vismatch
+
+# エンジンが起動のたびに作る空の作業ディレクトリ（roms/sandbox 側では既に除外済みだった）
+/.gopher2600/

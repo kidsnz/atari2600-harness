@@ -26,7 +26,7 @@ real Video Olympics look (4-px digits above the top wall). All digit cells verif
   PF2←(ScRoL),y` — the mid-line rewrite must complete after the beam draws the left half
   (clock >79) and before it reads PF1 for the right half (clock 96).
 - **Font pipeline:** glyphs auto-generated from the hand-painted 8×20 master font
-  (`scripts/pong_font_gen_pf.py`, OR-pair 8px→4px) so one painting feeds both the sprite-font
+  (`sandbox/practice/pong/tools/pong_font_gen_pf.py`, OR-pair 8px→4px) so one painting feeds both the sprite-font
   and playfield-font versions.
 
 ## Verified numbers (PONG)

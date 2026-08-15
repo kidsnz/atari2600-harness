@@ -213,7 +213,7 @@ def check_citations():
             # path may be perfectly good and simply live in a tree this checkout does
             # not contain. Keying on the root prefix is not enough — `scripts/` exists
             # on BOTH sides, and `docs/techniques/asymmetric-pf-score.md` cites the
-            # umbrella's `scripts/pong_font_gen_pf.py`. So when the umbrella is
+            # umbrella's `sandbox/practice/pong/tools/pong_font_gen_pf.py`. So when the umbrella is
             # absent, anything the harness alone cannot resolve is counted and passed
             # over rather than called broken.
             skipped += 1
