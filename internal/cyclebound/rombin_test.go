@@ -21,7 +21,11 @@ var romBins = map[string]string{
 	"Outlaw(2K)":        "../../../sandbox/studies/outlaw/Outlaw.bin",
 	"Combat(2K)":        "../../../sandbox/studies/combat/Combat_1977_Atari.bin",
 	"Stampede(2K)":      "../../../reference/pizza-boy/Samples for Pizza Boy/Stampede.bin",
-	"Frogger(4K)":       "../../../roms/frogger/frogger.bin",
+	// frogger.bin is a BUILD PRODUCT and gitignored (roms/.gitignore), so this entry silently
+	// skips on any machine that has not run `go run ./frogger/gen` + dasm. It is listed anyway
+	// because the corpus is meant to include the flagship; the skip is the honest state, not a
+	// pass. Regenerate with: cd roms && go run ./frogger/gen && dasm frogger/frogger.asm -f3 -ofrogger/frogger.bin
+	"Frogger(4K)": "../../../roms/frogger/frogger.bin",
 }
 
 func loadROMBin(t *testing.T, path string) []byte {

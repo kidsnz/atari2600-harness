@@ -21,6 +21,7 @@ Newly mined threads are auto-classified by (2)/(3). Refine a high-value thread b
 import csv
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HARNESS = os.path.normpath(os.path.join(HERE, ".."))
@@ -177,6 +178,15 @@ def emit(rows, lang):
         by.setdefault(cat, [])
         by[cat].append((r["topic_id"], r["slug"], clean_en(r["title"]),
                         ja_take(r["title"]), feed, r["url"]))
+    # ★2026-08-15: 出力は下で `for c in CATORDER` を回すだけなので、setdefault で受け入れた
+    # のに CATORDER に無いカテゴリは **一行も出ず、警告も出ない**＝採掘したスレが黙って消える。
+    # 落とす件数を数えて印字する（0でも「0件落とした」と分かるように出す）。
+    dropped = {c: len(v) for c, v in by.items() if c not in CATORDER and v}
+    if dropped:
+        print("WARNING: %d thread(s) in %d category/ies are NOT in CATORDER and will be DROPPED "
+              "from the digest: %s" % (sum(dropped.values()), len(dropped),
+                                       ", ".join("%s(%d)" % (k, v) for k, v in sorted(dropped.items()))),
+              file=sys.stderr)
     L = []
     if lang == "en":
         L.append("# Mining Digest — AtariAge mined threads, indexed to principles & checks\n")

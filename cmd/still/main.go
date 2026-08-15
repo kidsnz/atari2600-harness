@@ -218,15 +218,26 @@ func diffPixels(a, b *image.RGBA) int {
 func main() {
 	single := flag.Bool("single", false, "write only the -hi frame")
 	scale := flag.Int("scale", 2, "integer upscale factor")
-	trigger := flag.Int("trigger", 0x83, "zero-page RAM address whose value selects the frames")
+	// These three used to default to 0x83 / 3 / 6, which is TECHNOJACKET's kick-envelope index
+	// (k0i = $83, roms/technojacket/src/prologue.asm). "Which byte selects the frame" is a
+	// property of the ROM being rendered and cannot have a default; the old one silently picked
+	// another work's variable, and the tool only notices when that byte never moves -- not when
+	// it moves and means something else. Required since 2026-08-15 (unless -frame is used).
+	trigger := flag.Int("trigger", -1, "zero-page RAM address whose value selects the frames (REQUIRED unless -frame; technojacket's is 0x83)")
 	lo := flag.Int("lo", 3, "the right-hand frame is the first with RAM[trigger] < this")
 	hi := flag.Int("hi", 6, "the left-hand frame is the first with RAM[trigger] >= this")
 	frame := flag.Int("frame", 0, "render exactly this frame instead of choosing one by -trigger, "+
 		"for a ROM with no moving state; a blank frame is refused, not written")
 	flag.Parse()
-	if flag.NArg() != 2 || *trigger < 0x80 || *trigger > 0xFF || *frame < 0 {
-		fmt.Fprintln(os.Stderr, "usage: still [-single] [-scale N] [-trigger 0x83] [-lo N] [-hi N] <rom.bin> <out.png>")
+	usingFrame := *frame > 0
+	if flag.NArg() != 2 || *frame < 0 || (!usingFrame && (*trigger < 0x80 || *trigger > 0xFF)) ||
+		(usingFrame && *trigger != -1 && (*trigger < 0x80 || *trigger > 0xFF)) {
+		fmt.Fprintln(os.Stderr, "usage: still -trigger 0xNN [-lo N] [-hi N] [-single] [-scale N] <rom.bin> <out.png>")
 		fmt.Fprintln(os.Stderr, "       still -frame N [-scale N] <rom.bin> <out.png>")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "-trigger has NO default. It names the zero-page byte whose value selects the")
+		fmt.Fprintln(os.Stderr, "frame, which is a property of the ROM. It defaulted to 0x83 until 2026-08-15;")
+		fmt.Fprintln(os.Stderr, "that is technojacket's kick-envelope index and means nothing in another ROM.")
 		os.Exit(2)
 	}
 	rom, outPath := flag.Arg(0), flag.Arg(1)

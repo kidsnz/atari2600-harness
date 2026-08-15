@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 )
@@ -10,8 +12,12 @@ import (
 func main() {
 	for _, rom := range os.Args[1:] {
 		e, _ := emu.New("NTSC")
-		if err := e.LoadROM(rom); err != nil { panic(err) }
-		for i := 0; i < 40; i++ { e.StepFrame() }
+		if err := e.LoadROM(rom); err != nil {
+			panic(err)
+		}
+		for i := 0; i < 40; i++ {
+			e.StepFrame()
+		}
 		base, _ := e.Snapshot()
 		lines := map[int]int{}
 		moved := 0
@@ -22,12 +28,14 @@ func main() {
 				img, _ := e.Snapshot()
 				for y := 40; y < 160; y++ {
 					for x := 0; x < 160; x += 2 {
-						if img.RGBAAt(x, y) != base.RGBAAt(x, y) { moved++ }
+						if img.RGBAAt(x, y) != base.RGBAAt(x, y) {
+							moved++
+						}
 					}
 				}
 			}
 		}
 		fmt.Printf("%-20s フレーム行数 %v / 60フレーム後に動いたpx %d\n",
-			rom[len("../roms/technojacket/bin/"):len(rom)-4], lines, moved)
+			strings.TrimSuffix(filepath.Base(rom), ".bin"), lines, moved)
 	}
 }

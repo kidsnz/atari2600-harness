@@ -51,9 +51,9 @@ func main() {
 	diffOut := flag.String("diff", "", "write an object-attribution overlay PNG here (green=match, red=target-only, blue=mine-only)")
 	scale := flag.Int("scale", 4, "overlay upscale factor")
 	genpf := flag.Bool("genpf", false, "GENERATE mode: measure the target's cactus/PF bands and emit paste-ready CacLTbl/CacRTbl + CACTOP/CACBOT (no -mine needed)")
-	region := flag.String("region", "122-185", "genpf: target scanline range of the PF element, LO-HI")
-	arenaTop := flag.Int("arena-top", 74, "genpf: absolute scanline of arena line 0 (scanline→arena-line offset)")
-	tableLen := flag.Int("table-len", 112, "genpf: CacLTbl/CacRTbl length in arena lines")
+	region := flag.String("region", "", "genpf: target scanline range of the PF element, LO-HI (REQUIRED; there is no sensible default -- the old one, 122-185, was Outlaw's arena)")
+	arenaTop := flag.Int("arena-top", -1, "genpf: absolute scanline of arena line 0 (scanline→arena-line offset). REQUIRED with -genpf; 74 was Outlaw's")
+	tableLen := flag.Int("table-len", 0, "genpf: emitted table length in arena lines. REQUIRED with -genpf; 112 was Outlaw's")
 	scenName := flag.String("scenario", "", "drive BOTH ROMs through this behavmatch scenario's input script, then compare the picture — a single-frame diff is exact for a static playfield and misleading for anything that moves, because two ROMs at different points in their game read as a difference in the object")
 	tWarmup := flag.Int("target-warmup", 0, "matched state: frames to run the TARGET with no input before the scenario (skip a title screen). Deliberately separate from -target-frames: reusing the capture-frame counts here gave the two sides different warmups and reported a ROM as differing from itself")
 	mWarmup := flag.Int("mine-warmup", 0, "matched state: frames to run YOUR build with no input before the scenario")
@@ -78,6 +78,30 @@ func main() {
 
 	// --- GENERATE mode: emit the correct PF tables from the target, one-shot. ---
 	if *genpf {
+		// -region / -arena-top / -table-len used to default to 122-185 / 74 / 112, which are
+		// OUTLAW's arena. CLAUDE.md documents this flag as emitting "the correct" tables from
+		// "the target's PF bands" and never mentioned the defaults, so a new work run through
+		// -genpf got paste-ready tables measured from another game's scanlines -- correct-looking
+		// and wrong, which is this project's worst failure shape. Required now: a missing
+		// geometry is a question the tool cannot answer, not a value it can assume.
+		var missing []string
+		if *region == "" {
+			missing = append(missing, "-region LO-HI")
+		}
+		if *arenaTop < 0 {
+			missing = append(missing, "-arena-top N")
+		}
+		if *tableLen <= 0 {
+			missing = append(missing, "-table-len N")
+		}
+		if len(missing) > 0 {
+			fmt.Fprintf(os.Stderr, "-genpf needs the target's geometry, and it has no default: %s\n"+
+				"  Measure them from the target first (read_row / decompose_row / beamtrace).\n"+
+				"  For reference, Outlaw's are -region 122-185 -arena-top 74 -table-len 112;\n"+
+				"  they were the built-in defaults until 2026-08-15 and are wrong for anything else.\n",
+				strings.Join(missing, ", "))
+			os.Exit(2)
+		}
 		tg, err := vismatch.ExtractROM(tBin, *spec, *tFrames, *tReset)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "target:", err)
