@@ -25,8 +25,9 @@ unmodified), not a fixed pixel size.
 Checklist for grade A:
 1. Stella → Options → Video & Audio → **TV effects: Disabled** (phosphor/blending shift colors).
 2. Press **F12** in-game; find the PNG via Options → Snapshot settings (save directory shown there).
-   Tip: point the snapshot directory at the project's **`inbox/`** folder (next to `harness/`).
-3. Drop the file in **`260609_atari2600-dev/inbox/`** as-is — no cropping, no resizing, no
+   Tip: point the snapshot directory anywhere under `~/Documents` and give the path — the tools take
+   a directory argument.
+3. Leave the file where it is and give its path — as-is, no cropping, no resizing, no
    format conversion. That folder is the standing hand-off point ("put it here and Claude sees it").
 
 ## What the analyzer reports
@@ -60,7 +61,7 @@ Checklist for grade A:
 If you have the **ROM file**, skip screenshots entirely:
 `go run ./cmd/fieldtest -rom game.bin [-warmup N -shots K -gap G -press right@60,fire@90]`
 runs it in Gopher2600, captures K frames, and produces the full multi-frame analysis
-(overlay/report.txt/report.json) in one shot. Drop ROMs into `inbox/` (it belongs to no repo —
+(overlay/report.txt/report.json) in one shot. Point `-inbox` at whatever directory holds the ROMs (
 nothing gets committed). F12 screenshots remain the fallback when only a running Stella exists.
 
 ## Multi-frame separation (M8/M9 — the general solution)
@@ -81,7 +82,7 @@ the same scene instead** (`analyze_image {paths: [...]}` / `cmd/ingest -in a.png
   promise); `unresolved_share` reports pixels that never settled (background animation).
 
 **Contract v2:** for scenes with movement, press F12 two-three times in a row (don't resize the
-window between shots) and drop the sequence into `inbox/`. N=3 resolves ties that N=2 cannot.
+window between shots) and give the directory holding the sequence. N=3 resolves ties that N=2 cannot.
 Known limits: a sprite that never moves melts into the static layer (space the shots out);
 *animated playfield* (e.g. scrolling starfields) lands in the dynamic layer as objects — true
 to the pixels, noisy in semantics.

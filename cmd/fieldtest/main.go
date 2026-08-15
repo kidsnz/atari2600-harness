@@ -3,7 +3,8 @@
 //
 //	go run ./cmd/fieldtest -rom game.bin [-warmup N -shots K -gap G] [-auto]
 //	                        [-press right@60,fire@90,reset@30] [-out dir]
-//	go run ./cmd/fieldtest -inbox ../inbox       ; 整理モード（*.bin → 各フォルダ＋解析一式）
+//	go run ./cmd/fieldtest -inbox <dir>          ; 整理モード（*.bin → 各フォルダ＋解析一式）
+//	  ※ 傘の inbox/ は 2026-08-15 に廃止。Documents 配下ならどこでも直接指定できる
 //
 // -auto: 動的オブジェクトが採れるまで RESET → fire → fire+右入力保持 の順に試す
 // （タイトル画面・アトラクト・待機キャラ対策。何で開始できたかを報告）。
