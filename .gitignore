@@ -68,3 +68,50 @@
 
 # agent worktrees (created by background subagents; never part of the repo)
 .claude/
+
+# ★2026-08-15: リポジトリ直下に出たビルド生成物を無視する。
+# それまで /bin/ しか除外しておらず、`go build -o <name> ./cmd/<name>` が直下に吐いた
+# バイナリは追跡対象のままだった。結果 refdiff(12M)・fieldtest(12M)・jingle(2.8M) が git に入り、
+# refdiff は docs コミット(450367f)に巻き込まれた事故だった。
+#
+# 一度 `/*` + `!/*/` という広い形で書いて失敗している：それは Gopher2600(1.3G の埋め込みリポ)・
+# bin/(109M)・*.ja.md(ローカル読み物) の既存の除外まで解除し、`git add -A` が全部を index に入れた。
+# 広いルールは、自分が知らない除外まで巻き込む。だから cmd/ の名前を列挙する狭い形にする。
+# 新しい cmd/<name> を足したらここにも足すこと（列挙漏れは事故に戻る）。
+/audioingest
+/audiospec
+/beamtrace
+/behavmatch
+/calibrate
+/ceiling
+/cover
+/cpucert
+/cpucheck
+/cyclebound
+/dissect
+/drumfit
+/fieldtest
+/framegen
+/framesim
+/guidedfuzz
+/harness
+/ingest
+/jingle
+/metamorphic
+/mine-invariants
+/motion
+/mutate
+/oraclevote
+/pcmcheck
+/probe
+/rammap
+/ramtrace
+/refdiff
+/scenario
+/spritepos
+/statecov
+/stellacheck
+/still
+/timinglint
+/trajdiff
+/vismatch
