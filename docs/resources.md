@@ -69,7 +69,14 @@ Settled values that can be dropped directly into CLAUDE.md / `docs/2600-constant
 
 ### ⭐ Horizontal position (the antidote to failure #1) = NEW, most critical
 - **Formula:** missile/ball `X = 3N − 55` (N = CPU cycles from the sync point to the RESPx strobe),
-  **player is +1px → `X = 3N − 54`**. Leftmost X = 2 (player 3).
+  **player is +1px → `X = 3N − 54`**.
+  ⚠️ **There is NO leftmost-X constant.** This line used to end "Leftmost X = 2 (player 3)", and
+  CLAUDE.md retracted that on 2026-07-30 while this file — which CLAUDE.md names as the SOURCE of its
+  constants — kept asserting it, so following the routing table landed the reader on the retracted
+  claim (found 2026-08-15). Re-measured on `litmus_pos` with `cmd/calibrate`: a PLAYER draws from
+  clock **2** at `DELAY=12`, then 3 at 13 and 14. The leftmost position is a property of the
+  positioning code, not of the machine — the offset constant includes the kernel's own prologue.
+  Measure it for the kernel you have.
 - **What the offset is:** RESPx is a strobe; after the store completes there is **about a 5-color-clock
   delay** before the TIA starts drawing. This plus the **68-clock HBLANK** is why "`160 − P0 − width`
   doesn't hold." A strobe during HBLANK places the object at the far left.

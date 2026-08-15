@@ -26,7 +26,7 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 - ⬜ SECAM; real-game variable line counts (we already treat 262 as a range).
 
 ## 2. Horizontal positioning & HMOVE
-- ✅ X(N)=3N−55 (missile/ball), player +1px; slope 3 px/cycle; divide-by-15 coarse; leftmost player 3 /
+- ✅ X(N)=3N−55 (missile/ball), player +1px; slope 3 px/cycle; divide-by-15 coarse; **no leftmost-X constant** (retracted 2026-07-30; it is kernel-specific) /
   missile 2; all 16 HMOVE nibbles (+7..−8, positive = left) right after WSYNC.
 - ⚠️ `reference/docs_atari/cycle_counting_guide.html` uses `X=(CYCLES−20)*3` and "round to 15" — both are
   tutorial approximations. **Never cite it for positioning**; our calibrated formula is more precise.

@@ -32,7 +32,7 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 ## Horizontal position
 | Behavior | ROM | Evidence |
 |---|---|---|
-| Player coarse position (3 px/CPU-cycle, 15 px/loop, 160 wrap, leftmost X=3) | `litmus_pos` | `ResetPixel = 15·DELAY − 18`, slope 3.0000 (auto via `cmd/calibrate`) |
+| Player coarse position (3 px/CPU-cycle, 15 px/loop, 160 wrap; **no leftmost-X constant** — retracted 2026-07-30, see CLAUDE.md) | `litmus_pos` | `ResetPixel = 15·DELAY − 18`, slope 3.0000 (auto via `cmd/calibrate`) |
 | HMOVE nibble table (all 16, +7…−8, 1 px) | `litmus_hmove` | `HmovedPixel` matches CLAUDE.md for every nibble |
 | Missile / ball position family (`X = 3N − 55`) | `litmus_missile` | `read_tia` missile0=38 / ball=140; `read_row` 1px line at each |
 | Missile clamp X=2 vs player clamp X=3 (1px edge offset) | `litmus_collide_mp` | documented during m0-p0 setup |

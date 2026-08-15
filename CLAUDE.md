@@ -21,6 +21,21 @@ must always hold *only* in a doc — burn them here or into memory.
 > old file that happens to be Japanese, translate NOTHING — add in English if you must add, and leave the
 > rest. `*.ja.md` files are gitignored local reading copies and are none of this rule's business.
 
+## Start of session — read the board first
+
+**Before anything else, read the umbrella's `STATUS.md`** (`../STATUS.md` from here): the single
+board holding open work, what was decided, what is parked, and the handoff from the last session.
+`../OVERVIEW.md` is its companion — the at-a-glance tree, meant to be SHOWN to the author at
+milestones rather than read silently.
+
+This route is written here because nothing else guarantees it. There is no `SessionStart` hook in
+`.claude/settings.json`, and until 2026-08-15 the string "STATUS.md" appeared in this file **zero
+times** — so the rule "a new session reads STATUS.md first" lived only in memory, which is recalled
+by relevance rather than loaded by contract. A rule that fires only when something happens to
+remember it is not a rule. (Both boards are Japanese and live outside every repo, which is why they
+cannot move in here: the language policy above forbids repo artifacts in Japanese, and a translation
+pass is permanently closed.)
+
 ## Invariant premises
 - Goal: build a **verification harness** so Claude can author the Atari 2600 in 6502 assembly accurately
   (not a game-generation app).
@@ -91,10 +106,10 @@ must always hold *only* in a doc — burn them here or into memory.
   **`beam_race`** (v1.102.0, AT-3: advisory object-graphics-vs-beam map, factual/no-verdict; paired with scenario `checks.no_beam_race`) /
   **`spritepos`** (v1.102.0, AT-4: forward sprite-position solver = target X → SetXPos input + decomposition + snippet + emulator-verified achieved X) /
   **`save_state`** / **`restore_state`** (v1.107.0, whole-machine snapshot into a named, reusable slot — CPU/RAM/TIA/RIOT/cart/TV **plus the rendered framebuffer and the cycle counters**; branch-search from one position instead of replaying from load_rom. ~3.9 KB per snapshot. Does NOT rewind the append-only recorders: video/audio digests, coverage, audio capture) /
-  **`defuse`** (v1.114.0, SD-1: which instruction writes which address over ALL paths — the ∀ sibling of watch_ram/read_ram_trace. Per WSYNC region: each address's writer/reader PCs with source locations, plus the whole-program may-write set; targets resolved through the EFFECTIVE address so an indexed store is attributed to the register it reaches and a PHA lands wherever SP points. Also reports UNINITIALISED READS (RAM no path from reset definitely wrote = power-on rubbish on hardware, a defined value in the emulator). Soundness graded against the machine over the WHOLE ROM corpus (128 images, not just the 31 technique kernels): **32655/32655** observed (pc,addr) pairs inside their predicted sets. Declines a bank-switched image) /
-  **`beam_intervals`** (v1.114.0, SD-2: PROVES where each TIA write lands on the scanline over ALL paths — the ∀ sibling of `beamtrace`. Earliest/latest beam clock per write in read_row coordinates, `exact` when the position is path-independent, `crosses_line` when even the scanline depends on the path. A wide window IS the finding. **19143/19143** observed writes inside their proven window, graded over the whole corpus (was 7117 on the technique kernels alone); 106 of 327 exact; mean window 8.7 colour clocks. Nothing else in the 2600 ecosystem computes this) /
+  **`defuse`** (v1.114.0, SD-1: which instruction writes which address over ALL paths — the ∀ sibling of watch_ram/read_ram_trace. Per WSYNC region: each address's writer/reader PCs with source locations, plus the whole-program may-write set; targets resolved through the EFFECTIVE address so an indexed store is attributed to the register it reaches and a PHA lands wherever SP points. Also reports UNINITIALISED READS (RAM no path from reset definitely wrote = power-on rubbish on hardware, a defined value in the emulator). Soundness graded against the machine over the WHOLE ROM corpus (the whole image corpus, not just the 31 technique kernels): **41664/41664** observed (pc,addr) pairs inside their predicted sets (re-measured 2026-08-15; it read 32655 while the corpus grew under it). Declines a bank-switched image) /
+  **`beam_intervals`** (v1.114.0, SD-2: PROVES where each TIA write lands on the scanline over ALL paths — the ∀ sibling of `beamtrace`. Earliest/latest beam clock per write in read_row coordinates, `exact` when the position is path-independent, `crosses_line` when even the scanline depends on the path. A wide window IS the finding. **28541/28541** observed writes inside their proven window, graded over the whole corpus; **252 of 477 exact (53%); mean window 6.4 colour clocks** (all three re-measured 2026-08-15 — the file said 19143 / 106-of-327 / 8.7). Nothing else in the 2600 ecosystem computes this) /
   **`probe_ram_semantics`** (v1.107.0, "what is $XX?" for a ROM with no source: poke each RAM byte with each probe value, diff the frame against the un-poked baseline, classify from how the changed-region centroid travels = x_position / y_position / appearance / none. Non-destructive. Default frames=3 — at 1 a byte that reaches the screen via a multi-frame conversion, e.g. a BCD score, reads as no-effect. Cross-check its answers against `reference/ale-ram-maps/`) /
-  **`visual_ceiling`** (VC-1: the DENOMINATOR for a picture — the smallest error any kernel could reach for a target frame under three STATED constraint sets: C1 playfield-only, 2 colours/line on the 40x4-clock grid / C2 plus one 8-clock object / C3 no column grid (NOT 2600-achievable; it isolates what the grid costs), plus the flat-colour reference. **Read the DELTAS, not the rungs** — C1->C2 answers "what would one sprite buy here", C1->C3 "what is the grid costing" (measured: the grid costs 7.09 rmse on Barnstorming against 3.13 on Chopper Command). A ceiling is a property of (image, constraint set) and never of an image, so it **grades a PICTURE, not a ROM** — scoring a sprite-drawn game under C1 says nothing about its kernel. The palette is derived from the renderer, never transcribed. **No rung is validated by emitting a cartridge**, so no bound here has been shown to fit 76 cycles: C1 rests on one demonstration, C2 on none, C3 is unreachable by design. `docs/visual-ceiling.md`). `step_clock`/`watch(bus)` parked (docs/mcp-tools.md).
+  **`visual_ceiling`** (VC-1: the DENOMINATOR for a picture — the smallest error any kernel could reach for a target frame under three STATED constraint sets: C1 playfield-only, 2 colours/line on the 40x4-clock grid / C2 plus one 8-clock object / C3 no column grid (NOT 2600-achievable; it isolates what the grid costs), plus the flat-colour reference. **Read the DELTAS, not the rungs** — C1->C2 answers "what would one sprite buy here", C1->C3 "what is the grid costing" (measured: the grid costs 7.09 rmse on Barnstorming against 3.13 on Chopper Command). A ceiling is a property of (image, constraint set) and never of an image, so it **grades a PICTURE, not a ROM** — scoring a sprite-drawn game under C1 says nothing about its kernel. The palette is derived from the renderer, never transcribed. **No rung is validated by emitting a cartridge**, so no bound here has been shown to fit 76 cycles: C1 rests on one demonstration, C2 on none, C3 is unreachable by design. `docs/visual-ceiling.md`). `watch(bus)` parked (docs/mcp-tools.md). (`step_clock` is NOT parked — it shipped as **`trace_clocks`** in v1.32.0.)
   
 
 ## Constants you must never get wrong (source: `docs/resources.md`)
@@ -195,7 +210,7 @@ round trip. Also return `png_path` in JSON.
 | 4. pre-flight the kernel against the "emu-passes / HW-fails" traps | `docs/known-traps.md` → `scripts/check_traps.py` |
 | 5. verify — scenario format / litmus position+HMOVE data / what each litmus proves | `docs/scenarios.md` · `docs/litmus-results.md` · `docs/verified-coverage.md` |
 | 5b. how to *know* it's correct — the testing discipline (oracle problem, invariants, property/metamorphic/fuzz/mutation, claim-level demo) + per-build checklist | `docs/testing-playbook.md` |
-| search the whole mined corpus (forum 850 + dev-blogs 152, 3 gaps recorded) → principle/function it feeds | `docs/mining-digest.md` |
+| search the whole mined corpus (forum 862 + dev-blogs 152, 3 gaps recorded) → principle/function it feeds | `docs/mining-digest.md` |
 
 ### ② Reference — look up when needed
 | Task | Read |
@@ -211,7 +226,7 @@ round trip. Also return `png_path` in JSON.
 | **what each `check_*.py` gate has actually caught** — catches vs compliance vs self-inflicted, per gate, with cost. Read before adding a gate or arguing one is worth keeping; `check_wiring.py` fails if a gate has no row or if a row's "Runs in" disagrees with ci.yml / pre-push | `docs/gate-ledger.md` |
 | **the CI wall-clock budget (15 min; observed 10m23-13m15, so ~1m45 of headroom) and the end-of-session debris sweep** — what to do when CI exceeds the ceiling, why a measurement worktree goes OUTSIDE the repo, and why the sweep must ENUMERATE the repositories rather than recite a count (it was four for two days while every handoff said three) | `docs/system-weight.md` |
 | fundamentals audit (verified vs documented vs unknown, with sources) | `docs/fundamentals-audit.md` |
-| Exerciser ROM (integration showcase, 6 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
+| Exerciser ROM (integration showcase, 5 scenes; v1.0.0 keystone) | `docs/exerciser.md` |
 | Stella oracle cross-check usage | `docs/stella-oracle.md` |
 | Image ingestion (screenshot/ROM → TIA data) + input contract v3 | `docs/ingest.md` |
 | RAM maps per ROM (auto-extracted audit) | `docs/ram-maps.md` |
@@ -235,7 +250,7 @@ round trip. Also return `png_path` in JSON.
 ## Repository layout (v0.22.0 spinoff, standalone repo)
 **This repo = the harness base only (general-purpose, reused across all games).** Game ROM artifacts are
 split into a **separate repo**. Dependency is **one-way game → harness** (the harness has zero dependence on
-any game; even its tests reference only its own `roms/litmus`).
+any game; its runtime has none, though 45 of its test files reach into `roms/techniques` and 4 into the sibling `sandbox/` repo (measured 2026-08-15)).
 - Module = `github.com/kidsnz/atari2600-harness`. Gopher2600 via `go.mod` `replace => ./Gopher2600`.
 - Physical layout (under the umbrella folder `260609_atari2600-dev/`, three sibling repos bound by `go.work`):
   ```
@@ -254,7 +269,7 @@ any game; even its tests reference only its own `roms/litmus`).
   `cmd/statecov` (VV-11 TIA state-coverage matrix: which NUSIZ/size/VDEL/PF-mode/bank the test exercised; `internal/statecov`) /
   `cmd/mutate` (mutation testing → kill rate; `-covered` = VV-11 honest kill rate over executed code only) /
   `cmd/framesim` (VV-12 tolerant frame compare: SSIM + perceptual-hash distance, "how wrong & where"; `internal/framesim`) /
-  `cmd/keyfit` + `cmd/mixmatch` + `cmd/drumfit` (**the reproduction side of AUDIO — three questions that were hand-rolled once each and are now tools**. `keyfit`: which KEY can this machine play a figure in? The TIA's pitches are a fixed uneven ladder, so the answer is a property of the hardware and has to be measured before a note is chosen — it found that the source key of a real track was unusable, that D and E are outside 25 cents in EVERY bass octave, and that only three registers hold a four-note line in tune on a single waveform. `mixmatch`: how far is a ROM's spectral BALANCE from the record's, band by band? A 4-bit volume with no EQ means the only lever is which integer goes in which AUDV, and "the melody is too heavy" becomes a search once it reads "+4.9 dB in 200-1200 Hz". `drumfit`: measures a drum across many onsets and fits TIA envelope tables to it, so a kick can be the RECORD's kick — measured, the source's is 14 frames decaying gently at 42-44 Hz where the 2600 idiom is 9 frames sweeping 145 Hz down to 35. **Read drumfit's confidence column**: below ~120 Hz a single frame holds under two cycles and the per-frame pitch track is worthless (it reported 35 -> 18 -> 60 -> 13 Hz, errors past 1400 cents, while the amplitude from the same pass was clean) — pitch needs `-pitchwin 5`. `internal/keyfit`, `internal/mixmatch`, `internal/drumfit`) /
+  `cmd/drumfit` (plus `internal/keyfit` and `internal/mixmatch`, which have NO command and no importer — see the note at the end of this bullet) (**the reproduction side of AUDIO — three questions that were hand-rolled once each and are now tools**. `keyfit`: which KEY can this machine play a figure in? The TIA's pitches are a fixed uneven ladder, so the answer is a property of the hardware and has to be measured before a note is chosen — it found that the source key of a real track was unusable, that D and E are outside 25 cents in EVERY bass octave, and that only three registers hold a four-note line in tune on a single waveform. `mixmatch`: how far is a ROM's spectral BALANCE from the record's, band by band? A 4-bit volume with no EQ means the only lever is which integer goes in which AUDV, and "the melody is too heavy" becomes a search once it reads "+4.9 dB in 200-1200 Hz". `drumfit`: measures a drum across many onsets and fits TIA envelope tables to it, so a kick can be the RECORD's kick — measured, the source's is 14 frames decaying gently at 42-44 Hz where the 2600 idiom is 9 frames sweeping 145 Hz down to 35. **Read drumfit's confidence column**: below ~120 Hz a single frame holds under two cycles and the per-frame pitch track is worthless (it reported 35 -> 18 -> 60 -> 13 Hz, errors past 1400 cents, while the amplitude from the same pass was clean) — pitch needs `-pitchwin 5`. `internal/keyfit`, `internal/mixmatch`, `internal/drumfit`) /
   `cmd/audioingest` (**the audio counterpart of `analyze_image`** — the only path that runs from a RECORDING towards a ROM. Everything else here compares a build against something and therefore needs the build to exist first; this reads a reference track and prints what an author needs to reproduce its BASSLINE: tempo by onset-flux autocorrelation, the sixteenth grid, and the fundamental in each step already mapped to the nearest (AUDC, AUDF) the hardware can make, with the cents error shown. **Read the confidence and cents columns** — low confidence means it could not hear a bass note, and a large cents figure means the TIA cannot play the one that is there; both are findings. Monophonic low band only (<~300 Hz): it recovers a bassline, never an arrangement. 16-bit PCM WAV only, on purpose — convert with ffmpeg rather than let a half-written decoder mis-read a file. Also prints the whole-frame slot grid (a 124 BPM beat is 29.22 frames, so the sixteenths run 7,7,7,8). `internal/audioingest`) /
   `cmd/audioingest -census` (**does this PART exist in the record, and where** — the question that comes before "what notes does it play". Per sixteenth, per section, per band, over the whole file, so a part absent at 0:20 and present at 1:30 is located rather than guessed. Measured on "Bassline": the offbeat hat enters at bar 24 (0:47), full by bar 32 (1:02), and the opening 46 s has none. **Read `EighthLift`, not `Offbeat`** — the offbeat/downbeat ratio assumes the downbeat is where the drum is, and a sidechained mix ducks there, so it reported 4.44 for a section with no offbeat part; the lift compares the "and" against the neighbouring sixteenths, where the ducking cancels. **The phase is checked automatically against the 30-60 Hz drum on every run and the correction is printed** — the first real run was two sixteenths out and produced a coherent, entirely false reading. A near-silent section cannot win a ratio (`AudibleFloor`)) /
   `cmd/audiospec` (VV-13 frequency-domain audio compare: FFT spectral + RMS-envelope distance, separates inverted twins; `internal/audiospec`) /
@@ -295,19 +310,19 @@ Clone Gopher2600 into the **harness/** root (untracked, referenced via `go.mod` 
 - Plumbing check (harness/): `go run ./cmd/probe`. MCP server: `go build -o bin/harness ./cmd/harness`.
 - litmus regression (harness/): `go run ./cmd/scenario roms/litmus/scenarios/*.json` (exit 0 on all pass).
   **★2026-07-30: this command is no longer the gate, because it never was the whole one.** Measured: 95
-  scenario files exist — 57 under `roms/litmus`, 31 under `roms/techniques`, 7 under `roms/exerciser` — and
-  this line named 57 of them. The other 38 (40%) were written and never run by anything. All of them pass,
+  scenario files exist — 71 under `roms/litmus`, 31 under `roms/techniques`, 7 under `roms/exerciser` (109 total, re-counted 2026-08-15) — and
+  this line named 57 of them at the time. The rest were written and never run by anything. All of them pass,
   so nothing was hiding; nothing would have noticed if they stopped. `internal/scenario.TestEveryScenarioRuns`
-  now walks `roms/**/scenarios/*.json` and runs all 95 inside `go test ./...`, discovering the directories
-  rather than listing them, so a fourth one is covered without editing a command line. ~19s.
+  now walks `roms/**/scenarios/*.json` and runs all of them inside `go test ./...`, discovering the directories
+  rather than listing them, so a fourth one is covered without editing a command line. ~44s.
 - Calibration (harness/): `go run ./cmd/calibrate` (sweeps litmus_pos → reproduces slope 3 px/CPU-cycle).
 - ROM generation (roms/): `go run ./<game>/gen [scene]`.
 - ROM regression (roms/): `go run github.com/kidsnz/atari2600-harness/cmd/scenario <game>/scenarios/*.json`.
 
 ## Version control
 For each meaningful change, append to `CHANGELOG.md` (Keep a Changelog) and tag with SemVer. Record decisions
-in the CHANGELOG's "Decisions" section. **When tagging, also bump `Version:` in cmd/harness/main.go**
-(serverInfo) — it has drifted twice; treat it as part of the release checklist.
+in the CHANGELOG's "Decisions" section. **When tagging, also bump `Harness` in `internal/version/version.go`** (the single source that
+`cmd/harness` serverInfo reads; it exists BECAUSE two hand-maintained copies drifted twice) — it has drifted twice; treat it as part of the release checklist.
 
 **Before pushing, mirror CI — don't trust a plain local build+test.** A local `go test` runs under the
 umbrella `go.work` and effectively serially, which HIDES what CI hits. Run CI's actual invocation:
