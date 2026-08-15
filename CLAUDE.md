@@ -1,7 +1,14 @@
 # CLAUDE.md — atari2600-harness
 
-This file is **the only always-on context, auto-loaded in full every session**. Put only "invariant
-premises, settled decisions, constants you must never get wrong, and which doc to read for which task" here.
+This file is **the contract for working inside the harness repository**, and it is the entry point for
+anyone who clones only this repo. Put only "invariant premises, settled decisions, constants you must
+never get wrong, and which doc to read for which task" here.
+
+> It used to open "the only always-on context, auto-loaded in full every session". That was written on
+> 2026-06-09, when this repo WAS the project root; the umbrella was created the next day and this file
+> stayed behind. Measured 2026-08-15: opening at the umbrella, this file is not in context until
+> something under `harness/` is touched. The session-start contract is the umbrella's own `../CLAUDE.md`,
+> which points here. Read that one first.
 Deep dives go in `docs/` (routing table below). Assume anything not here is unread. Don't put facts that
 must always hold *only* in a doc — burn them here or into memory.
 
