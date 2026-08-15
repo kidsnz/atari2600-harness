@@ -43,8 +43,8 @@ FORMAT. A claims file is a JSON list. Each entry:
     }
 
 THE EXAMPLE ABOVE WAS BROKEN FOR A DAY, WHICH IS THE POINT. The first version of this docstring
-showed `cyclebound -pf roms/technojacket/cover.bin`. `cmd/cyclebound` has no `-pf` flag (only
-`-asm` and `-budget`), it takes a .asm rather than a .bin, `roms/technojacket/cover.bin` does not
+showed `cyclebound -pf roms/260809_technojacket/cover.bin`. `cmd/cyclebound` has no `-pf` flag (only
+`-asm` and `-budget`), it takes a .asm rather than a .bin, `roms/260809_technojacket/cover.bin` does not
 exist, and roms/ is a sibling repository that this script's ROOT cannot reach anyway. Four errors
 in one line -- inside the script written because reported numbers had never been run. The example
 here is now one that runs from the harness root; run it before trusting it, which is the whole

@@ -14,7 +14,7 @@ import (
 // straight through. So a ROM with a 77-cycle VBLANK line printed "CERTIFIED" and its
 // scenario went green.
 //
-// Measured 2026-08-09 on roms/technojacket (the atari2600-roms repo): adding two
+// Measured 2026-08-09 on roms/260809_technojacket (the atari2600-roms repo): adding two
 // instructions to a VBLANK line took one path to 77 cycles, five frames in three
 // hundred came out at 263 lines, and ntsc_frame_lines/frame_lines_stable were the only
 // checks that noticed. prove_line_budget — the ∀-over-all-paths gate, the one whose

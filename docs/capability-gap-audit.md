@@ -4222,7 +4222,7 @@ Both reduce to the same arithmetic, and the arithmetic settles it.
 | **one voice** | **29-34** |
 | the DAC write itself (`ldx out`, two linearisation fetches, two `sta AUDVx`) | 17 (+2 on a page cross) |
 
-**Against our own kernel.** `roms/technojacket/src/kernel-cover.asm` costs **57 of 76**
+**Against our own kernel.** `roms/260809_technojacket/src/kernel-cover.asm` costs **57 of 76**
 cycles on its base path, leaving **19**. One voice needs **34**. It does not fit, and no
 rearrangement changes that: the deficit is larger than the whole remaining budget.
 

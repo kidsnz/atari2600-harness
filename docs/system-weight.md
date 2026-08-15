@@ -178,11 +178,11 @@ until it was found by accident on 2026-08-13 — while being the only artefact h
 audience.
 
 **It is three again as of 2026-08-13**: the page had served its purpose, and the repository was
-retired. The page itself could not be rebuilt — `roms/technojacket/tools/mkpage.py` embeds the ROMs at generation
+retired. The page itself could not be rebuilt — `roms/260809_technojacket/tools/mkpage.py` embeds the ROMs at generation
 time, and three ROMs had landed since — so it is archived at
-`roms/technojacket/_archive/2026-08-11-cover-demos/` with the exact served bytes, a `git bundle`
+`roms/260809_technojacket/_archive/2026-08-11-cover-demos/` with the exact served bytes, a `git bundle`
 of its history, and a `PROVENANCE.md` carrying the restore procedure. The bytes were nearly lost
-to a subtlety worth remembering: the identical local copy at `roms/technojacket/tools/preview.html` is **gitignored
+to a subtlety worth remembering: the identical local copy at `roms/260809_technojacket/tools/preview.html` is **gitignored
 on purpose**, so it had never entered any git history.
 
 The lesson is not the number. It is that **the shutdown sweep must enumerate what exists rather

@@ -7,7 +7,7 @@ key being playable and not.
 **Status:** measured on the machine, `roms/litmus/litmus_pitchdither.asm` +
 `internal/audioingest/pitchdither_test.go`. The ROM takes the waveform, the rung pair, the swap
 rate and the scanline of the store from RAM, so one machine produces every case instead of
-several builds assumed to be alike. **In use**: `roms/technojacket` `cover-fsharp` plays
+several builds assumed to be alike. **In use**: `roms/260809_technojacket` `cover-fsharp` plays
 "Bassline" in the record's own key, measured on the ROM at the piece's real seven-frame note
 length -- D2 -0.9 c, E2 -6.0 c, F#2 +14.7 c, where the nearest single registers are -27.1,
 +29.8 and -25.8.

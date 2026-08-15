@@ -219,7 +219,7 @@ func main() {
 	single := flag.Bool("single", false, "write only the -hi frame")
 	scale := flag.Int("scale", 2, "integer upscale factor")
 	// These three used to default to 0x83 / 3 / 6, which is TECHNOJACKET's kick-envelope index
-	// (k0i = $83, roms/technojacket/src/prologue.asm). "Which byte selects the frame" is a
+	// (k0i = $83, roms/260809_technojacket/src/prologue.asm). "Which byte selects the frame" is a
 	// property of the ROM being rendered and cannot have a default; the old one silently picked
 	// another work's variable, and the tool only notices when that byte never moves -- not when
 	// it moves and means something else. Required since 2026-08-15 (unless -frame is used).

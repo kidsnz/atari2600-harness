@@ -564,7 +564,7 @@ versions follow [Semantic Versioning](https://semver.org/).
   cy` and its scenario went green, while the report's own `BlankOver` list held the
   violation. A blank overrun is not a visible tear; it is worse. The WSYNC after it
   waits for the next line and the frame gains a scanline.
-  Found 2026-08-09 on `roms/technojacket`: two instructions added to a VBLANK line took
+  Found 2026-08-09 on `roms/260809_technojacket`: two instructions added to a VBLANK line took
   one path to 77 cycles, 5 frames in 300 came out at 263 lines, and `ntsc_frame_lines` /
   `frame_lines_stable` were the only checks that noticed. The ∀-over-all-paths gate —
   whose whole claim is that it does not need to catch the bad frame in a sample — was
@@ -4741,7 +4741,7 @@ every capability** — is met:
 - **Physical spinoff: split the base into a standalone repo `atari2600-harness` (game ROMs move to a
   separate repo `atari2600-roms`).** Under an umbrella folder `260609_atari2600-dev/`, place `harness/`
   (this repo, history preserved) and `roms/` (new repo) as siblings, bound by `go.work`. Remove
-  `roms/frogger` from the harness (moved to the roms repo); `roms/litmus` stays as the harness's own
+  `roms/260610_frogger` from the harness (moved to the roms repo); `roms/litmus` stays as the harness's own
   verification ROMs. **Eradicate the harness→game dependency:** repoint the scenario/emu unit tests from
   frogger ROMs to litmus, and add a new fixture `roms/litmus/scenarios/golden.json` (+`.golden`).
   `.mcp.json`/`.claude` move up to the umbrella (read at Claude Code's project root). Updated CLAUDE.md's
@@ -4751,12 +4751,12 @@ every capability** — is met:
   (spinoff prep).** `go.mod` and 9 import files replaced. build/vet/test green, all scenarios PASS.
 - **Promoted `internal/playfield` → `pkg/playfield` (spinoff prep).** Go can't import `internal/` across
   modules, so the playfield encoder (universal Atari 2600 knowledge) became a public package. Updated the
-  only cross-package importer (`roms/frogger/gen`). Regenerated all scenes (header-comment-only diffs).
+  only cross-package importer (`roms/260610_frogger/gen`). Regenerated all scenes (header-comment-only diffs).
   Verified green; all scenarios (3 frogger + 3 litmus) PASS.
 - **Documentation freshness audit (spinoff preamble).** Rewrote `README.md` to v0.21.0 reality (old diagram
   = `cmd/probe` + `internal/emu` only → 4 cmds, 6 internals, roms/<game>, 19 MCP tools, gaps A–E all
   closed; fixed the smoke.asm path to `roms/litmus/`). Fixed minor staleness in `improvement-roadmap`,
-  `mcp-tools`, `tool-landscape`, and a stale `cmd/genpf` comment in `roms/frogger/gen/asmgen.go`.
+  `mcp-tools`, `tool-landscape`, and a stale `cmd/genpf` comment in `roms/260610_frogger/gen/asmgen.go`.
 
 ### Added
 - **Improvement roadmap document (`docs/improvement-roadmap.md`).** Prioritizes next moves to make authoring
@@ -4800,7 +4800,7 @@ every capability** — is met:
   rendering (complements the D-1/D-2 logic/timing regression). Implementation: wire Gopher2600's exported
   `digest.Video` into `internal/emu` (`EnableVideoDigest`/`ResetVideoDigest`/`VideoHash`); `internal/scenario`
   enables it for golden scenarios, resets after warmup (deterministic), and compares to `.golden`.
-  `cmd/scenario -update` records/updates the baseline. Sample: `roms/frogger/scenarios/golden.json` +
+  `cmd/scenario -update` records/updates the baseline. Sample: `roms/260610_frogger/scenarios/golden.json` +
   committed `golden.golden`. CLI only; `bin/harness` (MCP) unchanged.
 
 ## [0.18.0] - 2026-06-10
@@ -4814,7 +4814,7 @@ every capability** — is met:
   fields are an error (no swallowing typos). Whole-run measurements with side effects are separated into
   `checks{ntsc_frame_lines, max_line_budget}`. Structure: `internal/scenario` (parse + vocab + Run,
   ROM-agnostic) / `cmd/scenario` (thin CLI). Samples under `roms/litmus/scenarios/` and
-  `roms/frogger/scenarios/` (including `hop` = `up` input drives FrogY 144→128). CLI only; MCP unchanged.
+  `roms/260610_frogger/scenarios/` (including `hop` = `up` input drives FrogY 144→128). CLI only; MCP unchanged.
 
 ## [0.17.0] - 2026-06-10
 ### Added
@@ -4871,7 +4871,7 @@ every capability** — is met:
 ### Changed
 - **Monorepo reorg: root = harness base / `roms/<game>/` = ROMs (spinoff Phase 1).** Demonstrated the
   game→harness one-way dependency and separated without surgery. Moved game-specific kernel generation
-  (`cmd/genpf` + asmgen) into `roms/frogger/gen/` (package main importing `playfield`); litmus under
+  (`cmd/genpf` + asmgen) into `roms/260610_frogger/gen/` (package main importing `playfield`); litmus under
   `roms/litmus/`. All builds/tests green; `litmus_pf` read_row identical after the reorg.
 
 ## [0.10.1] - 2026-06-10
