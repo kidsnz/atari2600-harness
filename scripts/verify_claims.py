@@ -35,12 +35,20 @@ different route is still required, and that is a judgement this script cannot ma
 FORMAT. A claims file is a JSON list. Each entry:
 
     {
-      "id":      "pf-deadlines-coverage",        # short, unique
-      "claim":   "73 of 76 regions meet the playfield deadlines",
-      "command": "go run ./cmd/cyclebound -pf roms/technojacket/cover.bin",
-      "expect":  ["73/76"],                      # literal substrings the output MUST hold
+      "id":      "litmus-pf-late-is-late",       # short, unique
+      "claim":   "pf_late misses 3 of its 10 playfield deadlines",
+      "command": "go run ./cmd/cyclebound -asm roms/litmus/pf_late.asm -budget 76",
+      "expect":  ["\"certified\": true"],        # literal substrings the output MUST hold
       "reject":  ["REFUSED"]                     # optional: substrings it must NOT hold
     }
+
+THE EXAMPLE ABOVE WAS BROKEN FOR A DAY, WHICH IS THE POINT. The first version of this docstring
+showed `cyclebound -pf roms/technojacket/cover.bin`. `cmd/cyclebound` has no `-pf` flag (only
+`-asm` and `-budget`), it takes a .asm rather than a .bin, `roms/technojacket/cover.bin` does not
+exist, and roms/ is a sibling repository that this script's ROOT cannot reach anyway. Four errors
+in one line -- inside the script written because reported numbers had never been run. The example
+here is now one that runs from the harness root; run it before trusting it, which is the whole
+thesis.
 
 `expect` holds LITERALS, not patterns, on purpose. A regex is a place to hide a claim that
 matches anything -- `\\d+/\\d+` would have passed the 73/76 report -- and the whole point is
