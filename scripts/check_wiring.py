@@ -197,6 +197,64 @@ def gate_wiring():
     return out
 
 
+def tool_reachability():
+    """Every internal/ package must be reachable, and every cmd/ must be documented.
+
+    Two ways a tool stops being usable without stopping being green, both measured
+    2026-08-15 on a tree where every cmd/ built and every gate passed:
+
+      UNREACHABLE  internal/keyfit (502 lines) and internal/mixmatch (280) had no cmd/ and
+                   no importer at all, while CLAUDE.md described them as two of the three
+                   pillars of audio reproduction. Nothing could call them. This is the
+                   dead-code-with-numbers family the project already knows: sprite.DigitFont
+                   had its digit 9 upside down for months because its importer count was zero
+                   and nobody could notice.
+      UNDOCUMENTED cmd/ceiling, cmd/ingest, cmd/metamorphic, cmd/mine-invariants, cmd/motion
+                   and cmd/refdiff built and ran but appeared nowhere in CLAUDE.md, the file
+                   that decides what the author reaches for. Worse than missing: present, and
+                   never thought of.
+
+    Both are checkable by grep, which is the whole reason to check them.
+    """
+    out = []
+    ipath = os.path.join(HARNESS, "internal")
+    if os.path.isdir(ipath):
+        for pkg in sorted(os.listdir(ipath)):
+            if not os.path.isdir(os.path.join(ipath, pkg)) or pkg.startswith("_"):
+                continue
+            imp = 'atari2600-harness/internal/%s"' % pkg
+            # Count importers OUTSIDE the package's own directory.
+            reachable = False
+            for f in glob.glob(os.path.join(HARNESS, "**", "*.go"), recursive=True):
+                if os.sep + "Gopher2600" + os.sep in f:
+                    continue
+                if os.path.dirname(f) == os.path.join(ipath, pkg):
+                    continue
+                try:
+                    if imp in open(f, encoding="utf-8", errors="ignore").read():
+                        reachable = True
+                        break
+                except OSError:
+                    pass
+            if not reachable:
+                out.append("internal/%s is imported by nothing — no cmd/, no MCP tool, no other "
+                           "package. It cannot be called, so nothing it computes can be wrong in "
+                           "a way anyone would see. Give it a cmd/, or delete it and say so."
+                           % pkg)
+
+    cpath = os.path.join(HARNESS, "cmd")
+    claude = os.path.join(HARNESS, "CLAUDE.md")
+    if os.path.isdir(cpath) and os.path.isfile(claude):
+        text = open(claude, encoding="utf-8").read()
+        for c in sorted(os.listdir(cpath)):
+            if not os.path.isdir(os.path.join(cpath, c)) or c.startswith("_"):
+                continue
+            if ("cmd/" + c) not in text:
+                out.append("cmd/%s exists and builds, but CLAUDE.md never names it — the author "
+                           "cannot reach for a tool they do not know about." % c)
+    return out
+
+
 def main():
     entry_text = ""
     for e in ENTRYPOINTS:
@@ -245,6 +303,15 @@ def main():
         print("ROM nobody runs makes that sentence false for the reader who trusts it.")
         sys.exit(1)
 
+    tool_problems = tool_reachability()
+    if tool_problems:
+        print("TOOLS THAT CANNOT BE REACHED OR CANNOT BE FOUND:")
+        for t in tool_problems:
+            print("  ✗", t)
+        print("\nA tool nobody can call is the dead-code-with-numbers family; a tool nobody knows")
+        print("about is worse, because it is present and never thought of.")
+        sys.exit(1)
+
     gate_problems = gate_wiring()
     if gate_problems:
         print("GATE LEDGER — docs/gate-ledger.md does not match what actually runs:")
@@ -261,6 +328,12 @@ def main():
     n_gates = len(glob.glob(os.path.join(HARNESS, "scripts", "check_*.py")))
     print(f"gate ledger OK — all {n_gates} gates have a row, and every 'Runs in' matches ci.yml "
           f"and the pre-push hook.")
+    n_int = len([d for d in os.listdir(os.path.join(HARNESS, "internal"))
+                 if os.path.isdir(os.path.join(HARNESS, "internal", d)) and not d.startswith("_")])
+    n_cmd = len([d for d in os.listdir(os.path.join(HARNESS, "cmd"))
+                 if os.path.isdir(os.path.join(HARNESS, "cmd", d)) and not d.startswith("_")])
+    print(f"tools OK — all {n_int} internal packages are imported by something, and all {n_cmd} "
+          f"commands are named in CLAUDE.md.")
 
 
 if __name__ == "__main__":
