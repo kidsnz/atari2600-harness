@@ -1396,6 +1396,7 @@ type BeamtraceIn struct {
 	Scanline *int `json:"scanline,omitempty" jsonschema:"scanline to report (omit = every scanline that has writes)"`
 	Frames   int  `json:"frames,omitempty" jsonschema:"frames to trace (default 1); ADVANCES the emulator"`
 }
+
 // BeamtraceFrame is one traced frame's timeline. Frames are reported separately
 // rather than merged because the interesting kernels differ BETWEEN frames —
 // flicker and multiplexed sprites alternate which object a write feeds, and the
@@ -1577,6 +1578,21 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 	if pngPath == "" {
 		pngPath = filepath.Join(os.TempDir(), "atari2600_screen.png")
 	}
+	// One path per ROM, not one path for the machine. `.mcp.json` sets a single
+	// ATARI2600_SCREEN_PATH, and every Claude Code session launches its own copy of this
+	// server against it — so two sessions working on two different works overwrote each
+	// other's screenshot, and the author saw the wrong picture with nothing to indicate it
+	// (2026-08-15). Everything else about parallel sessions is the assistant's problem to
+	// manage; this one was the author's to notice, which is the wrong way round.
+	//
+	// The suffix is the ROM's own name, so the file is self-labelling and the previewer tab
+	// still auto-reloads for the round trip — it just reloads the work you are looking at.
+	// With no ROM loaded the plain path is kept, because there is nothing to disambiguate.
+	if curROMPath != "" {
+		base := strings.TrimSuffix(filepath.Base(curROMPath), filepath.Ext(curROMPath))
+		ext := filepath.Ext(pngPath)
+		pngPath = strings.TrimSuffix(pngPath, ext) + "-" + base + ext
+	}
 	if in.Raw {
 		// A raw shot writes beside the annotated one rather than over it: the user
 		// keeps the annotated file open in a previewer for the round trip, and
@@ -1616,9 +1632,9 @@ func handleScreenAnnotated(ctx context.Context, req *mcp.CallToolRequest, in Scr
 // --- analyze_image: screenshot → TIA data (the ingest pipeline) ---
 
 type AnalyzeImageIn struct {
-	Path  string   `json:"path,omitempty" jsonschema:"ONE screenshot PNG (grade A = Stella F12, unmodified). A flickered object will appear only partially — use paths instead"`  // PNG to analyze (grade A = unmodified Stella F12)
-	Paths []string `json:"paths,omitempty" jsonschema:"2-3 CONSECUTIVE shots of the same scene. Runs the multi-frame pipeline instead: static/dynamic separation, union tracks, flicker report (the multi field). The only way to analyse a multiplexed or flickered sprite"`  // multiple shots (consecutive F12 of the same scene) → multi-frame separation
-	Scale int      `json:"scale,omitempty" jsonschema:"integer zoom for the returned TIA-grid overlay image (default 3)"`  // overlay zoom factor (default 3)
+	Path  string   `json:"path,omitempty" jsonschema:"ONE screenshot PNG (grade A = Stella F12, unmodified). A flickered object will appear only partially — use paths instead"`                                                                                              // PNG to analyze (grade A = unmodified Stella F12)
+	Paths []string `json:"paths,omitempty" jsonschema:"2-3 CONSECUTIVE shots of the same scene. Runs the multi-frame pipeline instead: static/dynamic separation, union tracks, flicker report (the multi field). The only way to analyse a multiplexed or flickered sprite"` // multiple shots (consecutive F12 of the same scene) → multi-frame separation
+	Scale int      `json:"scale,omitempty" jsonschema:"integer zoom for the returned TIA-grid overlay image (default 3)"`                                                                                                                                                     // overlay zoom factor (default 3)
 }
 
 type AnalyzeImageOut struct {
