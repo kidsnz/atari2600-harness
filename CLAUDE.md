@@ -259,14 +259,13 @@ round trip. Also return `png_path` in JSON.
 split into a **separate repo**. Dependency is **one-way game → harness** (the harness has zero dependence on
 any game; its runtime has none, though 45 of its test files reach into `roms/techniques` and 4 into the sibling `sandbox/` repo (measured 2026-08-15)).
 - Module = `github.com/kidsnz/atari2600-harness`. Gopher2600 via `go.mod` `replace => ./Gopher2600`.
-- Physical layout (under the umbrella folder `260609_atari2600-dev/`, three sibling repos bound by `go.work`):
-  ```
-  260609_atari2600-dev/        ← umbrella (the folder Claude Code opens; .mcp.json/.claude live here)
-  ├── go.work                   ← binds harness + roms + sandbox locally
-  ├── harness/                  ← this repo (atari2600-harness) = verification engine
-  ├── roms/                     ← separate repo (atari2600-roms) = deliverables only (frogger; future pong/pizza-boy)
-  └── sandbox/                  ← local-only repo = practice / experiments / studies (skill-building; not pushed)
-  ```
+- Physical layout: this repo is one of three siblings under an umbrella folder, bound by `go.work`.
+  **The tree lives in one place — the umbrella's `../OVERVIEW.md`** — and is not repeated here.
+  It was in both files until 2026-08-15 and **both copies were wrong**: each showed `roms/` as
+  "frogger; future pong/pizza-boy" while a second work had existed there since 2026-08-09, and this
+  copy listed 4 of the umbrella's entries out of 9. A tree in two places is a tree that disagrees.
+  What matters from here: `roms/` and `sandbox/` are separate repos, the dependency is one-way
+  game → harness, and `.mcp.json` / `.claude` live at the umbrella.
 - Base contents: `cmd/harness` (MCP server) / `cmd/probe` (plumbing) / `cmd/scenario` (regression runner CLI) /
   `cmd/calibrate` (horizontal X(N) sweep-fit) /
   `cmd/fieldtest` (ROM self-drive + multi-frame analysis; `-inbox` batch, `-auto` start escalation) /
