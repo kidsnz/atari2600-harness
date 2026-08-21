@@ -15,6 +15,30 @@ with confidence, from basics to advanced tricks.
    push; write up the technique here.
 6. **Promote (optional)** — a stable, reusable kernel/generator graduates to `pkg/` (like `pkg/playfield` / `pkg/sprite`).
 
+## Promoting out of a work (roms/) into here
+
+Written 2026-08-21, after doing it once and getting three of the five wrong on the way.
+
+- **A measured fact goes up the day it is measured.** It cannot improve by waiting, only be
+  forgotten — that session re-derived, from throwaway probes, a rule `internal/emu/hmovemid_test.go`
+  already held. **Negative results count**: nobody writes down what did not work, which is exactly
+  why the next session repeats the experiment.
+- **A mechanism waits for its SECOND caller.** Promote a generator when something other than its
+  first use needs it, not on first success — a tool generalised from one use case encodes that use
+  case's accidents. `internal/keyfit` (502 lines) sat here with no CLI and no importer until
+  `check_wiring`'s fifth check was written to catch exactly that.
+- **This repository is PUBLIC and `roms/` is not.** The copy that lands here must not name the work:
+  cite `roms/`, not `roms/<work>/`. The work's own notes name the artifacts that went up, so the
+  trail exists for anyone holding both repositories and for nobody else.
+- **Nothing lands without its litmus, its grading test and its catalogue row.** The gates enforce
+  this — `check_provenance` refuses an uncited claim or a path that does not resolve,
+  `check_wiring` refuses an unreachable doc, `check_tests` refuses a test that can only fail when
+  its setup does.
+- **Verify the COMMITTED tree, not the working one.** A detached `git worktree` of the commit,
+  built and graded there. Measuring the working tree grades other sessions' unfinished work: the
+  pre-push mirror blocked a push over two files that were not in the commit, and a run of the gates
+  in the checkout said green while `go test` had never actually built.
+
 ## Catalog
 
 | # | Technique | Level | Doc | Demo ROM | Status |
