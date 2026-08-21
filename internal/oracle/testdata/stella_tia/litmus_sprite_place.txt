@@ -1,0 +1,37 @@
+# stella-tia-oracle capture
+# rom: roms/litmus/litmus_sprite_place.bin
+# frames: 5
+# stella: 
+# captured: 2026-08-21
+Stella 7.0
+> autoExec():
+
+Executed 2 commands from "~/Library/Application Support/St
+ella/autoexec.script"
+script file '~/Desktop/litmus_sprite_place.script' not fou
+nd
+config file '~/Library/Application Support/Stella/cfg/litm
+us_sprite_place.cfg' not found
+list file 'roms/litmus/litmus_sprite_place.lst' not found
+symbol file 'roms/litmus/litmus_sprite_place.sym' not foun
+d
+> tia
+scanline=#0   vsync VBLANK
+Collisions: p0_pf p0_bl m1_p0 m0_p0 p0_p1 p1_pf p1_bl m1_p
+1
+            m0_p1 m0_pf m0_bl m0_m1 m1_pf m1_bl bl_pf
+COLUxx: P0=$0e/      P1=$00/      PF=$00/      BK=$00/
+
+P0: GR=%00000000 pos=#24  HM=$0 3 copies - med (24)  refl
+delay
+P1: GR=%00000000 pos=#39  HM=$0 1 copy               refl
+delay
+M0: disabled pos=#38  HM=$0 size=#0 reset
+M1: disabled pos=#2   HM=$0 size=#0 reset
+BL: disabled pos=#2   HM=$0 size=#0 delay
+PF0: %00000000/$00 PF1: %00000000/$00 PF2: %00000000/$00
+     reflect score priority
+inpt0 inpt1 inpt2 inpt3 INPT4 INPT5 dump_gnd_0123
+AUDF0: $00/31440.0Hz AUDC0: $0 AUDV0: $0
+AUDF1: $00/31440.0Hz AUDC1: $0 AUDV1: $0
+> saveSes
