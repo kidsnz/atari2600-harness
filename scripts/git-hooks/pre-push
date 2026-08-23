@@ -19,6 +19,12 @@
 # a .bin. Measured: 137 t.Skip sites, only 80 of which say "unavailable", so grepping the skip
 # message would have missed 41% of them.
 #
+# WHAT IT COSTS, measured 2026-08-23: 5m41s, of which almost all is `go test -p 1 ./...`. The
+# version before this one claimed "~1 minute" while running the same suite, and an over-promising
+# gate is what makes a surprise feel like an excuse to reach for --no-verify. If that is too slow
+# to live with, the honest cut is to move the test sweep to CI and keep the cheap certain failures
+# here (vet, the doc gates, the inventory) — not to keep the claim and drop the measurement.
+#
 # Enable once per clone:  git config core.hooksPath scripts/git-hooks
 # Emergency bypass:        git push --no-verify
 set -uo pipefail
