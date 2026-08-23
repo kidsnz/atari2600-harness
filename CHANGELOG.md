@@ -95,6 +95,14 @@ versions follow [Semantic Versioning](https://semver.org/).
     the package's own tests, added along with `mixcheck` and unnoticed until the audit.
 
 ### Fixed
+- **Deleting a branch ran the full 5 min 41 s pre-push gate on a commit nobody was pushing.**
+  `git push --delete branch` sends an all-zero local sha; the loop skipped it, `SHA` stayed empty,
+  and the fallback reached for HEAD — so the hook built and tested the working tree's HEAD, which
+  is not what the push contained, and could refuse a deletion on the strength of an unrelated
+  failure. A push whose refs are all deletions now says so and exits 0. The fallback stays for the
+  case it was written for: a hook invoked by hand with no refs at all, where HEAD is the only
+  candidate. Found by the other session; confirmed against all three shapes (deletion only, no
+  refs, ordinary push).
 - **`pf_deadlines` printed one number for two opposite facts.** The verdict ended in "(N write(s)
   had no rule and were NOT checked)", which borrows the language of skipping a check that was due.
   A careful reader took it for a coverage hole in the playfield check on 2026-08-23, spent an

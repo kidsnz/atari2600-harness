@@ -31,11 +31,26 @@ set -uo pipefail
 
 REPO="$(git rev-parse --show-toplevel)"
 SHA=""
+REFS=0
 while read -r _lref lsha _rref _rsha; do
+  REFS=$((REFS+1))
   case "$lsha" in ""|0000000000000000000000000000000000000000) continue ;; esac
   SHA="$lsha"
 done
-[ -n "$SHA" ] || SHA="$(git rev-parse HEAD)"
+# A DELETION HAS NOTHING TO TEST. `git push --delete branch` sends an all-zero local sha, which the
+# loop skips; SHA then stayed empty and the fallback below reached for HEAD — so deleting a branch
+# spent 5 min 41 s building and testing a commit that was not being pushed, and could FAIL on a
+# dirty HEAD and refuse a deletion that has no relationship to it. Measured 2026-08-23 by the other
+# session. The fallback stays for the case it was written for: a hook run by hand or by a client
+# that sends no refs at all, where HEAD is the only thing there is to check.
+if [ -n "$SHA" ]; then
+  :
+elif [ "$REFS" -gt 0 ]; then
+  echo "pre-push: nothing but deletions in this push — no commit to test, skipping the gate." >&2
+  exit 0
+else
+  SHA="$(git rev-parse HEAD)"
+fi
 
 # A previous run killed outright (SIGKILL skips the trap) leaves its worktree registered; prune
 # before adding, or `git worktree list` grows a tail of dead entries that nothing removes.
