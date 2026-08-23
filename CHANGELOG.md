@@ -95,6 +95,24 @@ versions follow [Semantic Versioning](https://semver.org/).
     the package's own tests, added along with `mixcheck` and unnoticed until the audit.
 
 ### Fixed
+- **Four one-off investigation programs were published on GitHub, and the gate that should have
+  named them had a silent exemption.** `cmd/_c`, `cmd/_s`, `cmd/_shape` and `cmd/_v` went in on
+  2026-08-09 and 2026-08-11 as three commits' worth of "ついで", 3.6 KB in total, with hard-coded RAM
+  addresses, fixed frame counts, `panic(err)` for error handling and not one line of documentation.
+  `check_wiring` skipped any directory starting with `_` — in FOUR places, and the convention was
+  written down nowhere: `grep -n 'cmd/_' CLAUDE.md docs/ scripts/` found it only inside the gate
+  itself. So the gate reported "all 44 commands are named in CLAUDE.md" while silently excluding
+  four of forty-eight, which is the pf_deadlines disease with the count hidden instead of printed.
+  - The author's own standing rule covers this: investigation scripts and PoCs do not go in a
+    repository unasked, and **a public repository is to be treated as visible the moment something
+    lands in it**. Measured 2026-08-23: `gh repo view` says PUBLIC and all four returned HTTP 200
+    from `raw.githubusercontent.com`. Nothing referenced them (0 hits outside their own directories).
+  - The exemption is removed rather than documented. Writing it down would have published a recipe
+    for evading the gate. With it gone, the four were named immediately — the negative control ran
+    itself — and after deleting them the count reads 44 again, this time out of 44.
+  - **Deleting does not un-publish.** They remain in the history and on GitHub's commit pages;
+    rewriting history to remove 3.6 KB would break every clone, which is not a trade worth making.
+    The effect is that nothing new is confused by them, not that they were never there.
 - **The playfield-deadline check went GREENER the harder the kernel was broken.** Colour clocks
   fold back every 228, and `clockAt` folds `MaxClock` with them, so a write pushed a whole scanline
   late reappears as a small clock in the next line's HBLANK and compares as comfortably early.

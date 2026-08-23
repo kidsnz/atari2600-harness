@@ -220,7 +220,7 @@ def tool_reachability():
     ipath = os.path.join(HARNESS, "internal")
     if os.path.isdir(ipath):
         for pkg in sorted(os.listdir(ipath)):
-            if not os.path.isdir(os.path.join(ipath, pkg)) or pkg.startswith("_"):
+            if not os.path.isdir(os.path.join(ipath, pkg)):
                 continue
             imp = 'atari2600-harness/internal/%s"' % pkg
             # Count importers OUTSIDE the package's own directory.
@@ -247,7 +247,7 @@ def tool_reachability():
     if os.path.isdir(cpath) and os.path.isfile(claude):
         text = open(claude, encoding="utf-8").read()
         for c in sorted(os.listdir(cpath)):
-            if not os.path.isdir(os.path.join(cpath, c)) or c.startswith("_"):
+            if not os.path.isdir(os.path.join(cpath, c)):
                 continue
             if ("cmd/" + c) not in text:
                 out.append("cmd/%s exists and builds, but CLAUDE.md never names it — the author "
@@ -329,9 +329,9 @@ def main():
     print(f"gate ledger OK — all {n_gates} gates have a row, and every 'Runs in' matches ci.yml "
           f"and the pre-push hook.")
     n_int = len([d for d in os.listdir(os.path.join(HARNESS, "internal"))
-                 if os.path.isdir(os.path.join(HARNESS, "internal", d)) and not d.startswith("_")])
+                 if os.path.isdir(os.path.join(HARNESS, "internal", d))])
     n_cmd = len([d for d in os.listdir(os.path.join(HARNESS, "cmd"))
-                 if os.path.isdir(os.path.join(HARNESS, "cmd", d)) and not d.startswith("_")])
+                 if os.path.isdir(os.path.join(HARNESS, "cmd", d))])
     print(f"tools OK — all {n_int} internal packages are imported by something, and all {n_cmd} "
           f"commands are named in CLAUDE.md.")
 
