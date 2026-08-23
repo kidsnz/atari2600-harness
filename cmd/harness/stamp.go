@@ -120,8 +120,23 @@ func headRevision() string {
 	}
 	for {
 		gitPath := filepath.Join(dir, ".git")
-		if fi, err := os.Stat(gitPath); err == nil && fi.IsDir() {
-			return readHead(gitPath)
+		if fi, err := os.Stat(gitPath); err == nil {
+			if fi.IsDir() {
+				return readHead(gitPath)
+			}
+			// A LINKED WORKTREE keeps a FILE here, holding "gitdir: <path to the real one>".
+			// Without this branch the walk falls through to the parent directory, finds no
+			// repository at all, and the stale-binary warning this whole file exists to raise
+			// silently stops being able to fire. Found 2026-08-23 by the pre-push gate that
+			// runs in exactly such a worktree — and it matters beyond the gate: a session
+			// working from its own worktree would get an MCP server that cannot tell it the
+			// analyser is out of date.
+			if b, err := os.ReadFile(gitPath); err == nil {
+				if line := strings.TrimSpace(string(b)); strings.HasPrefix(line, "gitdir:") {
+					return readHead(strings.TrimSpace(strings.TrimPrefix(line, "gitdir:")))
+				}
+			}
+			return ""
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {

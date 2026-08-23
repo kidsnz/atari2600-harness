@@ -18,15 +18,15 @@ import (
 
 func TestStaleNoteFiresOnlyWhenTheSourceHasMoved(t *testing.T) {
 	for _, c := range []struct {
-		name           string
-		built, head    string
-		dirty          bool
-		wantStale      bool
-		wantMentions   []string
-		wantSilent     bool
+		name         string
+		built, head  string
+		dirty        bool
+		wantStale    bool
+		wantMentions []string
+		wantSilent   bool
 	}{
 		{
-			name: "the case that happened: binary four commits behind",
+			name:  "the case that happened: binary four commits behind",
 			built: "bb3b0f8", head: "30b492d",
 			wantStale: true, wantMentions: []string{"STALE", "bb3b0f8", "30b492d", "rebuild"},
 		},
@@ -36,7 +36,7 @@ func TestStaleNoteFiresOnlyWhenTheSourceHasMoved(t *testing.T) {
 			wantSilent: true,
 		},
 		{
-			name: "current revision but built dirty: the source it read is no commit",
+			name:  "current revision but built dirty: the source it read is no commit",
 			built: "30b492d", head: "30b492d", dirty: true,
 			wantMentions: []string{"UNCOMMITTED", "30b492d"},
 		},
@@ -120,8 +120,19 @@ func findGitDir(t *testing.T) string {
 	}
 	for {
 		p := filepath.Join(dir, ".git")
-		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
-			return p
+		if fi, err := os.Stat(p); err == nil {
+			if fi.IsDir() {
+				return p
+			}
+			// A linked worktree keeps a FILE here pointing at the real git directory. The
+			// cross-check has to follow it for the same reason headRevision does, or this test
+			// fails in exactly the place the pre-push gate runs — and a test that cannot run
+			// where the gate runs stops guarding it.
+			if b, err := os.ReadFile(p); err == nil {
+				if line := strings.TrimSpace(string(b)); strings.HasPrefix(line, "gitdir:") {
+					return strings.TrimSpace(strings.TrimPrefix(line, "gitdir:"))
+				}
+			}
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {

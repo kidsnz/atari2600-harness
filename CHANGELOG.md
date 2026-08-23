@@ -9,41 +9,150 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **`plan_sprite_placement` / `cmd/place` / `internal/place` — where a row of shapes CAN go,
-  decided by search instead of by arithmetic in someone's head.** Three grids are in play and they
-  do not line up: a player lands at `x = 3c − 60` and stops at 3, a missile **and the ball** land
-  at `x = 3c − 61` and stop at 2 — one clock LEFT of anywhere a player can be — and each floor is
-  reachable from a **window** of write cycles rather than one. Add copies that wrap past 160 and
-  draw at the left edge on the same line, and a three-cycle floor between any two strobes, and the
-  question "can these shapes be placed" stops being answerable by hand. It was answered by hand
-  twice here and came back **"impossible"** both times, for a row that places fine. The placer
-  returns the object bases, NUSIZ copy codes and strobe cycles, or the reason there are none, and
-  it **validates its own answer** before returning it — a wrong plan is worse than no plan. It is
-  placement only; whether the line then has the cycles to write the bytes is `prove_line_budget`'s
-  question. Wired at step 2 of `docs/authoring-protocol.md`, which is where an unworkable layout is
-  supposed to be rejected on paper.
+- **`cmd/bandsplit -files` — several WAVs side by side, for stems rather than bands.** The same
+  page answered the question twice on one job: the band page got the author to "B" and the stem
+  page got him to "the bass stem", and only the second was the sound he meant. It prints each
+  source's level BEFORE levelling, because a stem 25 dB under the others is one the separator
+  found nothing for rather than a quiet instrument — which is exactly what `other` was.
+- **`cmd/keyfit -waves` and `-fine` — one waveform, and a tonic off the semitone grid.**
+  `-one-voice` only REPORTS what a single waveform would cost and cannot be told WHICH, and the
+  best tonic for a single voice is generally not on the grid: for AUDC 6 over
+  {0,3,4,5,10,12,15} it is 38.4 Hz, D#1 minus 21 cents. Both gaps had to be hand-rolled twice in
+  one session, prompted by "one type of sound only, please" after a build that changed timbre
+  mid-figure. Run on that figure the tool also found a better saw tonic than the hand search
+  had (+24.1 cents against +25.4) — the hand grid had stepped past it.
+
+- **`cmd/gridfind` — measures what every other audio tool here takes as an INPUT.** `audioingest`
+  takes `-from`, `drumfit` takes `-t0`, and drumfit's own documentation says to read that value
+  off audioingest, so one wrong start propagates through the whole chain with nothing to catch
+  it. Measured cost: two delivered mp3s each carried ~233 ms of digital silence; a grid built
+  without accounting for it sat two sixteenths out of phase for two days, and four-on-the-floor
+  read as "the bass is on the offbeat" — every note reading coherent and wrong.
+  - **T0 is the first HIT after the silence, not the beat phase.** Phase is known only modulo a
+    beat, so it says where the beats are and not which one opens the bar. On the real file the
+    two disagreed by most of a beat and the phase was wrong; the phase is now printed as the
+    CHECK, with an explicit warning when they part company.
+  - **Pattern length is measured per BAND, and the whole-mix answer is the DRUMS' answer.** On
+    the same file the full band says 1 bar and `-band 85,1000` says 2 (correlation 0.963 against
+    0.681), because the drums repeat every bar and the lead every two. Run on the whole mix it
+    prints that warning unprompted. It reports the smallest true period, since a two-bar pattern
+    also correlates at four and eight.
+  - Run on the material it was written for it reproduced, from one command, a two-bar finding
+    that had previously taken a multi-agent analysis.
+- **`cmd/voicefit` — which of the machine's waveforms sounds most like THIS.** The timbre half of
+  choosing a voice, where `keyfit` is the tuning half; the two routinely disagree. Measured: a
+  lead was fitted by tuning alone, landed on AUDC 12, and the author's first words on hearing it
+  were that the timbre was nothing like the record — AUDC 12 is a squarewave with NO even
+  harmonics and the line rolls off 1.00 .47 .16 .07, making it the FURTHEST of the eight. Run on
+  the octave-up build, `mixmatch` actually ranked AUDC 12 BEST, because band balance and harmonic
+  structure are different questions and transposing an octave can satisfy the first while failing
+  the second. Both are now printed and the disagreement is the finding.
+- **`cmd/bandsplit` — which sound do you MEAN?** The step before every measurement here, and the
+  one that actually blocked the work: an author asked for "the most prominent melodic sound" to be
+  reproduced, guessing produced a bass reproduction that was not it, and a hand-written band-split
+  page settled it in one exchange — then was thrown away. Bands are normalised to the same peak,
+  because they differ by tens of dB and comparing them at natural levels asks which is loudest
+  rather than which holds the part. The page states in its own footer that a band is not an
+  instrument, since on this very record the author's correct answer of "B" pointed at a band that
+  excluded the part's fundamental.
+- **`cmd/keyfit -hz` — fit MEASURED pitches instead of degrees of a tonic.** Real music does not
+  sit on a semitone grid: the line this was added for reads 97.12 and 115.73 Hz, is 14 cents flat
+  of A=440, and its minor third is 303.5 cents rather than 300 — all of which rounding to degrees
+  throws away before the search starts. It ranks by worst PAIRWISE INTERVAL error rather than
+  absolute, because a figure moved bodily is still the same music and one whose thirds have
+  changed size is not. `-waves` restricts the search to what `voicefit` picked, which is how the
+  two halves of choosing a voice are made to meet. On the material it was added for it found a
+  pairing at 1.0 cents where a hand search had stopped at 1.7.
+- **`pkg/audio.MeasuredSpectra`, `SpectrumDistance` and `HarmonicsF`.** The measured harmonic
+  series of all eight pitched waveforms lived in `internal/emu/audioshape_test.go`, where **no
+  tool could import them**: choosing a voice by timbre — the thing an author actually does — had
+  numbers behind it that only a test could see. That is the third time something real here has
+  been unreachable (`internal/keyfit` and `internal/mixmatch` had no CLI; six commands were
+  missing from CLAUDE.md). The table moves to the package the tools import and the test becomes
+  what it should always have been: the check that the pinned table still matches the hardware.
+  `HarmonicsF` puts a reference RECORDING on the same axis as the machine's own output, with the
+  arithmetic in one copy so the two cannot drift.
+
+### Removed
+- **`cmd/mixcheck` and `keyfit -hz` were written today and deleted today, after an audit.** Both
+  are recorded here rather than silently dropped, because the reasons are the useful part.
+  - **`mixcheck`** was to answer "is this file one source or a mixture", and its insight is
+    right: band-limiting selects a frequency range and not an instrument. The implementation
+    could not support it. Its verdict flipped with the analysis band on the SAME file — a
+    separated bass stem read 99.6% "one source" over 30-400 Hz and 44.1% "a mixture" over
+    60-1000 — and it called another record's full mix a single source at 65.4%. The thresholds
+    were fitted on the four files it was developed against. More decisive than any of that: if
+    the right move is always to separate, and at about ten seconds it is, then a tool that tells
+    you whether to separate has no decision to inform. **The knowledge moved into the doc
+    comments of `cmd/audioingest` and `cmd/f0check`, with the demucs recipe**, which is where it
+    always belonged.
+  - **`keyfit -hz`** fitted measured absolute pitches instead of scale degrees. On the only
+    figure it was ever used on it returned **47.3 cents where `-degrees` returned 25.4**, because
+    it fitted each note's measurement noise as though it were music. A measured figure that sits
+    within 0.3 of a semitone of a scale IS on that scale, and degrees are then the right unit.
+    It nearly shipped a worse ROM.
+  - Also removed: a duplicate `dft` in `internal/audioingest` that shadowed the one already in
+    the package's own tests, added along with `mixcheck` and unnoticed until the audit.
+
+### Fixed
+- **`cmd/bandsplit` no longer has a default output path.** It defaulted to `bandsplit.html` in the
+  working directory, and this repository is PUBLIC: running it from inside the tree writes a
+  multi-megabyte page **with the source recording embedded** straight into the working tree, one
+  `git add -A` from publishing a client's unreleased master. `-out` is now required, and `*.html`
+  is gitignored as a second net. The umbrella's rule that other people's material never enters a
+  repository is structural, and a convenient default that quietly breaks it is worse than no
+  default.
 
 ### Changed
+- **A `golden_audio` / `golden_mix` check that hashes nothing is now refused at load.** The run
+  length is not "frames" alone — it is the larger of "frames" and the highest `at_frame` in
+  inputs/asserts — so a scenario with an audio golden and NEITHER runs one frame and matches
+  whatever it was recorded against. Measured on a real work: such a scenario stayed green after
+  its hi-hats were deleted from the ROM entirely. Under two frames is now an error; under sixty
+  prints a warning and still runs, because coverage here varies with how a scenario was written
+  rather than with intent — in this repository's own net `roms/techniques/sound_driver.json`
+  reaches frame 70 through its asserts while `roms/litmus/audio.json` reaches 3, and turning that
+  warning into an error is a decision about 7 existing scenarios, not about this code.
 
-- **`litmus_sprite_place` gained five bands, and technique #35 three rules, all measured.** Bands
-  11–12: a missile is clamped at **x = 2** and obeys `3c − 61` above it. Bands 13–14: **the ball**
-  places exactly like a missile, clamp and all — the fifth movable object, and one this catalogue
-  had never measured. Band 15: a **NUSIZ copy past 160 wraps** and draws at the left edge on the
-  same scanline, so a base strobed on the right reaches positions on the left that no strobe does.
-  The clamp being a WINDOW of write cycles rather than a single one is the load-bearing part: it is
-  what lets an object at the wall be strobed clear of another four pixels to its right, which
-  anywhere else on the grid would be one cycle away and impossible for two 3-cycle stores. Stella
-  agrees on all of it (37/37 write-only TIA registers).
-- **`internal/emu/spriteplace_test.go` now cross-checks `internal/place`'s constants against the
-  fixture that measured them.** Each check re-derives a constant from a band rather than from
-  another constant. Without this the placer could drift from the machine and every answer it gave
-  would still look confident — the failure this project already knows by name.
-- **`docs/techniques/sprite-placement.md`: the three ways to cut a 12-clock shape.** Player-then-
-  missile, missile-then-player, or two players — the cut decides which grid the shape's own x has
-  to sit on, and missile-first is the only one that can begin a row at x=2. Also corrects the
-  mid-line HMOVE section, which recorded write cycle 62 as "moved it correctly": it does not. The
-  earlier measurement watched only WHETHER the object moved, not by how much; at HMP0 = left 3 it
-  moves two pixels where three were asked for. The section now carries the whole table.
+- **`cmd/f0check` — is the pitch you measured the fundamental, or a harmonic of one your band
+  excluded?** Every other audio tool here takes the analysis band as an input and reports what it
+  finds inside it. That is the right contract and it is a trap: a band that excludes the
+  fundamental produces a confident wrong answer indistinguishable from a right one. Measured on
+  real material — a lead line read 194 Hz over 110-800 Hz for two days; its fundamental is
+  96.9 Hz, and 194 Hz was the second harmonic. Two independent analyses were needed to catch it.
+  - Prints the autocorrelation answer AND the naive FFT peak together, because they fail
+    differently and their disagreement is the finding. On that material the FFT peak was the one
+    that lied; autocorrelation proved the tougher of the two.
+  - Searches BELOW the band for a better period rather than testing integer multiples of what it
+    found: a squarewave read from above its fundamental leaves partials at no simple ratio to it,
+    which broke the first implementation and is now a test.
+  - Reports the lower period's LEVEL in dB. A sub an octave down at -19 dB is a sub-oscillator
+    inside one instrument; one at -3 dB is the note itself; both correlate equally well, so
+    correlation alone cannot tell an author what to do.
+  - `-strict` exits 1, so it can stand in a script or a gate.
+  - Run on the material it was written for, it independently reproduced a finding that had
+    previously taken a five-agent analysis: the line carries a sine sub exactly one octave down.
+
+### Fixed
+- **`internal/audioingest.F0` could return a frequency outside the range it was given** — three
+  separate defects, all found by writing the tests for `f0check`. **Scope, measured rather than
+  asserted:** `F0` is called from three places, all inside `internal/audioingest` itself
+  (`BassNotes`, `F0Checked`, `MixCheck`). An earlier draft of this entry claimed the fixes
+  reached `drumfit` and `mixmatch` as well; `grep` says those two use only `DecodeWAV`, and the
+  claim was written without checking. The defects were real; their blast radius was smaller than
+  advertised:
+  - a peak landing on the EDGE of the search range has a slope rather than a summit under it, so
+    the parabolic interpolation's denominator went to nothing and the correction ran away:
+    measured, a window whose true period lay outside `loHz..hiHz` returned **-488 Hz**. A negative
+    frequency is not a near miss; it is a value no caller can defend against.
+  - clamping that correction to the half sample it is entitled to still returned **809 Hz** from a
+    search told to stop at 800. Interpolation is now refused at the edge, where the integer lag is
+    the honest answer and `F0Checked` is what says the answer is suspect.
+  - the lag range truncated the wrong way at the short end: `int(44100/800)` is 55 and `44100/55`
+    is 801.8 Hz, so the search could return above its own `hiHz`. Both ends now round so the
+    answer falls inside the range the caller asked for.
+
+### Changed
 - **The fourth repository is retired, and the count in the shutdown sweep is replaced by an
   enumeration.** `260811_cover-demos` published a browser-playable page of the technojacket
   builds and had served its purpose; the repository is being taken down. The page **cannot be

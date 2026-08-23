@@ -1,37 +1,83 @@
 #!/usr/bin/env bash
-# pre-push — mirror the fast, high-value part of CI before every push, so a red
-# build never reaches GitHub. A plain local build+test runs under the umbrella
-# go.work (serially) and HIDES the parallel package-test races CI hits, so this
-# runs CI's actual invocation (GOWORK=off, -p 1) plus the quick doc checks.
+# pre-push — mirror CI on WHAT IS BEING PUSHED, not on the working tree.
+#
+# WHY IT CHANGED, measured 2026-08-23. This hook used to run the gates over the working tree, and
+# that is the same thing as the pushed commit only while ONE session is working. With two, another
+# session's untracked file (internal/scenario/goldencover_test.go, four days old, belonging to
+# neither of us) failed check_tests and blocked a clean push. The bypass — `--no-verify` — is the
+# real damage: a gate that fires on somebody else's work teaches everyone to disable gates, and at
+# three sessions the odds of someone having a dirty tree approach one.
+#
+# So the gates now run in a throwaway worktree checked out at the commit being pushed, which is
+# exactly what CI will see.
+#
+# THE TRAP THIS WALKS PAST, and why the inventory check is not optional: the .bin fixtures are
+# gitignored, so a fresh worktree has none, and the emulator tests answer a missing fixture with
+# t.Skip — which is reported as PASS. The first version of this change was demonstrated "working"
+# while testing nothing at all. Assembling the ROMs fixes that one case; comparing the fixture
+# INVENTORY against the checkout catches the whole class, including the next fixture that is not
+# a .bin. Measured: 137 t.Skip sites, only 80 of which say "unavailable", so grepping the skip
+# message would have missed 41% of them.
 #
 # Enable once per clone:  git config core.hooksPath scripts/git-hooks
 # Emergency bypass:        git push --no-verify
-#
-# Heavy CI steps (full scenario sweep, Klaus/Tom-Harte network conformance) are
-# intentionally left to CI itself — this hook stays under ~1 minute.
 set -uo pipefail
 
-echo "pre-push: mirroring CI (go vet / go test -p 1 / doc checks)…"
+REPO="$(git rev-parse --show-toplevel)"
+SHA=""
+while read -r _lref lsha _rref _rsha; do
+  case "$lsha" in ""|0000000000000000000000000000000000000000) continue ;; esac
+  SHA="$lsha"
+done
+[ -n "$SHA" ] || SHA="$(git rev-parse HEAD)"
+
+# A previous run killed outright (SIGKILL skips the trap) leaves its worktree registered; prune
+# before adding, or `git worktree list` grows a tail of dead entries that nothing removes.
+git -C "$REPO" worktree prune >/dev/null 2>&1
+W="$(mktemp -d "${TMPDIR:-/tmp}/prepush.XXXXXX")"
+cleanup() { git -C "$REPO" worktree remove --force "$W" >/dev/null 2>&1; rm -rf "$W"; }
+trap cleanup EXIT
+
 fail() {
   echo ""
-  echo "✗ pre-push BLOCKED: '$1' failed — fix it before pushing (or bypass with: git push --no-verify)"
+  echo "✗ pre-push BLOCKED: '$1' failed on the commit being pushed — fix it (or: git push --no-verify)"
   exit 1
 }
 
-export GOWORK=off CGO_ENABLED=0
-go vet ./...                          || fail "go vet"
-go test -p 1 ./...                    || fail "go test -p 1"
-python3 scripts/check_wiring.py       || fail "check_wiring"
-python3 scripts/check_provenance.py   || fail "check_provenance"
-python3 scripts/check_traps.py --selftest || fail "check_traps --selftest"
-python3 scripts/check_traps.py        || fail "check_traps"
-python3 scripts/check_tests.py --selftest || fail "check_tests --selftest"
-python3 scripts/check_tests.py        || fail "check_tests"
-python3 scripts/check_instruments.py --selftest || fail "check_instruments --selftest"
-python3 scripts/check_instruments.py  || fail "check_instruments"
-# check_memory reads ~/.claude/.../memory, which a CI checkout does not have (it skips there
-# and proves nothing), so the hook is its only real home. It was wired to NOTHING from the day
-# it was written until 2026-08-13 — see docs/gate-ledger.md.
-python3 scripts/check_memory.py       || fail "check_memory"
+echo "pre-push: mirroring CI on ${SHA:0:8} (a throwaway worktree, not this working tree)…"
+git -C "$REPO" worktree add --detach -q "$W" "$SHA" || fail "worktree add"
+ln -s "$REPO/Gopher2600" "$W/Gopher2600" 2>/dev/null
 
-echo "✓ pre-push: CI mirror green — pushing."
+# CI assembles these; without them every emulator test SKIPs and its package reports PASS.
+( cd "$W" && for f in roms/litmus/*.asm roms/techniques/*.asm roms/exerciser/*.asm roms/carts/*.asm; do
+    [ -e "$f" ] || continue
+    dasm "$f" -f3 -o"${f%.asm}.bin" >/dev/null 2>&1
+  done )
+
+# A gate that silently tests nothing is worse than no gate, so prove the world is the same one.
+missing="$(comm -13 <(cd "$W" && find roms -name '*.bin' | sort) <(cd "$REPO" && find roms -name '*.bin' | sort))"
+if [ -n "$missing" ]; then
+  echo ""
+  echo "  fixtures present in the checkout but MISSING from the worktree:"
+  echo "$missing" | head -10 | sed 's/^/    /'
+  fail "fixture inventory (the gate would have tested an emptier world than CI)"
+fi
+
+cd "$W" || fail "cd worktree"
+export GOWORK=off CGO_ENABLED=0
+go vet ./...                              || fail "go vet"
+go test -p 1 ./...                        || fail "go test -p 1"
+python3 scripts/check_wiring.py           || fail "check_wiring"
+python3 scripts/check_provenance.py       || fail "check_provenance"
+python3 scripts/check_traps.py --selftest || fail "check_traps --selftest"
+python3 scripts/check_traps.py            || fail "check_traps"
+python3 scripts/check_tests.py --selftest || fail "check_tests --selftest"
+python3 scripts/check_tests.py            || fail "check_tests"
+python3 scripts/check_instruments.py --selftest || fail "check_instruments --selftest"
+python3 scripts/check_instruments.py      || fail "check_instruments"
+# check_memory reads ~/.claude/.../memory, which a CI checkout does not have (it skips there and
+# proves nothing), so this hook is its only real home. It was wired to NOTHING from the day it was
+# written until 2026-08-13 — see docs/gate-ledger.md.
+python3 scripts/check_memory.py           || fail "check_memory"
+
+echo "✓ pre-push: the pushed commit is green — pushing."
