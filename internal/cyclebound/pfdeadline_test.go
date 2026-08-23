@@ -21,7 +21,7 @@ func TestALateWriteIsCaughtAndItsShiftIsQuantified(t *testing.T) {
 	}
 	if len(rep.Late) == 0 {
 		t.Fatalf("pf_late has no late writes, but every store in its line is three cycles "+
-			"behind the beam; checked %d, unchecked %d", rep.Checked, rep.Unchecked)
+			"behind the beam; checked %d, not-ours %d, unjudged %d", rep.Checked, rep.NotOurs, rep.Unjudged)
 	}
 	w := rep.Late[0]
 	if w.Reg != "PF1" || w.Deadline != 16 {
@@ -89,16 +89,16 @@ func TestTheDeadlineTableMatchesThePlayfieldGeometry(t *testing.T) {
 		want int
 		ok   bool
 	}{
-		{"PF0", 1, 0, true},    // columns 0-3   start at clock 0
-		{"PF1", 1, 16, true},   // columns 4-11  start at clock 16
-		{"PF2", 1, 48, true},   // columns 12-19 start at clock 48
-		{"PF0", 2, 80, true},   // the right half repeats at 80
+		{"PF0", 1, 0, true},  // columns 0-3   start at clock 0
+		{"PF1", 1, 16, true}, // columns 4-11  start at clock 16
+		{"PF2", 1, 48, true}, // columns 12-19 start at clock 48
+		{"PF0", 2, 80, true}, // the right half repeats at 80
 		{"PF1", 2, 96, true},
 		{"PF2", 2, 128, true},
-		{"PF0", 3, 0, false},   // a third write is beyond what this can judge
+		{"PF0", 3, 0, false}, // a third write is beyond what this can judge
 		{"COLUPF", 1, 0, true},
 		{"COLUPF", 2, 0, false},
-		{"GRP0", 1, 0, false},  // objects are not on a column grid; not this check's business
+		{"GRP0", 1, 0, false}, // objects are not on a column grid; not this check's business
 	} {
 		got, ok := pfDeadlineFor(c.reg, c.nth)
 		if ok != c.ok {
@@ -119,11 +119,45 @@ func TestUncheckedWritesAreReportedNotAbsorbed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rep.Unchecked == 0 {
+	if rep.NotOurs == 0 && rep.Unjudged == 0 {
 		t.Skip("this build happens to have no unjudgeable writes")
 	}
-	if !strings.Contains(rep.Summary(), "NOT checked") {
-		t.Errorf("%d write(s) were not checked but the summary does not say so: %q",
-			rep.Unchecked, rep.Summary())
+	sum := rep.Summary()
+	if rep.NotOurs > 0 && !strings.Contains(sum, "no playfield deadline governs") {
+		t.Errorf("%d write(s) fall outside these rules but the summary does not say so: %q",
+			rep.NotOurs, sum)
+	}
+	if rep.Unjudged > 0 && !strings.Contains(sum, "NOT JUDGED") {
+		t.Errorf("%d PLAYFIELD write(s) were not judged but the summary does not say so: %q",
+			rep.Unjudged, sum)
+	}
+}
+
+// The two counts must not be summed back together, whatever the wording. They mean opposite
+// things to a reader: NotOurs is "this rule does not apply here", Unjudged is "this rule applies
+// and nobody checked". A combined figure was read as a coverage hole in the playfield check on
+// 2026-08-23, and the first attempt to reword it called the whole count "non-playfield" — which
+// is flatly false of a third PF0 write. The classifier is what keeps them apart, so it is what
+// this test pins.
+func TestNotOursAndUnjudgedAreDifferentQuestions(t *testing.T) {
+	for _, c := range []struct {
+		reg       string
+		playfield bool
+	}{
+		{"PF0", true}, {"PF1", true}, {"PF2", true}, {"COLUPF", true}, {"COLUBK", true},
+		{"GRP0", false}, {"GRP1", false}, {"ENAM1", false}, {"NUSIZ0", false}, {"COLUP1", false},
+	} {
+		if got := isPlayfieldReg(c.reg); got != c.playfield {
+			t.Errorf("isPlayfieldReg(%s) = %v, want %v", c.reg, got, c.playfield)
+		}
+	}
+	// The pair that matters: a third PF0 write has no deadline AND is a playfield write, so it
+	// must land in Unjudged. If it ever lands in NotOurs, the verdict says "not our business"
+	// about a playfield write it did not check.
+	if _, ok := pfDeadlineFor("PF0", 3); ok {
+		t.Fatal("a third PF0 write is judgeable now; this test's premise is stale")
+	}
+	if !isPlayfieldReg("PF0") {
+		t.Error("a third PF0 write would be counted as somebody else's register")
 	}
 }

@@ -95,6 +95,26 @@ versions follow [Semantic Versioning](https://semver.org/).
     the package's own tests, added along with `mixcheck` and unnoticed until the audit.
 
 ### Fixed
+- **`pf_deadlines` printed one number for two opposite facts.** The verdict ended in "(N write(s)
+  had no rule and were NOT checked)", which borrows the language of skipping a check that was due.
+  A careful reader took it for a coverage hole in the playfield check on 2026-08-23, spent an
+  afternoon on it and retracted. The count is three things: a register the playfield rules do not
+  govern (GRP0, ENAM1, NUSIZ…), a second write to COLUPF/COLUBK, and a THIRD write to PF0/PF1/PF2
+  — and only the last is dangerous, because it is a playfield write this model genuinely cannot
+  judge. Summed into one figure, the reader cannot tell "not our business" from "our business, not
+  checked", which are opposite conclusions.
+  - The first replacement said "non-playfield write(s)" and was **false** — a third PF0 write is a
+    playfield write — and the existing test caught it within the minute. Replacing a misleading
+    sentence with a wrong one is not a repair.
+  - The count is now two: `NotOurs` prints as an aside, `Unjudged` prints in brackets and capitals
+    as "PLAYFIELD write(s) NOT JUDGED … this verdict is silent about them", because a rare failure
+    formatted like a routine one gets read like a routine one. `isPlayfieldReg` is the classifier
+    and a test pins it, including the case that started this: a third PF0 write must land in
+    `Unjudged`, never in `NotOurs`.
+  - **Measured across the corpus, which the split is what made possible**: of the 83 scenarios
+    that set `pf_deadlines`, **zero** have an unjudged playfield write; all 83 carry only the
+    not-our-business kind. The dangerous case exists in the model and does not exist in the tree —
+    a thing that is true because it was measured, not because it was assumed.
 - **A server that started current reported "not stale" forever.** `analyzerStamp` computed the
   whole stamp inside one `sync.Once`, on the reasoning that "HEAD moving under a live server is
   exactly the case being reported, so re-reading it per call would let the warning disappear on

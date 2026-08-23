@@ -47,6 +47,16 @@ type PFDeadline struct {
 
 // pfDeadlines maps (register, nth write in the region) to the colour clock by which it
 // must be in place. Clocks are this project's: HBLANK is -68..-1, visible 0..159.
+// isPlayfieldReg says whether a deadline WOULD govern this register at some repeat count. It is
+// the difference between "not our business" and "our business, and we could not judge it".
+func isPlayfieldReg(reg string) bool {
+	switch reg {
+	case "PF0", "PF1", "PF2", "COLUPF", "COLUBK":
+		return true
+	}
+	return false
+}
+
 func pfDeadlineFor(reg string, nth int) (int, bool) {
 	// The bounds check comes FIRST. A kernel that writes PF0 three times in a line is
 	// outside what this can judge, and indexing the table before saying so crashed --
@@ -75,12 +85,20 @@ func pfDeadlineFor(reg string, nth int) (int, bool) {
 
 // PFDeadlineReport is the verdict for one program.
 type PFDeadlineReport struct {
-	Asm       string       `json:"asm"`
-	Checked   int          `json:"checked"`             // writes that had a deadline to beat
-	Unchecked int          `json:"unchecked"`           // writes past the second, or to registers with no rule
-	Late      []PFDeadline `json:"late,omitempty"`      // the ones that miss, worst first
-	Tightest  *PFDeadline  `json:"tightest,omitempty"`  // the closest write that still makes it
-	Declined  string       `json:"declined,omitempty"`  // why nothing was checked
+	Asm     string `json:"asm"`
+	Checked int    `json:"checked"` // writes that had a deadline to beat
+	// TWO NUMBERS, NOT ONE. These used to be summed into `Unchecked`, and the sum is unreadable:
+	// NotOurs is "this rule does not apply", Unjudged is "this rule applies and we cannot say" —
+	// opposite meanings to whoever reads the verdict. A reader who saw the combined 1 on a real
+	// build could not tell whether the line was fully judged or not, and read it as a coverage
+	// hole in the playfield check, which cost an afternoon and a retraction on 2026-08-23.
+	// NotOurs > 0 is ordinary. Unjudged > 0 means `pf_deadlines: true` went green over a
+	// playfield write nobody checked.
+	NotOurs  int          `json:"not_ours"`           // registers no playfield deadline governs
+	Unjudged int          `json:"unjudged"`           // PF0/1/2 past the second, COLUPF/COLUBK past the first
+	Late     []PFDeadline `json:"late,omitempty"`     // the ones that miss, worst first
+	Tightest *PFDeadline  `json:"tightest,omitempty"` // the closest write that still makes it
+	Declined string       `json:"declined,omitempty"` // why nothing was checked
 }
 
 // CheckPFDeadlines proves, over ALL paths, that every playfield write lands before the
@@ -109,7 +127,11 @@ func CheckPFDeadlines(asmPath string) (*PFDeadlineReport, error) {
 			seen[w.Reg]++
 			dl, ok := pfDeadlineFor(w.Reg, seen[w.Reg])
 			if !ok {
-				rep.Unchecked++
+				if isPlayfieldReg(w.Reg) {
+					rep.Unjudged++
+				} else {
+					rep.NotOurs++
+				}
 				continue
 			}
 			rep.Checked++
@@ -142,8 +164,12 @@ func (r *PFDeadlineReport) Summary() string {
 			s += fmt.Sprintf("; tightest is %s at clock %d against a deadline of %d",
 				r.Tightest.Reg, r.Tightest.MaxClock, r.Tightest.Deadline)
 		}
-		if r.Unchecked > 0 {
-			s += fmt.Sprintf(" (%d write(s) had no rule and were NOT checked)", r.Unchecked)
+		if r.NotOurs > 0 {
+			s += fmt.Sprintf(" (%d write(s) to registers no playfield deadline governs)", r.NotOurs)
+		}
+		if r.Unjudged > 0 {
+			s += fmt.Sprintf(" [%d PLAYFIELD write(s) NOT JUDGED: they repeat past the two per "+
+				"line this models, so this verdict is silent about them]", r.Unjudged)
 		}
 		return s
 	}

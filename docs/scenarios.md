@@ -126,7 +126,7 @@ reused as-is for regression). **Unknown fields are an error** (typos are not swa
   The deadlines are the machine's geometry: PF0 by clock 0, PF1 by 16, PF2 by 48, and in repeat mode the
   right half's rewrites by 80 / 96 / 128; `COLUPF`/`COLUBK` by 0.
   **What it cannot judge it says so about rather than passing:** a third write to the same register in one
-  line, or a register with no column rule, is counted in the `NOT checked` figure printed with the verdict,
+  line, or a register with no column rule, is counted in the `outside these rules` figure printed with the verdict,
   and a declined analysis fails instead of passing silently.
 
 `checks` (whole run): `ntsc_frame_lines` (`StepFrame`) / `frame_lines_stable` (`StepFrame` × N, histogram) /
