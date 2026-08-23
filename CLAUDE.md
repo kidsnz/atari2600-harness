@@ -109,6 +109,7 @@ pass is permanently closed.)
   **`watch_ram`** (v1.20.0, RAM-change trap with writing PC) /
   **`read_motion`** (v1.79.0, VV-4: object motion-smoothness / jerk_rms over N frames = judder/ブルブル as a number) /
   **`prove_line_budget`** (v1.80.0, VV-2: STATIC per-scanline budget PROVER over ALL paths = the ∀ sibling of `assert_line_budget`; `cmd/cyclebound`+`internal/cyclebound`) /
+  **`plan_sprite_placement`** (WHERE a row of shapes can go, decided by SEARCH before any asm exists: three grids that do not line up — player `3c−60` floor 3, missile AND ball `3c−61` floor 2, each floor a WINDOW of cycles — plus copies that wrap past 160 and a 3-cycle floor between strobes. Returns object bases + NUSIZ + strobe cycles, or why none exists. `cmd/place`+`internal/place`; constants cross-checked against `litmus_sprite_place` in CI. Placement only — the cycles to WRITE the bytes are `prove_line_budget`'s question) /
   **`beamtrace`** (v1.102.0, AT-2: write→visible-pixel timeline = per scanline, each TIA write's beam clock + the visible span it governs) /
   **`beam_race`** (v1.102.0, AT-3: advisory object-graphics-vs-beam map, factual/no-verdict; paired with scenario `checks.no_beam_race`) /
   **`spritepos`** (v1.102.0, AT-4: forward sprite-position solver = target X → SetXPos input + decomposition + snippet + emulator-verified achieved X) /

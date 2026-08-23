@@ -31,6 +31,11 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
    - `docs/techniques/` → the nearest verified technique to clone.
 2. **Plan against checks** — run the design through `pkg/design` feasibility (budget / color bands /
    multiplex / PF windows / positioning). Reject an unworkable layout **on paper**, before asm.
+   - **If the layout is a row of shapes at fixed x, run `plan_sprite_placement` FIRST** (or
+     `cmd/place`). Where the objects can go is decided by three grids that do not line up, clamps
+     that are windows of cycles, and copies that wrap past 160 — worked out by hand it comes back
+     "impossible" for rows that place fine, which has now happened twice. It returns the bases,
+     NUSIZ codes and strobe cycles, or the reason there are none. `docs/techniques/sprite-placement.md`.
 3. **Author** — write the asm, cloning the nearest verified `roms/techniques/<name>.asm`.
 4. **Pre-flight** — `python3 scripts/check_traps.py <file.asm>` (the static "emu-passes/HW-fails" linter,
    spec = `docs/known-traps.md`). Walk the runtime-only traps (timer wraparound, HMOVE-24cy) by hand /

@@ -27,6 +27,7 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 	"github.com/kidsnz/atari2600-harness/internal/ingest"
 	"github.com/kidsnz/atari2600-harness/internal/motion"
+	"github.com/kidsnz/atari2600-harness/internal/place"
 	"github.com/kidsnz/atari2600-harness/internal/scenario"
 	"github.com/kidsnz/atari2600-harness/internal/spritepos"
 	"github.com/kidsnz/atari2600-harness/internal/srcmap"
@@ -1321,6 +1322,51 @@ func handleEdgeCoincidence(ctx context.Context, req *mcp.CallToolRequest, in Edg
 	return nil, out, nil
 }
 
+// --- plan_sprite_placement (where a row of shapes CAN go, before anyone writes a kernel) ---
+
+type PlanPlacementIn struct {
+	At           []int `json:"at" jsonschema:"left edges, in colour clocks, of the shapes drawn on ONE scanline. In a staggered row that is every other letter, so they are twice the pitch apart."`
+	NoSolidLeft  []int `json:"no_solid_left,omitempty" jsonschema:"indexes into at[] whose LEFT four clocks are not uniform, so a missile cannot stand in for them"`
+	NoSolidRight []int `json:"no_solid_right,omitempty" jsonschema:"indexes into at[] whose RIGHT four clocks are not uniform"`
+	FirstCycle   int   `json:"first_cycle,omitempty" jsonschema:"earliest write cycle the blank line can strobe on (default 16)"`
+	LastCycle    int   `json:"last_cycle,omitempty" jsonschema:"latest write cycle it can strobe on (default 72)"`
+}
+type PlanPlacementOut struct {
+	Placeable bool           `json:"placeable"`
+	Reason    string         `json:"reason,omitempty"`
+	Splits    []string       `json:"splits,omitempty"`
+	Objects   []place.Object `json:"objects,omitempty"`
+}
+
+func handlePlanPlacement(ctx context.Context, req *mcp.CallToolRequest, in PlanPlacementIn) (*mcp.CallToolResult, PlanPlacementOut, error) {
+	if len(in.At) == 0 {
+		return nil, PlanPlacementOut{}, fmt.Errorf("at[] is empty: give the shapes' left edges")
+	}
+	shapes := make([]place.Shape, len(in.At))
+	for i, x := range in.At {
+		shapes[i] = place.Shape{X: x, SolidLeft: true, SolidRight: true}
+	}
+	for _, i := range in.NoSolidLeft {
+		if i >= 0 && i < len(shapes) {
+			shapes[i].SolidLeft = false
+		}
+	}
+	for _, i := range in.NoSolidRight {
+		if i >= 0 && i < len(shapes) {
+			shapes[i].SolidRight = false
+		}
+	}
+	p, err := place.Solve(shapes, in.FirstCycle, in.LastCycle)
+	if err != nil {
+		return nil, PlanPlacementOut{Placeable: false, Reason: err.Error()}, nil
+	}
+	sp := make([]string, len(p.Splits))
+	for i, s := range p.Splits {
+		sp[i] = string(s)
+	}
+	return nil, PlanPlacementOut{Placeable: true, Splits: sp, Objects: p.Objects}, nil
+}
+
 // --- prove_line_budget (VV-2: statically PROVES the per-scanline budget over all reachable paths = the ∀ form of assert_line_budget) ---
 
 type ProveLineBudgetIn struct {
@@ -1908,6 +1954,7 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "assert_edge_coincidence", Description: "Worst-path fuzz for edge-compare kernels (PONG-class): the true per-line worst case is ALL edge variables (ball top/bottom, paddle tops/bottoms...) landing on the SAME Y (+~5cy per extra hit) — an overrun free-running tests can miss for hundreds of frames. Pokes every listed zero-page address to the same Y, runs frames_per_y frames under assert_line_budget semantics, sweeps Y over [y_min..y_max], and reports every failing alignment. Optional patch (auto-restored) for lightweight positioning tables."}, handleEdgeCoincidence)
 	mcp.AddTool(server, &mcp.Tool{Name: "defuse", Description: "Statically answer, over ALL paths, WHICH INSTRUCTION WRITES WHICH ADDRESS — the forall sibling of watch_ram/read_ram_trace, which report only what the runs you did happened to do. Assembles asm_path, walks the CFG, and per WSYNC-to-WSYNC region lists each address's writer PCs and reader PCs (with source locations), plus the whole-program may-write set. Targets are resolved through the EFFECTIVE address, so an indexed store is attributed to the register it actually reaches and a PHA lands wherever SP points (the stack trick writes a TIA register that way, and nothing else here can see it). Also reports UNINITIALISED READS: reads of RAM that no path from reset has definitely written first, which on hardware is power-on rubbish while an emulator hands out a defined value and the bug never surfaces in testing. Use it when a byte is being written from more than one place, when a value looks stale, or before trusting a cell that setup was supposed to fill. DECLINES a bank-switched image outright rather than describing a program that does not exist: this analysis keys on a flat address and reports per flat PC, and on a bank-switched cartridge that produced an empty may-write set for a ROM that demonstrably writes RAM — empty only because the flat 8K fold decodes almost nothing."}, handleDefUse)
 	mcp.AddTool(server, &mcp.Tool{Name: "beam_intervals", Description: "PROVE where every TIA write lands on the scanline, on EVERY path — the forall sibling of beamtrace, which answers for one execution. Assembles asm_path and carries elapsed cycles as an interval through each WSYNC-to-WSYNC region, so each write comes back with the earliest and latest beam clock it can reach (same coordinates as read_row: HBLANK -68..-1, visible 0..159), plus exact=true when its position does not depend on the path at all. A WIDE window is a finding, not a gap: it means the write's position varies with the branch taken, which is a bug in a kernel meant to be cycle-exact; crosses_line marks the worse case where even the SCANLINE depends on the path. Reach for it whenever a colour or graphics register is written after a branch, when one column of one line looks wrong, or to confirm a positioning write is genuinely cycle-exact before building on it. Nothing else in the 2600 ecosystem computes this — the state of the art is hand-counting a single path. Declines a bank-switched image: beam windows are computed from a flat-address decode of one 4K fold, and a confidently wrong beam clock looks exactly like a right one."}, handleBeamIntervals)
+	mcp.AddTool(server, &mcp.Tool{Name: "plan_sprite_placement", Description: "Decide WHERE a row of shapes can be put before writing the kernel that draws it: given the left edges of the shapes on one scanline, search every way the TIA's movable objects can be strobed to cover them, and return the object bases, NUSIZ copy codes and strobe write cycles — or say why no placement exists. Answers the question that arithmetic done by hand gets wrong, because three grids are in play and they do not line up: a player lands at x = 3c-60 and stops at x=3, a missile and the ball land at x = 3c-61 and stop at x=2 (one clock LEFT of anywhere a player can be), each floor is reachable from a WINDOW of write cycles rather than one, a NUSIZ copy past 160 wraps and draws at the left edge on the same line, and two strobes on a line are at least three cycles apart. A 12-clock shape is 8 clocks of player plus 4 of something, and the placer tries all three cuts: player then missile (head-first), missile then player (missile-first, the only way to begin a row at x=2), or two players. Mark a shape in no_solid_left/no_solid_right when that half is not uniform enough for a solid object to stand in for it. This is PLACEMENT only — whether the line then has the cycles to write every shape's bytes is prove_line_budget's question. Every constant is measured by roms/litmus/litmus_sprite_place.asm and cross-checked against it in CI."}, handlePlanPlacement)
 	mcp.AddTool(server, &mcp.Tool{Name: "prove_line_budget", Description: "Statically PROVE a kernel's per-scanline cycle budget over ALL reachable paths (∀) — the static sibling of assert_line_budget, which observes only one run (∃). Assembles asm_path, decodes from the reset/IRQ/NMI vectors, cuts the CFG at every STA WSYNC, and proves each WSYNC-to-WSYNC region's worst-case CPU cycles <= budget (default 76). Returns certified plus any over-budget regions (each with a cycle-by-cycle worst path + source location) and any regions it could not bound (unbounded loop / JSR / indirect JMP), reported honestly rather than passed. Run it BEFORE executing a kernel to catch a branch path that overruns only sometimes — the timing trap that rolls the screen on hardware while a lucky run looks fine. Handles a BANK-SWITCHED cartridge as one merged program keyed on (bank, address): an instruction whose data access reaches a bank-switch hotspot continues at the same address in the bank that hotspot's own mapper symbol names, so a WSYNC-to-WSYNC region that crosses banks gets a real proven worst case (measured: litmus_bank 54cy, _f6 72cy, _f4 128cy — each equal to what the emulator measures for the same interval). Still refused and counted in unmodelled_switches, which blocks certification: an instruction whose own bytes span a hotspot, a jmp/jsr INTO one, an unresolvable indirect access under a hotspot-bearing mapper, a hotspot symbol that does not name a bank, and any mapper whose banks are not the whole 4K window at $F000. On a banked image @lines/@amax cannot be read (DASM's listing addresses are physical ROM offsets there) and source_annotations says so."}, handleProveLineBudget)
 	mcp.AddTool(server, &mcp.Tool{Name: "trace_clocks", Description: "Execute the next N instructions and return each one's beam anatomy: PC, opcode, CPU cycles (WSYNC stalls visible as large counts), and start/end (scanline, color clock). Sub-instruction OBSERVATION granularity — the practical recovery of step_clock (Gopher2600 cannot suspend mid-instruction; see docs/mcp-tools.md)."}, handleTraceClocks)
 	mcp.AddTool(server, &mcp.Tool{Name: "beamtrace", Description: "Write→visible-pixel timeline (authoring aid): trace `frames` frames and return EVERY traced frame separately, each with, per scanline, every TIA write — the beam clock it lands at, the register name/kind, the value, and the visible-pixel span [vis_from,vis_to) it governs (until the next write to the same register). Answers 'where on the line does this sta GRP0 actually paint?', and with frames>1 also 'does it paint the same place NEXT frame?' — flicker and multiplexed sprites alternate between frames, and the first frame after a setup is routinely atypical. Comparing frames needs one call with frames>1: a second call cannot see the same frames, because every call ADVANCES the emulator `frames` frames. Omit `scanline` for all scanlines that have writes (payload grows with frames × scanlines; pass `scanline` to keep it narrow). Set up the state first."}, handleBeamtrace)

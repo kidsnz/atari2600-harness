@@ -8,7 +8,42 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`plan_sprite_placement` / `cmd/place` / `internal/place` — where a row of shapes CAN go,
+  decided by search instead of by arithmetic in someone's head.** Three grids are in play and they
+  do not line up: a player lands at `x = 3c − 60` and stops at 3, a missile **and the ball** land
+  at `x = 3c − 61` and stop at 2 — one clock LEFT of anywhere a player can be — and each floor is
+  reachable from a **window** of write cycles rather than one. Add copies that wrap past 160 and
+  draw at the left edge on the same line, and a three-cycle floor between any two strobes, and the
+  question "can these shapes be placed" stops being answerable by hand. It was answered by hand
+  twice here and came back **"impossible"** both times, for a row that places fine. The placer
+  returns the object bases, NUSIZ copy codes and strobe cycles, or the reason there are none, and
+  it **validates its own answer** before returning it — a wrong plan is worse than no plan. It is
+  placement only; whether the line then has the cycles to write the bytes is `prove_line_budget`'s
+  question. Wired at step 2 of `docs/authoring-protocol.md`, which is where an unworkable layout is
+  supposed to be rejected on paper.
+
 ### Changed
+
+- **`litmus_sprite_place` gained five bands, and technique #35 three rules, all measured.** Bands
+  11–12: a missile is clamped at **x = 2** and obeys `3c − 61` above it. Bands 13–14: **the ball**
+  places exactly like a missile, clamp and all — the fifth movable object, and one this catalogue
+  had never measured. Band 15: a **NUSIZ copy past 160 wraps** and draws at the left edge on the
+  same scanline, so a base strobed on the right reaches positions on the left that no strobe does.
+  The clamp being a WINDOW of write cycles rather than a single one is the load-bearing part: it is
+  what lets an object at the wall be strobed clear of another four pixels to its right, which
+  anywhere else on the grid would be one cycle away and impossible for two 3-cycle stores. Stella
+  agrees on all of it (37/37 write-only TIA registers).
+- **`internal/emu/spriteplace_test.go` now cross-checks `internal/place`'s constants against the
+  fixture that measured them.** Each check re-derives a constant from a band rather than from
+  another constant. Without this the placer could drift from the machine and every answer it gave
+  would still look confident — the failure this project already knows by name.
+- **`docs/techniques/sprite-placement.md`: the three ways to cut a 12-clock shape.** Player-then-
+  missile, missile-then-player, or two players — the cut decides which grid the shape's own x has
+  to sit on, and missile-first is the only one that can begin a row at x=2. Also corrects the
+  mid-line HMOVE section, which recorded write cycle 62 as "moved it correctly": it does not. The
+  earlier measurement watched only WHETHER the object moved, not by how much; at HMP0 = left 3 it
+  moves two pixels where three were asked for. The section now carries the whole table.
 - **The fourth repository is retired, and the count in the shutdown sweep is replaced by an
   enumeration.** `260811_cover-demos` published a browser-playable page of the technojacket
   builds and had served its purpose; the repository is being taken down. The page **cannot be

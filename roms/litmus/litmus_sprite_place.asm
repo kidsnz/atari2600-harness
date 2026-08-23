@@ -18,6 +18,9 @@
 ;   6. a GRP write takes effect at screen x = 3w - 64, so it needs FOUR colour clocks of margin
 ;      ahead of the copy it feeds and not one more
 ;   7. a normal-width player cannot be strobed left of x=3
+;   9. a missile and the ball are clamped at x=2 and a player at x=3, and each clamp spans a
+;      WINDOW of write cycles, not one
+;  10. a NUSIZ copy past 160 wraps to the left edge and draws there on the same line
 ;   8. and a strobe cancels the pending draw of the FIRST copy ONLY — the copies NUSIZ makes at
 ;      +32 and +64 are triggered from the reset position and still land on the strobe line
 ;
@@ -36,6 +39,11 @@
 ;    8     1,3  RESP0 write cycle 17 and 21     -> both land on x=3, the clamp
 ;    9     1,3  RESP0 write cycle 22 and 25     -> x=6 and x=15, the formula above the clamp
 ;   10     2,3  a mid-line strobe               -> copy 0 gone, copies 1 and 2 drawn anyway
+;   11     1,3  RESM0 write cycle 17 and 21     -> both land on x=2, the missile's clamp
+;   12     1,3  RESM0 write cycle 22 and 25     -> x=5 and x=14, the formula above the clamp
+;   13     1,3  RESBL write cycle 24 and 40     -> x=11 and x=59: the ball IS a missile grid
+;   14     1,3  RESBL write cycle 17 and 21     -> both land on x=2, the ball's clamp
+;   15     1-3  P0 at x=120 with three copies   -> 120, 152 and a WRAPPED one at 24
 
         processor 6502
 VSYNC   = $00
@@ -48,6 +56,10 @@ RESP0   = $10
 RESM0   = $12
 GRP0    = $1B
 ENAM0   = $1D
+RESBL   = $14
+ENABL   = $1F
+CTRLPF  = $0A
+COLUPF  = $08
 HMCLR   = $2B
 
         org $F000
@@ -65,6 +77,9 @@ Clr:    dex
         sta COLUBK
         lda #$0E
         sta COLUP0
+        sta COLUPF      ; the ball draws in COLUPF, and bands 13-14 need to see it
+        lda #$20
+        sta CTRLPF      ; ball 4 px wide
 
 Frame:
         lda #2
@@ -487,12 +502,188 @@ Vb:     sta WSYNC
         nop             ; 2
         sta RESP0      ; write cycle 28  -> x=24 while the beam is at 16
         sta WSYNC
+
+; ---- band 11: a missile is clamped at x=2, and the clamp is a WINDOW of write cycles ----
+; Band 8 showed a player clamped at 3. A missile stops one clock further LEFT, at 2 — a place no
+; player can be reached to by any strobe or any copy of one. Both cycles below land on it, and
+; that the clamp spans SEVERAL cycles rather than one is the load-bearing part: it is what lets
+; an object at the wall be strobed clear of another four pixels to its right, which anywhere
+; else on the grid would be one cycle away and therefore impossible for two 3-cycle stores.
+        sta WSYNC
+        lda #$00
+        sta NUSIZ0      ; one copy, missile 1 px
+        lda #0
+        sta GRP0
+        sta ENAM0
+        nop             ; 2
+        sta RESM0      ; write cycle 17  -> the clamp at x=2, not 3c-61
+        sta WSYNC
+        lda #$02
+        sta ENAM0
+        sta WSYNC
+        lda #$00
+        sta NUSIZ0      ; one copy, missile 1 px
+        lda #0
+        sta GRP0
+        sta ENAM0
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        sta RESM0      ; write cycle 21  -> the clamp at x=2, not 3c-61
+        sta WSYNC
+        lda #$02
+        sta ENAM0
+
+; ---- band 12: and above its clamp the missile formula holds ----
+        sta WSYNC
+        lda #0
+        sta ENAM0
+        bit $80         ; 3
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        sta RESM0      ; write cycle 22  -> x=5 = 3*22 - 61
+        sta WSYNC
+        lda #$02
+        sta ENAM0
+        sta WSYNC
+        lda #0
+        sta ENAM0
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        sta RESM0      ; write cycle 25  -> x=14 = 3*25 - 61
+        sta WSYNC
+        lda #$02
+        sta ENAM0
+
+; ---- band 13: the BALL places exactly like a missile ----
+; The fifth movable object, and the one this catalogue had never measured. RESBL obeys the same
+; x = 3c - 61 as RESM, so the ball shares the missile's grid -- one clock left of the player's --
+; and can stand in for a missile wherever a row has run out of them.
+        sta WSYNC
+        lda #0
+        sta ENABL
+        sta ENAM0       ; band 12's missile off, so only the ball is in this band
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        sta RESBL      ; write cycle 24  -> x=11 = 3*24 - 61, same as RESM
+        sta WSYNC
+        lda #$02
+        sta ENABL
+        sta WSYNC
+        lda #0
+        sta ENABL
+        sta ENAM0       ; band 12's missile off, so only the ball is in this band
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        sta RESBL      ; write cycle 40  -> x=59 = 3*40 - 61, same as RESM
+        sta WSYNC
+        lda #$02
+        sta ENABL
+
+; ---- band 14: and the ball is clamped at x=2, like a missile and unlike a player ----
+        sta WSYNC
+        lda #0
+        sta ENABL
+        sta ENAM0
+        bit $80         ; 3
+        nop             ; 2
+        nop             ; 2
+        sta RESBL      ; write cycle 17  -> the clamp at x=2
+        sta WSYNC
+        lda #$02
+        sta ENABL
+        sta WSYNC
+        lda #0
+        sta ENABL
+        sta ENAM0
+        bit $80         ; 3
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        sta RESBL      ; write cycle 21  -> the clamp at x=2
+        sta WSYNC
+        lda #$02
+        sta ENABL
+
+; ---- band 15: a NUSIZ copy past 160 WRAPS and draws at the left edge, on the same line ----
+; P0 is strobed to x=120 with three copies, which NUSIZ puts at 120, 152 and 184. There is no
+; 184 on a 160-clock line: the position counter folds it to 24 and the copy draws THERE, on the
+; same scanline, with whatever GRP0 held when the beam passed. So an object strobed on the right
+; of the screen can put a copy on the far left -- including at positions no strobe can reach.
+        sta WSYNC
+        lda #0
+        sta ENABL
+        sta ENAM0
+        lda #$06
+        sta NUSIZ0      ; three copies, 32 apart
+        bit $80         ; 3
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        nop             ; 2
+        sta RESP0      ; write cycle 60  -> x=120; copies at 120, 152 and 184->24
+        sta WSYNC
+        lda #$80
+        sta GRP0
+        sta WSYNC
+        lda #$80
+        sta GRP0
+        sta WSYNC
+        lda #$80
+        sta GRP0
         sta WSYNC
 
         lda #0
         sta GRP0
         sta ENAM0
-        ldx #147
+        ldx #127
 Rest:   sta WSYNC
         dex
         bne Rest

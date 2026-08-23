@@ -26,6 +26,9 @@ the numbers were re-derived from throwaway probes twice in one session. This fil
 | 7 | a normal-width player **cannot be strobed left of x = 3** | 8, 9 |
 | 8 | a strobe cancels the pending draw of the **FIRST copy only** | 10 |
 | 9 | a DOUBLE-width or QUAD-width player lands at **x = 3c − 59**, never left of x = 4 | — |
+| 10 | a missile is clamped at **x = 2** — one clock LEFT of anywhere a player can be — and **each clamp is a WINDOW of write cycles, not one** | 8, 9, 11, 12 |
+| 11 | the **BALL** places exactly like a missile: same `x = 3c − 61`, same clamp at 2 | 13, 14 |
+| 12 | a NUSIZ copy past 160 **wraps to the left edge and draws there on the same line** | 15 |
 
 Rule 9 is from the same session's probes rather than from this litmus, which grades normal width.
 Width itself is free: double and quad are the same single NUSIZ write and the same landing place;
@@ -80,11 +83,69 @@ from the reset position and land anyway. **A multi-copy object must be cleared.*
 
 ## Don't strobe HMOVE mid-line to hide the bar
 
-Measured, and it does not work: with HMP0 = left 3, a mid-line HMOVE at write cycle 35 and at 50
-moved the object **not at all**, at 62 moved it correctly (from the next line), and at 72 moved it
-**eleven** pixels and then the object vanished. `internal/emu/hmovemid_test.go` already says the
+Measured, and it does not work. **HMOVE is only usable at the top of a line, and its bar is the
+price of using it at all.** A strobe late in the line does suppress the bar — and gives the motion
+counter the wrong number of pulses, so the object moves by an amount nobody asked for:
+
+| HMOVE write cycle | bar | HMP0 = right 1 | HMP0 = left 3 |
+|---|---|---|---|
+| 2 (top of line) | **shown** | +1, correct | −3, correct |
+| 62 | none | **0 — no movement** | **−2, not −3** |
+| 65 | none | −1 | object vanished |
+| 68 / 70 | none | −3 / −4 | object vanished |
+| 72 | none | object vanished | object vanished |
+
+This table replaces an earlier reading of the same experiment which recorded cycle 62 as "moved it
+correctly". It did not: that measurement watched only WHETHER the object moved, not by how much,
+and at HMP0 = left 3 it moves two pixels where three were asked for. Checking the displacement is
+what turned an inconvenient result into a decisive one. `internal/emu/hmovemid_test.go` says the
 same thing from the other direction — of the three strobe positions `litmus_hmove_mid` tries, one
 shifts and two do nothing.
+
+**The consequence for a picture is a layout rule, not a timing one:** a pass that needs an HMOVE
+cannot draw anything in x 0..7 of that line. If it must, the objects have to be arranged so no
+nudge is needed at all — every object seated on the RESP grid, which for two objects 32 px apart
+means making them COPIES of one object instead.
+
+## The three ways to cut a 12-clock shape, and why the cut decides where it can go
+
+A shape twelve colour clocks wide is eight clocks of player and four of something else, and the
+choice of which side the four go on is not cosmetic — it moves the shape onto a different grid.
+
+| cut | left 8 | right 4 | the shape's own x must be | costs |
+|---|---|---|---|---|
+| **head-first** | player at L | missile at L+8 | ≡ 0 (mod 3), ≥ 3 | the right 4 clocks must be uniform (a missile is solid) |
+| **missile-first** | missile at L (px 0,1) | player at L+4 (px 2..5) | ≡ 2 (mod 3), ≥ 2 | the LEFT 4 clocks must be uniform |
+| **two players** | player at L | player at L+8 | ≡ 0 (mod 3), ≥ 3 | a second player slot; no uniformity needed at all |
+
+Missile-first is normally unusable: the missile at L and its player at L+4 are **one write cycle
+apart**, and two stores are three. **At the wall it becomes usable**, because rule 10 says the
+missile's position stops moving there — strobe it at cycle 16 and its player at 22 and both land
+where they must. That is the only way a row can begin at x=2, and x=2 is the only place a row 156
+clocks wide can begin if the margins are to match.
+
+    sta RESM0   ; write cycle 16 -> x=2   (the clamp: 16..21 all land here)
+    sta RESP0   ; write cycle 22 -> x=6
+
+Rule 12 widens it further: a base strobed on the RIGHT of the screen puts a copy on the far LEFT,
+at positions the strobe grid does not reach — at the price of a write to blank that copy if the
+row does not want it.
+
+## Do not work this out by hand — `plan_sprite_placement`
+
+Three grids that do not line up, clamps that are windows, copies that wrap, and a three-cycle floor
+between strobes: this is not arithmetic anyone should do in their head, and the first two attempts
+at it here both returned **"impossible"** for a row that places fine. The search is in
+`internal/place`, reachable as the MCP tool **`plan_sprite_placement`** and as **`cmd/place`**:
+
+    place -at 2,34,66,98,130      # the shapes on ONE scanline; a staggered row is every other one
+
+It returns the object bases, NUSIZ codes and strobe cycles, or the reason there are none. Its
+constants are the ones in the table above, and `internal/emu/spriteplace_test.go` checks them
+against this litmus in CI — so the model cannot drift from the machine without going red.
+
+It answers PLACEMENT only. Whether the line then has the cycles to write every shape's bytes is a
+different question, and `prove_line_budget` is the one that answers it.
 
 ## What this made possible, and where the tool for it lives
 

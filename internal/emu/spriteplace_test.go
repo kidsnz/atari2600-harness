@@ -1,6 +1,10 @@
 package emu
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/kidsnz/atari2600-harness/internal/place"
+)
 
 // TestSpritePlacementPhysics machine-locks where a RESP and a RESM strobe put their object, how
 // late a GRP write can be and still reach the copy it feeds, and what neither of them does on the
@@ -38,7 +42,7 @@ func TestSpritePlacementPhysics(t *testing.T) {
 			return out
 		}
 		for _, r := range rs {
-			if r.Element == "P0" || r.Element == "M0" {
+			if r.Element == "P0" || r.Element == "M0" || r.Element == "BL" {
 				out[r.Element] = append(out[r.Element], run{r.Clock, r.Len})
 			}
 		}
@@ -159,4 +163,67 @@ func TestSpritePlacementPhysics(t *testing.T) {
 	eq("parked at 42", starts(line(10, 1))["P0"], []int{42, 74, 106})
 	eq("the strobe line keeps copies 1 and 2", starts(line(10, 2))["P0"], []int{56, 88})
 	eq("and the line after has all three", starts(line(10, 3))["P0"], []int{24, 56, 88})
+
+	// ---- rule 9: the clamps, and the fact that each is a WINDOW of write cycles ----
+	// A missile stops at 2, one clock left of where a player stops, so x=2 is a position no player
+	// can be put in by any strobe or any copy of one. Both cycles land on it: the clamp is not a
+	// single cycle but a span, and that span is what lets an object AT THE WALL be strobed clear of
+	// another four pixels to its right. Anywhere else on the grid those two strobes are one cycle
+	// apart, which two 3-cycle stores cannot be. A picture as wide as the screen turns on this.
+	eq("RESM0 write cycle 17, clamped", starts(line(11, 1))["M0"], []int{2})
+	eq("RESM0 write cycle 21, clamped", starts(line(11, 3))["M0"], []int{2})
+	eq("RESM0 write cycle 22", starts(line(12, 1))["M0"], []int{5})
+	eq("RESM0 write cycle 25", starts(line(12, 3))["M0"], []int{14})
+
+	// ---- rule 10: the ball is on the missile's grid, clamp and all ----
+	// The fifth movable object, measured here for the first time. RESBL obeys x = 3c - 61 exactly
+	// as RESM does, so wherever a row has run out of missiles the ball is a spare one -- and it can
+	// reach x=2, which no player can.
+	eq("RESBL write cycle 24", starts(line(13, 1))["BL"], []int{11})
+	eq("RESBL write cycle 40", starts(line(13, 3))["BL"], []int{59})
+	eq("RESBL write cycle 17, clamped", starts(line(14, 1))["BL"], []int{2})
+	eq("RESBL write cycle 21, clamped", starts(line(14, 3))["BL"], []int{2})
+
+	// ---- rule 11: a NUSIZ copy past 160 wraps and draws at the left edge, on the SAME line ----
+	// P0 strobed to 120 with three copies: 120, 152, and 184 -- which is not a place on a 160-clock
+	// line. The counter folds it to 24 and it draws there, on the same scanline. So an object
+	// strobed on the right can put a copy on the far left, at positions the strobe grid does not
+	// reach; and a row that does not want that copy has to blank it, which is a write it must pay.
+	eq("a copy past 160 wraps to the left edge", starts(line(15, 1))["P0"], []int{24, 120, 152})
+	eq("and does it every line, not once", starts(line(15, 3))["P0"], []int{24, 120, 152})
+
+	// ---- the placer's model is checked against the hardware it claims to describe ----
+	// internal/place decides where a row of shapes can go, and it decides it from constants. This
+	// is the only place those constants meet the fixture. Without it the placer could drift from
+	// the machine and every answer it gave would still look confident -- the failure this project
+	// already knows by name (a table with numbers in it that nothing recomputes). Each check below
+	// re-derives a constant from a band ABOVE, not from another constant.
+	if got := place.PlayerSlope*24 + place.PlayerIntercept; got != starts(line(0, 1))["P0"][0] {
+		t.Errorf("place: player formula gives x=%d at cycle 24, the machine drew at %d",
+			got, starts(line(0, 1))["P0"][0])
+	}
+	if got := place.SolidSlope*24 + place.SolidIntercept; got != starts(line(2, 1))["M0"][0] {
+		t.Errorf("place: missile formula gives x=%d at cycle 24, the machine drew at %d",
+			got, starts(line(2, 1))["M0"][0])
+	}
+	if place.PlayerFloor != starts(line(8, 1))["P0"][0] {
+		t.Errorf("place: PlayerFloor=%d, the machine clamps at %d",
+			place.PlayerFloor, starts(line(8, 1))["P0"][0])
+	}
+	if place.SolidFloor != starts(line(11, 1))["M0"][0] {
+		t.Errorf("place: SolidFloor=%d, the machine clamps a missile at %d",
+			place.SolidFloor, starts(line(11, 1))["M0"][0])
+	}
+	if b := starts(line(13, 1))["BL"][0]; place.SolidSlope*24+place.SolidIntercept != b {
+		t.Errorf("place: the ball is modelled on the missile grid, but RESBL at cycle 24 drew at %d", b)
+	}
+	if (120+64)%place.LineClocks != starts(line(15, 1))["P0"][0] {
+		t.Errorf("place: LineClocks=%d puts the wrapped copy at %d, the machine drew it at %d",
+			place.LineClocks, (120+64)%place.LineClocks, starts(line(15, 1))["P0"][0])
+	}
+	// And the clamp is a WINDOW: the two cycles that both land on the floor must both be offered.
+	if n := len(place.CyclesForTest(place.SolidFloor, true)); n < 2 {
+		t.Errorf("place: the solid floor is offered from %d write cycles; the machine reaches it "+
+			"from at least two (bands 11 and 14), and that span is what a row at the wall needs", n)
+	}
 }

@@ -62,6 +62,9 @@ A(";   5. a strobe does not draw the new position on the line it runs on")
 A(";   6. a GRP write takes effect at screen x = 3w - 64, so it needs FOUR colour clocks of margin")
 A(";      ahead of the copy it feeds and not one more")
 A(";   7. a normal-width player cannot be strobed left of x=3")
+A(";   9. a missile and the ball are clamped at x=2 and a player at x=3, and each clamp spans a")
+A(";      WINDOW of write cycles, not one")
+A(";  10. a NUSIZ copy past 160 wraps to the left edge and draws there on the same line")
 A(";   8. and a strobe cancels the pending draw of the FIRST copy ONLY — the copies NUSIZ makes at")
 A(";      +32 and +64 are triggered from the reset position and still land on the strobe line")
 A(";")
@@ -80,6 +83,11 @@ A(";    7     1-3  GRP0 <- 0 on cycle 43 / 42 / 41 -> copy 1 keeps 3 px / is cle
 A(";    8     1,3  RESP0 write cycle 17 and 21     -> both land on x=3, the clamp")
 A(";    9     1,3  RESP0 write cycle 22 and 25     -> x=6 and x=15, the formula above the clamp")
 A(";   10     2,3  a mid-line strobe               -> copy 0 gone, copies 1 and 2 drawn anyway")
+A(";   11     1,3  RESM0 write cycle 17 and 21     -> both land on x=2, the missile's clamp")
+A(";   12     1,3  RESM0 write cycle 22 and 25     -> x=5 and x=14, the formula above the clamp")
+A(";   13     1,3  RESBL write cycle 24 and 40     -> x=11 and x=59: the ball IS a missile grid")
+A(";   14     1,3  RESBL write cycle 17 and 21     -> both land on x=2, the ball's clamp")
+A(";   15     1-3  P0 at x=120 with three copies   -> 120, 152 and a WRAPPED one at 24")
 A("")
 A("        processor 6502")
 A("VSYNC   = $00")
@@ -92,6 +100,10 @@ A("RESP0   = $10")
 A("RESM0   = $12")
 A("GRP0    = $1B")
 A("ENAM0   = $1D")
+A("RESBL   = $14")
+A("ENABL   = $1F")
+A("CTRLPF  = $0A")
+A("COLUPF  = $08")
 A("HMCLR   = $2B")
 A("")
 A("        org $F000")
@@ -109,6 +121,9 @@ A("        lda #$00")
 A("        sta COLUBK")
 A("        lda #$0E")
 A("        sta COLUP0")
+A("        sta COLUPF      ; the ball draws in COLUPF, and bands 13-14 need to see it")
+A("        lda #$20")
+A("        sta CTRLPF      ; ball 4 px wide")
 A("")
 A("Frame:")
 A("        lda #2")
@@ -135,13 +150,15 @@ def newline():
     return 0
 
 
-def show(grp=None, enam=None):
+def show(grp=None, enam=None, enabl=None):
     """a display line: put the graphics up in HBLANK and let the objects draw"""
     cy = newline()
     if grp is not None:
         A("        lda #$%02X" % grp); A("        sta GRP0"); cy += 5
     if enam is not None:
         A("        lda #$%02X" % enam); A("        sta ENAM0"); cy += 5
+    if enabl is not None:
+        A("        lda #$%02X" % enabl); A("        sta ENABL"); cy += 5
     return cy
 
 
@@ -249,6 +266,77 @@ show(0x80)                               # line 1: 42, 74, 106
 cy = newline()                           # line 2: the strobe line
 cy = strobe("RESP0", 28, cy, "  -> x=24 while the beam is at 16")
 show()                                   # line 3: 24, 56, 88
+
+A("")
+A("; ---- band 11: a missile is clamped at x=2, and the clamp is a WINDOW of write cycles ----")
+A("; Band 8 showed a player clamped at 3. A missile stops one clock further LEFT, at 2 — a place no")
+A("; player can be reached to by any strobe or any copy of one. Both cycles below land on it, and")
+A("; that the clamp spans SEVERAL cycles rather than one is the load-bearing part: it is what lets")
+A("; an object at the wall be strobed clear of another four pixels to its right, which anywhere")
+A("; else on the grid would be one cycle away and therefore impossible for two 3-cycle stores.")
+for want in (17, 21):
+    cy = newline()
+    A("        lda #$00")
+    A("        sta NUSIZ0      ; one copy, missile 1 px")
+    A("        lda #0")
+    A("        sta GRP0")
+    A("        sta ENAM0")
+    cy = 13
+    cy = strobe("RESM0", want, cy, "  -> the clamp at x=2, not 3c-61")
+    show(None, 0x02)
+
+A("")
+A("; ---- band 12: and above its clamp the missile formula holds ----")
+for want, x in ((22, 5), (25, 14)):
+    cy = newline()
+    A("        lda #0")
+    A("        sta ENAM0")
+    cy = 5
+    cy = strobe("RESM0", want, cy, "  -> x=%d = 3*%d - 61" % (x, want))
+    show(None, 0x02)
+
+A("")
+A("; ---- band 13: the BALL places exactly like a missile ----")
+A("; The fifth movable object, and the one this catalogue had never measured. RESBL obeys the same")
+A("; x = 3c - 61 as RESM, so the ball shares the missile's grid -- one clock left of the player's --")
+A("; and can stand in for a missile wherever a row has run out of them.")
+for want, x in ((24, 11), (40, 59)):
+    cy = newline()
+    A("        lda #0")
+    A("        sta ENABL")
+    A("        sta ENAM0       ; band 12's missile off, so only the ball is in this band")
+    cy = 8
+    cy = strobe("RESBL", want, cy, "  -> x=%d = 3*%d - 61, same as RESM" % (x, want))
+    show(None, None, 0x02)
+
+A("")
+A("; ---- band 14: and the ball is clamped at x=2, like a missile and unlike a player ----")
+for want in (17, 21):
+    cy = newline()
+    A("        lda #0")
+    A("        sta ENABL")
+    A("        sta ENAM0")
+    cy = 8
+    cy = strobe("RESBL", want, cy, "  -> the clamp at x=2")
+    show(None, None, 0x02)
+
+A("")
+A("; ---- band 15: a NUSIZ copy past 160 WRAPS and draws at the left edge, on the same line ----")
+A("; P0 is strobed to x=120 with three copies, which NUSIZ puts at 120, 152 and 184. There is no")
+A("; 184 on a 160-clock line: the position counter folds it to 24 and the copy draws THERE, on the")
+A("; same scanline, with whatever GRP0 held when the beam passed. So an object strobed on the right")
+A("; of the screen can put a copy on the far left -- including at positions no strobe can reach.")
+cy = newline()
+A("        lda #0")
+A("        sta ENABL")
+A("        sta ENAM0")
+A("        lda #$06")
+A("        sta NUSIZ0      ; three copies, 32 apart")
+cy = 13
+cy = strobe("RESP0", 60, cy, "  -> x=120; copies at 120, 152 and 184->24")
+show(0x80)
+show(0x80)
+show(0x80)
 
 newline()                                # a spare line: the cleanup below must not run on line 3
 
