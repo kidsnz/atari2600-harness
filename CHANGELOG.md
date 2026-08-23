@@ -95,6 +95,20 @@ versions follow [Semantic Versioning](https://semver.org/).
     the package's own tests, added along with `mixcheck` and unnoticed until the audit.
 
 ### Fixed
+- **A server that started current reported "not stale" forever.** `analyzerStamp` computed the
+  whole stamp inside one `sync.Once`, on the reasoning that "HEAD moving under a live server is
+  exactly the case being reported, so re-reading it per call would let the warning disappear on
+  its own". That does not hold: the only way a fresh read silences the warning is HEAD returning
+  to the revision the binary was built from, at which point the binary really is current. What the
+  caching bought was the opposite failure — measured by the other session by launching a server
+  with nothing stale, moving HEAD under it, and calling again: same answer, no warning, forever.
+  This is a long-lived MCP server the author reconnects to rarely, so "forever" is days.
+  - The split is now the honest one: the build half (version, revision, build time, dirty) is
+    stamped at link time and cannot change, so it stays cached; HEAD can change, so it is read per
+    call. `headRevisionFn` is a seam rather than a convenience — the half of this file that broke
+    was the half no test could reach, and a test now asserts the repository is read once per call
+    and that the build half does not move between them. Confirmed by putting the stale computation
+    back inside the `Once` and watching the test go red.
 - **Four commands the CHANGELOG already announced had never been committed.** `cmd/bandsplit`,
   `cmd/f0check`, `cmd/gridfind` and `cmd/voicefit` are named seven times across the entries above
   and in `CLAUDE.md`, with no code in the tree: this public repository has been describing tools a

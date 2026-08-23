@@ -54,11 +54,29 @@ type AnalyzerStamp struct {
 var (
 	stampOnce sync.Once
 	stampVal  AnalyzerStamp
+
+	// headRevisionFn is a seam, not a convenience. The half of this file that broke was the half
+	// no test could reach; making the repository lookup replaceable is what lets a test assert
+	// that it happens once PER CALL rather than once per process.
+	headRevisionFn = headRevision
 )
 
-// analyzerStamp reports the running build. Computed once: the binary's own identity
-// cannot change, and HEAD moving under a live server is exactly the case being
-// reported, so re-reading it per call would let the warning disappear on its own.
+// analyzerStamp reports the running build.
+//
+// THE BUILD HALF IS COMPUTED ONCE and the STALE HALF IS NOT, and the split is the point. The
+// binary's own identity — version, revision, build time, whether the tree was dirty when it was
+// made — is fixed at link time and cannot change while the process runs. HEAD can, and does: this
+// is a long-lived MCP server that the author reconnects to rarely.
+//
+// Both used to be inside the same sync.Once, on the reasoning that "HEAD moving under a live
+// server is exactly the case being reported, so re-reading it per call would let the warning
+// disappear on its own". That does not hold. The only way a fresh read makes the warning vanish
+// is HEAD returning to the revision the binary was built from — at which point the binary really
+// is current and silence is the right answer. What the caching actually bought was the opposite
+// failure, measured by the other session on 2026-08-23: a server started when nothing was stale
+// reported "not stale" FOREVER, however many commits landed afterwards. That is precisely the
+// shape this project keeps finding — a check that cannot fail — and it was invisible until the
+// commit before this one made the warning able to fire from the umbrella at all.
 func analyzerStamp() AnalyzerStamp {
 	stampOnce.Do(func() {
 		s := AnalyzerStamp{Version: version.Harness}
@@ -74,10 +92,11 @@ func analyzerStamp() AnalyzerStamp {
 				}
 			}
 		}
-		s.Stale = staleNote(s.Revision, headRevision(), s.Dirty)
 		stampVal = s
 	})
-	return stampVal
+	out := stampVal
+	out.Stale = staleNote(out.Revision, headRevisionFn(), out.Dirty)
+	return out
 }
 
 func shortRev(r string) string {

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -233,5 +234,49 @@ func TestHeadRevisionAnchorsToTheBinaryNotTheWorkingDirectory(t *testing.T) {
 	if fromCwd := headRevisionFrom(cwd); want == "" && got == fromCwd && fromCwd != "" {
 		t.Fatalf("the binary is in no repository, yet headRevision returned the working "+
 			"directory's revision %q: the cwd fallback is back", got)
+	}
+}
+
+// TestTheStaleHalfIsNotCached is the negative control for the split between the two halves of
+// analyzerStamp. A server here lives for days across many calls, so a stale check computed once
+// at startup answers about the moment it was launched and nothing after it — the other session
+// measured exactly that: a server started when nothing was stale reported "not stale" through
+// every later call, however many commits landed. The build half must stay cached (it cannot
+// change) and the repository half must not (it does).
+func TestTheStaleHalfIsNotCached(t *testing.T) {
+	saved := headRevisionFn
+	t.Cleanup(func() { headRevisionFn = saved; stampOnce = sync.Once{}; stampVal = AnalyzerStamp{} })
+
+	stampOnce = sync.Once{}
+	stampVal = AnalyzerStamp{}
+	calls := 0
+	head := "aaaaaaa"
+	headRevisionFn = func() string { calls++; return head }
+
+	first := analyzerStamp()
+	if calls != 1 {
+		t.Fatalf("the repository was read %d times on the first call, want 1", calls)
+	}
+	// The revision the binary was built from is whatever this test binary carries; what matters is
+	// that MOVING HEAD changes the answer on the very next call.
+	head = "bbbbbbb"
+	second := analyzerStamp()
+	if calls != 2 {
+		t.Fatalf("the repository was read %d times over two calls, want 2 — HEAD is being cached", calls)
+	}
+	if first.Version != second.Version || first.Revision != second.Revision ||
+		first.Built != second.Built || first.Dirty != second.Dirty {
+		t.Errorf("the build half changed between calls: %+v then %+v — it is stamped at link "+
+			"time and must be computed once", first, second)
+	}
+	// With a build revision that is neither of the two fake HEADs, both calls should be stale, and
+	// each should name the head it actually read.
+	if first.Revision != "" {
+		if !strings.Contains(first.Stale, "aaaaaaa") {
+			t.Errorf("first call's note does not name the HEAD it read: %q", first.Stale)
+		}
+		if !strings.Contains(second.Stale, "bbbbbbb") {
+			t.Errorf("second call still reports the FIRST head: %q", second.Stale)
+		}
 	}
 }
