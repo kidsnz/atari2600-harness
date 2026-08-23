@@ -49,6 +49,9 @@ type PFDeadline struct {
 // must be in place. Clocks are this project's: HBLANK is -68..-1, visible 0..159.
 // isPlayfieldReg says whether a deadline WOULD govern this register at some repeat count. It is
 // the difference between "not our business" and "our business, and we could not judge it".
+// clocksPerLine is one scanline in TIA colour clocks, measured from a WSYNC.
+const clocksPerLine = 228
+
 func isPlayfieldReg(reg string) bool {
 	switch reg {
 	case "PF0", "PF1", "PF2", "COLUPF", "COLUBK":
@@ -134,6 +137,39 @@ func CheckPFDeadlines(asmPath string) (*PFDeadlineReport, error) {
 				}
 				continue
 			}
+			// A WINDOW THAT STRADDLES A SCANLINE BOUNDARY IS NOT A LATE WRITE, AND NOT AN ON-TIME
+			// ONE EITHER. Colour clocks wrap every 228, so a write pushed a full line back reappears
+			// as a small clock in the NEXT line's HBLANK and compares as comfortably early.
+			// Measured 2026-08-23 by the other session, adding nops at the head of a play region:
+			//
+			//     +10 nops (96 > 76 cycles)  -> 6 of 23 LATE
+			//     +26 nops (128 > 76)        -> 3 of 23 LATE
+			//     +40 nops (156 > 76)        -> ok, all 23 land in time
+			//
+			// Breaking the kernel HARDER made the verdict greener, and the worst one was green.
+			// That is why cmd/cyclebound refuses to run this check on an uncertified kernel — a
+			// blunt rule with a real defect behind it. The rule can be replaced by the fact it was
+			// standing in for: BeamIntervals already marks these writes, and this file had never
+			// read the flag, which is precisely what its own opening paragraph says happened to the
+			// deadline question itself ("BeamIntervals already computes the windows it needs").
+			// Cutting on the measured fact rather than on "is the budget red" also keeps the
+			// answer to the OTHER question — a certified kernel with one wrapping write still gets
+			// its other writes judged.
+			//
+			// THE PREDICATE IS MaxAbs, NOT CrossesLine. CrossesLine is `minAbs/228 != maxAbs/228`,
+			// which is false whenever the window is EXACT — and the measured failure above is a run
+			// of nops, entirely exact, so a CrossesLine test would have caught none of it. The
+			// question is not "is the landing line uncertain" but "is it this line at all": MinAbs
+			// and MaxAbs count colour clocks from the region's own WSYNC, while MaxClock is folded
+			// back modulo 228 by clockAt, so a write at 468 clocks compares as a comfortable 12.
+			// Anything from 228 on is being measured against the deadlines of a line it is not on,
+			// whether it got there by a defect or because the region legitimately spans two lines —
+			// the table describes ONE line either way, so the comparison is not available.
+			// MaxAbs >= 228 subsumes CrossesLine, since a straddling window has maxAbs >= 228.
+			if w.MaxAbs >= clocksPerLine {
+				rep.Unjudged++
+				continue
+			}
 			rep.Checked++
 			d := PFDeadline{Region: reg.StartLoc, Reg: w.Reg, Nth: seen[w.Reg],
 				MaxClock: w.MaxClock, Deadline: dl, LateBy: w.MaxClock - dl}
@@ -168,8 +204,16 @@ func (r *PFDeadlineReport) Summary() string {
 			s += fmt.Sprintf(" (%d write(s) to registers no playfield deadline governs)", r.NotOurs)
 		}
 		if r.Unjudged > 0 {
+			// The third clause says "lands on another line" rather than "which line is not
+			// decided", because MaxAbs >= 228 covers two shapes and only one of them is uncertain.
+			// A run of nops is EXACT: which line it lands on is perfectly decided, just not the one
+			// these deadlines describe. Saying "not decided" about it would be false — and mixing
+			// two meanings into one sentence is exactly what this whole message was rewritten to
+			// stop doing an hour earlier.
 			s += fmt.Sprintf(" [%d PLAYFIELD write(s) NOT JUDGED: they repeat past the two per "+
-				"line this models, so this verdict is silent about them]", r.Unjudged)
+				"line this models, or they land on a scanline other than the one these deadlines "+
+				"describe (a window that straddles the boundary is the uncertain case of that); "+
+				"this verdict is silent about them]", r.Unjudged)
 		}
 		return s
 	}

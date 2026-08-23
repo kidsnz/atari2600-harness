@@ -95,6 +95,30 @@ versions follow [Semantic Versioning](https://semver.org/).
     the package's own tests, added along with `mixcheck` and unnoticed until the audit.
 
 ### Fixed
+- **The playfield-deadline check went GREENER the harder the kernel was broken.** Colour clocks
+  fold back every 228, and `clockAt` folds `MaxClock` with them, so a write pushed a whole scanline
+  late reappears as a small clock in the next line's HBLANK and compares as comfortably early.
+  Measured by the other session, adding nops at the head of a play region: +10 nops (96 cycles over
+  a 76 budget) gave 6 of 23 LATE, +26 gave 3, **+40 gave "all land in time"**. The worst kernel was
+  the green one.
+  - A write whose `MaxAbs` reaches 228 is being measured against the deadlines of a line it is not
+    on — whether a defect put it there or the region legitimately spans two lines, the table
+    describes ONE line either way — so it goes to `Unjudged` instead of being compared. The
+    predicate is `MaxAbs`, **not** `CrossesLine`: that flag is `minAbs/228 != maxAbs/228`, false for
+    any EXACT window, and a run of nops is exact. Measured on the new witness: with `CrossesLine`
+    it sets nothing aside and judges the wrapped writes anyway (10 checked, 2 late, 0 unjudged);
+    with `MaxAbs` it sets 7 aside and judges the 3 that stayed in their line.
+  - `roms/litmus/pf_wraps.asm` is the third witness beside `pf_ontime` and `pf_late`, and two
+    corpus sweeps enrolled it the moment it existed: `TestNoRomBreathesAcrossFrames` (a kernel that
+    overruns cannot hold a frame length — now a named exclusion with its measured distribution) and
+    the Stella TIA oracle (now queued for capture). Neither had to be remembered.
+  - **Measured across the corpus, which is the point of splitting the count**: of the 83 scenarios
+    that set `pf_deadlines`, zero have an unjudged playfield write under either predicate. This
+    closes a hole the tree does not currently contain — and the next kernel to fall into it will be
+    told rather than congratulated.
+  - `cmd/cyclebound` still declines the check entirely on an uncertified kernel while `cmd/scenario`
+    runs it, so the two tools answer the same question differently. That difference is now the only
+    one left, and it is written down here rather than left to be rediscovered.
 - **Deleting a branch ran the full 5 min 41 s pre-push gate on a commit nobody was pushing.**
   `git push --delete branch` sends an all-zero local sha; the loop skipped it, `SHA` stayed empty,
   and the fallback reached for HEAD — so the hook built and tested the working tree's HEAD, which

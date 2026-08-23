@@ -15,6 +15,14 @@ import (
 // than listed.
 var framelinesExclusions = map[string]string{
 	"framelines_trap": "the witness for scenario check frame_lines_stable — it spends an extra line every 128th frame ON PURPOSE",
+	"pf_wraps": "the third witness for the playfield-DEADLINE check, and it overruns its line ON " +
+		"PURPOSE: forty nops at the head of the kernel push every playfield store onto the FOLLOWING " +
+		"scanline, which is the whole point — colour clocks fold back every 228, so a write a line " +
+		"late compares as comfortably early and the verdict goes greener the harder the kernel is " +
+		"broken. A kernel that overruns cannot hold a frame length, and measured over 130 frames " +
+		"this one holds none (4x1 6x1 ... 44x1 350x21). Its siblings pf_ontime and pf_late both fit " +
+		"76 cycles and are swept normally, so this is one witness's shape and not an exemption for " +
+		"the pair it belongs to",
 	"cart_f4sc": "a bank-switch/superchip FINGERPRINT fixture, not a display ROM: every one of its " +
 		"eight banks ends `lda $FFF4 / jmp .reset`, handing back to bank 0 and re-entering the reset " +
 		"vector, so the machine ping-pongs between banks instead of driving frames. Measured over 130 " +

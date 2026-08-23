@@ -8,6 +8,7 @@ import (
 const (
 	pfOnTime = "../../roms/litmus/pf_ontime.asm"
 	pfLate   = "../../roms/litmus/pf_late.asm"
+	pfWraps  = "../../roms/litmus/pf_wraps.asm"
 )
 
 // The witness. pf_late puts three cycles of index arithmetic at the TOP of the line, and
@@ -159,5 +160,60 @@ func TestNotOursAndUnjudgedAreDifferentQuestions(t *testing.T) {
 	}
 	if !isPlayfieldReg("PF0") {
 		t.Error("a third PF0 write would be counted as somebody else's register")
+	}
+}
+
+// The third witness. Colour clocks fold back every 228, so a write pushed a whole scanline late
+// reappears as a small clock in the NEXT line's HBLANK and compares as comfortably early. Measured
+// on a real work by adding nops at the head of a play region: +10 nops gave 6 LATE, +26 gave 3,
+// +40 gave "all land in time". Breaking the kernel harder made the verdict greener, and the worst
+// one was green. pf_wraps is that shape minimised.
+//
+// The check must not call these writes on time, and must not call them late either — neither is
+// true. They belong in Unjudged, and the writes that DID stay in their own line must still be
+// judged: a kernel that wraps some of its stores is not a kernel this check has nothing to say
+// about.
+func TestWritesThatLandOnAnotherLineAreNotJudged(t *testing.T) {
+	rep, err := CheckPFDeadlines(pfWraps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Unjudged == 0 {
+		t.Fatalf("pf_wraps puts forty nops before its first store, so its playfield writes land "+
+			"on the following scanline, and none of them was reported as unjudged: %s", rep.Summary())
+	}
+	if rep.Checked == 0 {
+		t.Errorf("every write was set aside; the ones still inside their own line should be "+
+			"judged: %s", rep.Summary())
+	}
+	if !strings.Contains(rep.Summary(), "NOT JUDGED") {
+		t.Errorf("the verdict does not say it is silent about them: %q", rep.Summary())
+	}
+}
+
+// The predicate is MaxAbs, and CrossesLine is not a substitute for it. CrossesLine is
+// `minAbs/228 != maxAbs/228`, so it is FALSE for any exact window — and a run of nops is exact.
+// Measured on pf_wraps: with CrossesLine the report sets nothing aside and judges the wrapped
+// writes anyway; with MaxAbs it sets seven aside and judges the three that stayed. This test
+// pins the property that distinguishes them, so the cheaper-looking flag cannot be swapped back
+// in by someone reading only its name.
+func TestAnExactWindowPastTheLineIsStillPastTheLine(t *testing.T) {
+	rep, err := BeamIntervals(pfWraps)
+	if err != nil {
+		t.Skipf("beam intervals unavailable: %v", err)
+	}
+	sawExactPast := false
+	for _, reg := range rep.Regions {
+		for _, w := range reg.Writes {
+			if w.MaxAbs >= clocksPerLine && w.Exact {
+				sawExactPast = true
+				if w.CrossesLine {
+					t.Errorf("%s at %d clocks is exact, so CrossesLine should be false", w.Reg, w.MaxAbs)
+				}
+			}
+		}
+	}
+	if !sawExactPast {
+		t.Skip("this build of pf_wraps has no exact write past a line boundary")
 	}
 }
