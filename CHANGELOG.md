@@ -95,6 +95,15 @@ versions follow [Semantic Versioning](https://semver.org/).
     the package's own tests, added along with `mixcheck` and unnoticed until the audit.
 
 ### Fixed
+- **Four commands the CHANGELOG already announced had never been committed.** `cmd/bandsplit`,
+  `cmd/f0check`, `cmd/gridfind` and `cmd/voicefit` are named seven times across the entries above
+  and in `CLAUDE.md`, with no code in the tree: this public repository has been describing tools a
+  clone does not contain. They are adopted here, with the two repairs the gates asked for — a
+  calibration test for `FirstOnset` and `HarmonicsF` (synthetic input, literal answer, DC as the
+  negative control), and three tests in `internal/scenario` that asserted only that their fixtures
+  loaded, now asserting the fact each one is named after. `check_tests` then caught a test THIS
+  change had just added with no failure path at all; it was rewritten to go red if the anchor
+  regresses.
 - **The stale-binary warning was dead in the deployment it was written for.** `headRevision`
   walked up from the WORKING DIRECTORY, and `.mcp.json` sets no `cwd`, so the server inherits the
   client's: the umbrella directory holding harness/, roms/ and sandbox/, which belongs to no

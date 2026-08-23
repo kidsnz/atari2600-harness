@@ -222,6 +222,18 @@ func MeasureFundamental(samples []uint8, lo, hi int) (period int, corr float64) 
 // Derived independently two ways and agreed to three decimals: this DFT of the machine's
 // own output, and an ideal two-level reconstruction from the measured run lengths.
 func Harmonics(samples []uint8, period float64, n int) []float64 {
+	f := make([]float64, len(samples))
+	for i, v := range samples {
+		f[i] = float64(v)
+	}
+	return HarmonicsF(f, period, n)
+}
+
+// HarmonicsF is Harmonics over float samples, so a REFERENCE RECORDING can be put on the
+// same axis as the machine's own output. Harmonics takes the emulator's 4-bit stream and
+// delegates here; the arithmetic is one copy so a spectrum measured off a WAV and one
+// measured off the TIA cannot drift apart, which is the whole basis of comparing them.
+func HarmonicsF(samples []float64, period float64, n int) []float64 {
 	if period < 2 || n < 1 || len(samples) < int(period) {
 		return nil
 	}
@@ -231,7 +243,7 @@ func Harmonics(samples []uint8, period float64, n int) []float64 {
 	}
 	var mean float64
 	for i := 0; i < whole; i++ {
-		mean += float64(samples[i])
+		mean += samples[i]
 	}
 	mean /= float64(whole)
 
@@ -241,7 +253,7 @@ func Harmonics(samples []uint8, period float64, n int) []float64 {
 		var re, im float64
 		for i := 0; i < whole; i++ {
 			th := 2 * math.Pi * float64(k) * float64(i) / period
-			v := float64(samples[i]) - mean
+			v := samples[i] - mean
 			re += v * math.Cos(th)
 			im -= v * math.Sin(th)
 		}
@@ -482,4 +494,81 @@ func EmitSFX(label string, frames []SFXFrame) string {
 		fmt.Fprintf(&b, "        byte $%02X,$%02X\n", fr.C<<4|fr.V&0x0F, fr.F)
 	}
 	return b.String()
+}
+
+// MeasuredSpectra is the normalised amplitude of harmonics 1..8 of each pitched waveform,
+// measured on the emulator at AUDF 9 and pinned here.
+//
+// WHY IT LIVES HERE AND NOT IN A TEST. It was in internal/emu/audioshape_test.go, which meant
+// no tool could reach it: choosing a waveform by TIMBRE — the thing an author actually does —
+// had numbers behind it that only a test could see. That is the third time in this repository
+// something real has been unreachable (internal/keyfit and internal/mixmatch had no CLI, six
+// commands were missing from CLAUDE.md), so the table moves to the package the tools import
+// and the test becomes what it should always have been: the check that the pinned table still
+// matches the hardware.
+//
+// WHAT THE NUMBERS SAY. The shape test alongside it proves each waveform keeps its shape
+// across AUDF, so one AUDF measures the timbre. Reading down the first column: only 4, 12, 6
+// and 14 put most of their energy in the fundamental, and of those only 6 and 14 reach a bass
+// register. 4 and 12 are one timbre in two registers — their spectra agree to .02 — and both
+// have NO even harmonics, which is what makes them square-like and what stops them matching
+// any source with a gentle roll-off. 1 and 7 are nearly flat: every harmonic as loud as the
+// fundamental, which reads as bright and buzzy rather than as a pitch. 2 speaks about an
+// octave above where Freq puts it, because its second harmonic is six times its first.
+//
+// The tolerance the test allows is 0.02, and it is not zero because the DFT runs over a whole
+// number of cycles of an INTEGER period: AUDC 4 at AUDF 9 has twenty samples per cycle and
+// reads .574 where an ideally oversampled reconstruction gives .596.
+var MeasuredSpectra = map[int][]float64{
+	4:  {.574, .000, .198, .000, .127, .000, .101, .000},
+	12: {.594, .000, .199, .000, .120, .000, .087, .000},
+	6:  {.476, .119, .119, .104, .029, .082, .014, .055},
+	14: {.512, .043, .166, .043, .094, .042, .061, .040},
+	1:  {.149, .146, .141, .133, .125, .114, .102, .090},
+	7:  {.130, .130, .129, .127, .125, .123, .120, .117},
+	15: {.083, .161, .053, .065, .184, .052, .017, .384},
+	2:  {.037, .228, .035, .223, .032, .214, .028, .202},
+}
+
+// PitchedWaveforms are the AUDC values MeasuredSpectra covers, in a fixed order so that any
+// tool listing them lists them the same way. 0, 11 and 13 are silence or DC and 3, 5, 8, 9,
+// 10 are noise: none of them has a repeating shape to have a spectrum of.
+var PitchedWaveforms = []int{1, 2, 4, 6, 7, 12, 14, 15}
+
+// SpectrumDistance compares a reference harmonic series against a waveform's, after
+// normalising each so its fundamental is 1. It returns RMS distance in dB per harmonic over
+// the first min(len) harmonics; smaller is closer.
+//
+// NORMALISED BY THE FUNDAMENTAL, and in dB, on purpose. Absolute amplitude is loudness, which
+// on this machine is a separate 4-bit control, so comparing raw amplitudes would rank
+// waveforms by how loud they happen to be. dB rather than linear because the ear hears ratios:
+// a harmonic at .01 against .05 is the same audible difference as .1 against .5, and a linear
+// metric would call the first pair nearly identical.
+func SpectrumDistance(ref, cand []float64) float64 {
+	n := len(ref)
+	if len(cand) < n {
+		n = len(cand)
+	}
+	if n == 0 || ref[0] <= 0 || cand[0] <= 0 {
+		return math.Inf(1)
+	}
+	const floor = 1e-4 // -80 dB; a harmonic that is absent must not be an infinite distance
+	sum, cnt := 0.0, 0
+	for k := 0; k < n; k++ {
+		a := ref[k] / ref[0]
+		b := cand[k] / cand[0]
+		if a < floor {
+			a = floor
+		}
+		if b < floor {
+			b = floor
+		}
+		d := 20 * math.Log10(a/b)
+		sum += d * d
+		cnt++
+	}
+	if cnt == 0 {
+		return math.Inf(1)
+	}
+	return math.Sqrt(sum / float64(cnt))
 }

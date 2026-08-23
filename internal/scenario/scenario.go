@@ -244,8 +244,66 @@ func Load(path string) (*Scenario, error) {
 	if s.Rom == "" {
 		return nil, fmt.Errorf("%s: \"rom\" is required", path)
 	}
+	if err := s.checkGoldenCoverage(path); err != nil {
+		return nil, err
+	}
 	s.srcPath = path
 	return &s, nil
+}
+
+// checkGoldenCoverage refuses a golden_audio / golden_mix check that hashes nothing.
+//
+// HOW THIS HOLE WORKS. The run length is not taken from "frames" alone: it is the larger of
+// "frames" and the highest at_frame in inputs/asserts. A scenario with an audio golden and
+// NEITHER runs one frame, so the digest is over one frame of silence and matches whatever it
+// was recorded against. Measured on a real work: an audio scenario with no "frames" stayed
+// green after its hi-hats were deleted from the ROM entirely.
+//
+// WHY THE THRESHOLD IS TWO AND NOT THIRTY. Coverage varies with how a scenario is written
+// rather than with intent: in this repository's own net, roms/techniques sound_driver reaches
+// frame 70 through its asserts and hashes 70 frames, while roms/litmus audio.json reaches
+// frame 2 and hashes 2. Two frames is weak and it is not nothing — the litmus that uses it
+// checks register values through asserts and the golden is a backstop. So a run that covers
+// less than two frames is an ERROR, because no arrangement of sound is audible in one frame,
+// and a run that covers less than a second gets a warning on stderr and still runs. Turning
+// the warning into an error is a decision about 7 existing scenarios, not about this code.
+func (s *Scenario) checkGoldenCoverage(path string) error {
+	if s.Checks == nil || (!s.Checks.GoldenAudio && !s.Checks.GoldenMix) {
+		return nil
+	}
+	cover := s.Frames
+	for _, a := range s.Asserts {
+		if a.AtFrame+1 > cover {
+			cover = a.AtFrame + 1
+		}
+	}
+	for _, i := range s.Inputs {
+		if i.Frame+1 > cover {
+			cover = i.Frame + 1
+		}
+	}
+	if s.Fuzz != nil && s.Fuzz.Frames > cover {
+		cover = s.Fuzz.Frames
+	}
+	which := "golden_audio"
+	if s.Checks.GoldenMix {
+		which = "golden_mix"
+		if s.Checks.GoldenAudio {
+			which = "golden_audio/golden_mix"
+		}
+	}
+	if cover < 2 {
+		return fmt.Errorf("%s: %s hashes %d frame(s) — it cannot fail, whatever the ROM does. "+
+			"The run length is max(\"frames\", highest at_frame), and this scenario sets neither. "+
+			"Add \"frames\": <enough to hear the part> — a bar at 126 BPM is about 114",
+			path, which, cover)
+	}
+	if cover < 60 {
+		fmt.Fprintf(os.Stderr, "%s: warning: %s hashes only %d frame(s) (%.2f s). "+
+			"Anything the ROM does after that is not covered.\n", path, which, cover,
+			float64(cover)/59.9227)
+	}
+	return nil
 }
 
 // goldenPath は scenario ファイルパスから対応する .golden ファイルのパスを返す。

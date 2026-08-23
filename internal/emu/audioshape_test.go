@@ -248,8 +248,9 @@ func sameCycle(a, b []int) bool {
 // A pitch table says where a waveform's fundamental sits and nothing about whether the
 // fundamental is the loudest thing in it -- and on this machine it very often is not.
 //
-// Pinned as a golden because the practical conclusions in audio.Harmonics' comment rest
-// on these figures: that AUDC 2 speaks about an octave above where Freq puts it, that
+// Pinned as a golden in audio.MeasuredSpectra — which is where the numbers themselves now
+// live, so that cmd/voicefit and anything else can read them — because the practical
+// conclusions in audio.Harmonics' comment rest on these figures: that AUDC 2 speaks about an octave above where Freq puts it, that
 // AUDC 4 and 12 are one timbre in two registers, and that only 6 and 14 pair a strong
 // fundamental with a bass divisor.
 //
@@ -262,17 +263,12 @@ func TestTheWaveformSpectraAreWhatAnAuthorChoosesBy(t *testing.T) {
 	if testing.Short() {
 		t.Skip("captures audio")
 	}
+	// The table used to be a literal here. It is now audio.MeasuredSpectra, because a tool
+	// choosing a waveform by TIMBRE needs to import it and a _test.go file cannot be imported.
+	// This test's job is unchanged and is now stated more honestly: it is what proves the
+	// pinned table still matches the hardware.
 	const audf, tol = 9, 0.02
-	want := map[int][]float64{
-		4:  {.574, .000, .198, .000, .127, .000, .101, .000},
-		12: {.594, .000, .199, .000, .120, .000, .087, .000},
-		6:  {.476, .119, .119, .104, .029, .082, .014, .055},
-		14: {.512, .043, .166, .043, .094, .042, .061, .040},
-		1:  {.149, .146, .141, .133, .125, .114, .102, .090},
-		7:  {.130, .130, .129, .127, .125, .123, .120, .117},
-		15: {.083, .161, .053, .065, .184, .052, .017, .384},
-		2:  {.037, .228, .035, .223, .032, .214, .028, .202},
-	}
+	want := audio.MeasuredSpectra
 	for audc, w := range want {
 		e, err := New("NTSC")
 		if err != nil {

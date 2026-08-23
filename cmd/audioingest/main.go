@@ -16,6 +16,33 @@
 // READ THE CONFIDENCE AND CENTS COLUMNS. A step with low confidence is the analyser
 // saying it could not hear a bass note there, and a large cents figure is the TIA
 // saying it cannot play the one that is there. Both are findings, not noise.
+//
+// BEFORE YOU MEASURE ANYTHING: IS THIS FILE ONE SOURCE?
+//
+// Band-limiting selects a FREQUENCY RANGE. It does not select an INSTRUMENT. Everything the
+// record has in that range stays: the kick's body, other parts' harmonics, the reverb tail.
+// Measured cost of forgetting this, on the job these tools come from — a part was "isolated"
+// by cutting a mix to 110-300 Hz and then measured, reproduced and verified for days. The
+// goldens were green, the negative controls fired, the prover certified the kernel and the ROM
+// followed the measured line to within 36.6 cents. It was still the wrong sound, and the author
+// heard it in seconds.
+//
+// SEPARATE BY SOURCE FIRST. It costs about ten seconds and it is not an Atari problem:
+//
+//	python3 -m demucs -n htdemucs_ft -d mps -o stems track.wav
+//	bandsplit -files stems/htdemucs_ft/track/{bass,drums,other,vocals}.wav -out /tmp/pick.html
+//	open /tmp/pick.html          # and ask which one holds the part
+//
+// Then measure the stem, not the mix. On that job the acid line came back in `bass` (a bassline
+// separator looks where the line lives, 49-116 Hz) and `other` was empty at -24.5 dB. Separating
+// took the two-bar correlation from 0.681-vs-0.963 to 0.223-vs-0.979 and the per-note pitch
+// confidence from a median 0.69 to 0.77.
+//
+// A checker for this was written and then DELETED. Its verdict flipped with the analysis band on
+// the same file (a bass stem read 99.6% "one source" over 30-400 Hz and 44.1% "a mixture" over
+// 60-1000), and it called another record's full mix a single source. More to the point: if the
+// right move is always to separate — and at ten seconds it is — then a tool that tells you
+// whether to separate has no decision to inform. The knowledge belongs here, not in a command.
 package main
 
 import (

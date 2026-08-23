@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -68,6 +69,10 @@ func main() {
 	top := flag.Int("top", 8, "how many tonics to print")
 	clock := flag.Float64("clock", ntscClock, "TIA audio base clock (NTSC default; PAL is 3546894/114)")
 	asJSON := flag.Bool("json", false, "emit JSON instead of a table")
+	waves := flag.String("waves", "", "restrict to these AUDC values, e.g. 6 — the figure then uses ONE timbre")
+	fine := flag.Bool("fine", false, "-degrees: sweep tonics CONTINUOUSLY between -lo and -hi instead of on the semitone grid")
+	hi := flag.Float64("hi", 0, "-fine: highest tonic to try, Hz (default -lo x 2^-octaves)")
+	cstep := flag.Float64("cstep", 5, "-fine: tonic resolution in cents")
 	flag.Parse()
 
 	switch {
@@ -106,12 +111,37 @@ func main() {
 		os.Exit(2)
 	}
 
+	var wv []int
+	if *waves != "" {
+		for _, part := range strings.Split(*waves, ",") {
+			v, err := strconv.Atoi(strings.TrimSpace(part))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "-waves: %v\n", err)
+				os.Exit(2)
+			}
+			wv = append(wv, v)
+		}
+	}
 	var fits []keyfit.Fit
-	if *tonic > 0 {
+	switch {
+	case *tonic > 0 && wv != nil:
+		fits = []keyfit.Fit{keyfit.FitTonicVoices(*tonic, deg, wv, *clock)}
+	case *tonic > 0:
 		fits = []keyfit.Fit{keyfit.FitTonic(*tonic, deg, *clock)}
-	} else if *detune > 0 {
+	case *fine || wv != nil:
+		// Continuous, and restricted if asked. Both are needed for the same question — "one
+		// type of sound only" — because the best tonic for a SINGLE waveform is generally not
+		// on the semitone grid: for AUDC 6 over {0,3,4,5,10,12,15} it is 38.41 Hz, D#1 minus 21
+		// cents, which no grid sweep reaches. Before this, that fit had to be hand-rolled, and
+		// it was, twice in one session.
+		top := *hi
+		if top <= 0 {
+			top = *lo * math.Pow(2, float64(*octaves))
+		}
+		fits = keyfit.SweepVoices(*lo, top, *cstep, deg, wv, *clock)
+	case *detune > 0:
 		fits = keyfit.SweepDetuned(*lo, *detune, *step, deg, *clock)
-	} else {
+	default:
 		fits = keyfit.Sweep(*lo, *octaves, deg, *clock)
 	}
 

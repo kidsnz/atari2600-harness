@@ -240,7 +240,11 @@ func F0(w []float64, rate, loHz, hiHz float64) (hz, conf float64) {
 	if r0 == 0 {
 		return 0, 0
 	}
-	loLag, hiLag := int(rate/hiHz), int(rate/loHz)
+	// Ceil, not truncate. int(44100/800) is 55 and 44100/55 is 801.8 Hz, so truncating the
+	// short end lets the search return a frequency above the hiHz it was given. Rounding the
+	// lag DOWN in frequency at both ends keeps the answer inside the range the caller asked
+	// for, which is the whole contract of taking a range.
+	loLag, hiLag := int(math.Ceil(rate/hiHz)), int(rate/loHz)
 	if hiLag >= len(x) {
 		hiLag = len(x) - 1
 	}
@@ -260,11 +264,25 @@ func F0(w []float64, rate, loHz, hiHz float64) (hz, conf float64) {
 	// Parabolic interpolation around the peak: one lag at 4 kHz is ~2 semitones at
 	// 100 Hz, so taking the integer lag would quantise the answer more coarsely than
 	// the thing being measured.
-	y1, y2, y3 := acf(x, bestLag-1), best, acf(x, bestLag+1)
-	den := y1 - 2*y2 + y3
+	// Interpolate only when the peak has a lag on each side INSIDE the search range. On the
+	// edge there is no summit to interpolate, only a slope: den goes to nothing and the
+	// correction runs away. Measured, a window whose true period lay outside loHz..hiHz
+	// returned -488 Hz that way, and clamping the correction to half a sample still let it
+	// return 809 Hz from a search that was told to stop at 800. A frequency outside the
+	// range the caller asked for is not a near miss; it is a value no caller can defend
+	// against. At the edge the integer lag is the honest answer, and F0Checked is what says
+	// the answer is suspect.
 	delta := 0.0
-	if den != 0 {
-		delta = 0.5 * (y1 - y3) / den
+	if bestLag > loLag && bestLag < hiLag {
+		y1, y2, y3 := acf(x, bestLag-1), best, acf(x, bestLag+1)
+		if den := y1 - 2*y2 + y3; den != 0 {
+			delta = 0.5 * (y1 - y3) / den
+			if delta > 0.5 {
+				delta = 0.5
+			} else if delta < -0.5 {
+				delta = -0.5
+			}
+		}
 	}
 	return rate / (float64(bestLag) + delta), best / r0
 }
@@ -362,6 +380,372 @@ func BassNotes(samples []float64, rate int, startSec, stepSec float64, steps int
 			}
 		}
 		out = append(out, n)
+	}
+	return out
+}
+
+// ---- octave safety -------------------------------------------------------------
+//
+// WHY THIS EXISTS. F0 searches loHz..hiHz and cannot return anything outside it. That is
+// correct behaviour and it is also a trap: if the caller's band excludes the real
+// fundamental, F0 returns a HARMONIC of it, confidently and with no way for the caller to
+// tell. On the Transistor Dub work a lead line was measured over 110-800 Hz for two days
+// and read 194 Hz; its fundamental is 96.9 Hz, below the band, and 194 Hz was its second
+// harmonic. Two independent methods were needed to find that out. This makes it a
+// property the code reports rather than a mistake a person has to remember not to make.
+//
+// THE TEST. Autocorrelation at twice the found lag is high for ANY periodic signal, so
+// "energy at 2L" proves nothing on its own. What separates the two cases is which lag
+// correlates BETTER once the comparison is made lag-fair: for a signal whose period really
+// is L, ncc(2L) <= ncc(L); for one whose period is 2L, ncc(2L) > ncc(L) strictly. The
+// normalised cross-correlation below divides by the energy of the two overlapping segments
+// so that it does not decay with lag on its own, which the plain sum does.
+
+// F0Detail is what F0 found, together with the evidence for whether it is really the
+// fundamental or a harmonic of one the search range could not reach.
+type F0Detail struct {
+	Hz   float64 // what F0 returns
+	Conf float64 // its normalised autocorrelation peak
+
+	// SubHz is a LOWER fundamental that fits the same window better. Zero when none was
+	// found. SubRatio is Hz/SubHz when that is close to a whole number (2 = an octave down,
+	// 3 = a twelfth) and 0 when the relationship is not a simple one.
+	SubHz    float64
+	SubRatio int
+	SubNCC   float64 // the lag-fair correlation there
+	NCC      float64 // the lag-fair correlation at Hz, for comparison
+
+	// BelowRange is the finding that matters: the lower fundamental lies under loHz, so the
+	// caller's own search range is what hid it.
+	BelowRange bool
+}
+
+// Suspect reports whether the caller should not trust Hz as a fundamental.
+func (d F0Detail) Suspect() bool { return d.SubHz > 0 }
+
+// ncc is the normalised cross-correlation of x with itself at lag, in -1..1. Unlike the
+// plain sum it does not fall off with lag merely because fewer samples overlap, which is
+// what makes correlations at L and 2L comparable.
+func ncc(x []float64, lag int) float64 {
+	if lag <= 0 || lag >= len(x) {
+		return 0
+	}
+	var num, ea, eb float64
+	for i := 0; i+lag < len(x); i++ {
+		num += x[i] * x[i+lag]
+		ea += x[i] * x[i]
+		eb += x[i+lag] * x[i+lag]
+	}
+	if ea <= 0 || eb <= 0 {
+		return 0
+	}
+	return num / math.Sqrt(ea*eb)
+}
+
+// F0Checked runs F0 and then goes looking BELOW the search range for a period that fits
+// the same window better. subMargin is how much better the lower lag must correlate before
+// it is believed; 0.02 rejects the ordinary jitter of an in-range answer.
+//
+// It searches rather than testing integer multiples of the found lag, because the found
+// peak is not always a harmonic of the true fundamental: a squarewave read from above its
+// fundamental leaves partials 3f, 5f and 7f, whose in-band autocorrelation peak sits at no
+// simple ratio to f at all. floorHz bounds how far down it looks; pass 0 for loHz/4, and
+// note that the window must be long enough to hold a couple of cycles at floorHz or there
+// is nothing there to find.
+func F0Checked(w []float64, rate, loHz, hiHz, floorHz float64) F0Detail {
+	d := F0Detail{}
+	d.Hz, d.Conf = F0(w, rate, loHz, hiHz)
+	if d.Hz <= 0 {
+		return d
+	}
+	if floorHz <= 0 {
+		floorHz = loHz / 4
+	}
+	if floorHz < 20 {
+		floorHz = 20
+	}
+	mean := 0.0
+	for _, v := range w {
+		mean += v
+	}
+	mean /= float64(len(w))
+	x := make([]float64, len(w))
+	for i, v := range w {
+		x[i] = v - mean
+	}
+	d.NCC = ncc(x, int(math.Round(rate/d.Hz)))
+
+	const subMargin = 0.02
+	// Everything from just under the search range down to floorHz. Two cycles must fit, or
+	// the correlation is measured on too little overlap to mean anything.
+	//
+	// Decimated by DEC first. This search is for LOW frequencies, so throwing away three of
+	// every four samples costs nothing it is looking for and makes it sixteen times cheaper
+	// — the loop is O(samples x lags) and undecimated it took 18 s on the package's own
+	// tests, against a CI budget with under two minutes of slack.
+	const dec = 4
+	dx := make([]float64, len(x)/dec)
+	for i := range dx {
+		dx[i] = x[i*dec]
+	}
+	drate := rate / dec
+	from := int(drate/loHz) + 1
+	to := int(drate / floorHz)
+	if to > len(dx)/2 {
+		to = len(dx) / 2
+	}
+	dNCC := ncc(dx, int(math.Round(drate/d.Hz)))
+	if dNCC > d.NCC {
+		dNCC = d.NCC // compare like with like; never let decimation flatter the sub-search
+	}
+	bestNCC, bestLag := dNCC+subMargin, 0
+	for lag := from; lag <= to; lag++ {
+		if c := ncc(dx, lag); c > bestNCC {
+			bestNCC, bestLag = c, lag
+		}
+	}
+	if bestLag == 0 {
+		return d
+	}
+	// Refine at full rate around the decimated answer, so SubHz is not quantised by dec.
+	d.SubHz = drate / float64(bestLag)
+	fl := int(math.Round(rate / d.SubHz))
+	for lag := fl - dec; lag <= fl+dec; lag++ {
+		if lag > 0 && lag < len(x) {
+			if c := ncc(x, lag); c > d.SubNCC {
+				d.SubNCC, d.SubHz = c, rate/float64(lag)
+			}
+		}
+	}
+	_ = bestNCC
+	// Report the ratio only when it really is close to a whole number; "the fundamental is
+	// an octave down" and "there is a better period down there somewhere" are different
+	// findings and saying the first when only the second is true would be a guess.
+	r := d.Hz / d.SubHz
+	if math.Abs(r-math.Round(r)) < 0.06 {
+		d.SubRatio = int(math.Round(r))
+	}
+	d.BelowRange = d.SubHz < loHz
+	return d
+}
+
+// ---- the grid, measured rather than supplied ------------------------------------------
+//
+// WHY THIS EXISTS. audioingest takes -from and drumfit takes -t0: the start of the loop is an
+// INPUT to every audio tool here, and drumfit's own documentation says to read it off
+// audioingest. So one wrong value propagates through the whole chain with nothing to catch it.
+// Measured cost: two delivered mp3s each carry about 233 ms of digital silence before the
+// first sample, a grid was built without accounting for it, and for two days it sat two
+// sixteenths out of phase — which turned four-on-the-floor into "the bass is on the offbeat"
+// and made every note reading coherent and wrong.
+
+// LeadingSilence returns the seconds before the first short-term window whose RMS rises above
+// frac of the file's loudest window. It is deliberately relative: an absolute threshold cannot
+// tell a quiet recording from a silent lead-in, and a delivered file's level is not knowable
+// in advance. frac <= 0 uses 0.02, which is 34 dB below peak.
+func LeadingSilence(samples []float64, rate int, frac float64) float64 {
+	if len(samples) == 0 || rate <= 0 {
+		return 0
+	}
+	if frac <= 0 {
+		frac = 0.02
+	}
+	win := rate / 200 // 5 ms — finer than a sixteenth by two orders of magnitude
+	if win < 8 {
+		win = 8
+	}
+	var peak float64
+	rms := make([]float64, 0, len(samples)/win+1)
+	for i := 0; i+win <= len(samples); i += win {
+		var s float64
+		for _, v := range samples[i : i+win] {
+			s += v * v
+		}
+		r := math.Sqrt(s / float64(win))
+		rms = append(rms, r)
+		if r > peak {
+			peak = r
+		}
+	}
+	if peak == 0 {
+		return float64(len(samples)) / float64(rate)
+	}
+	for i, r := range rms {
+		if r >= frac*peak {
+			return float64(i*win) / float64(rate)
+		}
+	}
+	return float64(len(samples)) / float64(rate)
+}
+
+// PatternBars reports how many bars long the repeating unit is, by comparing each bar's
+// per-sixteenth energy profile with the bars that follow it.
+//
+// WHY IT IS NEEDED. "Reproduce the first bar" and "reproduce the loop" are the same request
+// only when the loop is one bar. On the material this was written for the lead alternates
+// between two shapes about a minor third apart at eleven of sixteen steps, and a one-bar loop
+// would have been a different piece of music. Nothing measured that until it was asked for
+// specially.
+//
+// scores[p-1] is the mean correlation between bars p apart, so a reader can see the margin
+// rather than trust the verdict. The answer is the SMALLEST period within margin of the best
+// score: a two-bar pattern also correlates well at four and eight bars, and reporting eight
+// would be true and useless.
+func PatternBars(samples []float64, rate int, t0, barSec float64, maxBars int) (int, []float64) {
+	if barSec <= 0 || rate <= 0 || maxBars < 1 {
+		return 1, nil
+	}
+	step := barSec / 16
+	var bars [][]float64
+	for b := 0; ; b++ {
+		v := make([]float64, 16)
+		ok := true
+		for s := 0; s < 16; s++ {
+			i0 := int((t0 + float64(b)*barSec + float64(s)*step) * float64(rate))
+			i1 := i0 + int(step*float64(rate))
+			if i0 < 0 || i1 > len(samples) {
+				ok = false
+				break
+			}
+			var e float64
+			for _, x := range samples[i0:i1] {
+				e += x * x
+			}
+			v[s] = math.Sqrt(e / float64(i1-i0))
+		}
+		if !ok {
+			break
+		}
+		bars = append(bars, v)
+	}
+	if len(bars) < 2 {
+		return 1, nil
+	}
+	if maxBars > len(bars)-1 {
+		maxBars = len(bars) - 1
+	}
+	scores := make([]float64, maxBars)
+	for p := 1; p <= maxBars; p++ {
+		var sum float64
+		var n int
+		for i := 0; i+p < len(bars); i++ {
+			sum += corr(bars[i], bars[i+p])
+			n++
+		}
+		if n > 0 {
+			scores[p-1] = sum / float64(n)
+		}
+	}
+	best := 0.0
+	for _, s := range scores {
+		if s > best {
+			best = s
+		}
+	}
+	// 0.02 of correlation: enough that a genuinely better period wins, small enough that the
+	// smallest true period is not passed over for a multiple of itself that scores a hair more.
+	for p, s := range scores {
+		if s >= best-0.02 {
+			return p + 1, scores
+		}
+	}
+	return 1, scores
+}
+
+func corr(a, b []float64) float64 {
+	if len(a) != len(b) || len(a) == 0 {
+		return 0
+	}
+	var ma, mb float64
+	for i := range a {
+		ma += a[i]
+		mb += b[i]
+	}
+	ma /= float64(len(a))
+	mb /= float64(len(b))
+	var num, va, vb float64
+	for i := range a {
+		da, db := a[i]-ma, b[i]-mb
+		num += da * db
+		va += da * da
+		vb += db * db
+	}
+	if va <= 0 || vb <= 0 {
+		return 0
+	}
+	return num / math.Sqrt(va*vb)
+}
+
+// FirstOnset returns the time of the strongest onset in the first `within` seconds at or after
+// `after`. It is how a downbeat is found when a beat PHASE is not enough: phase is known only
+// modulo a beat, so it says where the beats are and not which one starts the bar.
+//
+// Measured need: on a real track the phase estimate and the first audible hit disagreed by
+// about 0.2 s — most of a beat — and the phase was the one that was wrong. An electronic track
+// starts on a hit, so the hit is the better anchor and the phase is the check on it.
+func FirstOnset(env []float64, sampleRate int, after, within float64) float64 {
+	if len(env) == 0 || sampleRate <= 0 {
+		return after
+	}
+	// OnsetEnvelope is one value per sample of the original signal.
+	i0 := int(after * float64(sampleRate))
+	i1 := i0 + int(within*float64(sampleRate))
+	if i0 < 0 {
+		i0 = 0
+	}
+	if i1 > len(env) {
+		i1 = len(env)
+	}
+	if i0 >= i1 {
+		return after
+	}
+	best, bi := env[i0], i0
+	for i := i0; i < i1; i++ {
+		if env[i] > best {
+			best, bi = env[i], i
+		}
+	}
+	return float64(bi) / float64(sampleRate)
+}
+
+// BandPass filters in place-safe fashion with a 2nd-order Butterworth band-pass, applied
+// forward then backward so the result has no phase shift — which matters here because the
+// output is used to locate events in TIME.
+func BandPass(x []float64, rate int, lo, hi float64) []float64 {
+	if lo <= 0 || hi <= lo || rate <= 0 {
+		out := make([]float64, len(x))
+		copy(out, x)
+		return out
+	}
+	f0 := math.Sqrt(lo * hi)
+	q := f0 / (hi - lo)
+	w := 2 * math.Pi * f0 / float64(rate)
+	alpha := math.Sin(w) / (2 * q)
+	b0, b1, b2 := alpha, 0.0, -alpha
+	a0, a1, a2 := 1+alpha, -2*math.Cos(w), 1-alpha
+	b0, b1, b2 = b0/a0, b1/a0, b2/a0
+	a1, a2 = a1/a0, a2/a0
+
+	pass := func(in []float64) []float64 {
+		out := make([]float64, len(in))
+		var x1, x2, y1, y2 float64
+		for i, v := range in {
+			y := b0*v + b1*x1 + b2*x2 - a1*y1 - a2*y2
+			out[i] = y
+			x2, x1 = x1, v
+			y2, y1 = y1, y
+		}
+		return out
+	}
+	fwd := pass(x)
+	rev := make([]float64, len(fwd))
+	for i := range fwd {
+		rev[i] = fwd[len(fwd)-1-i]
+	}
+	rev = pass(rev)
+	out := make([]float64, len(rev))
+	for i := range rev {
+		out[i] = rev[len(rev)-1-i]
 	}
 	return out
 }

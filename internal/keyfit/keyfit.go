@@ -21,6 +21,7 @@ package keyfit
 import (
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/kidsnz/atari2600-harness/pkg/audio"
 )
@@ -228,4 +229,70 @@ func Best(fits []Fit, oneVoice bool) Fit {
 		}
 	}
 	return best
+}
+
+// ---- one voice, and a tonic that need not sit on the semitone grid ---------------------
+//
+// WHY BOTH AT ONCE. Sweep and SweepDetuned rank tonics using the BEST waveform per degree, and
+// -one-voice only REPORTS what a single waveform would cost — it cannot be told WHICH waveform
+// to use. That is the wrong shape for the question an author actually asks, which on the job
+// this comes from was "one type of sound only, please" after hearing a build that changed
+// timbre mid-figure. And the best tonic for a single voice is generally NOT on the semitone
+// grid: for AUDC 6 over the degree set {0,3,4,5,10,12,15} it is 38.41 Hz, which is D#1 minus 21
+// cents, and no grid sweep reaches it. Both gaps had to be worked around by hand twice in one
+// session, which is what this replaces.
+
+// SweepVoices searches tonics continuously between loHz and hiHz at stepCents resolution,
+// restricted to the given waveforms, and returns the fits sorted best-worst-degree first.
+// waves nil means every playable one, which makes this SweepDetuned with a finer grid.
+func SweepVoices(loHz, hiHz, stepCents float64, degrees []int, waves []int, baseClock float64) []Fit {
+	if loHz <= 0 || hiHz <= loHz || len(degrees) == 0 {
+		return nil
+	}
+	if stepCents <= 0 {
+		stepCents = 5
+	}
+	if waves == nil {
+		waves = Playable()
+	}
+	var out []Fit
+	steps := int(1200 * math.Log2(hiHz/loHz) / stepCents)
+	for i := 0; i <= steps; i++ {
+		hz := loHz * math.Pow(2, float64(i)*stepCents/1200)
+		f := FitTonicVoices(hz, degrees, waves, baseClock)
+		if len(f.Choices) == len(degrees) {
+			out = append(out, f)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return math.Abs(out[i].Worst) < math.Abs(out[j].Worst)
+	})
+	return out
+}
+
+// FitTonicVoices is FitTonic restricted to a waveform set.
+func FitTonicVoices(tonicHz float64, degrees []int, waves []int, baseClock float64) Fit {
+	if waves == nil {
+		waves = Playable()
+	}
+	f := Fit{TonicHz: tonicHz, TonicName: Name(tonicHz)}
+	for _, d := range degrees {
+		target := tonicHz * math.Pow(2, float64(d)/12)
+		c, af, cents := Nearest(target, waves, baseClock)
+		if c < 0 {
+			continue
+		}
+		f.Choices = append(f.Choices, Choice{
+			Semitone: d, WantHz: target, AUDC: c, AUDF: af,
+			GotHz: audio.Freq(c, af, baseClock), Cents: cents,
+		})
+		if math.Abs(cents) > math.Abs(f.Worst) {
+			f.Worst, f.WorstDeg = cents, d
+		}
+		if len(waves) == 1 {
+			f.OneVoice, f.OneWorst = waves[0], f.Worst
+			f.OneVoiceFundamental = audio.FundamentalStrength(waves[0])
+		}
+	}
+	return f
 }
