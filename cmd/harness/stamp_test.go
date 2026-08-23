@@ -78,14 +78,24 @@ func TestStaleNoteFiresOnlyWhenTheSourceHasMoved(t *testing.T) {
 }
 
 // TestHeadRevisionReadsThisRepository checks the half that touches the filesystem.
-// Without it, headRevision could return "" for every input and the whole warning
-// would go permanently silent while every unit case above still passed — the exact
-// shape of failure this project keeps finding.
+// Without it, the walk could return "" for every input and the whole warning would go
+// permanently silent while every unit case above still passed — the exact shape of failure
+// this project keeps finding.
+//
+// It drives headRevisionFrom rather than headRevision because THAT IS THE POINT. The version
+// of this test that called headRevision() said, in its own failure message, that the warning
+// "can never fire in practice" — and could never print it, because `go test` fixes the working
+// directory inside the repository, so the condition it named was structurally false. The walk
+// now takes its directory as an argument, which is what makes the broken case reachable at all
+// (see TestHeadRevisionIsSilentFromTheUmbrella below).
 func TestHeadRevisionReadsThisRepository(t *testing.T) {
-	got := headRevision()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := headRevisionFrom(cwd)
 	if got == "" {
-		t.Fatal("headRevision found no repository from the test's working directory, so the stale " +
-			"warning can never fire in practice however well staleNote behaves")
+		t.Fatal("the walk found no repository from the test's own directory, which is inside one")
 	}
 	if len(got) != 7 {
 		t.Errorf("expected a 7-character short revision, got %q", got)
@@ -139,5 +149,89 @@ func findGitDir(t *testing.T) string {
 			t.Fatal("no .git found")
 		}
 		dir = parent
+	}
+}
+
+// TestHeadRevisionIsSilentFromTheUmbrella stages the layout that actually broke, and is the
+// test the old shape of this file could not express.
+//
+// `.mcp.json` sets no `cwd`, so the server inherits the client's: the umbrella directory that
+// holds harness/, roms/ and sandbox/ and belongs to no repository itself. Measured 2026-08-23,
+// a full day of static-analysis answers came back from a binary built at 845656c while the
+// repository sat at 2817b25, with no `stale` field on any of them.
+//
+// The three assertions are one argument: a repository BESIDE you is not a repository ABOVE you,
+// so anchoring the walk to the working directory can only be wrong here — silent at the umbrella
+// and, worse, confidently wrong from a sibling. That is why headRevision anchors to the binary.
+func TestHeadRevisionIsSilentFromTheUmbrella(t *testing.T) {
+	umbrella := t.TempDir()
+	if headRevisionFrom(umbrella) != "" {
+		t.Skipf("%s already sits inside a repository, so the umbrella case cannot be staged here", umbrella)
+	}
+	stage := func(name, sha string) string {
+		t.Helper()
+		git := filepath.Join(umbrella, name, ".git")
+		if err := os.MkdirAll(filepath.Join(git, "refs", "heads"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(git, "HEAD"), []byte("ref: refs/heads/main\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(git, "refs", "heads", "main"), []byte(sha+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		bin := filepath.Join(umbrella, name, "bin")
+		if err := os.MkdirAll(bin, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return bin
+	}
+	harnessBin := stage("harness", "2817b25aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	romsBin := stage("roms", "c834f58bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+
+	if got := headRevisionFrom(harnessBin); got != "2817b25" {
+		t.Errorf("from harness/bin the walk read %q, want %q", got, "2817b25")
+	}
+	// A working-directory fallback would have compared a HARNESS build number against this.
+	if got := headRevisionFrom(romsBin); got != "c834f58" {
+		t.Errorf("from roms/bin the walk read %q, want %q", got, "c834f58")
+	}
+	if got := headRevisionFrom(umbrella); got != "" {
+		t.Errorf("from the umbrella the walk read %q, want \"\": nothing above it is a repository", got)
+	}
+}
+
+// TestHeadRevisionAnchorsToTheBinaryNotTheWorkingDirectory is the guard against the fallback
+// being restored. Under `go test` the binary sits in a temp directory outside every repository,
+// so headRevision finds nothing and the warning stays quiet — the same silence as before the
+// anchor changed, and the safe direction, since a false STALE is worse than none. A fallback
+// that reached for the working directory would make this test read a revision instead, and from
+// roms/ the same fallback would compare a HARNESS build number against roms' HEAD and report
+// STALE forever.
+//
+// The first version of this test only logged, and check_tests caught it in the same run that
+// this file's other repairs went green: a test with no failure path is a green tick that means
+// nothing. It was written by the same hand that had spent the day naming that shape.
+func TestHeadRevisionAnchorsToTheBinaryNotTheWorkingDirectory(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	want := headRevisionFrom(filepath.Dir(exe))
+	got := headRevision()
+	if got != want {
+		t.Fatalf("headRevision read %q but the binary's own directory says %q — the anchor is "+
+			"not the executable", got, want)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fromCwd := headRevisionFrom(cwd); want == "" && got == fromCwd && fromCwd != "" {
+		t.Fatalf("the binary is in no repository, yet headRevision returned the working "+
+			"directory's revision %q: the cwd fallback is back", got)
 	}
 }

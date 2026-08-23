@@ -95,6 +95,32 @@ versions follow [Semantic Versioning](https://semver.org/).
     the package's own tests, added along with `mixcheck` and unnoticed until the audit.
 
 ### Fixed
+- **The stale-binary warning was dead in the deployment it was written for.** `headRevision`
+  walked up from the WORKING DIRECTORY, and `.mcp.json` sets no `cwd`, so the server inherits the
+  client's: the umbrella directory holding harness/, roms/ and sandbox/, which belongs to no
+  repository ON PURPOSE — that placement is what makes publishing `reference/` structurally
+  impossible. The walk reached `/` without finding a `.git`, returned `""`, and `staleNote` opens
+  with `if built == "" || head == ""`, so BOTH sentences it can raise died there. Measured
+  2026-08-23: `bin/harness` had been built at 845656c while the repository sat at 2817b25, and a
+  full day of static-analysis answers came back with no `stale` field at all. The `dirty` FLAG
+  survived because it is stamped at build time — so the skimmable form lived and the full
+  sentence, written that way precisely so it could not be skimmed past, did not.
+  - `headRevision` now anchors to `os.Executable()` (symlinks resolved), which is inside the
+    repository it was built from whatever the working directory is. **There is deliberately no
+    working-directory fallback**: from `roms/` the walk finds `roms/.git` and would compare a
+    harness build revision against a different repository's HEAD, reporting STALE forever — the
+    false positive this file's own comment forbids. Under `go run` and `go test` the binary sits
+    in a temp directory and the warning stays silent, which is the same silence as before and the
+    safe direction.
+  - **The walk now takes its directory as an ARGUMENT (`headRevisionFrom`), and that is the
+    point.** The test that covered it called `headRevision()` and said, in its own failure
+    message, that the warning "can never fire in practice" — a sentence it could never print,
+    because `go test` fixes the working directory inside the repository, so the condition it
+    named was structurally false. `TestHeadRevisionIsSilentFromTheUmbrella` stages the real
+    layout (two repositories beside each other, none above) and pins all three answers; a second
+    test goes red if the working-directory fallback is ever restored. Verified end to end: run
+    from the umbrella, the built server now reports the sentence it had been swallowing, and a
+    copy of the same binary placed outside the repository stays silent rather than crying STALE.
 - **`cmd/bandsplit` no longer has a default output path.** It defaulted to `bandsplit.html` in the
   working directory, and this repository is PUBLIC: running it from inside the tree writes a
   multi-megabyte page **with the source recording embedded** straight into the working tree, one

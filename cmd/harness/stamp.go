@@ -108,16 +108,47 @@ func staleNote(built, head string, dirty bool) string {
 		"exactly like a fix that did not work."
 }
 
-// headRevision reads the repository's current commit without shelling out. It walks
-// up from the working directory looking for .git, so it works whether the server was
-// started from the harness root or a subdirectory, and returns "" rather than
-// guessing when anything is unexpected — a wrong HEAD would produce a false STALE,
-// which is worse than none.
+// headRevision reads the repository's current commit without shelling out, anchored to the
+// BINARY'S OWN LOCATION rather than to the working directory.
+//
+// WHY NOT THE WORKING DIRECTORY, measured 2026-08-23. `.mcp.json` sets no `cwd`, so the server
+// inherits the client's, which is the UMBRELLA directory holding harness/, roms/ and sandbox/.
+// The umbrella belongs to no repository ON PURPOSE — that placement is what makes publishing
+// reference/ structurally impossible — so the walk reached / without finding a .git and returned
+// "". staleNote() opens with `if built == "" || head == ""`, so BOTH warnings it can raise died
+// there: the STALE sentence and, in the same branch, the one about a binary built from a dirty
+// tree. On that day bin/harness had been built at 845656c while the repository sat at 2817b25,
+// and a full day of static-analysis answers came back through it with no `stale` field at all.
+// The `dirty` FLAG survived, because it is stamped at build time — so the skimmable form lived
+// and the full sentence, written that way precisely so it could not be skimmed past, did not.
+//
+// WHY THERE IS NO WORKING-DIRECTORY FALLBACK. From roms/ the walk finds roms/.git and would
+// compare a harness build revision against a DIFFERENT repository's HEAD, reporting STALE
+// forever — the false positive the paragraph above forbids. Anchoring to the executable has no
+// such failure: bin/harness lives inside the repository it was built from.
+//
+// The limits, so the next reader does not re-add the fallback: under `go run` and `go test` the
+// binary sits in a temp directory, the walk finds nothing, and the warning stays silent. That is
+// the same silence as before this change, and it is the safe direction. A binary built in one
+// repository and copied into another's bin/ would report against the wrong one; that does not
+// happen in this deployment, and it is why headRevisionFrom takes its directory as an ARGUMENT
+// — the case that actually broke is only reachable from a test that can choose the directory.
 func headRevision() string {
-	dir, err := os.Getwd()
+	exe, err := os.Executable()
 	if err != nil {
 		return ""
 	}
+	// A symlinked binary would otherwise be looked up beside the link rather than beside the
+	// real file, which is a different repository or none.
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	return headRevisionFrom(filepath.Dir(exe))
+}
+
+// headRevisionFrom walks up from dir looking for .git, and returns "" rather than guessing when
+// anything is unexpected — a wrong HEAD would produce a false STALE, which is worse than none.
+func headRevisionFrom(dir string) string {
 	for {
 		gitPath := filepath.Join(dir, ".git")
 		if fi, err := os.Stat(gitPath); err == nil {
