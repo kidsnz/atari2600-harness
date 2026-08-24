@@ -843,8 +843,6 @@ versions follow [Semantic Versioning](https://semver.org/).
   picture is verified independently of the golden: CERTIFIED at 74 cy, 262 lines,
   `frame_lines_stable` 262x130, and rendered.
 
-## [Unreleased]
-
 ### Fixed
 - **The sole-blocker table I added an hour ago is an upper bound whose gap to reality can be TOTAL, and the
   correction is measured rather than argued.** That table says WSYNC-in-body is worth **+5.7 pt**. Disabling
