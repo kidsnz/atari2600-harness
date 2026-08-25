@@ -9,6 +9,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Technique #36 — RESPx re-strobing: eight copies a scanline, not three**
+  (`docs/techniques/restrobe-copies.md`, `roms/litmus/litmus_restrobe.asm`,
+  `internal/emu/restrobe_test.go`, `scripts/gen_litmus_restrobe.py`). A player in a NUSIZ copy mode
+  draws **3 + k** copies on one scanline with k mid-line RESP strobes, so one player reaches eight
+  shaped slots and two reach sixteen. Measured as a six-rung ladder, 3 through 8, and CI-locked.
+  `reference/atariage/180632` had filed this as solidcorp's unverified candidate ⑨ since 2011.
+  Two consequences are graded with it: an added copy is **never at x ≡ 0 (mod 3)** (a base is
+  `3c − 60`, so its surviving copies land at ≡ 1 and ≡ 2), and the leading two copies cannot be
+  moved. The mechanism is `sprite-placement.md` rule 8 read from the other side — each strobe costs
+  the copy at its own base and the one pending from the old base, and buys the two the new base
+  makes, hence exactly +1 per strobe.
+
+### Changed
+- **`sprite-placement.md` rule 5 was over-general and is now scoped.** "A strobe does not draw the
+  new position on the line it runs on" is true of the FIRST copy; later NUSIZ copies of the new base
+  do draw, on that same line — which band 10 of the same fixture had already measured ("56 and 88
+  but not 24") without the one-line rule saying so. Read as general, it makes six shaped slots a
+  scanline look like a hardware ceiling, and it did: three probes in the work that prompted this each
+  tried to check it with a ONE-COPY player, where "the first copy" and "the only copy" are the same
+  thing.
+
+### Note — a correction that was nearly made and should not have been
+  The measurement that produced the ladder first read rules 1, 2 and 9 as **wrong by three pixels**.
+  They are not. The new fixture labelled its strobes one cycle high — padding to the store's FIRST
+  cycle and calling that the write cycle — where this catalogue counts the store's LAST
+  (`scripts/gen_litmus_sprite_place.py:strobe` pads to `want-2`). Same measurement, different origin.
+  The fixture now uses the catalogue's convention and rule 1 reproduces exactly. Nothing in
+  `internal/place` changed.
+
+### Added
 - **`cmd/bandsplit -files` — several WAVs side by side, for stems rather than bands.** The same
   page answered the question twice on one job: the band page got the author to "B" and the stem
   page got him to "the bass stem", and only the second was the sound he meant. It prints each

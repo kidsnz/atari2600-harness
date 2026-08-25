@@ -21,7 +21,7 @@ the numbers were re-derived from throwaway probes twice in one session. This fil
 | 2 | a `RESM` strobe puts a missile at **x = 3c − 61** — one clock further LEFT from the same cycle | 2, 3 |
 | 3 | so `RESM` three cycles after `RESP` puts the missile at **exactly player + 8** | 4 |
 | 4 | a missile follows its player's NUSIZ copies | 5 |
-| 5 | a strobe **does not draw the new position on the line it runs on** | 6 |
+| 5 | a strobe **does not draw the new position on the line it runs on** — of the FIRST copy. Later NUSIZ copies of the new base DO draw, on that same line: see rule 8 and `restrobe-copies.md` | 6 |
 | 6 | a GRP write takes effect at **screen x = 3w − 64** — four colour clocks of margin, no more | 7 |
 | 7 | a normal-width player **cannot be strobed left of x = 3** | 8, 9 |
 | 8 | a strobe cancels the pending draw of the **FIRST copy only** | 10 |
@@ -80,6 +80,16 @@ gets there first. Band 10 says what actually happens: P0 parked at 42 with copie
 is strobed to x=24 while the beam is at 16, ahead of all three, and the strobe line comes out with
 **56 and 88 but not 24**. Copy 0 is cancelled; the copies NUSIZ makes at +32 and +64 are triggered
 from the reset position and land anyway. **A multi-copy object must be cleared.**
+
+Read from the other side, that is a way to draw MORE: each mid-line strobe costs the copy at its own
+base and the one pending from the old base, and buys the two the new base makes, so a player in a
+copy mode gains one shaped slot per strobe and reaches eight on one scanline. Measured as a ladder
+in **`restrobe-copies.md`** (`litmus_restrobe`), which is where to go when the question is how many
+letters fit on a line rather than where one of them lands.
+
+**Rule 5 states the single-copy case**, which is what band 6 grades, and band 10 above is the same
+machine behaviour with copies switched on. Three probes in the originating work read rule 5 as
+general and each measured a one-copy player to check it, which cannot tell the two apart.
 
 ## Don't strobe HMOVE mid-line to hide the bar
 
