@@ -81,9 +81,27 @@ cycle  0   RESP0            the line opens with one
 
 Nine GRP writes, three strobes, ending at cycle 73 of 76 — **the budget is spent, not merely used.**
 The writes sit six cycles apart, which is `lda zp` (3) plus `sta GRPx` (3); the 3–3–3 burst in the
-middle is stores from registers already loaded. Every byte in that ROM is a pair of nibbles
-(`$77` = 7,7; `$E4` = E,4), so nine writes are **eighteen characters at 4 px each**, and a venetian
-blind doubles that to thirty-six.
+middle is stores from registers already loaded. Every byte is a pair of nibbles (`$77` = 7,7;
+`$E4` = E,4), so a slot is two characters at 4 px.
+
+**Count the slots on the screen rather than the writes in the listing.** Decomposing two adjacent
+scanlines of that ROM (65 and 66, `emu.DecomposeRow`):
+
+```
+line 65 slots:    28   44   60   76   92  100  116  132
+line 66 slots: 20   36   52   68   84       108  124  140
+union        : 20 28 36 44 52 60 68 76 84 92 100 108 116 124 132 140   -- 16 slots, 8 apart
+```
+
+**Eight slots a scanline = sixteen characters; the thirty-two of the thread's title are TWO
+scanlines interleaved**, a venetian blind, and 128 px / 32 characters is exactly the 4 px the
+nibbles say. Nine writes did not mean nine drawn slots, and reading the count off the listing gave
+eighteen and thirty-six here until the pixels were counted.
+
+**What the blind does NOT cost is a blank line.** All eleven scanlines of each text row draw; the
+alternation is between odd and even COLUMNS, not between drawing and repositioning, because the
+re-strobes rebuild the positions inside the drawing line itself. What it does cost is density: each
+character appears on every other scanline, which is why the glyphs read as dotted.
 
 **The arithmetic that decides whether a design fits:** slots come from re-strobing, but bytes come
 from the line's cycles. At six cycles a write a line affords about ten writes, and how many letters
