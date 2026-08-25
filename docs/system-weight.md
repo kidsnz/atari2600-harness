@@ -54,8 +54,22 @@ package, artefacts removed:
 
 ### The ceiling
 
-**15 minutes of job wall-clock.** Observed range **10m23 - 13m15**, so the headroom is about
-**1m45 at the worst run seen**, not the 4.5 minutes this line claimed for its first few hours.
+**20 minutes of job wall-clock, and it is a LOOK-AT-IT line, not a budget.** Nothing enforces it:
+`ci.yml` has no `timeout`, so a run over the line does not fail — it asks a human to go and look.
+Calling it a "budget" is what made 2026-08-24 read a 41-second gap as a cliff and spend an hour
+diagnosing a cause that did not exist.
+
+**Measured 2026-08-24 over 97 successful runs: min 4.37, median 7.42, max 14.45 minutes, and
+ZERO runs above 15.** Three windows counted independently (19 / 39 / 97 runs) all land on the same
+ceiling of 14.45, and the top six cluster at 14.18-14.45. The line sits 5.55 minutes outside that
+ceiling on purpose: **a breach means something actually changed, because nothing that has ever run
+here has come close.**
+
+The old line was 15 minutes with "1m45 of headroom", read off the slowest run then visible. That
+framing measures the runner's mood: **the same commit, run four times on 2026-08-24, took 488 /
+793 / 799 / 851 seconds — 6.0 minutes of spread on byte-identical work, with 2-5 seconds of queue.**
+A single-run line inside that spread fires on luck. A "gap to the line" computed from one run is
+not a quantity.
 
 That claim was a **single sample, and the fastest one** — the same defect
 `check_instruments.py` was extended to forbid on the very day this page was written. Measured
@@ -68,7 +82,10 @@ distribution, because the run that breaches the ceiling is the slow one.**
 author stops waiting and context-switches is a loop that stops being run before pushing. GitHub's
 job limit is six hours and is irrelevant here.
 
-**When a run exceeds 15 minutes, the next commit must do one of three things and say which:**
+**When a run exceeds 20 minutes, the next commit must do one of three things and say which.**
+**Do NOT start by guessing the cause — the cause is already measured and recorded**: 84% of the
+wall clock is the single `go test -p 1 ./...` step, `-p 1` is there because packages share `.bin`
+fixtures (`ci.yml:48`), and the entry point to fixing that is `t.TempDir()` (§ below). Start there:
 
 1. **Make the heavy thing faster.** First resort, because it costs no coverage. A test that is slow
    because it is serial is not a test that is slow.
