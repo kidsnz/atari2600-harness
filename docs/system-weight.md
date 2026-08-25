@@ -59,11 +59,28 @@ package, artefacts removed:
 Calling it a "budget" is what made 2026-08-23 read a 41-second gap as a cliff and spend an hour
 diagnosing a cause that did not exist.
 
-**Measured 2026-08-24 over 97 successful runs: min 4.37, median 7.42, max 14.45 minutes, and
-ZERO runs above 15.** Three windows counted independently (19 / 39 / 97 runs) all land on the same
-ceiling of 14.45, and the top six cluster at 14.18-14.45. The line sits 5.55 minutes outside that
-ceiling on purpose: **a breach means something actually changed, because nothing that has ever run
-here has come close.**
+**Measured 2026-08-24 over 243 successful runs — every one this repository has: max 14.45 minutes,
+and ZERO above 15.** The top six cluster at 14.18-14.45.
+
+**Read the MAXIMUM and nothing else here.** Counted over four windows the maximum does not move and
+the other statistics do:
+
+| window | min | median | **max** |
+|---|---|---|---|
+| 19 runs | 8.13 | 13.27 | **14.45** |
+| 39 runs | 6.10 | 11.62 | **14.45** |
+| 97 runs | 4.37 | 7.43 | **14.45** |
+| 243 runs | 1.18 | 5.13 | **14.45** |
+
+A median here measures how far back you looked — the suite grew, so a wider window drags it down.
+The maximum is a property of the machine and the workload. **The line is drawn from the maximum for
+that reason**, and it sits 5.55 minutes outside it: a breach means something actually changed,
+because nothing that has ever run here has come close.
+
+**And the top of that distribution is not an event.** Six runs across five days and six different
+commits landed within a minute of the old 15-minute line — 2026-08-13 (+34s), 08-15 (+42s),
+08-21 (+43s), 08-23 (+41s), 08-23 (+33s), 08-24 (+49s). A session that treats any one of them as
+news is reading the same upper tail it read the last five times.
 
 The old line was 15 minutes with "1m45 of headroom", read off the slowest run then visible. That
 framing measures the runner's mood: **the same commit, run four times on 2026-08-24, took 488 /
