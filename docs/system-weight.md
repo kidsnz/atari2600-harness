@@ -56,7 +56,7 @@ package, artefacts removed:
 
 **20 minutes of job wall-clock, and it is a LOOK-AT-IT line, not a budget.** Nothing enforces it:
 `ci.yml` has no `timeout`, so a run over the line does not fail — it asks a human to go and look.
-Calling it a "budget" is what made 2026-08-24 read a 41-second gap as a cliff and spend an hour
+Calling it a "budget" is what made 2026-08-23 read a 41-second gap as a cliff and spend an hour
 diagnosing a cause that did not exist.
 
 **Measured 2026-08-24 over 97 successful runs: min 4.37, median 7.42, max 14.45 minutes, and
