@@ -22,6 +22,13 @@ that a mid-line `RESBL` re-emits START (two balls on one line) while `RESPx` doe
 at the last position). Everything below is about a player in a **COPY mode**, which is the case that
 fixture does not cover and where the answer is the opposite one.
 
+**And the missiles are a third answer again.** `roms/litmus/litmus_restrobe_objects.asm` sweeps all
+of them over width, spacing and k: the ball draws **1 + k** blocks, a MISSILE draws **1** — `RESM0`
+and `RESM1` appear nowhere in `litmus_resp_edge`, so that half had never been measured — and a
+missile struck inside its own block is EXTENDED past the 8 px its size field allows. So a row of
+solid blocks down one line is a ball technique, not a missile one. The table is in
+`sprite-placement.md`, under rules 11 and 13.
+
 ## The ladder is a function of the SPACING, not a constant
 
 `litmus_restrobe` parks P0 at x=3 with NUSIZ=3 (three copies, sixteen apart) while the screen is

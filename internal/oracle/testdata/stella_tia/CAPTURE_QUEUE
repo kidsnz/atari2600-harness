@@ -13,4 +13,3 @@
 #
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
-roms/litmus/litmus_restrobe.bin  # 2026-08-26  the ROM gained the spacing sweep and the two-player band, so the 2026-08-26 capture is of a different image; a capture records no hash, so a stale one would compare silently rather than fail

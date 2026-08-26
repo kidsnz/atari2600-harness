@@ -37,6 +37,7 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 | Missile / ball position family (`X = 3N − 55`) | `litmus_missile` | `read_tia` missile0=38 / ball=140; `read_row` 1px line at each |
 | Missile clamp X=2 vs player clamp X=3 (1px edge offset) | `litmus_collide_mp` | documented during m0-p0 setup |
 | RESBL re-emits START (2 balls on a re-strobed line); RESPx does not (1 player) | `litmus_resp_edge` | `read_row`: 2 ball runs vs 1 player run |
+| Re-strobe, swept over the objects: the BALL draws **1 + k** blocks for k mid-line strobes (2 widths × spacings 3/8/16 × k 1–3), a **MISSILE draws 1** (M0 and M1 alike — `litmus_resp_edge` strobes no `RESM`, so this half was uncovered), a **PLAYER with one copy draws 1**. Struck INSIDE the block that is drawing: a missile's block is EXTENDED past the 8 px its size field allows (10 px at +6, 9 px at +9), the ball RESTARTS and cuts the old block (2 px at +6, 5 px at +9; two whole blocks need **12 px**), a lone player is untouched | `litmus_restrobe_objects` | `DecomposeRow` runs per band, 62 bands; Stella 37/37 |
 | HMOVE comb: left 8px blanked on strobe-after-WSYNC lines even with HMxx=0 | `litmus_hmove_side` | `read_row`: strobe lines clock 0–7 black, others not |
 | Late HMOVE: mid-visible (~cyc 39) = no-op; line-end (~cyc 74) = left (HM+8) px, no comb | `litmus_hmove_side` | cumulative P0 drift −9px/strobe measured (emulator-verified; Stella cross-check pending) |
 
