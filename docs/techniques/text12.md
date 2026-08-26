@@ -12,6 +12,14 @@ width ladder is 12 (flicker-free) → 24 (column flicker) → 28 (Jentzsch) → 
 RESP re-strobing, solidcorp 2011). 12 is the sweet spot: zero flicker, no re-strobe timing
 hazards, reuses the score kernel verbatim.
 
+**Before designing anything wider, read [`restrobe-copies.md`](restrobe-copies.md) (technique #36).**
+The rungs above 24 all use the mechanism named in the line above — a mid-line `RESP` re-strobe — and
+#36 is where this harness measured it: a player in a copy mode draws **3 + k** slots with k mid-line
+strobes at 6, 7 or 8 cycles of spacing, the ladder is **flat** at 3 and 5 cycles, and it climbs faster
+at 12. This page's "12 is the sweet spot" is a statement about cost, not about a ceiling. A work in
+the private `roms/` repository re-derived that ceiling from scratch in 2026-08 without reading #36,
+and lost days to it; the one-way link (#36 pointed here, nothing pointed there) is why.
+
 ## The technique
 
 - **Font**: 4×5 glyphs (39 chars: space, A-Z, 0-9, !, .), one nibble per row (bit 3 = leftmost),

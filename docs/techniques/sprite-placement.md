@@ -27,8 +27,9 @@ the numbers were re-derived from throwaway probes twice in one session. This fil
 | 8 | a strobe cancels the pending draw of the **FIRST copy only** | 10 |
 | 9 | a DOUBLE-width or QUAD-width player lands at **x = 3c − 59**, never left of x = 4 | — |
 | 10 | a missile is clamped at **x = 2** — one clock LEFT of anywhere a player can be — and **each clamp is a WINDOW of write cycles, not one** | 8, 9, 11, 12 |
-| 11 | the **BALL** places exactly like a missile: same `x = 3c − 61`, same clamp at 2 | 13, 14 |
+| 11 | the **BALL** places exactly like a missile: same `x = 3c − 61`, same clamp at 2 — **placement only.** Whether the two behave alike when RE-STROBED while they are drawing is a different question, and this fixture does not grade it: see rule 13 and `restrobe-copies.md` | 13, 14 |
 | 12 | a NUSIZ copy past 160 **wraps to the left edge and draws there on the same line** | 15 |
+| 13 | **a mid-line `RESP` re-strobe is a placement mechanism, not only HMOVE**: it puts an object anywhere on the 3 px grid *during a drawn line*, for the price of a three-cycle store — see `restrobe-copies.md` | — |
 
 Rule 9 is from the same session's probes rather than from this litmus, which grades normal width.
 Width itself is free: double and quad are the same single NUSIZ write and the same landing place;
@@ -90,6 +91,37 @@ letters fit on a line rather than where one of them lands.
 **Rule 5 states the single-copy case**, which is what band 6 grades, and band 10 above is the same
 machine behaviour with copies switched on. Three probes in the originating work read rule 5 as
 general and each measured a one-copy player to check it, which cannot tell the two apart.
+
+## Rule 13, and the ceiling it removes — the mid-line mover is not only HMOVE
+
+Everywhere else this catalogue records mid-line movement, it records HMOVE and nothing else:
+`known-traps.md:68` (the cycle-73-74 strobe), `fundamentals-audit.md:40` ("late HMOVE during the
+visible line … moves objects RIGHT"), `capability-gap-audit.md:177` and `:182`. Read together they
+say an object can be nudged by at most ±8 px once a line, and nothing says otherwise.
+
+That is enough to make a uniform pitch wider than 8 px look impossible, and the argument is easy to
+reconstruct — a piece in the private `roms/` repository wrote it down in full in 2026-08: *the only
+mid-line mover is HMOVE; its range is 8 px; a uniform pitch P needs a phase shift of P; so P is 8 or
+16, and 16 is out of reach — therefore a dedicated blank scanline is required.* Every step follows,
+and the conclusion is wrong, because the premise names the wrong mechanism.
+
+**A `RESP` strobe repositions the object outright, onto the 3 px grid, for the three cycles of a
+store, on a line that is being drawn.** Rules 1 and 7 already say where it lands; `litmus_restrobe`
+already proves that mid-line strobes place copies — that is what the 3 + k ladder counts. This rule
+only names the consequence for POSITION rather than for count, which is the half nobody had written
+down. Measured contrast between two kernels of the same piece:
+
+    study kernel        drawn lines 20 / move-only 2   in drawn lines: HMOVE 5, RESP 0    pitch  8, span  79
+    the one that won    drawn lines 11 / move-only 1   in drawn lines: RESP 35, HMOVE 0   pitch 16, span 151
+
+The second places ten objects at a uniform **16 px** pitch across **151 of the 160 px with no blank
+scanline at all** — the arrangement the HMOVE-only reasoning had ruled out.
+
+**What it costs.** The strobe cancels the pending draw of the copy at its own base (rule 8), so it is
+cheap in cycles and expensive in slots; it must not be struck in the first three cycles after an
+HMOVE (`restrobe-copies.md`'s traps); and it can only land on the 3 px grid, so HMOVE remains the
+only way to move by a fraction of it. Source: measured in a piece in the private `roms/` repository,
+2026-08-26; that work's ledger names this file.
 
 ## Don't strobe HMOVE mid-line to hide the bar
 

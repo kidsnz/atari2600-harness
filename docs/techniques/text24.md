@@ -27,6 +27,10 @@ screen, packed buffers non-zero, 262 lines, golden-pinned.
 ## Notes / variants
 - 50% flicker is unavoidable for 24 on one line without RESP re-strobing (the 32-char route,
   candidate ⑨). On LCDs column/block flicker often looks better than CRTs (supercat).
+  **The re-strobe is measured — see [`restrobe-copies.md`](restrobe-copies.md) (technique #36)**:
+  how many slots a mid-line strobe adds (**3 + k** per player at 6/7/8 cycles of spacing), where the
+  ladder is **flat** (3 and 5 cycles), and where the copies land (off the multiple-of-three grid at
+  spacing 8, on it at 6). Read it before concluding that flicker is the only way past 12.
 - For genuinely interleaved single characters (za2600's look), switch to NUSIZ medium and offset
   by 8px instead of 48 — same skeleton, different position constants.
 - Per-frame color staging works in the gaps for two-color text.

@@ -27,6 +27,15 @@ finished 2600 game. Build and verify each step before the next.
 | **title / logo from a Photoshop mock** | `multicolor48` (per-row color 48px), `bitmap48`, `text12` | **Photoshop mock first → 48px image → flicker-free 2-color 48px kernel** (SpiceWare SF2 logo path); 2:1-ish pixel aspect | pixel-aspect (1.67–1.82; no single value arbitrates — see design-principles); color non-RGB | `design.MinColorBandWidthPx` (pixel aspect has no constant — see design-principles) |
 | **music / sound** | `music_driver`, `sound_driver`, `sfx`, `tia_pcm` | TIA = LFSR-pair voices (not a table); AUDF lowering has ≤32cy latency; out-of-tune scale → pick fitting notes | 2-voice phase interference → silence; Gopher2600 noise differs from real HW | `read_audio`, golden_audio |
 
+**Wider text than the rows above deliver:** `text12` and `text24` are the flicker-free and
+column-flicker rungs. Everything above them on the width ladder (26 supercat, 28 Jentzsch, 32
+solidcorp, 36/576/1008 omegamatrix) is a **mid-line RESP re-strobe** route, and the re-strobe is
+measured in [`techniques/restrobe-copies.md`](techniques/restrobe-copies.md) (technique #36):
+**3 + k** slots per player at 6/7/8 cycles of strobe spacing, flat at 3 and 5. The ladder itself is
+row 13 of [`techniques/README.md`](techniques/README.md). **Read one of those before deciding that
+12 or 24 characters is the ceiling** — a work in the private `roms/` repository decided exactly that
+in 2026-08, without either page, and lost days.
+
 ## Beyond-bB (advanced, future)
 DPC/DPC+/CDFJ/ARM (bigger ROM, writable gfx RAM, 3-voice ARM music) — `reference/atariage/blogs/` (SpiceWare
 SF2/Frantic/Draconian) + `docs/design-principles.md` Bitmap section. Out of scope until the vanilla path is solid.
