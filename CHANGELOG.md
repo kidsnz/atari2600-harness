@@ -6,14 +6,48 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — technique #36 was generalising from one strobe spacing (2026-08-26)
+
+`restrobe-copies.md` measured the re-strobe ladder with strobes eight cycles apart, found 3 + k, and
+then said in as many words that "the eight-cycle spacing in the fixture is not special; any spacing
+at or above three cycles works". Sweeping the spacing says otherwise, and not at the edges:
+
+    spacing   3   4   5   6   7   8  10  12
+    k=5       4   -   4   8   8   8   6   -
+
+At **three and five cycles the ladder is FLAT at four** — every strobe after the first buys nothing.
+At **twelve it climbs faster than 3 + k** (4, 6, 8, 9). And the doc's stated consequence that "an
+added copy is never at x = 0 (mod 3)", which it called a rule that "binds every kernel built on
+this", is false at spacing six, where the copies are 45, 63, 81 and 99.
+
+The fixture now sweeps eight spacings x k=1..5, and `restrobe_test.go` grades all 35 as a table plus
+a thirty-sixth band that measures **two players reaching sixteen slots** — the doc's opening claim,
+which until now was 8x2 done in the head while the same doc's only real-world datapoint was eight
+slots a scanline. Sixteen holds: P0 and P1 draw sixteen objects at sixteen distinct positions, three
+of them clipped to 7 px because at that schedule the copies sit 9 and 7 apart in alternation.
+
+The mechanism behind the spacing dependence is NOT explained, and the doc says so rather than
+offering a third model — two were written down during this work and each is refuted by a row of the
+same table.
+
+Also in this pass: the doc's citation of `reference/atariage/311795` resolved nowhere (the directory
+is `311795-576-1008-characters`) so `check_provenance.py` was red; `litmus_restrobe.bin` had reached
+the corpus with neither a Stella capture nor a queue line, so `TestStellaAgreesWithHarnessOnWriteOnlyTIARegisters` was red — captured at 37/37, then retired again here because the ROM changed and a
+capture records no hash, so a stale one would compare silently rather than fail. `pf_wraps.bin`,
+queued since 2026-08-23, was captured in the same pass at 37/37.
+
+
 ## [Unreleased]
 
 ### Added
-- **Technique #36 — RESPx re-strobing: eight copies a scanline, not three**
+- **Technique #36 — RESPx re-strobing: more copies a scanline, and how many depends on the spacing**
   (`docs/techniques/restrobe-copies.md`, `roms/litmus/litmus_restrobe.asm`,
   `internal/emu/restrobe_test.go`, `scripts/gen_litmus_restrobe.py`). A player in a NUSIZ copy mode
-  draws **3 + k** copies on one scanline with k mid-line RESP strobes, so one player reaches eight
-  shaped slots and two reach sixteen. Measured as a six-rung ladder, 3 through 8, and CI-locked.
+  draws more copies on one scanline with each mid-line RESP strobe — 3 + k at spacings of 6, 7 or 8
+  cycles, so one player reaches eight shaped slots and two reach sixteen. This bullet first said
+  "eight copies a scanline, not three" and stated 3 + k without qualification; the spacing sweep in
+  the entry above shows the ladder is flat at 3 and 5 cycles and steeper at 12, and both entries are
+  still unreleased, so this one is corrected in place rather than left to contradict it.
   `reference/atariage/180632` had filed this as solidcorp's unverified candidate ⑨ since 2011.
   Two consequences are graded with it: an added copy is **never at x ≡ 0 (mod 3)** (a base is
   `3c − 60`, so its surviving copies land at ≡ 1 and ≡ 2), and the leading two copies cannot be
