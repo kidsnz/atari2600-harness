@@ -13,4 +13,3 @@
 #
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
-roms/litmus/pf_wraps.bin  # 2026-08-23  added mid-session as the third playfield-deadline witness; capturing needs Stella in the foreground for ~13 s
