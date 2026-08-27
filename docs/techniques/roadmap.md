@@ -29,6 +29,22 @@ same pipeline; "documented" refinements noted per item remain available when a g
 - [x] **#11 Bank switching (F8)** — break the 4K ROM ceiling. ★★★ · **done for F8** (litmus_bank pattern: vectors+reset stub in every bank, same-location switch zones; the whole Exerciser is a live F8 2-bank cart, `bank.number` asserted in CI). F6/F4/larger schemes remain documented-only.
 - [x] **#12 Venetian Blinds** — intra-frame line interleaving: 2 figures through 1 player, zero flicker, striped look (Whitehead, *Video Chess* 1979). ★★ · **done** (catalog: `venetian-blinds.md`; demo `venetian.asm` — alternating rows pixel-verified).
 
+- [ ] **#37 Striped row at a uniform pitch wider than 8 px, with NO blank scanline** — ten shaped slots at a
+  uniform **16 px** pitch across **151 of the 160 px**, every slot lit on every other scanline and **zero**
+  move-only lines. It is not on `text12.md`'s width ladder at all, and the reasoning it breaks is written up in
+  `sprite-placement.md` under rule 13. **BLOCKED ON TWO OF THIS FILE'S OWN PROMOTION RULES**, both measured
+  2026-08-26 rather than assumed:
+  - *"A mechanism waits for its SECOND caller."* The generator exists once, inside one piece in the private
+    `roms/` repository, and its solvers import that work's own kernel module. One caller.
+  - *"Nothing lands without its litmus, its grading test and its catalogue row."* A generic kernel with
+    placeholder glyphs has to be written first; the working one carries the artwork and cannot move.
+  Also **still moving**: the generator was committed four times on 2026-08-26, the last of them changing the
+  scheduling decision itself. Check both before starting —
+  `git -C ../roms log --oneline --since=3.days -- '*/tools/mk_stripe*.py'` (quiet = settled) and
+  `ls docs/techniques/ | grep -c stripe` (1 = landed).
+  **The measured FACTS are already up** and are not waiting on any of this: `design-principles.md`, "Placing a
+  row of shapes and WRITING them are different limits".
+
 ## Notes
 - `reference/docs_atari/spiceware_tutorial/` (Darrell Spice Jr., *Let's Make a Game*, Steps 1–14) is a
   ready-made **general curriculum** that touches most of #2–#9 in build order — a strong execution guide,

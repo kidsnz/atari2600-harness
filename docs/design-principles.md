@@ -115,6 +115,22 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **Minimum-byte initialisation + hotspot placement**: in a tight 2K/4K, Omegamatrix's 8-byte self-modifying init (`bne .loop+1` jumps between operator and operand → `#$0A` executes as an ASL) yields A=0 / X=0 / SP=$FF / carry clear. Put bank hotspots **at the highest addresses (near the already-used interrupt vectors)** and the free chunk is maximised (a ZP hotspot = Tigervision 3F saves 1 ROM byte + 1cy per switch). 〔mining blog 12061, 11811〕
 - **★The "lodging" pattern for physics lines (sharing a WSYNC line between mutually exclusive paths)**: splitting the Overscan physics into "one concern = one WSYNC line" runs out of lines, but **paths that are mutually exclusive within the same frame (normal / hit / miss / frozen …) may use the same line for different purposes** —— each path strobes line N's WSYNC itself and only the contents of the line are swapped (e.g. line 3 = paddle input normally / english computation on a hit / serve handling on a miss). Work that gets skipped (a frame's worth of paddle input not being applied, say) merely means "drawn with a value one frame old" = an invisible compromise. Keep **the total line count identical on every path** (offset the variable part with the number of filler lines). When a feature addition inflates the budget, first ask "which path is it exclusive with", and consider lodging before adding a dedicated line. Housekeeping that must run every frame (LFSR / counters / note length / switch polling) is safest gathered on **a dedicated line where all paths converge**. 〔in-house: PONG pf2 physics-line architecture 2026-07-02–03 (serve lodging → generalised to hit/miss → new line 5)〕
 
+- **★Placing a row of shapes and WRITING them are different limits, and the writes bind first.** A line's
+  placement capacity is a search over strobe cycles (`plan_sprite_placement`); its write capacity is the
+  graphics stores that must fit in the same 76 cycles (`prove_line_budget`). They are not the same number and
+  the second is smaller, so "the row fits" answered from placement alone is answered from the wrong half.
+  Measured on a ten-slot row at a uniform 16 px pitch: **one scanline can PLACE all ten and can WRITE only
+  eight**, at both shape widths tried, best schedule ending at cycle **73 of 76**. That is what forces a second
+  line — and a shape drawn on one of two lines is lit on every other scanline, so **a striped look is a
+  consequence of the budget, not a style**. Two more in the same "cost, not taste" direction: the two lines
+  afford **12 shape-draws at 7 px and 13 at 6 px, while one solid word costs 20**, so a row mixing two solid
+  shapes with eight striped ones is not an arrangement the budget offers; and **the phase is free** — every
+  arrangement that schedules at a given width ends its heavier line on the same cycle, whether the split is
+  5/5 or 4/6. **Ask placement and cycles separately and report them separately: a combined "no" cannot tell
+  you which of the two said it.** 〔measured 2026-08-26 in a piece in the private `roms/` repository;
+  **not re-measured here** — the solvers behind it are bound to that work's own kernel, and the reusable form
+  is on `techniques/roadmap.md` waiting for a second caller〕
+
 ## Rules of thumb for "good graphics"
 - Visual impact ≈ number of colours × sprite density. More colours are bought by adding hardware (Pitfall II = DPC). 〔Demon Attack, Stay Frosty/Draconian〕
 - The exemplars = the AtariAge Homebrew Awards "Best Graphics" category. **The strongest ground truth = the homebrew "Pizza Boy", every pixel of which the user drew personally** (designed in Photoshop; constraints confirmed with DaveC). More accurate than mining external threads = put the design questions (colour bands / NUSIZ / flicker tolerance) to the author directly.
