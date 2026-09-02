@@ -68,7 +68,13 @@ def scan_text(asm):
         if re.search(r"clean_start", low):
             has_cleanstart = True
         # 1) Unstable illegal opcodes (break on real hardware depending on the unit/temperature) 〔known-traps D / mined 168616,132496〕
-        m = re.search(r"\b(lxa|xaa|ane)\b", low)
+        # ASR/ALR joined this list on 2026-09-02. The docs had it in the STABLE set citing
+        # mining 168616, but 168616 itself reports it failing on official hardware (late
+        # Taiwanese Atari Jr; Thunderground's score corrupts) and 294471 s32 carries an
+        # independent confirmation from omegamatrix on real hardware. No ROM in the corpus
+        # uses it (measured with two structurally different expressions, both exit 1), so
+        # adding it costs nothing and closes the gap between the docs and this check.
+        m = re.search(r"\b(lxa|xaa|ane|asr|alr)\b", low)
         if m:
             errors.append((n, f"unstable illegal opcode `{m.group(1)}` — HW-unreliable (use LAX/SAX/SBX/DCP instead)"))
         if re.search(r"\blax\s+#", low):
