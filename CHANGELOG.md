@@ -6,6 +6,38 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — indirect-jump positioning, and a 2002 attribution this file had eight years wrong (2026-09-02)
+
+`design-principles.md` carried one bullet holding two unrelated claims: that striking HMOVE at cycle
+73–74 suppresses the left-edge comb, and that indirect-jump positioning is "Omegamatrix's ... the
+HMPx low nibble doubles as the jump index". Both sat under one `(needs litmus)`. They are now two
+bullets, and the second is backed.
+
+The technique is older and a different shape than the credit said. Erik Mooney posted it to the
+Stella mailing list on 2002-07-21 (`200207/msg00330`, expanded in `msg00334`): prepare N hardcoded
+positioning lines, compute a pointer off-screen, `JMP (ptr)` into the right one. No low-nibble
+folding — the nibble stays free for movement. `litmus_jmpind_pos.asm` measures nine variants five
+CPU cycles apart and finds the object exactly 15 colour clocks apart each time, in a deliberately
+non-monotone table order so a band-index artefact cannot pass; the sixteen HMPx nibbles land at
+−signed4(nibble) from the unmoved position, reaching −7..+8.
+
+That makes Manuel Polik's arithmetic in the same thread (`msg00332`) checkable for the first time:
+"I'd only need 9 kernel parts, as there are only 128 horizontal positions." Nine parts reach **136
+contiguous positions**, so the claim holds — but the reason is not in the thread. The set is
+contiguous only because the fine range (16 values) is at least the coarse step (15 clocks): the
+intervals [15k−7, 15k+8] and [15(k+1)−7, 15(k+1)+8] meet exactly at their endpoint. One fewer fine
+value and nine parts leave holes. `TestJmpIndPosCoverageIsContiguous` derives that from the measured
+step and the measured range, not from the constants, so a change to either fails it by name.
+
+The comb half of the old bullet is still unbacked and now says so precisely: `litmus_hmove_side.asm`
+band D does strobe at ~cycle 74 and its header records "no comb", but no test grades it — the ROM is
+only carried as ceiling corpus.
+
+Two negative controls were run against the fixture itself: pointing every table entry at variant 0
+collapses all nine bands onto one clock and fails eight gradings, and sorting the table order trips
+the monotonicity control by name.
+
+
 ### Changed — technique #36 was generalising from one strobe spacing (2026-08-26)
 
 `restrobe-copies.md` measured the re-strobe ladder with strobes eight cycles apart, found 3 + k, and
@@ -40,6 +72,14 @@ queued since 2026-08-23, was captured in the same pass at 37/37.
 ## [Unreleased]
 
 ### Added
+- **Indirect-jump object positioning** (`docs/design-principles.md`,
+  `roms/litmus/litmus_jmpind_pos.asm`, `internal/emu/jmpindpos_test.go`,
+  `scripts/gen_litmus_jmpind_pos.py`). `JMP (ptr)` into a table of hardcoded positioning lines
+  replaces the cycle-counting delay loop: each variant defers the RESPx strobe by 5 CPU cycles = 15
+  colour clocks, and the HMPx nibble applied by the following HMOVE fills in between. Nine variants
+  reach 128 contiguous positions (measured 136) and are contiguous only because the fine range is at
+  least the coarse step. Pays ROM for cycles plus >= 2 bytes of RAM per object. Sourced to Erik
+  Mooney and Manuel Polik, Stella list 2002-07, correcting a later attribution.
 - **Technique #36 — RESPx re-strobing: more copies a scanline, and how many depends on the spacing**
   (`docs/techniques/restrobe-copies.md`, `roms/litmus/litmus_restrobe.asm`,
   `internal/emu/restrobe_test.go`, `scripts/gen_litmus_restrobe.py`). A player in a NUSIZ copy mode
