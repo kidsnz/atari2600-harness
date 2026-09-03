@@ -16,9 +16,12 @@ const CTRLPFScoreBit = 0x02
 // ScoreModeTwoColor は CTRLPF 値が score ビットを立てて左右2色PFになっているかを返す。
 func ScoreModeTwoColor(ctrlpf byte) bool { return ctrlpf&CTRLPFScoreBit != 0 }
 
-// ScrollScanlinesConstant は縦/横スクロール背景の鉄則「総スキャンライン数をフレーム間で
-// 一定に保つ」を判定する。frameLines は各フレームの総ライン数。pal=true なら各フレームが
-// 偶数ラインであることも要求する（PAL は偶数必須）。〔design-principles.md / 採掘 200972〕
+// ★2026-09-03: この定数を足したとき、★直前にあった ScrollScanlinesConstant の注釈との
+// あいだに空行を入れ忘れ、★★注釈が融合した。★`go doc RAM2600` が関数の説明を出し、
+// ★★★`go doc ScrollScanlinesConstant` は【1行も出さない】状態だった。
+// ★`go build` は exit=0 なので、★★ビルドでは捕まらない種類の事故。★helper-3 が
+// ★Go 自身の道具（`go doc`）で見つけた。★注釈の直前には必ず空行を置くこと。
+//
 // RAM2600 は 2600 の内蔵 RAM の総バイト数（$80–$FF）。★スタックはこの中から上に向かって
 // 積まれるので、変数と共有する。〔emu.RAMSize と同じ量。ここは design 側の定数〕
 const RAM2600 = 128
@@ -42,6 +45,9 @@ func ScrollBackgroundFitsRAM(boardBytes, bufferBytes, deltaBytes, stackBytes int
 	return boardBytes+bufferBytes+deltaBytes+stackBytes <= RAM2600
 }
 
+// ScrollScanlinesConstant は縦/横スクロール背景の鉄則「総スキャンライン数をフレーム間で
+// 一定に保つ」を判定する。frameLines は各フレームの総ライン数。pal=true なら各フレームが
+// 偶数ラインであることも要求する（PAL は偶数必須）。〔design-principles.md / 採掘 200972〕
 func ScrollScanlinesConstant(frameLines []int, pal bool) bool {
 	if len(frameLines) == 0 {
 		return true

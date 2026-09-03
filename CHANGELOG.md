@@ -6,6 +6,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — `SEI` finally removed from the missiles technique, and a doc comment I fused the same day (2026-09-03)
+
+Two corrections, one of them mine from earlier the same day.
+
+**`missiles-bullets.md` still said "Needs `SEI` (no IRQ)".** That error was found and recorded this
+morning and never actually edited — the distillation caught it a second time and pointed out that
+`reference/atariage/63334-plp-php/notes.ja.md:19` quotes the wrong line verbatim, so the mistake had
+already propagated. `SEI` does nothing here: `CPU.Interrupt()` is reached from five call sites in the
+vendored engine and all five are `mem.arm.Interrupt()`, the ARM coprocessor in ELF/ACE carts. The RIOT's
+PA7 flag is a status bit software polls and never reaches the CPU. 139 of 173 ROMs here still open with
+`sei` and that is fine as convention; calling it a requirement of this technique was not.
+
+**Adding `RAM2600` fused two doc comments.** No blank line between the new constant's comment and
+`ScrollScanlinesConstant`'s, so `go doc RAM2600` printed the function's description and
+`go doc ScrollScanlinesConstant` printed nothing at all. `go build` exits 0 either way, which is why it
+survived a full test run. Found with Go's own tool.
+
+
 ### Added — the skipdraw is 17 or 20 cycles; "constant 18" was wrong twice (2026-09-03)
 
 `fundamentals-audit.md` carried "skipdraw/DoDraw **constant**-18-cycle draw" as documented-only and added

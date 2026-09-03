@@ -86,9 +86,9 @@ func TestScrollScanlinesConstant(t *testing.T) {
 // "120-byte-class" world on internal RAM, with SuperChip/CBS needed above that.
 func TestScrollBackgroundFitsRAM(t *testing.T) {
 	cases := []struct {
-		name                                  string
+		name                        string
 		board, buffer, delta, stack int
-		want                                  bool
+		want                        bool
 	}{
 		{"a 120-byte-class world with a shallow stack", 60, 40, 12, 6, true},
 		{"exactly the 128 bytes", 60, 40, 22, 6, true},
