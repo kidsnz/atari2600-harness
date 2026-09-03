@@ -78,7 +78,14 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   controls). The fixture latches every old copy to zero on entry: without that, the ball's old copy
   survives from an earlier frame and band B passes on stale state — measured, and the reason the
   first negative control did not fire.
-- 📖 Missiles have **no** vertical delay (so in a 2LK they start only on even lines).
+- ✅ **Missiles have no vertical delay** — measured 2026-09-03; this line was documented-only until
+  then. Read against the ball, which does have one: with every VDEL bit set and both objects enabled on
+  the same line and no GRP write after, the **missile lights and the ball stays dark**. Two controls make
+  that readable — with VDELBL clear both light (so the fixture does enable both), and with VDELBL set
+  plus a GRP1 write both light (so the ball was waiting on a latch, not broken). There is no VDELM
+  register and no new/old pair for a missile, which is why in a 2LK it starts on the line it is enabled.
+  〔Stella PG; pairs with `litmus_vdel_cross`〕 `→ roms/litmus/litmus_missile_novdel.asm` /
+  `internal/emu/missilenovdel_test.go` (3 gradings, 2 negative controls)
 - ✅ Moveable-object writes are shear-safe at CPU cycles 0–22 of the line — closed by derivation from
   verified constants (any write completing by cy 22 precedes every draw start: (X+68)/3 ≥ 22.67 even at
   X=0) plus litmus_48px6's measured mid-line GRP choreography (writes landing in copy gaps).

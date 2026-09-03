@@ -6,6 +6,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — missiles have no delay path, measured against the ball that does (2026-09-03)
+
+The line "Missiles have no vertical delay (so in a 2LK they start only on even lines)" was
+documented-only, and all three harness layers returned 0 for it. The claim only says something next to an
+object that DOES have the delay, so the fixture puts the missile beside the ball under identical enables:
+every VDEL bit set, both enabled on one line, no GRP write after. The missile lights; the ball stays
+dark. Two controls make that readable — VDELBL clear lights both (the fixture does enable the ball), and
+VDELBL set plus a GRP1 write lights both (the ball was waiting on a latch, not broken).
+
+Fifth item closed by auditing harness against its own declared gaps. 24 documented-only lines remain,
+from 31 this morning.
+
+
 ### Added — grade VDEL's cross-copy, including the ball half nobody had checked (2026-09-03)
 
 `fundamentals-audit.md` carried VDEL as documented-only while calling it "the load-bearing mechanism".
