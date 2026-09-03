@@ -6,6 +6,40 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the reset-strobe phase, and the one clock between an 8-clock object and a 1-clock one (2026-09-03)
+
+`fundamentals-audit.md` carried the RESPx pipeline as 📖, and that file's own legend defines 📖 as "stated
+by a document, NOT measured by our litmus ROMs". The statement was Towers': counter reset, then the first
+visible copy appears 5px right of the reset. Nothing in the tree graded it — checked with all five layers,
+including the ledger and `reference/` - while `litmus_jmpind_pos` and `plan_sprite_placement` each measured
+their own x0 empirically, precisely because this constant was never pinned.
+
+It is 5, for the player. The missile and the ball land at 4. That one clock between an 8-clock object and a
+1-clock object is a number the document does not carry, and it is the number a placement routine gets wrong
+if it treats the three alike.
+
+The offsets are read against the strobe instruction's own beam position rather than derived from cycle
+arithmetic: `TraceClocks` reports each instruction's start and end in visible coordinates, so the strobe's
+end clock and the pixel it produces are two readings of the same frame. That matters because a three-cycle
+`sta` spans nine colour clocks and any derivation has to assume which of them latches the reset - an
+assumption this fixture does not need to make.
+
+`litmus_respx_phase.asm` sweeps sixteen strobe cycles per object, one CPU cycle apart, so consecutive bands
+are exactly three colour clocks apart; the slope grading requires an unbroken run of twelve such steps,
+which stops the offset assertion from being satisfiable by a fixture that never moved. Stella agrees on
+37/37 write-only registers.
+
+Three faults in the fixture were caught by its own probe before any grading existed, and each is written
+into the generator rather than silently fixed: a delay of exactly one CPU cycle is not constructible from
+`nop`/`bit` and is now refused instead of rounded; `ldx #0` is a 256-iteration loop, so the filler is
+omitted when the bands already fill the picture (the first version produced a 35-scanline frame); and
+`RESM1` is $13, not $12 - with $12 and only ENAM1 set, nothing visible moved and the probe read a constant
+across all sixteen missile bands, which is exactly what a wrong strobe address looks like.
+
+Found by auditing harness against its own declared gaps rather than by reading the corpus: of eleven harness
+findings the day before, six needed no corpus at all.
+
+
 ### Added — indirect-jump positioning, and a 2002 attribution this file had eight years wrong (2026-09-02)
 
 `design-principles.md` carried one bullet holding two unrelated claims: that striking HMOVE at cycle

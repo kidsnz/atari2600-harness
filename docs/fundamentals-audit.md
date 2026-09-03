@@ -40,7 +40,7 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   left per extra pulse). **Late HMOVE during the visible line "plugs" MOTCK pulses → moves objects RIGHT at
   1px/4CLK** (the Cosmic Ark starfield family). None of this is in our local spec shelf — Towers
   (https://www.atarihq.com/danb/files/TIA_HW_Notes.txt) is the adopted authority. ⬜ all of it unmeasured.
-- 📖 **RESPx pipeline** (Towers): counter reset → first visible copy appears **5px right** of the reset
+- ✅ **RESPx / RESMx / RESBL reset phase** — measured 2026-09-03; this line was documented-only until then. The player's first visible pixel lands **+5 colour clocks** past the strobe's own end clock (the value Towers' *TIA Hardware Notes* states), and the **missile and the ball land +4** — a one-clock difference between an 8-clock object and a 1-clock object that the document does not carry. One extra CPU cycle before the strobe moves any of them exactly **+3** clocks. Offsets are read against the strobe instruction's own beam position (`TraceClocks`, visible coordinates), so nothing is derived from cycle arithmetic. 〔Towers, *TIA Hardware Notes*, RESPx pipeline〕 `→ roms/litmus/litmus_respx_phase.asm` / `internal/emu/respxphase_test.go` (3 gradings, 2 negative controls: the player's offset forced to 4 fails by name; a flat sweep trips the slope control)
   point (explains our verified +5 family offsets). **RESBL re-emits START (ball restartable mid-line);
   RESPx does not** (player needs a 160-clock wrap). ⬜ double-strobe behavior unmeasured.
 - 📖 missile-locked-to-player (RESMP D1): release leaves M centered on P (Stella PG). ⬜ exact lock offset.
