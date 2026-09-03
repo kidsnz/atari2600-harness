@@ -35,11 +35,18 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   in-flight movement (right-8 stayed +8/frame in all three windows). Keep the 24-cycle rule as a
   REAL-HARDWARE portability constraint ("unpredictable" on silicon, Stella PG 5×), but our oracle is
   deterministic and write-inert; the rule costs nothing to follow (HMCLR after SLEEP 24, as score6 does).
-- 📖 **HMOVE mechanism** (Towers, *TIA Hardware Notes*): HMOVE right after WSYNC **extends HBLANK by exactly
-  8 color clocks** → the famous left-side 8px black comb on HMOVE lines; movement = clock stuffing (1px
-  left per extra pulse). **Late HMOVE during the visible line "plugs" MOTCK pulses → moves objects RIGHT at
-  1px/4CLK** (the Cosmic Ark starfield family). None of this is in our local spec shelf — Towers
-  (https://www.atarihq.com/danb/files/TIA_HW_Notes.txt) is the adopted authority. ⬜ all of it unmeasured.
+- ✅ **HMOVE mechanism** (Towers, *TIA Hardware Notes*) — measured 2026-09-03; this line was
+  documented-only until then, and `roms/litmus/litmus_hmove_side.asm` had recorded the numbers in its
+  header since V2-2 while **nothing graded them** (the ROM was carried only as ceiling corpus).
+  HMOVE struck right after WSYNC **extends HBLANK by 8 colour clocks** → the left-side comb, painted
+  with **every HMxx at zero** (16 of band A's 32 lines, strictly alternating). HMOVE struck
+  **mid-visible displaces nothing and paints no comb** (0 of 32 lines; P0 holds clock 9 across all 64
+  lines of bands A–C). HMOVE struck **at the end of the line adds 8 to the nibble**: HMP0 = $10 asks
+  for one clock left and delivers **nine** — measured over 14 uniform strobes, 151 → 34. The loop-exit
+  strobe moves **−8** instead, because `bne` falls through there and the strobe lands one cycle
+  earlier; that is recorded rather than dropped. `→ internal/emu/hmoveside_test.go` (4 gradings,
+  2 negative controls: removing the +8 fails on every step; claiming the comb in the mid-visible
+  bands fails by name)
 - ✅ **RESPx / RESMx / RESBL reset phase** — measured 2026-09-03; this line was documented-only until then. The player's first visible pixel lands **+5 colour clocks** past the strobe's own end clock (the value Towers' *TIA Hardware Notes* states), and the **missile and the ball land +4** — a one-clock difference between an 8-clock object and a 1-clock object that the document does not carry. One extra CPU cycle before the strobe moves any of them exactly **+3** clocks. Offsets are read against the strobe instruction's own beam position (`TraceClocks`, visible coordinates), so nothing is derived from cycle arithmetic. 〔Towers, *TIA Hardware Notes*, RESPx pipeline〕 `→ roms/litmus/litmus_respx_phase.asm` / `internal/emu/respxphase_test.go` (3 gradings, 2 negative controls: the player's offset forced to 4 fails by name; a flat sweep trips the slope control)
   point (explains our verified +5 family offsets). **RESBL re-emits START (ball restartable mid-line);
   RESPx does not** (player needs a 160-clock wrap). ⬜ double-strobe behavior unmeasured.

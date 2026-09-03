@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — grade the HMOVE side effects a ROM had been measuring silently since V2-2 (2026-09-03)
+
+`litmus_hmove_side.asm` has recorded three numbers in its header since V2-2 and nothing checked any of
+them: the ROM was carried only as ceiling corpus, so those lines were a comment. `fundamentals-audit.md`
+marked the mechanism documented-only and `design-principles.md` marked the comb half `(needs litmus)`.
+Both markers were accurate.
+
+Now graded. A strobe right after WSYNC extends HBLANK and paints the left-side comb with **every HMxx at
+zero** — 16 of band A's 32 lines, strictly alternating, which is what makes it the extended blank rather
+than an object that walked left. A strobe mid-visible paints **no comb on any of 32 lines** and displaces
+nothing: P0 holds clock 9 across all 64 lines of bands A–C. A strobe at the end of the line **adds 8 to
+the nibble**: HMP0 = $10 asks for one clock left and delivers nine, measured over 14 uniform strobes,
+151 → 34.
+
+The loop-exit strobe moves −8 rather than −9, because `bne` falls through on the last iteration and the
+strobe lands one cycle earlier. That is asserted separately instead of trimmed away — a fixture whose
+last band is quietly excluded is a fixture nobody can reproduce.
+
+Negative controls: dropping the +8 (grading the nibble alone at −1) fails on every step; claiming the
+comb across the mid-visible bands as well fails by name.
+
+This is the second item closed by auditing harness against its own declared gaps rather than by reading
+the corpus. `fundamentals-audit.md` is down to 27 documented-only lines and three `needs litmus` markers
+remain.
+
+
 ### Added — the reset-strobe phase, and the one clock between an 8-clock object and a 1-clock one (2026-09-03)
 
 `fundamentals-audit.md` carried the RESPx pipeline as 📖, and that file's own legend defines 📖 as "stated
