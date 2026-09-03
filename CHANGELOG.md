@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a trap we would otherwise have measured wrong: SuperChip phantom reads are off by default (2026-09-03)
+
+Gopher2600 does model the SARA phantom-read recovery — `mapper_atari.go` has `saraCycles = 2` and the
+guard `cart.env.Prefs.Cartridge.EmulateSARA.Get().(bool)` — but
+`preferences/cartridge_preferences.go` `SetDefaults` sets **`EmulateSARA` to `false`**, and nothing in
+this repo sets it (`rg 'EmulateSARA|SARA' internal cmd pkg` returns nothing).
+
+So a litmus written for phantom reads today would come back **green because the feature is off**, and
+the green would say nothing about hardware — it would be measuring our own default. That is the shape
+this project keeps hitting: an instrument that answers a different question than the one asked, with
+no outward sign. Recorded in `known-traps.md` section E with both ways out — pin the preference and
+say so, or record the behaviour as not modelled.
+
+The other half of SuperChip needs no preference and is measurable as it stands: the write/read port
+split ($F000-$F07F write-only, $F080-$F0FF read-only). Nothing in `verified-coverage.md` covers
+SuperChip today (`rg -i 'superchip|sc ram' docs/verified-coverage.md` → 0 hits).
+
+Found by the mailing-list distillation (helper-3) while designing that litmus — before writing it,
+which is the point. Verified against the engine source here. Six gates pass.
+
 ### Changed — six audit items split into what we measured and what we did not, and a litmus header that pointed the reader backwards (2026-09-03)
 
 Six `fundamentals-audit.md` items were marked 📖 (documented, not measured by us) while a measurement
