@@ -268,17 +268,37 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   for what specifically blocks each.
 
 ## 11. Procedural generation (new domain)
-- 📖 **Pitfall's bidirectional LFSR** (samiam blog + disassembly, simulated & confirmed): 1 byte = the
-  world; right step inserts bit3⊕4⊕5⊕7, left step inserts bit0⊕4⊕5⊕6 (**the disassembly's comment says
-  bit1 — wrong; simulation proves bit0**); period exactly 255; left∘right = identity. Expected sequences
-  from seed $C4 are computed and litmus-ready.
+- ✅ **Pitfall's bidirectional LFSR — computed, not run** (samiam blog + disassembly; settled here by
+  enumerating all 256 byte values, `scratchpad/lfsr_check.py`, no emulator involved). 1 byte = the
+  world. **The step named for the direction the world scrolls, not for the direction the register
+  shifts** — that distinction is the whole trap:
+  **"right" = shift LEFT**, inserting `bit3⊕4⊕5⊕7` at bit 0;
+  **"left" = shift RIGHT**, inserting `bit0⊕4⊕5⊕6` at bit 7.
+  It cannot be read the other way and still work: **a shift right loses bit 0, so its tap has to
+  contain bit 0; a shift left loses bit 7, so its tap has to contain bit 7.** The two tap sets in the
+  sources each contain exactly one of those, and each fits exactly one direction. Read literally
+  ("right step" = shift right with `bit3⊕4⊕5⊕7`) the function is **not even a bijection** and the
+  orbit from $C4 is 34 long, with cycle lengths {1,2,3,4,31,32,33,34} over the 256 seeds.
+  Read correctly: **both steps are permutations of 0–255, `left∘right` and `right∘left` are both the
+  identity, 0 is the fixed point, and every one of the other 255 bytes lies on a single cycle** — so
+  "period exactly 255" is exact, not approximate. **The disassembly's `bit1` is wrong**: `shr{1,4,5,6}`
+  is not a bijection and fails to invert the right step for **128 of the 256** values.
+  From seed **$C4** the world runs `$C4 $89 $12 $25 $4B $97 $2E $5C $B8 $70 $E0 $C0 $81 $03 $06 $0C …`
+  and ends `… $11 $23 $47 $8E $1C $38 $71 $E2`; the "left" sequence is that one reversed.
+  Regression handles: sha256[:16] of the 255-byte forward sequence = **751c0803eae3c1d4**, of the
+  reverse = **62b12e47b5a03b55**.
 - 📖 **DaveC's Random-Dungeon** (read in full): 2-byte room codes (walls/interior indices into ROM strip
   libraries); **exit-wall code spliced into the next room's entry wall** = infinite consistent dungeon with
   zero map storage; curated room-code tables (validity by construction); 8-bit Galois LFSR `eor #$8E`
   (period 255, confirmed) → later 16-bit; pacing counter for special rooms; 3 kernels dispatched per frame.
   His landscape evolved to 10 zones × per-zone x/y/tile arrays = 20 independent objects + per-line COLUPx.
-- 📖 LFSR hygiene (SpiceWare Step 10): `lsr/bcc/eor #$B4` (8-bit, period 255), seed from INTIM, never 0.
-
+- ✅ **LFSR hygiene (SpiceWare Step 10) — computed, not run** (`scratchpad/lfsr_check.py`, all 256
+  values enumerated, no emulator): `lsr A / bcc + / eor #$B4` is a **permutation of 0–255**; **$00 is a
+  fixed point** (hence "never seed 0" — it is not a caution, it is the only way the generator can
+  fail); every other byte lies on **one cycle of length 255**, so the period claim is exact.
+  From seed $01: `$01 $B4 $5A $2D $A2 $51 $9C $4E …`, ending `… $69 $80 $40 $20 $10 $08 $04 $02`;
+  sha256[:16] of the 255-byte sequence = **1cc3384d72331258**. Seeding from INTIM is untested here —
+  that is about *where the seed comes from*, not about the generator, and INTIM can read 0.
 ## 12. Harness/tooling implications
 - 📖 **Stella IS automatable for F-4** (debugger doc + installed Stella 7.0 verified): `<rom>.script`
   auto-runs at `-debug` startup (`frame N / tia / riot / dump 80 ff 7 / saveSnap / saveSes`); `saveSes`

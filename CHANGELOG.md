@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — Pitfall's bidirectional LFSR cannot be read the way its sources are written (2026-09-03)
+
+Two audit items settled by **enumeration, with no emulator**: both are pure arithmetic over 256 byte
+values, so an emulator would only have been a slower way to be less sure.
+
+The sources say "right step inserts `bit3⊕4⊕5⊕7`, left step inserts `bit0⊕4⊕5⊕6`". Implemented
+literally — "right step" as a shift right — the function **is not even a bijection**: the orbit from
+$C4 is 34 long and cycle lengths over the 256 seeds come out {1,2,3,4,31,32,33,34}. Nothing about
+"period exactly 255" survives.
+
+The correct reading is forced by the structure rather than chosen: **a shift right loses bit 0, so its
+tap must contain bit 0; a shift left loses bit 7, so its tap must contain bit 7.** Each of the two tap
+sets contains exactly one of those, and so fits exactly one direction. **"right" and "left" name the
+direction the world scrolls, not the direction the register shifts.** Read that way every claim holds:
+both steps are permutations, `left∘right` and `right∘left` are both the identity, $00 is the fixed
+point, and the other 255 bytes lie on one cycle — so "period exactly 255" is exact. The disassembly's
+`bit1` variant is wrong: `shr{1,4,5,6}` fails to invert for **128 of 256** values.
+
+`eor #$B4` (SpiceWare) likewise: permutation, $00 the fixed point — "never seed 0" is not a caution but
+the only way the generator can fail — and one cycle of 255. Sequences are pinned by sha256 prefix so a
+re-run compares without eyeballing 255 values.
+
+**The method was validated against ground truth before being trusted.** The same twenty lines were run
+against `eor #$8E`, which `litmus_lfsr` already measures on the emulator and `scenarios/lfsr.json`
+pins in CI, and reproduced `ram.0x90..0x97 == 1,142,71,173,216,108,54,27` byte for byte. Re-run here
+and confirmed.
+
+Found and computed by the mailing-list distillation (helper-3). Both entries say "computed, not run",
+and the failing reading is kept in the text so the next reader does not fall into it.
+
 ### Changed — the claim with the worst reference-rot in the file had no name, so it got one (2026-09-03)
 
 "PAL must be even" lived as a parenthetical inside the scrolling-PF-background bullet — a different
