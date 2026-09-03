@@ -110,6 +110,20 @@ Vis:    sta WSYNC
         bne Vis
 
 ; --- Overscan: 30 lines, with the three snapshots taken on the first ---
+;
+; NOTE (2026-09-03): the three snapshots below are stored RAW, and the scenario therefore pins
+; 130 / 130 / 2 rather than 128 / 128 / 0. CXP0FB drives only D7 and D6; every other pin floats,
+; and Gopher2600 fills a floating pin from the last value the CPU put on the bus
+; (memory.go: `data |= mem.LastCPUData & ^mem.DataBusDriven`). The last such value here is the
+; 2 from `lda #2 / sta VBLANK` on the very next line, so the low bits read back as $02 and
+; snap2 "clear" is $02, not $00.
+;
+; So `scenarios/litmus_cxclr.json` pins TWO things at once: the collision latch (D7) and the
+; instruction that last drove the bus. Reordering these instructions harmlessly — changing
+; nothing the TIA does — moves the low bits and fails the scenario. That is not a bug, but it
+; is not readable from the values either, which is why this note exists. A ROM written today
+; would normalise to 0/1 before storing (see the flicker-attribution design) so the pinned value
+; says only what the TIA did. Found by the mailing-list distillation.
         lda #2
         sta VBLANK
 

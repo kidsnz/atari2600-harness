@@ -100,6 +100,19 @@ kernel means the frame length moves and the picture rolls on hardware.
 The source names the same hazard for the `lsr`/`bpl` seed and prescribes a comment
 ("assumes A < 128"). A comment is the weak form; see below for the machine form.
 
+**Put the comment on the seed, not on the branch.** All five annotated sites here comment the
+*branch* — the line that is safe. The person who breaks this edits the *seed* and has no reason to
+look at the branch below it, so the warning sits on the side nobody reads. Write it as
+`lda #0  ; the 0 is also the beq's condition below — change one, check the other`.
+
+**And note what a comment-requiring gate cannot do.** A lint that finds seed→branch pairs and
+demands a comment goes *silent* at exactly the moment it is needed: change `lda #0` to `lda mask`
+and the pattern no longer matches, so nothing fires. It documents the hazard; it does not guard it.
+What actually guards it today is the result side — a branch that becomes conditional takes the
+other path, which moves the picture (golden frame) and the line's cycle count
+(`prove_line_budget`). The proof route below is worth more than the comment route not because it is
+stricter but because a re-derived fact cannot go stale, and comments here have.
+
 ## Where it is used here (measured 2026-09-03)
 
 **28 sites across 17 files, all under `harness/roms` — none in the works themselves.**

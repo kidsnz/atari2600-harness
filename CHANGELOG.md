@@ -6,6 +6,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — a line that said "pending our own measurement" while sitting on the measurement (2026-09-03)
+
+`fundamentals-audit.md` listed the HMOVE comb / late-HMOVE behaviour as adopted from Towers'
+notes "pending our own measurement". We measured it: `litmus_hmove_side`, two rows in
+`verified-coverage.md`, a scenario, a golden and `internal/emu/hmoveside_test.go`. What is still
+pending is narrower — the Stella cross-check — and that is already recorded where the measurement
+was made, so nothing is lost by correcting the line.
+
+Also annotates `litmus_cxclr.asm`, whose scenario pins `130 / 130 / 2` where a reader expects
+`128 / 128 / 0`. CXP0FB drives only D7 and D6; Gopher2600 fills the floating pins from the last
+value the CPU put on the bus (`memory.go`: `data |= mem.LastCPUData & ^mem.DataBusDriven`), and the
+last such value is the `2` from the `lda #2 / sta VBLANK` on the next line. **So that scenario pins
+the collision latch and the instruction that last drove the bus, together** — reordering those
+instructions harmlessly, changing nothing the TIA does, fails it. Not a bug, but not readable from
+the values either. Comment-only; the assembled binary is byte-identical to HEAD.
+
+Found by the mailing-list distillation (helper-3), who also correctly declined to reclassify a
+neighbouring line: `:129` says a collision pattern is verifiable "once we do flicker", and we do
+have flicker — but our flicker ROM touches no collision register, so the claim is right and only
+its stated reason is wrong. The mark stays.
+
 ### Added — `branch-always` / simulated BRA, the third catalogue entry that corrects its own source (2026-09-03)
 
 A conditional branch whose flag the preceding instruction has already fixed, replacing a 3-byte

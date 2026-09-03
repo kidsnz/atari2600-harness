@@ -330,8 +330,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 1. `cycle_counting_guide.html` positioning math = approximation; do not cite for positions.
 2. Pitfall disassembly `LeftRandom` comment is wrong (bit0, not bit1) — carry the corrected formula.
 3. SpiceWare Step 3 vs Step 7 left-PF1 window numbers conflict — to be settled by litmus.
-4. The HMOVE comb / late-HMOVE behavior exists in **no** local source — Towers' TIA Hardware Notes adopted
-   as the authority, pending our own measurement.
+4. The HMOVE comb / late-HMOVE behavior exists in **no** local source — Towers' TIA Hardware Notes was
+   adopted as the authority and has since been **corroborated by our own measurement**:
+   `litmus_hmove_side` (comb = left 8 px blanked on strobe-after-WSYNC lines even with HMxx=0;
+   mid-visible strobe ~cyc 39 = a no-op; line-end strobe ~cyc 74 = left by HM+8 px with no comb),
+   fixed by `roms/litmus/scenarios/hmove_side.json` and `internal/emu/hmoveside_test.go`. What is
+   still open is narrower, and it is recorded where the measurement was made rather than here: the
+   numbers are emulator-verified and the Stella cross-check is pending
+   (`docs/verified-coverage.md:42`). **Line corrected 2026-09-03** — it had said "pending our own
+   measurement" while sitting on top of the evidence that the measurement had been made.
 5. Add to constants: 24-cycle HMxx freeze after HMOVE; NMOS-BCD C-only; stores never take page-cross
    penalties (deterministic kernel timing); CLD mandatory at init.
 
