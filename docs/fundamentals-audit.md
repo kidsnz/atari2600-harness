@@ -192,7 +192,19 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 - ✅ INPT4/5 fire: D7, 0=pressed; **VBLANK D6=1 latch mode** — verified `litmus_input` (v0.42.0).
   Test with N flag, never Z (bus noise in low bits).
 - ✅ Paddles INPT0–3 dump/charge — verified `litmus_paddle` (v0.54.0; transfer curve measured).
-- 📖 SWACNT/SWBCNT DDRs — documented only (rarely game-relevant).
+- 📖 **SWACNT/SWBCNT DDRs** — documented only. **"Rarely game-relevant" was withdrawn 2026-09-03:**
+  it was true of *our* ROMs and not of the games. `docs/casebook.md:98` reads a commercial title
+  as **"gate joysticks through the port DDR"**, so the counterexample was already in this
+  repository, one file away. What is true is the narrower statement: **no ROM here writes
+  SWACNT or SWBCNT at all** (`rg -l "SWACNT|SWBCNT" roms --glob "*.asm"` → 0), and none needs to,
+  because the engine resets the RIOT chip memory to zero (`hardware/memory/vcs/riot.go` `Reset`),
+  which is all-inputs, and `deriveSWCHA` then returns the peripheral value unchanged. So a DDR
+  litmus cannot confirm existing practice — it has to **drive a port as an output**, which no ROM
+  here does.
+  ⬜ **The power-up value is the engine's choice, not a measurement.** `Reset` zeroes the memory
+  explicitly; whether a real 6532 clears its DDR on RES is not established here. Measure **what
+  writing SWACNT does**, which is the truth table (`riot/ports/ports.go`, 8 rows, all four
+  SWCHA_W×SWACNT combinations present), not the default.
 
 ## 8. 6502/6507 precision
 - ✅ cycle accounting (76/line; WSYNC-stall exclusion).

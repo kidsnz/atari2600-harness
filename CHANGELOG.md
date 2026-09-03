@@ -6,6 +6,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — "rarely game-relevant" was true of our ROMs and not of the games (2026-09-03)
+
+`fundamentals-audit.md` dismissed the SWACNT/SWBCNT data-direction registers as "rarely
+game-relevant". **The counterexample was already in this repository, one file away:**
+`docs/casebook.md:98` reads a commercial title as *"gate joysticks through the port DDR"*.
+
+The measurable statement underneath is narrower and now stated: **no ROM here writes SWACNT or
+SWBCNT at all**, and none needs to, because the engine resets RIOT chip memory to zero — all inputs —
+and `deriveSWCHA` then returns the peripheral value unchanged. That is a fact about our corpus, and it
+was generalised into a claim about games.
+
+Consequence for anyone writing that litmus: it cannot confirm existing practice, because there is no
+existing practice to confirm. It has to **drive a port as an output**, which nothing here does.
+
+Also marked ⬜ rather than left implied: **the power-up value is the engine's choice, not a
+measurement.** `Reset` zeroes the memory explicitly; whether a real 6532 clears its DDR on RES is not
+established here. The thing to measure is what *writing* SWACNT does — the truth table, which is
+hardware logic — not the default, which is ours. Same shape as the SuperChip SARA entry above.
+
+Found by the mailing-list distillation (helper-3). One claim of theirs did not survive checking: they
+reported the engine's SWCHA truth table as missing the `SWCHA_W=0, SWACNT=1` row. It is present — the
+table has eight rows and all four combinations; only three carry the derivation comment beside them.
+
 ### Fixed — Pitfall's bidirectional LFSR cannot be read the way its sources are written (2026-09-03)
 
 Two audit items settled by **enumeration, with no emulator**: both are pure arithmetic over 256 byte
