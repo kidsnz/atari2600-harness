@@ -180,3 +180,14 @@ re-strobing changes it.
   them measured a player with ONE copy, where "the first copy" and "the only copy" are the same
   thing and rule 8 eats it. **Measure the mechanism's own precondition.** `litmus_resp_edge` had
   already pinned the single-copy answer; nothing here contradicts it.
+
+## The ball is the one object this technique does not reach
+
+Re-strobing multiplies **players and missiles**. The **ball cannot be replicated horizontally** — it is,
+in the source's words, a degraded missile: same 1-clock body, no NUSIZ copies to strobe against
+〔190154:40〕. So a layout that needs four small movers on one line gets them from BL + M0 + M1 plus
+copies of the missiles, never from copies of the ball.
+
+The solver already encodes this and the catalogue did not say it: `internal/place/place.go:194-197`
+offers players and missiles the full pattern set `{0x00, 0x01, 0x02, 0x03, 0x04, 0x06}` and gives the
+ball `{0x00}` alone. Written down 2026-09-03, after an audit found the constraint living only in code.

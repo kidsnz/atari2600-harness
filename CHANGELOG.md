@@ -6,6 +6,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — four doc lines corrected against the sources they cite (2026-09-03)
+
+Four separate findings from the same audit pass, all "harness says X, the note harness cites says
+something else":
+
+**The ~18 colour bands do not come from the 3CC grid.** `design-principles.md` read as if 3 colour clocks
+produced the band count; 160 ÷ 3 is 53, not 18. The 18 comes from the width of the STORE that paints a
+band — `writeCycles × 3`, so 9 px for `STA zp` — which is exactly what `design.MinColorBandWidthPx`
+computes and `color_test.go` pins at 9/12/18. The code was right and the prose was a factor of three out.
+
+**"No division" costs four instructions.** The proportional-homing line said `(target−pos)/16` needs no
+division, which is true, and left out what keeping the sign costs: a `cmp #$80` before each of the four
+`ror`s 〔107024:16〕.
+
+**The pixel-aspect spread now names its free variables.** The line said the 1.67–1.82 answers differ "by
+display assumption" and named only overscan. The sources name two more: an NTSC display expects 227.5
+colour clocks a line and the 2600 emits 228 〔169128:12〕, and the machine is 240p progressive at full
+refresh rather than half 〔208810:9〕. Neither number appears anywhere else here — 227.5 gets zero hits
+across five layers, and every 228 in the tree is cycle budget, a different quantity.
+
+**The ball cannot be replicated horizontally**, and only the solver knew. `internal/place/place.go:194-197`
+gives players and missiles the full NUSIZ pattern set and the ball `{0x00}` alone; the technique catalogue
+said nothing. Now `restrobe-copies.md` does 〔190154:40〕.
+
+
 ### Changed — `InterlaceColorsSafe` called "safe" the pairs its own source says are unusable (2026-09-03)
 
 The function returned `Luminance(a) == Luminance(b)` and the doc line told authors to give both temporal-
