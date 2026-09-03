@@ -205,7 +205,7 @@ Vis:    sta WSYNC
         sbc sy0
         cmp #SPRITE_H
         bcc VD0
-        lda #0
+        lda #0              ; A=0 here is also the beq's condition below - change one, check both
         beq VS0
 VD0:    tax
         lda Art,x
@@ -215,7 +215,7 @@ VS0:    sta GRP0            ; ~21
         sbc sy1
         cmp #SPRITE_H
         bcc VD1
-        lda #0
+        lda #0              ; A=0 here is also the beq's condition below - change one, check both
         beq VS1
 VD1:    tax
         lda Art,x

@@ -116,7 +116,7 @@ LiveJoin:
 ; same cost: the prune changes which arms exist, not what an arm costs.
 PlainRow:
         sta WSYNC
-        lda #0
+        lda #0          ; A=0 here is also the beq's condition below - change one, check both
         sta $81
         beq PlainJoin
         nop

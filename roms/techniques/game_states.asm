@@ -227,7 +227,7 @@ KLine:  sta WSYNC
         sbc #100
         cmp #8
         bcc KDraw
-KBlank: lda #0
+KBlank: lda #0              ; A=0 here is also the beq's condition below - change one, check both
         beq KStore
 KDraw:  tax
         lda Art,x

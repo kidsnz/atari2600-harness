@@ -87,7 +87,7 @@ KLine:  sta WSYNC
         sbc #90
         cmp #16
         bcc KOn
-        lda #0
+        lda #0      ; A=0 here is also the beq's condition below - change one, check both
         beq KStore
 KOn:    lda #$3C
 KStore: sta GRP0

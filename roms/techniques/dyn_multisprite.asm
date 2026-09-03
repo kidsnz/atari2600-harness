@@ -200,7 +200,7 @@ KA_dr:  ldx p0row           ; 15
         sta GRP0
         sta p0row
         inc p0qi
-        lda #1
+        lda #1              ; A!=0 here is also the bne's condition below - change one, check both
         sta p0st
         bne KA_end2
 KA_id:  lda #0
@@ -242,7 +242,7 @@ KB_dr:  ldx p1row
         sta GRP1
         sta p1row
         inc p1qi
-        lda #1
+        lda #1              ; A!=0 here is also the bne's condition below - change one, check both
         sta p1st
         bne KB_end2
 KB_id:  lda #0

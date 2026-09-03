@@ -86,7 +86,7 @@ Vis:    sta WSYNC
         sta sfxOn
         lda #0
         sta sfxIdx
-Held:   lda #1
+Held:   lda #1      ; A!=0 here is also the bne's condition below - change one, check both
         sta prevFi
         bne Tick
 NoPress:

@@ -6,6 +6,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the 23 silent always-taken branches now carry their invariant, on the seed (2026-09-03)
+
+`branch-always` recorded that only 5 of our 28 always-taken branches named their invariant. The other
+23 now do, and the note goes **on the seed** rather than on the branch:
+
+    lda #0          ; A=0 here is also the beq's condition below - change one, check both
+
+That placement is the point. All five pre-existing notes sit on the *branch* — the line that is safe.
+The person who breaks this edits the *seed* and has no reason to look two lines down, so the warning
+was on the side nobody reads.
+
+The one site that already had it — `litmus_6502`, whose seed line says `Z=0` — is pointed at rather
+than duplicated. It is also the evidence: of 28 sites, the single one where someone wrote the note on
+the seed is the single one that reads correctly today.
+
+No label names in the text, deliberately: a label is one more thing that can go stale, and the branch
+is one or two lines below with nothing ambiguous between. Comment-only — all 14 affected ROMs assemble
+byte-identical to their previous binaries, checked pair by pair. Six gates pass.
+
+Written by the mailing-list distillation (helper-2), who supplied each line's verbatim text alongside
+its number so the patch could be matched on content — the numbers had already moved once by then.
+
 ### Added — the VSYNC "≥2 lines" threshold is our own setting, and its default is the answer (2026-09-03)
 
 `television.go` accepts a frame as synced when `vsync.activeScanlineCount >= env.Prefs.TV.VSYNCscanlines`,

@@ -164,7 +164,7 @@ KLine:  sta WSYNC          ; @lines 2 — 2-line sprite kernel (data row spans 2
         sbc #ENEMYROW
         cmp #8
         bcc EDraw
-        lda #0
+        lda #0              ; A=0 here is also the beq's condition below - change one, check both
         beq EStore
 EDraw:  tay
         lda EArt,y
@@ -174,7 +174,7 @@ EStore: sta GRP1
         sbc bulY
         cmp #4
         bcc BOn
-        lda #0
+        lda #0              ; A=0 here is also the beq's condition below - change one, check both
         beq BStore
 BOn:    lda #2
 BStore: sta ENAM0
@@ -183,7 +183,7 @@ BStore: sta ENAM0
         sbc #SHIPROW
         cmp #8
         bcc SDraw
-        lda #0
+        lda #0              ; A=0 here is also the beq's condition below - change one, check both
         beq SStore
 SDraw:  tay
         lda Ship,y

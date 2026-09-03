@@ -83,7 +83,7 @@ KDraw:  txa
         sbc #80
         cmp #40
         bcc KOn
-        lda #0
+        lda #0              ; A=0 here is also the beq's condition below - change one, check both
         beq KStore
 KOn:    lda #$7E            ; バー（6px 幅）
 KStore: sta GRP0

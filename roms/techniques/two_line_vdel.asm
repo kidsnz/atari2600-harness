@@ -147,7 +147,7 @@ Pair:   sta WSYNC           ; --- A 行 ---
         sbc y0p             ; 7
         cmp #SPRITE_H       ; 9
         bcc PD0             ; 11/12
-        lda #0              ; 13
+        lda #0              ; 13 (A=0 here is also the beq's condition below - change one, check both)
         beq PS0             ; 16
 PD0:    tax                 ; 14
         lda ArtA,x          ; 18
@@ -164,7 +164,7 @@ PS0:    sta GRP0            ; ~21
         sbc y1              ; 7
         cmp #SPRITE_H       ; 9
         bcc PD1             ; 11/12
-        lda #0              ; 13
+        lda #0              ; 13 (A=0 here is also the beq's condition below - change one, check both)
         beq PS1             ; 16
 PD1:    tax                 ; 14
         lda ArtB,x          ; 18

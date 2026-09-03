@@ -57,7 +57,7 @@ Vis:    sta WSYNC
         lda raw
         and #$02
         beq SelOn
-        lda #0
+        lda #0      ; A=0 here is also the beq's condition below - change one, check both
         sta bSelect
         beq SelDone
 SelOn:  lda #1
@@ -66,7 +66,7 @@ SelDone:
         lda raw
         and #$08
         beq ColBW
-        lda #1
+        lda #1      ; A!=0 here is also the bne's condition below - change one, check both
         sta bColor
         bne ColDone
 ColBW:  lda #0
@@ -75,7 +75,7 @@ ColDone:
         lda raw
         and #$40
         beq P0b
-        lda #1
+        lda #1      ; A!=0 here is also the bne's condition below - change one, check both
         sta bP0pro
         bne P0done
 P0b:    lda #0
@@ -84,7 +84,7 @@ P0done:
         lda raw
         and #$80
         beq P1b
-        lda #1
+        lda #1      ; A!=0 here is also the bne's condition below - change one, check both
         sta bP1pro
         bne P1done
 P1b:    lda #0

@@ -124,7 +124,7 @@ TK1:    lda INTIM
 CrossSeg:
         ldy #$80            ; $F5F4-F5
         sty TIM1T           ; $F5F6-F8
-        lda #$01            ; $F5F9-FA, Z=0（計測窓内 2cy）
+        lda #$01            ; $F5F9-FA, Z=0（計測窓内 2cy）  and it is the bne's condition below - change one, check both
         bne CrossTgt        ; $F5FB-FC → 次アドレス $F5FD、ターゲット $F601（跨ぎ, 4cy）→ 窓 = 2+4+4
         nop
         nop

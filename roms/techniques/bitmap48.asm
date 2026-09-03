@@ -89,7 +89,7 @@ NextFrame:
         lda offset
         cmp #BMH-WINDOW
         bcc OffDone
-        lda #1
+        lda #1      ; A!=0 here is also the bne's condition below - change one, check both
         sta odir
         bne OffDone
 ODown:  dec offset

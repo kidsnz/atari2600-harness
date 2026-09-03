@@ -65,7 +65,7 @@ Vis:    sta WSYNC          ; @lines 3 — last visible line + overscan SFX proce
         bne Pressed         ; 押しっぱなしは無視
         jsr Trigger
 Pressed:
-        lda #1
+        lda #1      ; A!=0 here is also the bne's condition below - change one, check both
         sta prevFi
         bne Tick
 NoPress:
