@@ -6,6 +6,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the skipdraw is 17 or 20 cycles; "constant 18" was wrong twice (2026-09-03)
+
+`fundamentals-audit.md` carried "skipdraw/DoDraw **constant**-18-cycle draw" as documented-only and added
+"worth a cycle litmus", which was an accurate self-assessment. Timed over eight frames of
+`vertical_pos_dcp.asm`: **20 cycles from WSYNC to GRP0 on the 80 lines that draw**, **17 on the 1,686 that
+skip**. Not constant, and neither figure is 18.
+
+The ROM's own comment already read `~17-20`. The audit line did not, and a kernel budgeted at a constant
+loses three cycles on exactly the lines that draw — the tightest ones it has.
+
+The two paths are separated by the branch's own cycle count (taken 3, fallthrough 2) rather than by
+reading sprite state, so the test does not need to know which lines are supposed to draw. Negative
+control: asserting 18 for both paths fails on both, and on the "they must differ" clause as well.
+
+Found by the Stella distillation, which reported the corpus's several different 18s and noted that
+harness's own ROM had the right numbers in a comment nobody graded.
+
+
 ### Changed — four doc lines corrected against the sources they cite (2026-09-03)
 
 Four separate findings from the same audit pass, all "harness says X, the note harness cites says

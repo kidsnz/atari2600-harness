@@ -180,10 +180,14 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   chains keep the carry.
 - 📖 JMP ($xxFF) page bug. ⚠️ BIT-as-NOP reads can strike TIA strobe mirrors — audit `.byte $2C` tricks.
 - ⬜ RMW double-write bus behavior on TIA strobes (6502.org silent; needs visual6502/64doc as source).
-- 📖 skipdraw/DoDraw constant-18-cycle draw, illegal `dcp`=5 cycles (Davie S23) — our emulator runs these;
-  worth a cycle litmus to also certify illegal-opcode support.
-
-## 9. Memory map, RAM & stack
+- ✅ **skipdraw/DoDraw is 17 or 20 cycles, not a constant 18** — measured 2026-09-03; this line said
+  "constant-18-cycle draw" and added "worth a cycle litmus", which was an accurate self-assessment.
+  Timed WSYNC→GRP0 over eight frames of `roms/techniques/vertical_pos_dcp.asm`: **20 cycles on the 80
+  lines that draw** (the range branch taken, then `ldx sprDraw` / `lda ArtRev,x`) and **17 on the 1,686
+  that skip**. The ROM's own comment already read `~17-20`; the audit line did not. A kernel budgeted at
+  a constant loses three cycles on exactly the lines that draw — the tightest ones. The illegal `dcp`
+  costs 5 and the emulator runs it, which this fixture also exercises.
+  `→ internal/emu/skipdraw_test.go` (1 grading, 1 negative control: asserting 18/18 fails on both paths)
 - 📖 Mirror templates (woodgrain Memory_Map): TIA at $xyz0 (x even, z∈{0,4}); RAM $80–$FF mirrored at
   **$0180–$01FF — which is why the stack works**; ROM $1000–$1FFF mirrored at every odd $x000 (incl $F000).
 - 📖 Convention: stack from $FF down (`LDX #$FF/TXS`), variables from $80 up "hoping the two never meet"
