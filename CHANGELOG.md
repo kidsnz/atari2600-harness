@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — a false-positive count stated without a date, and the corpus it was measured on has grown 48 files (2026-09-03)
+
+`check_traps.py` justified the write-only-TIA-read detector with "Zero false positives measured: 0 hits
+across the 123 files in roms/techniques + roms/litmus". **That sentence carried no date**, so it read as
+a claim about the corpus as it stands rather than a historical measurement. It is not: 123 was measured
+on 2026-07-30, and the corpus is now **171 files** (31 techniques + 140 litmus). Forty-eight litmus ROMs
+had been added since and nobody had re-run it.
+
+**Re-measured today over all 171 and the claim survives** — 0 ERROR, 1 warn:
+
+    python3 scripts/check_traps.py roms/techniques/*.asm roms/litmus/*.asm
+    traps OK — no emu-passes/HW-fails static traps in 171 asm file(s).
+
+So this is not a bug in the detector; it is a count with no invalidation mechanism, which is the failure
+mode the umbrella `CLAUDE.md` names. The sibling comment eight lines up already carried "Measured
+2026-07-30" and was therefore fine — the two sat side by side and only one was falsifiable.
+
+Also documented at the top of the file: **the no-argument default scans `roms/techniques/*.asm` only —
+31 files, not the corpus.** Both the "123" and "171" figures come from passing the two directories
+explicitly, and nothing said so, which is how a reader could take the routine gate to be the measurement.
+
+Found by the mailing-list distillation (helper-3), who also correctly did *not* flag the five "123 ROMs"
+figures in `capability-gap-audit.md`: those sit under headings dated 2026-07-30 and are records of what
+was true then, not claims about now. Negative control: a `lda GRP0` probe appended to a technique ROM
+makes the gate exit 1; removing it returns exit 0.
+
 ### Fixed — `SEI` finally removed from the missiles technique, and a doc comment I fused the same day (2026-09-03)
 
 Two corrections, one of them mine from earlier the same day.

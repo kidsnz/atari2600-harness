@@ -10,6 +10,10 @@ scenario/`breakif` side = not handled here.
 Usage:
     cd harness
     python3 scripts/check_traps.py [file.asm ...]   # with no argument, checks roms/techniques/*.asm
+                                                   # ★that default is 31 files, NOT the whole corpus.
+                                                   # The "123"/"171" figures in the comments below come
+                                                   # from passing both directories explicitly:
+                                                   #   check_traps.py roms/techniques/*.asm roms/litmus/*.asm
     python3 scripts/check_traps.py --selftest        # self-test of the detectors (bait string confirms every detector fires)
 
 Verdict: a single ERROR means exit 1 (fails CI). WARN is informational (does not affect the exit).
@@ -103,9 +107,15 @@ def scan_text(asm):
                                   f"If it is a bank-switch hotspot or a SuperChip write port, say so with "
                                   f"`; @rom-write-ok` so the intent is declared rather than guessed"))
         # 5) Reads of a write-only TIA register 〔known-traps / Gopher2600 cpubus.TIAReadRegisters=$00-$0D〕
-        #    Zero false positives measured: 0 hits across the 123 files in roms/techniques + roms/litmus
-        #    (the read-side opcodes themselves match 509 times, so the detector is not silent — there
-        #    really are none).
+        #    Zero false positives measured 2026-07-30: 0 hits across the 123 files then in
+        #    roms/techniques + roms/litmus (the read-side opcodes themselves match 509 times, so the
+        #    detector is not silent — there really are none).
+        #    RE-MEASURED 2026-09-03: 171 files (31 techniques + 140 litmus), still 0 ERROR, 1 warn.
+        #      python3 scripts/check_traps.py roms/techniques/*.asm roms/litmus/*.asm
+        #    Why this line changed: the sentence carried a count with NO date, so it read as a claim
+        #    about the corpus as it stands. 48 litmus ROMs had been added since and nobody had
+        #    re-run it — the claim happened to survive, but nothing was checking. Counts stated
+        #    without a date are the failure mode the umbrella CLAUDE.md names; found by helper-3.
         m = READ_OP.search(code)
         if m:
             operand = m.group(2)
