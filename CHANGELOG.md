@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — promoting the PAL rule left the claim in two places; now it is in one (2026-09-03)
+
+`899069c` gave the PAL even-scanline rule its own name and left the original parenthetical in the
+scrolling-background bullet, on the reasoning that it read correctly where it was. That was wrong for a
+reason this repository has been bitten by before and says so at the top of its own `CLAUDE.md`: **two
+copies of one claim is not redundancy, it is a second thing to keep in sync.**
+
+It also broke the fix it was meant to enable. The distillation could not resolve 21 references because
+the claim now had two homes and no way to choose between them — and separately measured that the two
+places where addressing-by-rule-name fails in this file (`:178`/`:187`) are **also** a duplicated name.
+Duplication is the failure mode of that method, and I had just created one.
+
+The parenthetical now points at the rule instead of restating it, and the rule's name resolves to
+exactly one line (`rg -F 'PAL frames must have an even scanline count'` → 1 hit). The old wording
+"PAL must be even" is gone from the file, which is deliberate: references quoting it were **already**
+all broken — the distillation measured every judgeable one of the 73 in that cluster as pointing at the
+wrong line, with zero pointing at what the line holds now.
+
+Found by helper-1, who was blocked by it and said so rather than picking one.
+
 ### Fixed — "rarely game-relevant" was true of our ROMs and not of the games (2026-09-03)
 
 `fundamentals-audit.md` dismissed the SWACNT/SWBCNT data-direction registers as "rarely
