@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the AUDC "duplicates" list was right about tuning and wrong about samples (2026-09-03)
+
+`fundamentals-audit.md` carried the sources' consolidated AUDC table with "duplicates {0,11} {4,5}
+{6,10} {7,9} {12,13}" as a single flat set, still marked 📖 (documented, not measured by us). We had
+already measured it — `verified-coverage.md:108` says only {0,11} {4,5} {12,13} are sample-identical
+and **{6,10} and {7,9} are inverted twins**: same period and tuning, complementary hi/lo duty.
+
+The two lines had sat eight sections apart, disagreeing, since V2-14.
+
+Note what is *not* wrong here. The distillation first reported this as "the documents are wrong" and
+then withdrew that after reading `pkg/audio/audio.go:50`, which already says it: *the documents'
+"duplicates" are correct in the tuning sense, but at the sample level they split into two kinds.*
+The sources are right; the audit line was missing which level it was talking about. Fixed by splitting
+the claim by level rather than deleting half of it, and the flat set now appears once, in the ✅.
+
+Also states the consequence, which nothing said anywhere: a golden audio digest or a waveform diff
+reports 6 vs 10 and 7 vs 9 as **different**, and that is correct rather than a defect —
+`audio.Canonical` folds all five pairs for classification but does not make the samples equal. Without
+that sentence the next person to swap those voices suspects the golden.
+
+The base constant (≈31,399.5 Hz) stays 📖: `verified-coverage.md:109` verified the *formula*, not that
+constant by name. Found by the mailing-list distillation (helper-3); all four citations checked
+verbatim before landing. Six gates pass.
+
 ### Fixed — a false-positive count stated without a date, and the corpus it was measured on has grown 48 files (2026-09-03)
 
 `check_traps.py` justified the write-only-TIA-read detector with "Zero false positives measured: 0 hits

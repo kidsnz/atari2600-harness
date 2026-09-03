@@ -118,11 +118,22 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 ## 6. Audio
 - ✅ AUDC/AUDF/AUDV register readback; audio digest golden.
 - 📖 **Complete AUDC table consolidated** (Slocum guide v1.02 — held locally, authoritative; Stolberg's
-  frequency/waveform guide; Stella PG): duplicates {0,11} {4,5} {6,10} {7,9} {12,13}; usable voices —
-  Square(4), Bass(6), Pitfall(7), Noise(8), Buzz(15), Lead(12), Saw(1), Engine(3). Pitch:
-  `f = base/(AUDF+1)/D`, base ≈ 31,399.5 Hz NTSC (clock/114, 2 samples/line), CPU-clock modes (12–15)
-  ÷3; D = 2/31/31/511/93/6/15/465. PAL ≈13 cents flatter. Slocum's three tuning setups (which
-  (AUDC,AUDF) pairs are in tune) are transcription-ready for `pkg/audio`.
+  frequency/waveform guide; Stella PG): usable voices — Square(4), Bass(6), Pitfall(7), Noise(8),
+  Buzz(15), Lead(12), Saw(1), Engine(3). Pitch: `f = base/(AUDF+1)/D`, base ≈ 31,399.5 Hz NTSC
+  (clock/114, 2 samples/line), CPU-clock modes (12–15) ÷3; D = 2/31/31/511/93/6/15/465. PAL ≈13 cents
+  flatter. Slocum's three tuning setups (which (AUDC,AUDF) pairs are in tune) are transcription-ready
+  for `pkg/audio`.
+  ✅ **The "duplicates" are two different things — measured** (`docs/verified-coverage.md:108`): the
+  sources list {0,11} {4,5} {6,10} {7,9} {12,13} as one set of duplicates. That is right about
+  **tuning** and wrong about **samples**: only {0,11} {4,5} {12,13} are sample-identical, while
+  **{6,10} and {7,9} are inverted twins** — same period and tuning, complementary hi/lo duty, so
+  identical to the ear but a different sample sequence (`pkg/audio/audio.go:48-50`; the assertion is
+  the duty-sum check in `internal/emu/emu_audiocap_test.go:134`). Consequence: any sample-level
+  comparison — a golden audio digest, a waveform diff — reports 6 vs 10 and 7 vs 9 as **different**,
+  and that difference is correct, not a defect. `audio.Canonical` folds all five pairs for
+  classification; it does not make the samples equal.
+  ✅ **Pitch formula measured** (`docs/verified-coverage.md:109`): `base/(AUDF+1)/D` confirmed by
+  raw-sample capture (square 30/62, lead 90, bass 310).
 - 📖 SFX recipes (Slocum): kick=Buzz@30, hi-hat=Noise@0 for 1 frame, snare=Noise@~8; arpeggio/echo/
   portamento patterns. Driver economics: ~400–500 cycles/frame, 600–2000 bytes ROM (Sequencer Kit).
 - ✅ **The pitch table is measured against the machine at 330 of its 512 (AUDC,AUDF) points**
