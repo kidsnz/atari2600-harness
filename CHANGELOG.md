@@ -6,6 +6,40 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `branch-always` / simulated BRA, the third catalogue entry that corrects its own source (2026-09-03)
+
+A conditional branch whose flag the preceding instruction has already fixed, replacing a 3-byte
+`JMP abs`. Used **28 times across 17 files** here and absent from the catalogue until now.
+
+**The source states a one-byte saving without its condition, and the condition does all the work.**
+Measured against this repository's own instruction table
+(`Gopher2600/hardware/cpu/instructions/definitions.json`):
+
+    seed needed anyway → branch only     2 bytes / 3 cy    −1 byte, ±0 cycles   ✓
+    seed added: `lda #imm` + branch      4 bytes / 5 cy    +1 byte, +2 cycles   ✗
+    seed added: `lsr` + branch           3 bytes / 5 cy    ±0 bytes, +2 cycles  ✗
+
+So there is no configuration in which *adding* a seed wins — with `lsr` it costs the same bytes as the
+`jmp` it replaced while running two cycles slower. Of our 28 uses, **25 free-ride on a flag that
+already existed** and the other 3 are litmus ROMs built to measure this shape. **None of the 25 could
+use the source's cheaper `lsr` seed**, because in every one the accumulator holds the value being
+stored and `lsr` would destroy it.
+
+Page-crossing costs the branch a cycle, and of the 28 sites **exactly one crosses** — `litmus_6502:128`,
+where the crossing is the thing being measured. The rule and the corpus are both stated, because
+either alone is false.
+
+**Only 5 of the 28 name the invariant in a comment.** The other 23 are live, undocumented hazards:
+the branch's unconditionality is a property of the instruction *above* it, so changing `lda #0` to
+`lda mask` silently makes it conditional and moves the line's cycle count with the data.
+
+Written by the mailing-list distillation (helper-2), who derived the classifier from this repository's
+CPU rather than asserting it — the operators that may sit between seed and branch are computed from
+`cpu.go`, and two independent derivations (Z-writers, N-writers) agree on the same 43. Their own three
+corrections are kept in the working notes: a file count written without counting, a parser defect that
+inflated 28 to 45, and this entry's economics, first reported as a draw because only bytes were
+compared.
+
 ### Fixed — promoting the PAL rule left the claim in two places; now it is in one (2026-09-03)
 
 `899069c` gave the PAL even-scanline rule its own name and left the original parenthetical in the
