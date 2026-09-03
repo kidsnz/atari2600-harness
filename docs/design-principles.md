@@ -58,6 +58,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 ## Playfield
 - 40px across × 4 clocks per px. Expressive power is earned through vertical rhythm. 〔Davie S13〕
 - **A scrolling PF background is 3 layers — board RAM + display buffer + delta update** — plus tile-granular scrolling (avoids tearing). Iron rule = **keep the total scanline count constant from frame to frame** (PAL must be even; safe zone 262/264). The scroll band is 10–16 lines top and bottom. 〔200972 tile-scrolling-engines, Boulder Dash style〕 `→ design.ScrollScanlinesConstant` **and `design.ScrollBackgroundFitsRAM`**. **Corrected 2026-09-03:** this line prescribed three layers and pointed only at the scanline check, which looks at line counts and PAL evenness and nothing else — so nothing asked whether the three fit. The same source says they usually do not: **a world you rewrite at run time needs SuperChip/CBS RAM, because the internal 128 bytes only hold a 120-byte-class malleable world** 〔200972:14〕. Budget the three layers plus the stack against `design.RAM2600` before choosing this structure. Found by auditing harness claims against the sources harness itself cites.
+- **PAL frames must have an even scanline count** — an odd total is not a legal PAL frame, so a
+  kernel that varies its line count must vary it in twos. Safe zone 262 (NTSC) / 264 (PAL).
+  `→ design.ScrollScanlinesConstant`, which carries **two** checks under one name: the count is
+  constant frame to frame, **and** it is even when `pal` is set (`pkg/design/pf.go:60`).
+  **Promoted to its own rule 2026-09-03.** It had been living as a parenthetical inside the
+  scrolling-background bullet above, which is a different subject and carries a different name.
+  The distillation measured the cost of that: **eight corpus references cite this claim and every
+  one of them cites a line number that no longer holds it** — the worst rate of any claim in this
+  file. A claim with no name of its own has no address, so nothing can point at it and survive an
+  edit. That is the general lesson, not a fact about PAL. 〔200972 tile-scrolling-engines〕
 - **For HUD/text the character COUNT picks the technique**: 48px = 12 characters / venetian blinds = 32 characters (but only at 3px width). Either split the HUD into its own screen mode, or isolate it in a zone and reuse the score area for several purposes. 〔197162 text-hud〕 `→ design.MaxChars`
 - **An asymmetric PF is expensive** (PF0/1/2 written twice mid-scanline; the PF0 window is only ~20cy). Compromises = central 32px / every other line with double height / venetian / RAM self-modification. 〔Davie S17, castlevania-port〕
 - **Write deadlines for an asymmetric PF (measured cycles)**: when you display the left half and rewrite the right half on the same scanline, aim each write at the moment that PF is **no longer visible**. The classic kernel's actual values =

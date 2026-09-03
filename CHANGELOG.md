@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the claim with the worst reference-rot in the file had no name, so it got one (2026-09-03)
+
+"PAL must be even" lived as a parenthetical inside the scrolling-PF-background bullet — a different
+subject, under a different name. The distillation measured what that cost: **eight corpus references
+cite this claim, and every one of them cites a line number that no longer holds it.** No other claim in
+`design-principles.md` comes close.
+
+The cause is structural rather than careless. A reference can only be as stable as the thing it points
+at, and a claim buried in a subordinate clause has no name to point at — only a line number, which the
+next edit moves. Promoted to its own rule so it has an address that `rg -F` finds.
+
+While promoting it: `design.ScrollScanlinesConstant` carries **two** checks under one name — the count is
+constant frame to frame, *and* it is even under PAL (`pkg/design/pf.go:60`). That is now stated where
+someone reading the PAL rule will see it. The original parenthetical is left in place; it reads correctly
+where it is.
+
+This also bounds the distillation's own proposal — addressing references by rule name instead of line
+number, which they measured at 100% stable against 55% for line numbers. It works only for claims that
+*have* names. Found by helper-1, who found the limit of their own method.
+
 ### Added — a trap we would otherwise have measured wrong: SuperChip phantom reads are off by default (2026-09-03)
 
 Gopher2600 does model the SARA phantom-read recovery — `mapper_atari.go` has `saraCycles = 2` and the
