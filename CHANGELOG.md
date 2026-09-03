@@ -6,6 +6,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the VSYNC "≥2 lines" threshold is our own setting, and its default is the answer (2026-09-03)
+
+`television.go` accepts a frame as synced when `vsync.activeScanlineCount >= env.Prefs.TV.VSYNCscanlines`,
+and `preferences/television.go` `SetDefaults` sets that to **2**. Nothing in this repo changes it.
+
+So a litmus that sweeps 0..4 VSYNC lines and reports "1 fails, 2 passes" has read back the number it was
+given. **This is the sharper twin of the SuperChip SARA entry**: there the default switches a feature
+*off*, so a green result looks odd enough to investigate; here the default **agrees with the literature**,
+so the same worthless green looks like corroboration.
+
+`fundamentals-audit.md` now splits the item by what is ours to measure — the procedure's shape is, the
+threshold is not — and `known-traps.md` section E carries the trap. What a litmus can honestly show is
+that a step exists and that there is only one, with a Go-side control that moves `VSYNCscanlines` to 3
+and watches the step move, so the test states its own input.
+
+Found by the mailing-list distillation (helper-3), who reached "this cannot be settled here" rather than
+designing the ROM they were asked for. They also noticed that `television.go` sets `failedVSYNC = true`
+on the branch where VSYNC *succeeded*, against its own comment eleven lines up — **and then established
+that the field is never read** (six occurrences: a comment, the declaration, two resets, one assignment,
+one comment), so nothing behaves differently and it is reported rather than touched. Upstream code, not
+ours.
+
 ### Fixed — a line that said "pending our own measurement" while sitting on the measurement (2026-09-03)
 
 `fundamentals-audit.md` listed the HMOVE comb / late-HMOVE behaviour as adopted from Towers'

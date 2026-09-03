@@ -19,7 +19,18 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 
 ## 1. Frame & timing
 - ✅ NTSC 262 (3/37/192/30), PAL 312; 1 line = 228 clocks = 76 CPU cycles; cycle-counting invariant.
-- 📖 VSYNC procedure: set D1, wait ≥2 lines, clear (Stella PG ~§3).
+- 📖 **VSYNC procedure: set D1, wait ≥2 lines, clear** (Stella PG ~§3). **Split by measurability
+  2026-09-03** — the procedure and the threshold are different claims and only one of them is ours
+  to measure. The *shape* (set D1, hold, clear, and the frame is accepted) is measurable here. The
+  **≥2 is not**: `television.go` accepts a frame when
+  `vsync.activeScanlineCount >= env.Prefs.TV.VSYNCscanlines`, and that preference defaults to **2**
+  (`preferences/television.go` `SetDefaults`), with nothing in this repo setting it. A litmus that
+  sweeps 0..4 lines and reports "1 fails, 2 passes" would be reading back the number we supplied.
+  See `known-traps.md` section E; it is the sharper twin of the SuperChip SARA entry, because there
+  the default disables a feature and the green looks odd, while here the default **agrees with the
+  literature** and the green looks like corroboration. What can be measured is that a step exists
+  and that there is only one, with a Go-side control moving `VSYNCscanlines` to 3 so the test says
+  out loud that the threshold is an input.
 - ✅ **RIOT timers TIM1T/8T/64T/1024T ($294–7)** — verified `litmus_timer` (v0.47.0),
   regression-locked `roms/litmus/scenarios/timer.json`, table row `docs/verified-coverage.md:26`.
   Write 1–255; the counter decrements 1/cycle; **after underflow it continues from $FF, still
