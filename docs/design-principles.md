@@ -33,7 +33,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **There is no "one correct RGB"**: Stella generates the palette from YIQ dynamically, so the same register value differs by a dozen up to 0x20 between emulators and settings.
   For us the running table `internal/ingest/palette_stella.go` is authoritative (100% match against Stella). 〔rgb-color-values, 118495〕
 - **hue ↔ colour map**: hue1 = yellow / hue4 = red / hue8 = blue / hue12 = green (hue15 ≈ hue1). hue1 is the standard choice for yellow. 〔132561〕
-- **The higher the luminance the lower the saturation — it washes out toward white** (bright blue in particular stops being identifiable) → **place colours you want to read as vivid at mid-to-low luminance**. Saturation and luminance trade off. 〔132561〕 `→ design.Hue/Luminance/WashoutRisk, HueName, GradientSameHue, InterlaceColorsSafe`
+- **The higher the luminance the lower the saturation — it washes out toward white** (bright blue in particular stops being identifiable) → **place colours you want to read as vivid at mid-to-low luminance**. Saturation and luminance trade off. 〔132561〕 `→ design.Hue/Luminance/WashoutRisk, HueName, GradientSameHue, SameLuminance`
 - **The atom of the colour data model is "colour per scanline" = `colorPerRow[]`**: holding an array of scanline index → COLUPx value instead of a single `color` expresses vertical multi-colour (the cheapest multi-colour) directly. TIA Studio's M1 design decision converged on this too. 〔research w4 / `tools/research-w4-m1-open-questions.md`〕
 - **Background "shimmer / noise texture" is just streaming bits of the random seed into `COLUBK` every scanline (no dedicated RAM)**: water shimmer, sandstorm, twinkling stars — copy bits of the LFSR/randomSeed you already run into `COLUBK` per band and get them at **almost zero cost**. 〔Fishing Derby `.colorWaterShimmer` = a water effect that streams randomSeed bits into per-line COLUBK〕
 
@@ -89,7 +89,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **Flicker is a last resort, and only for short-lived objects.** Never over a large area. Don't trust the emulator — verify by compositing several frames. 〔flicker-to-enhance-graphics〕
 - **Two algorithms for flickering more than 2 objects**: (a) **age-based** (count how many times each object has been shown and display the oldest next) / (b) **list reordering** (merge SHOWN/NOT_SHOWN every frame). **Put both players fully into the flicker pool and you reach ~24 objects** (Frantic is the real example). The design layer above `flicker_multiplex`/`dyn_multisprite`. 〔mining blog SpiceWare 10777, 11656〕
   - There is also the move of **turning deliberate flicker into an effect**: blinking target objects give a Game & Watch flavour while sidestepping the 5-moving-sprite limit = a real case of turning a defect into an aesthetic. 〔Pizza Boy 329673〕
-  - **If you use temporal colour mixing (colours alternating every 2 frames), give both colours the SAME luminance and separate them by hue alone** = perceived flicker is proportional to the luminance difference, so it drops sharply (e.g. yellow-green vs blue-green at lum4). 〔176987 interlaced-multicolor〕 `→ design.InterlaceColorsSafe`
+  - **Temporal colour mixing (colours alternating every 2 frames) trades flicker against legibility.**
+    Perceived flicker is proportional to the luminance difference, so equal luminance minimises it —
+    but the same source rebuts itself on the same page: **完全均一は不可**, telling a dark green from a
+    light green needs *some* luminance difference, and the craft is "the smallest luminance difference
+    that still reads, with the largest hue difference" 〔176987:24, :37〕. **How small still reads is not
+    measured anywhere here** (five layers, zero hits), so pick by eye and record what you picked.
+    〔176987 interlaced-multicolor〕 `→ design.SameLuminance` — **renamed 2026-09-03** from
+    `InterlaceColorsSafe`, which called "safe" exactly the pairs this source says a player may not be
+    able to tell apart. The function reports equal luminance; it cannot report safety.
   - **Tune how flicker reads by luminance**: on a black background, luminance `$x4`–`$x8` is the safe zone (default `$38`). Same luminance with different hue minimises the shimmer (consistent with the rule above). Running 264 lines = PAL must be even. 〔mining 162521 StayFrosty〕
 
 ## Kernel budget and state

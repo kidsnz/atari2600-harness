@@ -109,12 +109,14 @@ func TestGradientSameHue(t *testing.T) {
 	}
 }
 
-// TestInterlaceColorsSafe は時間混色が同一輝度なら可、輝度差ありで不可。
-func TestInterlaceColorsSafe(t *testing.T) {
-	if !InterlaceColorsSafe(0x48, 0xC8) { // hue違い・同輝度(段4)
+// TestSameLuminance — ★2026-09-03 に InterlaceColorsSafe から改名。★関数は【同一輝度か】
+// しか言わない。★出典 176987 は同じノートで「完全均一は不可」と反論しており、★「Safe」を
+// 名乗れる根拠は無い。★★閾値（識別に足りる最小の輝度差）は5層すべてで0件＝未測定。
+func TestSameLuminance(t *testing.T) {
+	if !SameLuminance(0x48, 0xC8) { // hue違い・同輝度(段4)
 		t.Error("equal-luminance interlace should be safe")
 	}
-	if InterlaceColorsSafe(0x42, 0x4C) { // 同hue・輝度差
+	if SameLuminance(0x42, 0x4C) { // 同hue・輝度差
 		t.Error("luminance-differing interlace should be unsafe")
 	}
 }

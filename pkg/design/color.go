@@ -107,8 +107,24 @@ func GradientSameHue(regs []byte) bool {
 	return true
 }
 
-// InterlaceColorsSafe returns whether the 2-frame alternating temporal blend a/b is "low flicker".
-// Perceived flicker is proportional to the luminance difference, so keeping both colors at the same
-// luminance and differing only in hue reduces it drastically.
-// [mining 176987 interlaced-multicolor]
-func InterlaceColorsSafe(a, b byte) bool { return Luminance(a) == Luminance(b) }
+// SameLuminance reports whether two colours sit on the same luminance step. That is all
+// it computes, and the name says so because the previous one — InterlaceColorsSafe — was
+// making a judgement the function cannot make and the source does not support.
+//
+// The context is 2-frame temporal colour mixing. Perceived flicker is proportional to the
+// luminance difference, so equal luminance minimises it. But the source harness cites for
+// that rule carries its own rebuttal in the same note: seagtgruff points out that telling
+// a dark green from a light green NEEDS some luminance difference, and 〔176987:37〕 puts
+// it plainly — **完全均一は不可。「輝度差を識別に足りる最小に、hue 差を最大に」**
+// ("perfect uniformity is unusable; the craft is the smallest luminance difference that
+// still reads, with the largest hue difference").
+//
+// So equal luminance is the flicker-free end of a trade-off, not the safe choice: a pair
+// this function returns true for is exactly a pair the source says the player may not be
+// able to tell apart. The threshold — how small a luminance difference still reads — is
+// not measured anywhere in this tree (five layers, zero hits), so no function here should
+// pretend to know it.
+//
+// Renamed 2026-09-03 after the Stella distillation read the cited note and found the
+// rebuttal on the same page as the rule. 〔176987:24, :37〕
+func SameLuminance(a, b byte) bool { return Luminance(a) == Luminance(b) }

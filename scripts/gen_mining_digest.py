@@ -48,7 +48,7 @@ FEED = {
     "multiple-colors-per-scanline": ("Color", "§色 / design.MinColorBandWidthPx,CheckColorBands"),
     "multi-colored-sprites": ("Color", "§色 / design.Hue,Luminance"),
     "bg-pf-per-scanline": ("Color", "§作画craft / design.GradientSameHue"),
-    "interlaced-multicolored-playfield": ("Color", "§多重化 / design.InterlaceColorsSafe"),
+    "interlaced-multicolored-playfield": ("Color", "§多重化 / design.SameLuminance"),
     "drawing-wizard-sprite": ("Sprite", "§作画craft / 8pxシルエット可読性(doc)"),
     "detailed-missile-sprite-drawing-trick": ("Sprite", "§スプライト / missile=線(doc)"),
     "creative-use-of-the-missile-sprites": ("Sprite", "§スプライト / missile=線(doc)"),

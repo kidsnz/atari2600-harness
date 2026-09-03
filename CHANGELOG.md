@@ -6,6 +6,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — `InterlaceColorsSafe` called "safe" the pairs its own source says are unusable (2026-09-03)
+
+The function returned `Luminance(a) == Luminance(b)` and the doc line told authors to give both temporal-
+mix colours the SAME luminance. The note harness cites for that rule carries the rebuttal on the same
+page: seagtgruff points out that telling a dark green from a light green needs *some* luminance
+difference, and 〔176987:37〕 says it outright — 完全均一は不可, the craft is "the smallest luminance
+difference that still reads, with the largest hue difference".
+
+So the function was returning true for exactly the pairs the source says a player may not be able to tell
+apart, under a name that claimed a judgement. Renamed to **`SameLuminance`**, which is what it computes.
+The doc now carries the trade-off and says plainly that the threshold — how small a difference still
+reads — is measured nowhere in this tree (five layers, zero hits), so it is picked by eye and recorded.
+
+Found by the Stella distillation reading the cited note far enough to reach the rebuttal.
+
+
 ### Added — a scrolling background's three layers were prescribed without asking whether they fit (2026-09-03)
 
 `design-principles.md` describes a scrolling PF background as three layers — board RAM, display buffer,
