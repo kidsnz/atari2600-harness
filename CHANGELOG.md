@@ -6,6 +6,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a scrolling background's three layers were prescribed without asking whether they fit (2026-09-03)
+
+`design-principles.md` describes a scrolling PF background as three layers — board RAM, display buffer,
+delta update — and pointed at `design.ScrollScanlinesConstant`, which looks at line counts and PAL
+evenness and nothing else. Nothing asked whether the three fit in 128 bytes. The source harness itself
+cites says they usually do not: a world rewritten at run time needs SuperChip/CBS RAM, because internal
+RAM only holds a **120-byte-class** malleable world 〔200972:14〕.
+
+`design.ScrollBackgroundFitsRAM(board, buffer, delta, stack)` and `design.RAM2600` close it, with the
+stack counted because that is what actually tips a plausible budget over.
+
+Found by auditing harness claims against the sources harness cites — the same pass that produced the ASR
+correction. Fourteen candidate pairs yielded two real findings; most of the rest were the audit tool's own
+false positives, which is the expected shape.
+
+
 ### Added — missiles have no delay path, measured against the ball that does (2026-09-03)
 
 The line "Missiles have no vertical delay (so in a 2LK they start only on even lines)" was

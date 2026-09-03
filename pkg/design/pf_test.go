@@ -79,3 +79,34 @@ func TestScrollScanlinesConstant(t *testing.T) {
 		t.Error("empty should be trivially constant")
 	}
 }
+
+// TestScrollBackgroundFitsRAM guards the gap the distillation found: the three-layer
+// scrolling structure is prescribed in design-principles.md and nothing checked whether
+// it fits the 2600's 128 bytes. Source 〔200972:14〕 puts the practical ceiling at a
+// "120-byte-class" world on internal RAM, with SuperChip/CBS needed above that.
+func TestScrollBackgroundFitsRAM(t *testing.T) {
+	cases := []struct {
+		name                                  string
+		board, buffer, delta, stack int
+		want                                  bool
+	}{
+		{"a 120-byte-class world with a shallow stack", 60, 40, 12, 6, true},
+		{"exactly the 128 bytes", 60, 40, 22, 6, true},
+		{"one byte over", 60, 40, 23, 6, false},
+		{"the stack is what tips it", 60, 40, 22, 8, false},
+		{"a large board alone", 128, 0, 0, 0, true},
+		{"a large board plus any buffer", 128, 1, 0, 0, false},
+		{"negative is refused rather than wrapped", -1, 0, 0, 0, false},
+	}
+	for _, c := range cases {
+		if got := ScrollBackgroundFitsRAM(c.board, c.buffer, c.delta, c.stack); got != c.want {
+			t.Errorf("%s: board %d + buffer %d + delta %d + stack %d = %d of %d bytes; got %v want %v",
+				c.name, c.board, c.buffer, c.delta, c.stack,
+				c.board+c.buffer+c.delta+c.stack, RAM2600, got, c.want)
+		}
+	}
+	// The constant must match what the emulator models, or the budget is fiction.
+	if RAM2600 != 128 {
+		t.Errorf("RAM2600 is %d; the 2600 has 128 bytes at $80-$FF", RAM2600)
+	}
+}

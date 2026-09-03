@@ -19,6 +19,29 @@ func ScoreModeTwoColor(ctrlpf byte) bool { return ctrlpf&CTRLPFScoreBit != 0 }
 // ScrollScanlinesConstant は縦/横スクロール背景の鉄則「総スキャンライン数をフレーム間で
 // 一定に保つ」を判定する。frameLines は各フレームの総ライン数。pal=true なら各フレームが
 // 偶数ラインであることも要求する（PAL は偶数必須）。〔design-principles.md / 採掘 200972〕
+// RAM2600 は 2600 の内蔵 RAM の総バイト数（$80–$FF）。★スタックはこの中から上に向かって
+// 積まれるので、変数と共有する。〔emu.RAMSize と同じ量。ここは design 側の定数〕
+const RAM2600 = 128
+
+// ScrollBackgroundFitsRAM は「スクロール背景の3層（盤面 + 表示バッファ + 差分）」が
+// ★内蔵 128 バイトに収まるかを判定する。
+//
+// ★なぜ要るか（2026-09-03・蒸留が見つけた穴）: `design-principles.md` はこの3層構造を
+// 規定して `ScrollScanlinesConstant` を指していたが、★★その関数は走査線数と PAL の偶奇
+// しか見ていない。★★★出典 〔200972:14〕 は逆に **「実行中に書き換えたい広域は
+// SuperChip/CBS RAM に置く必要があり、内蔵 128 バイト RAM では小さい世界（120 byte 級）
+// しか malleable にできない」** と書いている——★3層を数えておいて、それが RAM に入るか
+// を誰も検査していなかった。
+//
+// stackBytes は呼び出しの深さぶん（1段 2 バイト）＋割り込みは無いので純粋に JSR の深さ。
+// ★false のときは SuperChip/CBS RAM が要る、というのがこの関数の言っていること。
+func ScrollBackgroundFitsRAM(boardBytes, bufferBytes, deltaBytes, stackBytes int) bool {
+	if boardBytes < 0 || bufferBytes < 0 || deltaBytes < 0 || stackBytes < 0 {
+		return false
+	}
+	return boardBytes+bufferBytes+deltaBytes+stackBytes <= RAM2600
+}
+
 func ScrollScanlinesConstant(frameLines []int, pal bool) bool {
 	if len(frameLines) == 0 {
 		return true
