@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — six audit items split into what we measured and what we did not, and a litmus header that pointed the reader backwards (2026-09-03)
+
+Six `fundamentals-audit.md` items were marked 📖 (documented, not measured by us) while a measurement
+for them already existed in `verified-coverage.md`. Three convert outright — **RIOT timers**,
+**CTRLPF SCORE/priority/ball-width**, **JMP ($xxFF)**. Three do not, and saying so is the point:
+
+- **page-cross** — we measured `LDA abs,X` +1, `STA abs,X` fixed, `BNE` 2/3/4, `DCP zp` 5. We did
+  **not** measure `(ind),Y`, RMW `abs,X`, or reads through `abs,Y`.
+- **NMOS decimal** — the flag half is ours ($99+$01 under SED: A=$00, C=1, Z=0, N=1, so "never branch
+  on Z or N" is measured, not quoted). D undefined at power-up and surviving interrupts is not; the
+  `CLD` rule is *enforced* by `check_traps.py`, which is a lint, not a hardware fact.
+- **mirrors** — the RAM mirror holds both directions and one TIA mirror renders. One mirror is not
+  the $xyz0 pattern, and ROM mirroring at every odd $x000 is untested.
+
+`JMP ($xxFF)` also split in two: the page bug is ✅, but the `.byte $2C` skip trick beside it stays 📖
+**and is invisible to the linter** — `check_traps.py` matches mnemonics, so a skip written as a raw
+`.byte $2C` never reaches `READ_OP`. Our own instance is `roms/techniques/tia_pcm.asm:89`.
+
+**`litmus_timer.asm` line 5 named the RAM cells backwards** — it said $93=INTIM $94=TIMINT when the
+code at :48-55 stores TIMINT→$93 and INTIM→$94. Three things already disagreed with it: the code, the
+recorded values ($94=$EF is impossible for TIMINT, which only defines D7/D6), and
+`scenarios/timer.json` (`ram.0x93 == 192`, `ram.0x94 == 239`). Comment-only: the assembled binary is
+byte-identical, checked against HEAD.
+
+Note the counting. **The 📖 lines went 23 → 25 while this landed** — splitting a claim into a measured
+half and an unmeasured half adds a 📖. Progress here cannot be tracked by counting 📖.
+
+Found by the mailing-list distillation (helper-3), who also withdrew their own first classification:
+they had checked whether a measurement existed on the topic, not whether it covered the whole claim.
+All citations checked verbatim; six gates pass.
+
 ### Fixed — the AUDC "duplicates" list was right about tuning and wrong about samples (2026-09-03)
 
 `fundamentals-audit.md` carried the sources' consolidated AUDC table with "duplicates {0,11} {4,5}

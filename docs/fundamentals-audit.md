@@ -20,9 +20,18 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 ## 1. Frame & timing
 - ✅ NTSC 262 (3/37/192/30), PAL 312; 1 line = 228 clocks = 76 CPU cycles; cycle-counting invariant.
 - 📖 VSYNC procedure: set D1, wait ≥2 lines, clear (Stella PG ~§3).
-- 📖 RIOT timers TIM1T/8T/64T/1024T ($294–7): write 1–255; **after expiry INTIM holds 0 for one interval,
-  then flips to $FF and decrements 1/cycle** (lets you measure how late you are) (Stella PG PIA §2.3).
-  TIMINT $285: D7 expired flag. ⬜ whether reading INTIM clears D7; exact first-decrement offset.
+- ✅ **RIOT timers TIM1T/8T/64T/1024T ($294–7)** — verified `litmus_timer` (v0.47.0),
+  regression-locked `roms/litmus/scenarios/timer.json`, table row `docs/verified-coverage.md:26`.
+  Write 1–255; the counter decrements 1/cycle; **after underflow it continues from $FF, still
+  1/cycle** ($94=$EF then $96=$E1). TIMINT $285 D7 = expired ($93=$C0, D7+D6 set).
+  **Reading INTIM clears TIMINT** — $95=$00 after the INTIM read at $94; the scenario pins
+  `ram.0x93 == 192` and `ram.0x95 == 0`, so the clear is a regression, not an observation.
+  📖 Still documented-only (Stella PG PIA §2.3): **"INTIM holds 0 for one interval before the
+  $FF wrap"** — the ROM steps straight through expiry and never samples the 0 interval.
+  ⬜ **Exact first-decrement offset.** The countdown band pins three successive reads at
+  $3C/$35/$2E from TIM1T=$40 — that fixes the rate (−7 per `lda abs`+`sta zp` iteration) and the
+  value 4 ticks after the write **for that instruction sequence**; it does not isolate how many
+  cycles after the store the first decrement lands.
 - ⬜ SECAM; real-game variable line counts (we already treat 262 as a range).
 
 ## 2. Horizontal positioning & HMOVE
@@ -102,10 +111,14 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   writes split *per pixel* (old bits left, new bits right) — well-defined, great litmus predicate.
 - ⚠️ Internal discrepancy found: SpiceWare Step 3 says the left-PF1 window opens at cycle ~66 of the prior
   line; Step 7 annotates ~71. Resolve by measurement; trust the harness.
-- 📖 CTRLPF D1 SCORE (left half→COLUP0, right→COLUP1), D2 PFP priority (PF/BL above players),
-  D4–5 ball width 1/2/4/8 (Stella PG). ✅ **SCORE×PFP interaction measured** `litmus_score_pfp`
-  (v1.53.0): **PFP dominates** — with D2 set, D1 has no effect (PF renders in COLUPF on BOTH
-  halves, with priority over players); $02→halves colored, $04 and $06→identical COLUPF rendering.
+- ✅ **CTRLPF D1 SCORE / D2 PFP priority / D4–5 ball width** — verified `litmus_ctrlpf` (v1.53.0),
+  table row `docs/verified-coverage.md:66`.
+  SCORE (D1): left half→COLUP0, right→COLUP1, split at clock 80. Priority (D2): with D2 clear P0
+  draws over PF; with D2 set PF draws over P0. **Ball width D4–5 = 00/01/10/11 → 1/2/4/8 px**,
+  read back per band (`read_row` rows 106/114/122/128).
+  ✅ **SCORE×PFP interaction measured** (v1.53.0): **PFP dominates** — with D2 set, D1 has no
+  effect (PF renders in COLUPF on BOTH halves, with priority over players); $02→halves colored,
+  $04 and $06→identical COLUPF rendering.
 - 📖 Asymmetric PF under reflection via double PF0 rewrite per line is real-game practice
   (DaveC's Random-Dungeon `_room_loop`). ⬜ unverified by us.
 
@@ -183,13 +196,33 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 
 ## 8. 6502/6507 precision
 - ✅ cycle accounting (76/line; WSYNC-stall exclusion).
-- 📖 Page-cross +1 applies to **reads** (abs,X / abs,Y / (ind),Y); **stores are fixed** (STA abs,X always 5,
-  (ind),Y always 6); RMW abs,X fixed 7. Branches: 2, +1 taken, +1 page-cross **measured from the next
-  instruction's address**. (6502.org.)
-- 📖 **NMOS decimal mode: only the C flag is valid** after ADC/SBC (never branch on Z/N/V); D is unknown at
-  power-up and survives interrupts → `CLD` in init is mandatory. BCD idiom: SED/CLC/ADC…/CLD; multi-byte
-  chains keep the carry.
-- 📖 JMP ($xxFF) page bug. ⚠️ BIT-as-NOP reads can strike TIA strobe mirrors — audit `.byte $2C` tricks.
+- 📖 Page-cross +1 applies to **reads** (abs,X / abs,Y / (ind),Y); **stores are fixed** (STA abs,X
+  always 5, (ind),Y always 6); RMW abs,X fixed 7. Branches: 2, +1 taken, +1 page-cross **measured
+  from the next instruction's address**. (6502.org.)
+  ✅ **Measured for the cases the litmus covers** (`docs/verified-coverage.md:90-91`, `litmus_6502`
+  v0.44.0, regression-locked `roms/litmus/scenarios/cpu6502.json`): **LDA abs,X** 4cy → 5cy on a
+  page cross (+1); **STA abs,X** 5cy on both sides (**stores really are fixed** — the basis for
+  kernel determinism); **BNE** 2 / 3 / 4 (not taken / taken / taken+page-cross); **DCP zp** 5cy
+  (which also proves illegal-opcode support). The ROM measures each with a TIM1T=$80 window.
+  📖 **Not measured by us**: `(ind),Y` = 6 fixed, RMW abs,X = 7 fixed, and reads through **abs,Y**.
+- 📖 **NMOS decimal mode: only the C flag is valid** after ADC/SBC (never branch on Z/N/V); D is
+  unknown at power-up and survives interrupts → `CLD` in init is mandatory. BCD idiom:
+  SED/CLC/ADC…/CLD; multi-byte chains keep the carry.
+  ✅ **The flag half is measured** (`docs/verified-coverage.md:88`, `litmus_6502` v0.44.0):
+  $99+$01 under SED gives **A=$00 (correct)** and the pushed status $BD = **C=1 (correct), Z=0 and
+  N=1 (both wrong for the decimal result)** — so "do not branch on Z or N" is our own measurement,
+  not just the source's. **V is recorded (0) but nothing asserts it.**
+  📖 **Not measured by us**: that D is undefined at power-up and survives interrupts. The `CLD`
+  rule is *enforced* rather than measured — `scripts/check_traps.py` errors on an init with
+  neither `CLD` nor `CLEAN_START` (see `docs/known-traps.md`), which is a lint, not a hardware fact.
+- ✅ **JMP ($xxFF) page bug** — verified `litmus_6502` (v0.44.0), table row
+  `docs/verified-coverage.md:89`: the indirect vector's high byte is fetched from **$xx00**, not
+  $xx+1:00. `jmp ($F3FF)` lands on the buggy path and the ROM records the marker $92=$A5;
+  regression-locked `roms/litmus/scenarios/cpu6502.json`.
+- ⚠️ 📖 **BIT-as-NOP reads can strike TIA strobe mirrors — audit `.byte $2C` tricks.** Not measured,
+  and **not caught by the linter either**: `scripts/check_traps.py` matches mnemonics
+  (`READ_OP`), so a skip written as a raw `.byte $2C` / `.byte $0C` is invisible to it. The one
+  such skip in our own tree is `roms/techniques/tia_pcm.asm:89`.
 - ⬜ RMW double-write bus behavior on TIA strobes (6502.org silent; needs visual6502/64doc as source).
 - ✅ **skipdraw/DoDraw is 17 or 20 cycles, not a constant 18** — measured 2026-09-03; this line said
   "constant-18-cycle draw" and added "worth a cycle litmus", which was an accurate self-assessment.
@@ -199,8 +232,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   a constant loses three cycles on exactly the lines that draw — the tightest ones. The illegal `dcp`
   costs 5 and the emulator runs it, which this fixture also exercises.
   `→ internal/emu/skipdraw_test.go` (1 grading, 1 negative control: asserting 18/18 fails on both paths)
-- 📖 Mirror templates (woodgrain Memory_Map): TIA at $xyz0 (x even, z∈{0,4}); RAM $80–$FF mirrored at
-  **$0180–$01FF — which is why the stack works**; ROM $1000–$1FFF mirrored at every odd $x000 (incl $F000).
+- 📖 Mirror templates (woodgrain Memory_Map): TIA at $xyz0 (x even, z∈{0,4}); RAM $80–$FF mirrored
+  at **$0180–$01FF — which is why the stack works**; ROM $1000–$1FFF mirrored at every odd $x000
+  (incl $F000).
+  ✅ **Two of the three measured** (`docs/verified-coverage.md:27`, `litmus_mirror` v0.49.0,
+  regression-locked `roms/litmus/scenarios/mirror.json`): the **RAM mirror holds in both
+  directions** — write $5A to $0180, read $5A at $0080; write $A5 to $0080, read $A5 at $0180 —
+  and **one TIA mirror**, $0049 → COLUBK, checked by rendering ($84 blue at `read_row(100)`).
+  📖 **Not measured by us**: the TIA template as a rule ($xyz0 for x even, z∈{0,4}) — one mirror is
+  not the pattern — and the ROM mirroring of $1000–$1FFF at every odd $x000.
 - 📖 Convention: stack from $FF down (`LDX #$FF/TXS`), variables from $80 up "hoping the two never meet"
   (Stella PG). Real-game RAM budgets: Pitfall ≈ all 128 bytes (world = 1 byte!), Random-Dungeon ≈45 with
   aliased overlays, za2600 overflows into cart RAM. ⬜ a RAM-map audit feature (symbols → read/write
