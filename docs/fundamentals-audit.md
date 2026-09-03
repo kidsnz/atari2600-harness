@@ -50,7 +50,20 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 - ✅ **RESPx / RESMx / RESBL reset phase** — measured 2026-09-03; this line was documented-only until then. The player's first visible pixel lands **+5 colour clocks** past the strobe's own end clock (the value Towers' *TIA Hardware Notes* states), and the **missile and the ball land +4** — a one-clock difference between an 8-clock object and a 1-clock object that the document does not carry. One extra CPU cycle before the strobe moves any of them exactly **+3** clocks. Offsets are read against the strobe instruction's own beam position (`TraceClocks`, visible coordinates), so nothing is derived from cycle arithmetic. 〔Towers, *TIA Hardware Notes*, RESPx pipeline〕 `→ roms/litmus/litmus_respx_phase.asm` / `internal/emu/respxphase_test.go` (3 gradings, 2 negative controls: the player's offset forced to 4 fails by name; a flat sweep trips the slope control)
   point (explains our verified +5 family offsets). **RESBL re-emits START (ball restartable mid-line);
   RESPx does not** (player needs a 160-clock wrap). ⬜ double-strobe behavior unmeasured.
-- 📖 missile-locked-to-player (RESMP D1): release leaves M centered on P (Stella PG). ⬜ exact lock offset.
+- ✅ **missile-locked-to-player (RESMP D1)** — the ⬜ was stale: `roms/litmus/litmus_resmp.asm` +
+  `scenarios/resmp.json` already lock the offset at **+4** (player0.hmoved_pixel 24, missile0 28) and
+  confirm it follows an HMOVE'd player. What that fixture could not answer is the word **"centered"**,
+  which is a claim about width. Measured 2026-09-03 across three widths: **+4 at NUSIZ 1x** (an 8-clock
+  player, so that IS the centre), **+6 at 2x** (16 clocks; the centre would be +8) and **+10 at 4x**
+  (32 clocks; the centre would be +16). Centred holds at 1x only. The snap fires when the player's scan
+  counter reaches a particular pixel — 2 at 1x, 4 at 2x, 5 at 4x
+  (`Gopher2600 hardware/tia/video/player.go:776`) — so it tracks a pixel index, not a width. The lock
+  must be **held for a full scanline**; locking and releasing inside one line never snaps.
+  `roms/techniques/bullets.asm:3` states +4 and is right for the 1x it uses.
+  〔Stella PG for the mechanism; the width dependence is ours〕
+  `→ roms/litmus/litmus_resmp_width.asm` / `internal/emu/resmpwidth_test.go` (4 gradings,
+  3 negative controls: calling 2x the centre fails by name; a lock released inside one line fails three
+  of the four; a missile that does not track the sweep fails)
 
 ## 3. Sprites (players)
 - ✅ GRP bit order (D7 left), row order, NUSIZ double/quad/3-copies, REFP, P0+P1 16px combine.

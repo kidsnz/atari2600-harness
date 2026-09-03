@@ -6,6 +6,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the RESMP lock offset is not the centre once the player is wide (2026-09-03)
+
+`fundamentals-audit.md` carried "release leaves M centered on P (Stella PG). ⬜ exact lock offset". The ⬜
+was stale: `litmus_resmp.asm` + `scenarios/resmp.json` have locked the offset at +4 since v1.47.0. What
+they could not answer is the word "centered", which is a claim about width and needs the width changed.
+
+Across three widths: **+4 at NUSIZ 1x** (an 8-clock player, so that is the centre), **+6 at 2x** (16
+clocks, centre +8) and **+10 at 4x** (32 clocks, centre +16). Centred holds at 1x only. The snap fires
+when the player's scan counter reaches a particular pixel - 2, 4 and 5 respectively
+(`Gopher2600 hardware/tia/video/player.go:776`) - so it follows a pixel index, not a width. A bullet
+spawned from a double-width shooter appears two clocks left of where "centre" predicts, six at 4x.
+
+The lock has to be held for a full scanline; locking and releasing inside one line never snaps. That
+cause was itself got wrong once and corrected in the generator: the first note said the player had to be
+DRAWN while locked, and removing the graphics byte changes nothing while removing the held line breaks
+three of the four gradings.
+
+Negative controls: calling 2x the centre fails by name; a lock released inside one line fails three of
+four; a missile that does not track the player's sweep fails. Stella agrees 37/37.
+
+
 ### Added — grade the HMOVE side effects a ROM had been measuring silently since V2-2 (2026-09-03)
 
 `litmus_hmove_side.asm` has recorded three numbers in its header since V2-2 and nothing checked any of
