@@ -6,6 +6,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — grade VDEL's cross-copy, including the ball half nobody had checked (2026-09-03)
+
+`fundamentals-audit.md` carried VDEL as documented-only while calling it "the load-bearing mechanism".
+The claim (Stella PG §6.D): writing GRP0 copies P1's new→old; writing GRP1 copies P0's new→old **and also
+ENABL's new→old**. The vendored engine does exactly that (`hardware/tia/video/video.go:234-238`), and
+nothing asserted it.
+
+The ball half is the strange one — a write to a *player* register moving the *ball's* enable — and it
+gives a clean binary reading. Two bands one instruction apart: with VDELBL set and ENABL's new copy on,
+the ball stays dark after `sta GRP0` and lights after `sta GRP1`. Both players show their old byte, each
+latched by the other register.
+
+The fixture latches every old copy to zero on entry, and that is not decoration. Without it the ball's
+old copy survives from an earlier frame, band B passes on stale state, and the negative control that
+should destroy the effect (writing GRP0 where GRP1 belongs) does not fire. That is how the defect was
+found: the control was run, did not fire, and the fixture was wrong rather than the claim.
+
+Negative controls now fire on both halves. Stella agrees 37/37. Fourth item closed by auditing harness
+against its own declared gaps; that file is down to 25 documented-only lines from 31 this morning.
+
+
 ### Added — the RESMP lock offset is not the centre once the player is wide (2026-09-03)
 
 `fundamentals-audit.md` carried "release leaves M centered on P (Stella PG). ⬜ exact lock offset". The ⬜

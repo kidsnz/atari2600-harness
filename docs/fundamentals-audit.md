@@ -67,12 +67,17 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 
 ## 3. Sprites (players)
 - ✅ GRP bit order (D7 left), row order, NUSIZ double/quad/3-copies, REFP, P0+P1 16px combine.
-- 📖 **VDEL exact semantics** (Stella PG §6.D — the load-bearing mechanism): each GRP has new+old copies.
-  **Writing GRP0 copies P1's new→old; writing GRP1 copies P0's new→old, and also ENABL's new→old.**
-  VDELPx/VDELBL D0=1 selects the *old* copy for display. This write-triggered cross-copy is what powers the
-  2-line kernel alignment AND the 48px/6-digit score trick. ✅ The 2LK alignment relation is now
-  **verified pixel-exact** by `litmus_vdel_2lk` (v1.53.0): GRP0-even/GRP1-odd writes, VDELP0=0 → P0
-  starts 1 line above P1; VDELP0=1 → P0 shifts +1 line and aligns exactly (read_row 137→138).
+- ✅ **VDEL exact semantics** (Stella PG §6.D — the load-bearing mechanism) — measured 2026-09-03;
+  this line was documented-only until then. Each GRP has new+old copies. **Writing GRP0 copies P1's
+  new→old; writing GRP1 copies P0's new→old, and also ENABL's new→old.** VDELPx/VDELBL D0=1 selects the
+  *old* copy for display. All three confirmed: with VDELBL set and ENABL's new copy on, the ball stays
+  **dark** after a GRP0 write and **lights** after a GRP1 write — two bands one instruction apart. Both
+  players show their old byte, each latched by the **other** register.
+  〔Stella PG §6.D; engine `hardware/tia/video/video.go:234-238`〕
+  `→ roms/litmus/litmus_vdel_cross.asm` / `internal/emu/vdelcross_test.go` (3 gradings, 2 negative
+  controls). The fixture latches every old copy to zero on entry: without that, the ball's old copy
+  survives from an earlier frame and band B passes on stale state — measured, and the reason the
+  first negative control did not fire.
 - 📖 Missiles have **no** vertical delay (so in a 2LK they start only on even lines).
 - ✅ Moveable-object writes are shear-safe at CPU cycles 0–22 of the line — closed by derivation from
   verified constants (any write completing by cy 22 precedes every draw start: (X+68)/3 ≥ 22.67 even at
