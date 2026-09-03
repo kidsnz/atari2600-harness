@@ -34,6 +34,14 @@ def strip_comment(line):
 # The TIA's "write-only" registers = $0E(PF1)-$2C(CXCLR). On the read side there is only $00-$0D
 # (Gopher2600 cpubus.go TIAReadRegisters is just CXM0P..INPT5, $00-$0D). Reading there returns bus
 # residue rather than the register = the classic "happens to work in the emulator".
+# The TIA's 14 read registers, $00-$0D. A read of any address in TIA space is decoded on
+# the low nibble alone, so a write-only register read comes back as one of these unless the
+# nibble is $0E or $0F. 〔Gopher2600 memorymap.go:96 maskReadTIA = 0x000f; :147〕
+MIRROR_READ = {0x00: "CXM0P", 0x01: "CXM1P", 0x02: "CXP0FB", 0x03: "CXP1FB", 0x04: "CXM0FB",
+               0x05: "CXM1FB", 0x06: "CXBLPF", 0x07: "CXPPMM", 0x08: "INPT0", 0x09: "INPT1",
+               0x0A: "INPT2", 0x0B: "INPT3", 0x0C: "INPT4", 0x0D: "INPT5"}
+
+
 TIA_WRITE_ONLY = {
     "PF1": 0x0E, "PF2": 0x0F, "RESP0": 0x10, "RESP1": 0x11, "RESM0": 0x12, "RESM1": 0x13,
     "RESBL": 0x14, "AUDC0": 0x15, "AUDC1": 0x16, "AUDF0": 0x17, "AUDF1": 0x18, "AUDV0": 0x19,
@@ -102,8 +110,13 @@ def scan_text(asm):
         if m:
             operand = m.group(2)
             reg = None
+            v = -1
             if operand.upper() in TIA_WRITE_ONLY:
                 reg = operand.upper()
+                # ★2026-09-02: v was left unset on this branch when the mirror lookup was
+                # added, so a symbolic operand (`lda GRP0`) would have read a stale v from a
+                # previous line. Set it from the table, which is where the name came from.
+                v = TIA_WRITE_ONLY[reg]
             elif operand.startswith("$"):
                 try:
                     v = int(operand[1:], 16)
@@ -112,9 +125,21 @@ def scan_text(asm):
                 if 0x0E <= v <= 0x2C:
                     reg = next((k for k, a in TIA_WRITE_ONLY.items() if a == v), "$%02X" % v)
             if reg:
-                errors.append((n, f"reads {reg}, a WRITE-ONLY TIA register — the TIA answers reads only at "
-                                  f"$00-$0D (CXxx/INPTx); this returns bus residue, which an emulator may "
-                                  f"make look deterministic"))
+                # The reason line was wrong until 2026-09-02: it said the read "returns bus
+                # residue". The TIA decodes reads on the low nibble only (the vendored engine
+                # masks with 0x000f, memorymap.go:96/147), so of the 31 addresses $0E-$2C that
+                # a program might read here, 27 land on a REAL read register and only four
+                # ($0E $0F $1E $1F) are undriven. `lda GRP0` ($1B) returns INPT3, not residue;
+                # `lda HMOVE` ($2A) returns INPT2; `lda CXCLR` ($2C) returns INPT4. That is
+                # worse than residue, not better: the value is reproducible, so the bug hides.
+                # Found by the Stella distillation (helper-3 computed it, reproduced here).
+                mirror = MIRROR_READ.get(v & 0x0F)
+                because = (f"reads back {mirror} (the TIA decodes reads on the low nibble only), "
+                           f"so the value is REPRODUCIBLE and the bug hides"
+                           if mirror else
+                           "is one of the four undriven addresses ($0E $0F $1E $1F), so it "
+                           "returns bus residue")
+                errors.append((n, f"reads {reg}, a WRITE-ONLY TIA register — it {because}"))
     # 4) Reset initialisation (neither CLD nor CLEAN_START) 〔known-traps D / mined 261488,318346〕
     if not (has_cld or has_cleanstart):
         errors.append((0, "no CLD and no CLEAN_START — decimal flag / SP / RAM are undefined at power-up (BCD garbage, rolls)"))
