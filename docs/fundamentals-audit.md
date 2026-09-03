@@ -135,7 +135,22 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 
 ## 5. Collisions
 - ✅ 3 of 15 pairs (BL-PF, P0-P1, M0-P0), sticky latches, CXCLR.
-- ⬜ remaining 12 pairs. 📖 read idiom: one `BIT CXxx` yields two pairs via N and V flags.
+- ⬜ remaining 12 pairs.
+- 📖 read idiom: one `BIT CXxx` yields two pairs via N and V. The flag semantics are settled in
+  the engine's source, not by a litmus: `Gopher2600/hardware/cpu/cpu.go:1262 "case instructions.BIT"`
+  loads M, sets `Sign` and `Overflow` from it, and only then ANDs `A` — so N and V are M's bit7/bit6
+  (`registers/data.go:73 "IsNegative"` masks `0x80`, `:83 "IsBitV"` masks `0x40`) and do not depend
+  on `A` at all. Z is the only flag `A` reaches. That is engine source rather than a measurement, so
+  the mark stays 📖 until a litmus sweeps `A` and shows N and V do not move: a single value of `A`
+  cannot tell "independent of A" apart from "happened to agree".
+- ⚠️ **Read it with `A = $C0`, not `$FF`.** Only D7/D6 of a collision register are driven; the rest
+  of the byte is the last value the CPU put on the bus (`Gopher2600/hardware/memory/memory.go:189
+  "data |= mem.LastCPUData & ^mem.DataBusDriven"`), which is why
+  `roms/litmus/scenarios/litmus_cxclr.json` asserts 130 and 2 rather than 128 and 0. With `A = $FF`,
+  Z answers "is the whole byte zero" and so moves when the preceding instruction changes, with no
+  change in TIA behaviour at all. With `A = $C0` the residue is masked and Z becomes a third useful
+  predicate — "neither of these two pairs collided" — so one `BIT` yields three tests, not two.
+  With `A = $00`, Z is always 1 and carries nothing.
 - 📖 flicker collision attribution (za2600 `EN_LAST_DRAWN`): alternating-frame entities must track whose
   collision the latch belongs to — a verifiable pattern once we do flicker.
 

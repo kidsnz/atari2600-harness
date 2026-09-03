@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — `BIT CXxx` returns three predicates, not two, and the mark stays 📖 anyway (2026-09-03)
+
+The audit line said one `BIT CXxx` yields two collision pairs via N and V. True, and incomplete in a way
+that matters: **read it with `A = $C0`, not `$FF`.**
+
+Only D7/D6 of a collision register are driven. Every other bit is the last value the CPU put on the bus
+(`memory.go`: `data |= mem.LastCPUData & ^mem.DataBusDriven`) — which is exactly why
+`scenarios/litmus_cxclr.json` pins 130 and 2 rather than 128 and 0. So with `A = $FF`, Z answers "is the
+whole byte zero" and **moves when the preceding instruction changes, with no change in TIA behaviour at
+all**. With `A = $C0` the residue is masked and Z becomes a third useful predicate — "neither pair
+collided" — so one `BIT` yields three tests. With `A = $00` it yields nothing: Z is always 1.
+
+The flag semantics come from the engine's source (`cpu.go` `case instructions.BIT` loads M, sets Sign and
+Overflow from it, and only then ANDs A; `data.go` masks `0x80` and `0x40`), which settles that N and V do
+not depend on A.
+
+**The mark stays 📖.** This file's own Legend defines ✅ as *measured by our litmus ROMs, locked in CI*,
+and reading engine source is not a litmus — it establishes semantics, not measurement. Raising the mark
+would need a ROM that sweeps `A` and shows N and V do not move, because a single value of `A` cannot tell
+"independent of A" apart from "happened to agree" on that one value.
+
+Found by the mailing-list distillation (helper-3), who declined to promote their own finding on the
+Legend's own terms.
+
 ### Changed — the 23 silent always-taken branches now carry their invariant, on the seed (2026-09-03)
 
 `branch-always` recorded that only 5 of our 28 always-taken branches named their invariant. The other
