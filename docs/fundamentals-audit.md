@@ -262,6 +262,16 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   which is all-inputs, and `deriveSWCHA` then returns the peripheral value unchanged. So a DDR
   litmus cannot confirm existing practice — it has to **drive a port as an output**, which no ROM
   here does.
+  **The list went further and we could not follow it, 2026-09-04.** A 2004 post reads the Stella
+  Programmer's Guide saying SWCHB *"is hardwired to be input only"* and asks the obvious question —
+  *"then why would they have the SWBCNT register?"* — then reports **Air-Sea Battle setting D4 of
+  SWCHB as output**, and **Combat doing the same with its comments mislabelled**: *"it says this
+  stops the response from the joysticks but it doesn't"*. If that holds, "rarely game-relevant" was
+  wrong about two of the best-known cartridges there are.
+  **Unverified here, and stating why:** neither ROM is in `reference/` — the only `Combat.bin` present
+  is a twelve-byte fragment. Reading a commercial ROM's *bytes* would be inside our clean-room line
+  (bytes carry no interpretation); we simply do not have them. The 2004 thread also records the
+  question going **unanswered**, so the list does not settle it either.
   ⬜ **The power-up value is the engine's choice, not a measurement.** `Reset` zeroes the memory
   explicitly; whether a real 6532 clears its DDR on RES is not established here. Measure **what
   writing SWACNT does**, which is the truth table (`riot/ports/ports.go`, 8 rows, all four

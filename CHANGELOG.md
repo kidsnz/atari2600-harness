@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the DDR line's counterexamples may be Combat and Air-Sea Battle, and we cannot check (2026-09-04)
+
+Yesterday "rarely game-relevant" was withdrawn for the port DDRs on the strength of one line in
+`casebook.md`. The list goes further. A 2004 post quotes the Stella Programmer's Guide saying SWCHB
+*"is hardwired to be input only"*, asks *"then why would they have the SWBCNT register?"*, and reports
+**Air-Sea Battle setting D4 of SWCHB as output** and **Combat doing the same with its comments
+mislabelled** — *"it says this stops the response from the joysticks but it doesn't"*.
+
+If that holds, the dismissal was wrong about two of the best-known cartridges there are.
+
+**Recorded as unverified, with the reason.** Neither ROM is in `reference/`: the only `Combat.bin` here
+is a twelve-byte fragment. Reading a commercial ROM's *bytes* would sit inside our clean-room line —
+bytes carry no interpretation, and deriving meaning from them is the skill — but we do not have them.
+The 2004 thread also records the question going **unanswered**, so the list does not settle it either.
+
+Also noted for the record: the distillation attributed a Combat SWBCNT verification to this session,
+and **there is no such measurement**. Checked before repeating it, which is why the entry says
+"unverified" rather than citing a check that did not happen.
+
+Separately, and usefully negative: **the NMOS-decimal rule (only C is valid after ADC/SBC) is not in the
+corpus.** Three differently-shaped queries, the tightest returning nothing and the other two returning
+hits that are all other senses. `CLAUDE.md` files that rule under "constants you must never get wrong",
+and the mailing list will not corroborate it — so it stays where it is, resting on our own measurement
+of the flags.
+
+Found by the mailing-list distillation (helper-1).
+
 ### Changed — `collide_all`'s asserts are not vacuous, and the tool that said so was already there (2026-09-04)
 
 Yesterday's note said `litmus_collide_all` cannot serve as a sensor, because every object overlaps every
