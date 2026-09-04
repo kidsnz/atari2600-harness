@@ -23,6 +23,28 @@ Trade-offs vs #10 flicker: blinds = stable but striped & half-density; flicker =
 shimmering. Video Chess chose stripes; Pac-Man chose shimmer. Use blinds for static/dense scenes
 (boards, HUDs), flicker for moving objects.
 
+**They are not exclusive, and the third option is the one this page was missing.** Glenn Saunders,
+stella-list `the-demo-image-series-9` (2003-02), on two objects too close to share a line:
+
+```
+XXXXXXXXXXXXX
+                             XXXXXXXXXXXXXXXX
+XXXXXXXXXXXXX
+                             XXXXXXXXXXXXXXXX
+```
+
+> *"and then **alternate this even/odd pattern** so it would be like a **'closed venetian blind'**
+> technique. That way **on every frame you'll have graphics on both sides**."*
+
+Interleave the two objects by line — blinds — **and** swap which one owns the even lines each frame —
+flicker. Neither object ever vanishes for a whole frame, which is what plain flicker does and what
+the eye reads as blinking; what alternates instead is *which half of each object* is drawn. The
+striping stays (half density, as above), but the shimmer moves from the object to its texture. Cost
+is unchanged: it is the blinds kernel with one bit of frame parity added to the row test.
+
+Untested here — no fixture combines them, and the claim above is a 2003 design sketch, not a
+measurement. Recorded because the page previously read as a fork in the road.
+
 ## Verified here (pixel-level, Gopher2600, locked in CI)
 Adjacent rows read back alternating `[83+2 FFFFFE]` (diamond row $18, white) and `[80+8 AC1212]`
 (frame row $FF, red) — two figures, one player, no flicker. Position, last-line color register,

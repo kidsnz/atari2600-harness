@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the score kernel's cost, and blinds+flicker as one technique (2026-09-04)
+
+Two more of the same shape as the missile-colour fix earlier tonight: **a fact written where it is a
+mechanism and not where it is a consequence.** Third and fourth instances in one night, so the shape
+is worth naming: *a page that says what a technique consumes is not the same as a page that says what
+that costs you.*
+
+**`score-kernel.md`** said the display uses "the two players in 3-copies-close mode". It did not say
+that nothing playable can be in the score band. Andrew Davie, 2001, on his own game: *"when you jump
+at the top of the screen, **your sprite disappears**, as sprites are used for the high-score
+routine."* The design answer was already on the same mailing list, in a different thread — Erik
+Mooney, 1999: put status in a band at the top or the bottom, where the play area does not reach. Two
+posts six years and one archive apart; joining them turns a layout convention into a rule with a
+reason, and explains why almost every 2600 game looks the way it does.
+
+**`venetian-blinds.md`** read as a fork in the road: *"Video Chess chose stripes; Pac-Man chose
+shimmer. Use blinds for static scenes, flicker for moving objects."* Glenn Saunders, 2003, sketched
+the third option — interleave two objects by line **and** alternate which one owns the even lines
+each frame, *"like a 'closed venetian blind' … that way on every frame you'll have graphics on both
+sides."* Neither object ever vanishes for a whole frame, which is what the eye reads as blinking;
+what alternates is which half of each object is drawn, so the shimmer moves from the object to its
+texture. Cost is one bit of frame parity in the row test. Recorded as untested — it is a design
+sketch, not a measurement — but a page that presented an either/or now presents three options.
+
+Both found by the mailing-list distillation (helper-2).
+
 ### Changed — the SWACNT truth table is the engine's answer; the 400 µs settling time is not modelled (2026-09-04)
 
 Landed `litmus_swacnt` an hour earlier and then learned what qualifies it. The Programmer's Guide

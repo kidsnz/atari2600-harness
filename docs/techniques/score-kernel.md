@@ -8,6 +8,19 @@
 **Goal:** the standard score display every real game needs: a 6-digit decimal score rendered with
 the two players in 3-copies-close mode + VDEL 6-store choreography (48px), updated from BCD bytes.
 
+**It takes both players for the lines it occupies, and the consequence is visible.** Andrew Davie,
+stella-list (2001), on his own game: *"when you jump at the top of the screen, **your sprite
+disappears**, as sprites are used for the high-score routine."* Nothing playable can enter the score
+band — not the avatar, not a projectile, not an enemy — because there are no player objects left
+there. The playfield and the ball are still yours; the players are not.
+
+The design answer is a rule someone else on the same list had already written down. Erik Mooney,
+`role-playing-game-development` (1999): **put status display in a band at the top or the bottom**,
+where the play area does not reach. That is not decoration, it is what makes the constraint above
+invisible to the player — and it is why almost every 2600 game looks the way it does. If the score
+must float over the play area instead, budget a different mechanism (playfield digits at 4-clock
+grain, or a sprite the score borrows only on lines the player cannot reach).
+
 Demo: `roms/techniques/score6.asm` (score auto-increments each frame).
 CI: `scenarios/score6.json` (positions, BCD carry chain at frames 99/150, 262 lines, golden).
 Foundation: `litmus_48px6` (hardware-verified 6-store choreography, v0.52.0) + `litmus_6502`
