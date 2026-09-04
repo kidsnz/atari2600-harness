@@ -22,7 +22,9 @@ DaveC's `landscape.asm` (AtariAge; `reference/files-dave/`) and the 8bitworkshop
   missile/ball/PF, **or a third route this line used to omit: interleave the two players at a wide
   `NUSIZ` so each sits in the other's gaps.** Glenn Saunders describes it on the list in 2000 —
   P1 P2 P1 P2 P1 P2 across one line, **six figures and no flicker**, paid for in width rather than
-  in frames. Added 2026-09-03; not measured here.
+  in frames. **And a fourth: use a missile as a CHARACTER** — vary its width (`NUSIZ` bits 4-5) and
+  its colour every line and `HMOVE` it every line, and it draws a shape rather than a dot 〔stella
+  1997, Erik Mooney, with a tank sketched in ASCII〕. Added 2026-09-03; neither is measured here.
 - **Single-line vs 2-line kernel.** A *single-line* kernel updates the TIA every scanline (almost no spare
   CPU). A *2-line (double-line) kernel* repeats each sprite line over 2 scanlines, buying CPU time for logic —
   the more common choice for real games. Ours is effectively single-line.

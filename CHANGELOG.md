@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — an open item in `litmus-results.md` had an answer waiting in a 2004 post (2026-09-03)
+
+The file's "Unverified (optional, low priority)" list asked for *"an exact explanation of the boundary
+artifact for deep-HBLANK strobes (DELAY 0–2)"*. Eric Ball gave it on the list in 2004: a horizontal
+positioning routine *"doesn't work for X less than or equal to 7"* because **`RESP0` completes at cycle
+21, which is still inside HBLANK**. Two `NOP`s at the head fix it. The table he was correcting had been
+published in 1998 and stood wrong for six years — **the game it came from never placed anything in that
+range**, so nobody hit it.
+
+Marked answered-from-a-source rather than resolved: we have not measured it.
+
+The part worth keeping is what looking for it turned up. **Our own tooling already routes around this
+boundary without naming it**: `internal/calibrate`'s `Fit` least-squares *"only the longest contiguous
+run … (excluding saturated points)"*, saturation being *"the strobe pinning to the left edge outside its
+valid range"*. The tool knows; no document said so. **A tool that avoids a boundary is not a boundary
+that has been written down**, which is exactly how a wrong table survived six years.
+
+Also: `zone-multiplexing.md` gains a **fourth** way past two players on a line — use a missile as a
+*character*, varying its width and colour and `HMOVE`ing it every line so it draws a shape rather than a
+dot 〔stella 1997, Erik Mooney〕. That line listed two escapes this morning and now lists four.
+
+From the mailing-list distillation (helper-2), who measured three states for each claim — what the
+litmus covers, what the code does, what the docs say — and separately withdrew one of their own earlier
+findings: their "PAL odd-scanline failure mode is absent" rested on a query requiring the words
+`black|b/w|monochrome`, and harness says it as *"PAL color circuitry fails on odd scanlines"*. The zero
+was true of the query and false as a conclusion.
+
 ### Changed — seven technique pages now point at the placement table, chosen by measurement (2026-09-03)
 
 Thirty-six technique pages touch a placement register and three cited `sprite-placement.md` — two of

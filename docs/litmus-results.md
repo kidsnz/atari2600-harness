@@ -103,5 +103,16 @@ breakdown) are always backed by `read_tia` numbers on this harness. Gap B is clo
 
 ## Unverified (optional, low priority)
 
-- An exact explanation of the boundary artifact for deep-HBLANK strobes (DELAY 0–2).
+- ~~An exact explanation of the boundary artifact for deep-HBLANK strobes (DELAY 0–2).~~
+  **Answered from a source, 2026-09-03 — still to be measured here.** Eric Ball, stella 2004:
+  a horizontal-positioning routine *"doesn't work for X less than or equal to 7"* because
+  **`RESP0` completes at cycle 21, which is still inside HBLANK**, so the object lands somewhere
+  other than where the arithmetic says. His fix is two `NOP`s at the head of the routine. The
+  table this corrects had been published in 1998 and was wrong for six years — nobody noticed
+  because the game it came from never placed anything in that range.
+  Our own tooling already avoids the region without naming it: `internal/calibrate`'s `Fit` says it
+  least-squares *"only the longest contiguous run … (excluding saturated points)"*, saturation being
+  *"the strobe pinning to the left edge outside its valid range"*. **A tool that routes around a
+  boundary is not the same as a boundary that has been written down** — which is how the 1998 table
+  survived six years, and why this line is being answered rather than deleted.
 - Per-kernel measurement of the absolute N in the missile/ball formula `X = 3N − 55` (player is −54).
