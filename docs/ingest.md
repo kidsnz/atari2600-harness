@@ -33,6 +33,14 @@ It does not give a conversion table — one point is one point, and the 1997 sou
 necessarily a corresponding hue"* — but it does mean **a PAL release is a re-choice of colours, not a
 re-mapping of them.**
 
+**And the budget is different, counted 2026-09-04:** rendering all 128 even values gives **NTSC 126
+distinct colours, PAL 104, SECAM 8**. A 1997 post claiming PAL has *"half the colours"* was hedged
+with *"I vaguely remember"*, and the hedge was the accurate part — 104 is 83% of 126, not 50%.
+**SECAM is the one to know about**: eight colours, because the standard carries luminance only and
+assigns each level a fixed hue. A picture designed here does not degrade on SECAM, **it is replaced**.
+Pinned in `internal/emu/palspec_test.go`, so if any of the three numbers moves, the work designed
+against it fails loudly.
+
 **The canvas is not the screen. A 2600 pixel is wide.** Anything drawn at 100 % on a
 square-pixel canvas — the form this project's artwork arrives in — is stretched horizontally on a
 real display by somewhere between **1.60× and 1.82×**; the range is not measurement noise, it is the

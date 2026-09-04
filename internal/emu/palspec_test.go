@@ -102,6 +102,59 @@ func TestSameColourByteIsADifferentColourOnPAL(t *testing.T) {
 		}
 	}
 
+	// **How many colours each standard actually has**, counted 2026-09-04 by rendering all 128 even
+	// values and collecting distinct results:
+	//
+	//	NTSC  126 of 128
+	//	PAL   104
+	//	SECAM   8
+	//
+	// A 1997 post says PAL has *"half the colours"*, hedged with *"I vaguely remember"* — the hedge was
+	// right and the claim was not: 104 is 83% of 126, not 50%. **SECAM is the one that deserves the
+	// alarm**: eight colours, because it carries luminance only and maps each level to a fixed hue.
+	// A picture designed here does not degrade on SECAM, it is replaced.
+	count := func(spec string) int {
+		e, err := New(spec)
+		if err != nil {
+			return -1
+		}
+		if err := e.LoadROM("../../roms/litmus/litmus_swacnt.bin"); err != nil {
+			return -1
+		}
+		if err := e.RunFrames(2); err != nil {
+			t.Fatal(err)
+		}
+		seen := map[string]bool{}
+		for v := 0; v <= 0xFE; v += 2 {
+			if err := e.Poke(0x81, uint8(v)); err != nil {
+				t.Fatal(err)
+			}
+			if err := e.RunFrames(2); err != nil {
+				t.Fatal(err)
+			}
+			runs, _, err := e.ReadRow(100)
+			if err != nil || len(runs) == 0 {
+				continue
+			}
+			seen[runs[0].Hex] = true
+		}
+		return len(seen)
+	}
+	for _, tc := range []struct {
+		spec string
+		want int
+	}{{"NTSC", 126}, {"PAL", 104}, {"SECAM", 8}} {
+		if got := count(tc.spec); got != tc.want {
+			if got < 0 {
+				t.Logf("%s unavailable", tc.spec)
+				continue
+			}
+			t.Errorf("%s renders %d distinct colours from 128 values, want %d — the palette budget "+
+				"for that standard has changed and anything designed against the old number needs "+
+				"re-checking", tc.spec, got, tc.want)
+		}
+	}
+
 	// The control: a luminance-only value has no hue to get wrong, so it must NOT differ much.
 	// Without this the test would pass on a build where PAL simply returned garbage.
 	n, ok1 := sample("NTSC", 0x0E)

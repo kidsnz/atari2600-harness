@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — how many colours each TV standard actually has: 126 / 104 / 8 (2026-09-04)
+
+A 1997 post says PAL has *"half the colours"*, hedged with *"I vaguely remember"*. Nobody on the list
+checked. Counted here by rendering all 128 even values and collecting distinct results:
+
+| | distinct colours |
+|---|---|
+| NTSC | **126** of 128 |
+| PAL | **104** |
+| SECAM | **8** |
+
+**The hedge was the accurate part**: 104 is 83% of 126, not 50%.
+
+**SECAM is the number that matters.** Eight colours — the standard carries luminance only and assigns
+each level a fixed hue. A picture designed here does not degrade on SECAM, **it is replaced**. That
+sits alongside the two facts already measured today: the same byte is a different colour on PAL
+(`$36` orange → green, confirmed against a 2001 hardware report), and the pixel aspect changes too
+(1.60–1.82 on NTSC against 1.90–2.00 on PAL). **"PAL support" therefore means re-choosing colours
+from a smaller set and re-proportioning the drawing** — three independent changes, none of them a
+conversion.
+
+Pinned in `palspec_test.go` and written into `ingest.md`, where the artwork enters.
+
+Found by the mailing-list distillation (helper-1), who spotted that the claim had gone 29 years
+without anyone counting and named the file that would answer it.
+
 ### Added — what A12 actually is, and what every bank-switching scheme is answering (2026-09-04)
 
 `bankswitching.md` was 49 lines and opened, as of this morning, with the 24-pin connector that
