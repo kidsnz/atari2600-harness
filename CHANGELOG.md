@@ -6,6 +6,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the two primary sources went into the files that own their subjects, not a new one (2026-09-04)
+
+They were first put in a new `docs/hardware-origins.md`. **That was wrong and the file is gone.** Every
+fact in it had an owning file already:
+
+    polynomial counters   -> integration-density-playbook.md (which already discusses the LFSR seed)
+    the 24-pin connector  -> techniques/bankswitching.md
+    VSYNC and the budget  -> design-principles.md
+    the patent            -> techniques/restrobe-copies.md
+
+The umbrella's own rule says so — *"when it starts wanting to explain something, that explanation
+belongs in the file that owns the subject"* — and a "why the machine is like this" file is a subject
+nobody walks toward. It would have been read once, by whoever wrote it.
+
+Each fact now sits where someone hits it while doing the work it bears on: the LFSR economy beside our
+LFSR seed, the connector beside bank switching, the deliberate absence of vertical sync beside the
+vertical budget, the patent beside the technique it invented. Caught by the author, who asked what the
+new file was for and whether it functioned.
+
 ### Fixed — `check_provenance` rewrote a commercial ROM's `.bin` to a `.asm` that will never exist (2026-09-04)
 
 Citing `sandbox/studies/combat/Combat.bin` turned the gate red locally. The rule it hit is a good one:

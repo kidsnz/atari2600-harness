@@ -111,7 +111,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   〔mining blog SpiceWare 10777:8, 11656〕
 - **76cy per line is the ceiling.** Decide the line count first, then allocate features out of the remaining budget. 〔splendidnut〕 `→ design.LineBudget/RemainingCycles`
 - **★RIOT 6532 timer wrap-around bug (the "Stella passes / real hardware rolls" trap)**: write `TIM64T`/`TIM1024T` on **exactly the cycle** the timer wraps around and the divider silently degenerates to **1T**, wrecking the frame length so the picture rolls on hardware. **The fix = a double write (double-write TIM64T).** Easy to miss because it is emulator-dependent = a direct hit on the harness's core mission (gap B). Diagnosed in that thread by Gopher2600's author (JetSetIlly). 〔mining 303277 "To Roll or not to Roll"〕 (harness-hardening candidate = an assert that detects a timer write on the wrap-around cycle)
-- **Hard lower bounds on the vertical budget, and asymmetric failure modes**: given that the total scanline count is held constant, the lower bound of each region = VSYNC ≥ 3 / Overscan ≥ 3 / VBLANK ≥ 15 (even for PAL). **Overstretching Overscan = no picture / overstretching VBLANK = jitter** — the failures show up differently, so do not absorb the surplus on the VBLANK side (a jitter source). 〔mining 171270〕
+- **Hard lower bounds on the vertical budget, and asymmetric failure modes**: given that the total scanline count is held constant, the lower bound of each region = VSYNC ≥ 3 / Overscan ≥ 3 / VBLANK ≥ 15 (even for PAL). **Why this is yours to do at all** (added 2026-09-04): the designers removed it on purpose —
+  *"They also eliminated any provision for vertical synchronization and gave that task to the
+  programmer."* Of a piece with the rest of the machine: *"making the software do as much of the
+  work as possible, so that the hardware could be cheaper — silicon was very expensive in those
+  days."* Their statement of the budget is *"must finish displaying a single frame in exactly the
+  same time — 15.24 milliseconds"*; that is their round figure and not our measured refresh
+  (NTSC 15734.26/262 = 60.0544 Hz = 16.65 ms), so do not carry it as a constant. 〔Perry & Wallich, IEEE Spectrum 1983-03〕 **Overstretching Overscan = no picture / overstretching VBLANK = jitter** — the failures show up differently, so do not absorb the surplus on the VBLANK side (a jitter source). 〔mining 171270〕
   (Ambiguity resolved 2026-08-06. The Japanese original's word order read as a contradiction; the sentence
   above is the only reading its own two failure modes support, so nothing is left to decide about the WORDING.
   **The CLAIM, though, is not verifiable here and is not treated as measured**: "no picture" and "jitter" are

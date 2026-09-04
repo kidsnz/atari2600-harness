@@ -50,6 +50,12 @@ variables are provably **never live at the same time**, overlay them on the same
 *(procedural-from-seed, adversarially bounded)*
 Trade storage for a *tiny* amount of compute. Pitfall! synthesises all 255 screens from a
 polynomial-counter **seed** (an 8-bit LFSR seeded at **0xC4**, ~50 bytes of generator, a few
+
+**Why the hardware counts this way at all** (added 2026-09-04): a polynomial counter was cheaper
+silicon. The designers: *"A polynomial counter occupies one-fourth the silicon area of an equivalent
+binary counter, but, unlike a binary counter, it does not count in any simple order."* 〔Perry & Wallich, "Design case history: the Atari Video Computer System", IEEE Spectrum 1983-03 pp.45-51〕
+Every LFSR in this repository — the audio dividers, Pitfall's world, `eor #$B4` — is that one
+economy, and "does not count in any simple order" is the bill, paid by the programmer ever since.
 cycles *per screen* — not per pixel). Entombed builds its whole maze from a
 **32-byte table + a small algorithm + symmetry** (20-bit half-row → fixed 4-bit wall → 16 →
 bit-duplication → only **8 bits** actually selected). **KILL (§C):** the demoscene "everything

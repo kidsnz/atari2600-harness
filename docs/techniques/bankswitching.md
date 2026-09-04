@@ -1,5 +1,12 @@
 # Technique — bank-switched game structure (F8 template)
 
+**Where the whole problem comes from** (added 2026-09-04): *"Atari limited the cartridge
+connector to 24 pins, omitting read-write and clock lines for RAM, as well as lines for
+addresses greater than 4096."* Hotspots, the split read/write ports of cartridge RAM and the
+4K ceiling all descend from that one choice — and the designers disowned it: *"Mr. Miner and
+Mr. Decuir agreed in retrospect that this decision was a mistake, since a 30-pin connector
+would have cost only 50 cents for each VCS and 10 cents a cartridge."* 〔Perry & Wallich, "Design case history: the Atari Video Computer System", IEEE Spectrum 1983-03 pp.45-51〕
+
 **Goal:** the structural template for games larger than 4K: per-bank reset stubs + vectors, a
 reusable cross-bank call trampoline, and the data-bank pattern (level assets loaded from
 another bank into RAM).
