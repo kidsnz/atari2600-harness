@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — "frying", the player-side proof that the power-up trap is real (2026-09-04)
+
+Yesterday's row says *do not depend on a power-up value on purpose*. This is the same fact from the
+other side, and it is why that row is not theoretical. From 1998: *"**'frying'… means turning your
+2600 on in such a way that it doesn't boot up quite right**"* — used to reach the *"fast walkers"* in
+The Empire Strikes Back — *"**this is probably a method reserved for the OLD STYLE Atari 2600s, since
+the newer versions had slightly different switches**."*
+
+Players were corrupting RAM deliberately, getting results reproducible enough to trade as technique,
+and finding it depended on which console they owned. A 2005 thread gives the mechanism precisely
+enough to emulate: bits are ANDed away at pseudo-random addresses and **never set**, so power-up
+corruption only ever *clears*.
+
+Two consequences worth having. For a ROM: an uninitialised value is not merely undefined, it is
+something **a person can reach into and change** — `CLEAN_START` protects against an adversary, not
+only against chance. For a fixture: a fried state is a legitimate thing to test against, and
+`save_state`/`restore_state` make one reproducible, which the 2005 thread already noticed — *"once it
+produces a 'fried' effect, we can save the state of the emulator … loading that state file will
+produce the same fried state."*
+
+Found independently by two of the mailing-list distillers (helper-1 from the 2005 mechanism thread,
+helper-2 from the 1998 player thread), which is itself the useful part: the same fact arriving twice
+from opposite ends of the archive.
+
 ### Changed — record that two of the five illegal-opcode spellings do not assemble (2026-09-04)
 
 `check_traps.py` rejects `lxa|xaa|ane|asr|alr` — five spellings for three instructions. Measured with
