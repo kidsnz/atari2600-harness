@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — read collisions at `$30/$31`, and why a placement table has to exist (2026-09-04)
+
+**A shipped commercial game was broken by a mirror choice that costs nothing.** `known-traps.md` says
+the TIA answers reads at `$00-$0D`, which is true of the TIA and not of the machine: the page those
+addresses sit in is not exclusively the TIA's. Darrell Spice Jr. tested 135 titles on a Supercharger
+and found three broken; stella-list `supercharger-problem-games` (2003-08) on one of them:
+*"**Air-Sea Battle reads the images of the collision registers at `$00/$01`, as opposed to
+`$30/$31`** … patching the code to use the images at `$3x` makes it [work]."*
+
+So: **read collisions at `$30/$31`.** Identical on a bare console, one survives more configurations,
+and there is no argument on the other side — a rule whose reason is entirely one-sided is the
+cheapest kind to follow. The mechanism is *not* settled and is recorded as unexplained: the reporter
+says "maybe", and a Supercharger's RAM is meant to live at `$1000-$1FFF`. False-green direction —
+emulator passes, a real configuration does not — same side as the F8 hotspot decoding.
+
+**And the reason `sprite-placement.md` exists at all was never written in it.** The TIA has no
+register that reports where an object currently is: you can strobe `RESP0` and nudge with `HMP0`, but
+nothing reads back. Erik Mooney, on the list: *"you can't read the horizontal positions directly."*
+Every position a running game knows, it knows because it wrote it in RAM and kept the shadow honest.
+That is why the placement arithmetic has to be right *before* the strobe, why 1997's "I moved my
+kernel later and it broke only on hardware" had no in-program diagnostic — the machine was never
+going to tell anyone — and why `read_tia`'s `hmoved_pixel` is a **tool** capability that no ROM may
+depend on. Too fundamental for the list to say twice, which is why it was missing here.
+
+Found by the mailing-list distillation (helper-2).
+
 ### Changed — a fourth aspect-ratio datum widens the range, and `ingest.md` learns to say so (2026-09-04)
 
 `design-principles.md` recorded three sources for a 2600 pixel's aspect — 1.67, 1.71, 1.82 — all from

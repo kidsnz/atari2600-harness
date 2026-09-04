@@ -27,6 +27,22 @@ repeatable while real hardware does not. Measured false positives: **0 across 12
 pairs in that corpus, so it is looking at something. Bait-tested in `--selftest`; negative control: disabling
 the rule fails the selftest by name.
 
+**`$00-$0D` is right about the TIA and wrong about the machine, 2026-09-04.** Those addresses answer
+because the TIA decodes only the low bits — but the *page* they sit in is not exclusively the TIA's,
+and something else in the address space can win. Darrell Spice Jr. tested 135 titles on a
+Supercharger and found three broken; on one of them, stella-list `supercharger-problem-games`
+(2003-08): *"**Air-Sea Battle reads the images of the collision registers at `$00/$01`, as opposed to
+`$30/$31`** … patching the code to use the images at `$3x` makes it [work]."* A shipped commercial
+game, broken by a mirror choice that costs nothing to make differently.
+
+**So read collisions at `$30/$31`, not `$00/$01`.** The two are identical on a bare console, one of
+them survives more configurations, and there is no argument on the other side — the reason is
+entirely one-sided, which is the cheapest kind of rule to follow. (The *mechanism* is not settled:
+the reporter says "maybe", and a Supercharger's RAM is meant to live at `$1000-$1FFF`, which does not
+obviously explain it. Recorded as an observed failure, not an explanation.) **This is the false-green
+direction** — the emulator passes it and a real configuration does not — the same side as the F8
+hotspot decoding elsewhere in this file. Found by the mailing-list distillation (helper-2).
+
 **New static trap (2026-07-30): `STA` into cartridge ROM.** The write is discarded, so a program that treats a
 ROM address as storage reads back whatever was assembled there. Bank-switch hotspots and the SuperChip write
 port are the legitimate exceptions, and both are deliberate — so intent is **declared, not inferred**: a line

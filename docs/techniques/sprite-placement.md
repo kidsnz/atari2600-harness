@@ -24,6 +24,23 @@ subject: the work was about collision latches, so the *placement* document was n
 **Cite this table from any technique whose fixture places an object** — a rule nobody reads is a
 rule that gets measured again.
 
+## Why a placement table has to exist at all
+
+**The TIA has no register that reports where an object currently is.** You can strobe `RESP0` and you
+can nudge with `HMP0`, but nothing reads back — there is no counterpart to `read_tia`'s
+`hmoved_pixel` on the console itself. Erik Mooney said it plainly on stella-list: *"you can't read
+the horizontal positions directly."* Every position a running game knows, it knows because it wrote
+it down in RAM and kept the shadow copy honest.
+
+That is the reason this file, `plan_sprite_placement`, `cmd/place` and `internal/place` exist. A
+program cannot ask the hardware where things are, so the arithmetic has to be right *before* the
+strobe — and it is why 1997's *"I moved my kernel later and it broke only on hardware"* has no
+in-program diagnostic: the machine was never going to tell anyone. It is also why the harness's
+ability to read positions back is a *tool* capability and not a hardware one; a ROM cannot do it, so
+no ROM may depend on it.
+
+Too fundamental for anyone on the list to write down twice, which is exactly why it was missing here.
+
 ## The rules
 
 | | rule | band |
