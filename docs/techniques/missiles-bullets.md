@@ -63,9 +63,31 @@ twice, descending, so each `PHP` lands in the next ENAM:
              CPX MissY0 ; PHP   ; [$011D]=ENAM0  (SP $1D→$1C)
              PLA ; PLA          ; restore SP=$1E
 ```
-= 20 cy, both missiles, no branches. **Irreducible:** the two `PLA` (8 cy) are the mandatory SP restore.
-If that overruns the line, the fix is more budget (a 2-line kernel), or the graphics-pointer X-pin trick
-that collapses `PLA;PLA` to a 2-cy `TXS` (`two-line-kernel.md`). — in-house: Combat 2026-07-18, ∀-certified.
+= 20 cy, both missiles, no branches. The two `PLA` (8 cy) are the SP restore, and they are mandatory
+**only while `X` is the line counter** — which is what makes `CPX` the comparison and leaves nothing to
+hold `$1E` across the line.
+
+**Corrected 2026-09-03: this line read "Irreducible", and the sentence two lines below already named
+the escape.** Compare the line counter in `Y` instead and `X` stays free, so the restore is a 2-cycle
+`TXS` rather than eight cycles of `PLA;PLA`:
+
+```
+; once per frame:  LDX #ENABL ; TXS
+; per line:   CPY BLline ; PHP
+             CPY M1line ; PHP
+             TXS                 ; 2 cy, not 8
+```
+
+That shape is **Thomas Jentzsch, stella 1999-11 〔msg00039〕**, whose own comment reads
+`php ;3      got this trick from Combat` — so the in-house derivation below and this post reach the
+same trick from the same game, twenty-seven years apart. **`CPY` appears nowhere in this file or in
+`two-line-kernel.md`**, which is why the alternative read as "a different technique" rather than as
+the same one with a different register. The saving is arithmetic on paper here and has not been
+measured; what is measured is that "irreducible" was too strong a word.
+
+If the line still overruns, the fix is more budget (a 2-line kernel), or the graphics-pointer X-pin
+trick that collapses `PLA;PLA` to a 2-cy `TXS` (`two-line-kernel.md`).
+— in-house: Combat 2026-07-18, ∀-certified; independently in Jentzsch 1999-11 〔stella msg00039〕.
 
 ## Missile bounce / tank block off the playfield — CX?FB move-check-revert
 The mover doesn't know where the maze walls are; use the hardware object-vs-playfield latches

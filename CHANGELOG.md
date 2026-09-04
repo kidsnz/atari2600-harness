@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — "Irreducible" in `missiles-bullets.md`, contradicted two lines below it (2026-09-03)
+
+The missile-strobe kernel's cost was written as *"20 cy, both missiles, no branches. **Irreducible:** the
+two `PLA` (8 cy) are the mandatory SP restore."* The next sentence but one already named the way out —
+the X-pin trick that collapses `PLA;PLA` to a two-cycle `TXS` — while framing it as a different
+technique from a different file.
+
+It is not a different technique. It is the same one with the line counter in `Y`: compare with `CPY`
+instead of `CPX` and `X` stays free to hold `$1E` across the line, so the restore is `TXS`. **`CPY`
+appears nowhere in this file or in `two-line-kernel.md`**, which is how an alternative written in terms
+of the other index register read as something else entirely.
+
+The shape is **Thomas Jentzsch, stella 1999-11**, whose own comment reads `php ;3      got this trick
+from Combat` — the same game this file derives from in-house, twenty-seven years apart. That is a
+provenance addition, not a new technique: an independent, dated, external corroboration of a
+derivation, which is the strongest form a `— in-house:` line can acquire.
+
+What is corrected is the word. The cycle saving is arithmetic on paper and is not claimed as measured;
+what is measured is that "irreducible" was false, since our own file names the escape.
+
+Found by the mailing-list distillation (helper-3), who also stated the fair version: had Combat's
+kernel needed `Y` for something else, `X` would have been the only register left, so the derivation is
+sound and only the word overreached.
+
 ### Added — `litmus_pf0_reflect`: two PF0 writes in one line, and where the window ends (2026-09-03)
 
 The audit line held two claims under one mark: *"asymmetric PF under reflection via double PF0 rewrite
