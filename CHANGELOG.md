@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — `flicker-multiplexing.md` now says why the list told you not to do this (2026-09-03)
+
+The page had **nothing about collisions** — zero mentions of a collision register or `CXCLR` — while
+the standing advice on the list, for twenty-eight years, was that a flickered slot cannot use the
+hardware at all:
+
+> Obviously, you can't use the hardware collision registers … it'd just be a check to see if the
+> "hot-spot" … is within a rectangular area — Erik Mooney, stella `199811/msg00037`
+
+The reason is this page's own subject: on any frame at most one of a flickered pair is drawn, so a
+pair that never share a frame can never latch. `litmus_flicker_attrib` measures the fix, and now the
+page says so, with the ordering intact — **the 1998 advice was not wrong, it was practical.** Software
+rectangles need no per-frame discipline and survive an author who forgets one; the hardware route is
+cheaper and conditional, and the condition is what to write down.
+
+Found by the mailing-list distillation (helper-3), who noticed that a fixture built here today has a
+prehistory that says the opposite, and that both statements are true.
+
+**Also measured and left open: the catalogue has no entry for placing an INVISIBLE object as a
+collision probe.** A 1998 post describes a missile in the fist and a ball on the hit areas, hidden
+three different ways — same colour as the player, priority beneath it, or PF and BG set alike. The
+engine carries the mechanism (`video.go`: *"priority 1 (ball is same color as playfield)"*, *"priority 2
+(missile 0 is same color as player 0)"*), and searching `docs/techniques/` for the idea returns
+nothing — five apparent hits are the word "invisible" in unrelated sentences. Worth a page; not
+written yet.
+
 ### Added — `blank-a-frame.md`, and a shipped precedent for a tightening we called untried (2026-09-03)
 
 **`blank-a-frame`** is the third answer to a setup that will not fit, next to trimming the work and

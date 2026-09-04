@@ -34,3 +34,28 @@ core; sort + dynamic 2-of-N allocation + fairness rotation is the documented ext
 - **The flicker itself is asserted:** three consecutive frames read
   P0/P1 = (53,97) → (40,120) → (55,95) — odd frames carry the moving horizontal pair, even
   frames the fixed-X vertical pair.
+
+## Collisions across a flickered slot — and why the list said not to (added 2026-09-03)
+
+Nothing above touches a collision register, and for twenty-eight years the standing advice was that
+it could not:
+
+> Obviously, you can't use the hardware collision registers … it'd just be a check to see if the
+> "hot-spot" for the punching player's fist is within a rectangular area that the other player is in.
+> — Erik Mooney, stella `199811/msg00037`
+
+The reason is in this page's own subject. On any frame at most one of a flickered pair is drawn, so
+a pair that never share a frame can never latch — the objects pass through each other. An author who
+shipped it put it more plainly: *"you can swing the pod through all other objects (except the
+playfield). I'm not sure, if i can fix this"* 〔`200007/msg00140`〕. The playfield is the exception
+because the playfield is not flickered.
+
+**It is fixable, and `litmus_flicker_attrib` measures the fix.** With `CXCLR` strobed every frame the
+latch you read belongs to whatever was drawn in *that* frame, so a flickered slot can be given its
+own attribution — and without the per-frame clear it cannot, which the same fixture shows by leaving
+the strobe out and watching every frame read set. See `docs/techniques/flicker-collision-attribution.md`
+for what it costs and the two idioms, and `internal/emu/flickerattrib_test.go` for the grading.
+
+The 1998 advice was not wrong; it was practical. Software rectangles need no per-frame discipline and
+survive an author who forgets one. The hardware route is cheaper and conditional, and the condition is
+the thing to write down.
