@@ -220,7 +220,28 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     will be visually square**), and the 40 x 192 is 5:32."* That is 8:5 = **1.60**, and it is the first of
     these to come from the mailing list rather than AtariAge — a fourth independent overscan assumption.
     **This strengthens the decision below rather than weakening it**: a spread that grows as sources
-    accumulate is not converging, which is what "underspecified" predicts. Mooney's phrasing is also the
+    accumulate is not converging, which is what "underspecified" predicts.
+    **A fifth datum breaks the range at the TOP, on a different axis, 2026-09-04.** Eric Ball, 2004:
+    *"For NTSC **160x200** is very close to 4:3, for PAL **160x240** is very close to 4:3."* PAL's
+    240 gives **2.00** — above everything above — and the reason is not another overscan guess, it is
+    **the television standard**. So the spread now has *two* free variables, not one.
+    **And all five values come out of one expression**, which is worth stating plainly because it
+    makes the disagreement legible rather than mysterious:
+    `pixel aspect = (4:3) ÷ (160 ÷ visible lines) = visible_lines / 120`.
+    192 → 1.600, 200 → 1.667, 205 → 1.708, 218 → 1.817, 240 → 2.000 — reproducing 8:5, 5:3, 12:7 and
+    20:11 to three places. Every source is the same physics; each picked a different line count, and
+    PAL picks a different one again.
+    **The consequence is not only shape, it is angle.** A line drawn at 45° on a square-pixel canvas
+    reads as `atan(1/aspect)`: **32° at 1.60, 31° at 1.67, 27° at 2.00**. Eric Ball arrived from
+    exactly that symptom — *"when I try doing 16 degrees of movement assuming 1 pixel per frame
+    up/down and 1 pixel per frame left/right, **the 45° diagonals don't seem quite right**."*
+    **Do not confuse this with the diagonal correction already in this file.** Combat's frame gating
+    (`MPace & $03`, move on 3 of 4 frames) corrects **√2 — the distance travelled diagonally** — and
+    is needed on any display. The aspect correction is about **the angle the eye sees**, and is
+    needed because a 2600 pixel is wide. Two different corrections; this repository has the first and,
+    within the searches run, not the second. Found by the mailing-list distillation (helper-2), who
+    flagged that the 2004 quote is a description they had not verified and the arithmetic is theirs —
+    re-run here and matching. Mooney's phrasing is also the
     most useful one for an artist — **8 tall × 5 wide reads as a square** — so it is the form to hand to
     whoever is drawing (see `docs/ingest.md`). **The sources name two more free variables this line left implicit** 〔found 2026-09-03〕: an NTSC display expects **227.5 colour clocks per line and the 2600 emits 228** 〔169128:12〕, so the horizontal scale is already off a standards-conforming set by half a clock per line; and the 2600 is **240p progressive — the even field of 480i, but at full refresh rather than half** 〔208810:9〕, so "how many visible lines" asks about a signal with no interlaced partner to average against. Neither number lives anywhere else in this tree (227.5: five layers, zero hits; every 228 here is cycle budget, a different quantity). **So no single Stella measurement settles it either** — it settles what
     STELLA assumes, which is one more source, not an arbiter. (Checked 2026-08-04: Stella 7.0's `-help`

@@ -42,6 +42,12 @@ drawing is Erik Mooney's (stella-list, 2001-10): **an object 8 pixels tall and 5
 as a square.** So a circle is an oval on the canvas, taller than it is wide, and letterforms need
 about half as many pixels across as down.
 
+**On a PAL console it is worse, and on a different axis.** The pixel aspect is
+`visible_lines / 120`, so PAL's 240 lines give **2.00** against NTSC's 1.60–1.82 — a letter keeps its
+height and gains a fifth of its width again. A 45° line reads as **27°** there against **31°** on
+NTSC. So "PAL support" changes the drawing twice over: the colours are re-chosen, and the proportions
+move.
+
 None of that has to be settled to work. The loop is *draw → build → look at it on the emulator →
 adjust*, and the eye closes the gap in one pass; the number only matters for the first guess. What
 would bite is trusting a square-dot preview and never looking at the render — so **look at the

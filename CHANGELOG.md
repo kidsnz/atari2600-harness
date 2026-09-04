@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — one formula behind all five aspect-ratio sources, and PAL is 2.00 (2026-09-04)
+
+The aspect-ratio note listed four disagreeing sources (1.60, 1.67, 1.71, 1.82) and explained the
+spread as "three different overscan assumptions". A fifth datum breaks the range at the **top**, on a
+**different axis**: Eric Ball, 2004, *"For NTSC **160x200** is very close to 4:3, for PAL **160x240**
+is very close to 4:3."* PAL's 240 lines give **2.00**, and the reason is the television standard, not
+another guess about overscan.
+
+**All five come out of one expression**, which makes the disagreement legible instead of mysterious:
+
+    pixel aspect = (4:3) ÷ (160 ÷ visible lines) = visible_lines / 120
+
+192 → 1.600, 200 → 1.667, 205 → 1.708, 218 → 1.817, 240 → 2.000, reproducing 8:5, 5:3, 12:7 and 20:11
+to three places. Same physics; different line count each time.
+
+**The consequence is angle, not only shape.** A 45° line on a square-pixel canvas reads as
+`atan(1/aspect)`: **32° at 1.60, 31° at 1.67, 27° at 2.00**. Ball arrived from exactly that symptom —
+*"the 45° diagonals don't seem quite right."*
+
+**Not the same as the diagonal correction already here.** Combat's frame gating (`MPace & $03`, move
+on 3 of 4 frames) corrects **√2, the distance travelled diagonally**, and is needed on any display.
+The aspect correction is about **the angle the eye sees**, and is needed because a 2600 pixel is
+wide. This repository has the first and, within the searches run, not the second.
+
+`ingest.md` now says what this means for artwork: **"PAL support" changes the drawing twice** — the
+colours are re-chosen (measured earlier tonight) and the proportions move.
+
+Found by the mailing-list distillation (helper-2), who marked the 2004 quote as unverified and the
+arithmetic as theirs; re-run here and matching to three places.
+
 ### Changed — the keypad's real cost, and a name for what this harness cannot reach (2026-09-04)
 
 `input-budget.md` said the 400 µs settling time was 6.288 scanlines *per direction change* and that
