@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a test for the JSR/stack facts `absint.go` is built on and nothing re-ran (2026-09-04)
+
+`internal/cyclebound/absint.go` says *"Measured on litmus_jsr_stack, whose own header states the ground
+truth"*, and `defuse.go` cites the same ROM for the addresses a JSR writes. The ROM exists, the facts
+were taken once, and **no `_test.go` named it** — so the abstract interpreter's treatment of `JSR` rested
+on a claim about the day it was measured. That is `hmovenibble_test.go`'s own warning with the subject
+changed: **a constant nobody re-checks is a claim about a version**, except here it is not a constant,
+it is a measurement production code is built on.
+
+Two facts, two assertions:
+
+- **A JSR pushes the return address first**, so a callee entered with the caller's SP at $FF opens its
+  `pha` at **$01FD**, not $01FF. An interpreter handing the callee an unchanged SP names an address two
+  above the one the machine writes, and names it `exact: true`. $01FD is the page-1 mirror of RAM $FD,
+  so the pushed `$A5` is readable — and the test also requires $FF *not* to hold `$A5`, or it would pass
+  on a machine that wrote the byte across the whole stack page.
+- **Page 1 is the address space the console decodes**, so with SP aimed into the TIA the callee's `pha`
+  writes `$0109` = COLUBK. The ROM's header says the picture arbitrates this, so **the assertion is on
+  the picture**: the background must differ between scanline 60 and 170. Reading the colour rather than
+  the register is deliberate — a readout disagreeing with the screen would be the more interesting
+  failure, and this way the screen answers.
+
+Negative controls, both fired and recovered: entering `Green` with SP at $FF instead of $0B removes the
+COLUBK write and the background stops changing; changing `Save`'s `$A5` to `$00` fails fact 1 by name.
+
+Found by the mailing-list distillation (helper-2), who counted the litmus ROMs with no scenario (75 of
+142), narrowed it to the one no test names, and then **corrected their own conclusion**: it is not
+unchecked, because the Stella oracle sweeps its capture directory wholesale and checks without naming.
+What survived the correction is the sharper finding — the sweep compares write-only TIA registers, and
+the stack facts are not among them.
+
 ### Changed — the random boot bank is a preference too, and ours defaults to off (2026-09-04)
 
 The trap says F8/F6/F4 cartridges boot in a random bank, so every bank's reset entry must `JMP` to a
