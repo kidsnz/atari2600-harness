@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a shipped game depends on bus residue, which is the third direction (2026-09-04)
+
+This file already says *do not read a write-only TIA register* (residue comes back) and *do not read
+collisions through the `$0x` mirror* (a Supercharger breaks). A 2001 report gives the opposite: a
+commercial cartridge that **cannot run unless the residue is there**.
+
+Someone writing their own emulator found Haunted House (4K PAL) looping forever on `SBC $0F / BCS`:
+*"Both PCAE and Z26 … leave the accumulator with `$F3`, so **the value subtracted was `$F`**. In my
+emu, since [it] is subtracting zero … the game **enters into an endless loop**. Since the address
+`$000F` **can't be read, the data bus isn't updated**, so the subtract is made with `$0F` which is
+**the last value loaded into the bus**."* Gopher2600 models it (`memory.go:189`,
+`data |= mem.LastCPUData & ^mem.DataBusDriven`), so the ROM runs here.
+
+Two facts follow. **The residue is the last byte the CPU put on the bus** — which is also why
+`INPT4`'s low seven bits read as previous data rather than as anything about the trigger, since
+`INPT4` drives D7 alone. And **the pattern is not universal**: the engine's own comment says *"this
+pattern is good for replicating what we see on the **pluscart** … a **different bit pattern can be
+seen on the Harmony**"*, with `RandomPins` (default off, never set here) for the superchip case where
+the pins are *"more indeterminate"*. A ROM leaning on residue is portable across a narrower set of
+hardware than its author knew.
+
+Recorded with a note that `mining-digest.md:814` already points at a Haunted House disassembly, so
+the dependency is confirmable from bytes without opening anyone's commented source.
+
+Found by the mailing-list distillation (helper-2).
+
 ### Added — ten litmus ROMs measure a TIA with no revision bugs, because ours has them off (2026-09-04)
 
 `known-traps.md` already asks this question about `EmulateSARA`: *"A litmus written for phantom reads
