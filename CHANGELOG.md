@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `litmus_switchdraw`: a sprite kernel that costs the same on every line, and what that costs (2026-09-04)
+
+`fundamentals-audit` recorded the problem on 2026-09-03: the classic skipDraw idiom is **20 cycles on
+the lines that draw and 17 on the lines that skip**, so a kernel budgeted at a constant loses three
+cycles on exactly the tightest lines. The mailing list has the answer — 2005-02, Thomas Jentzsch,
+*"NOT skipdraw"*, with a follow-up thread that names it **SwitchDraw** — and recorded the price as
+*"it has some disadvantages"* and nothing else. Both halves are now measured.
+
+**The kernel.** Remove the branch by letting the table absorb the range test: `sprDraw` walks the
+whole byte range, so a 256-entry table with the art at 0..H−1 and zero elsewhere turns "am I in
+range" into an array index.
+
+    lda #H-1 / DCP sprDraw / ldx sprDraw / lda Art256,x / sta GRP0
+
+**17 cycles on every line, drawing or not** — equal to the old skip path, three better than the old
+draw path, and, for beam racing, *the same number twice*.
+
+**The price, which the source left blank: 248 bytes.** A 256-byte table instead of 8 — **6.1 % of a
+4K cartridge**, per sprite, not shared between sprites with different art. Against it: 3 × 192 =
+**576 cycles a frame, 7.6 scanlines' worth**. Which side wins depends on what is binding; the file
+states both numbers and takes no side, because that is a budget question and not a technique one.
+
+**The negative control is the strongest kind available: the same measurement code on the other
+fixture.** With no branch to watch, drawing and skipping lines are told apart by what lands in GRP0,
+and that loop is then run against the *branching* ROM, where it must still report 20 and 17 — if it
+cannot see the difference, the agreement proves nothing about the kernel.
+
+Found by the mailing-list distillation (helper-2 and helper-1), who also found that **the first
+post's code is broken** — its wait loop branches to itself — so a reader who finds only that message
+copies something that hangs. The second post is the corrected one.
+
 ### Added — `crtview`: look at a ROM the way a television would, including from a terminal (2026-09-04)
 
 The principle landed alongside this says every visual path here is pixel-exact and pre-television.

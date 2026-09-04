@@ -388,6 +388,25 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   a constant loses three cycles on exactly the lines that draw — the tightest ones. The illegal `dcp`
   costs 5 and the emulator runs it, which this fixture also exercises.
   `→ internal/emu/skipdraw_test.go` (1 grading, 1 negative control: asserting 18/18 fails on both paths)
+  ✅ **And the three cycles can be bought back — measured 2026-09-04, with the price the source never
+  stated.** The list has the answer (2005-02, Thomas Jentzsch, *"NOT skipdraw"*; the follow-up thread
+  names it **SwitchDraw**) but recorded only *"it has some disadvantages"*. `litmus_switchdraw` removes
+  the branch by letting the TABLE absorb the range test — `sprDraw` walks the whole byte range, so a
+  256-entry table with the art at 0..H−1 and zero elsewhere makes "am I in range" an array index:
+  `lda #H-1 / DCP sprDraw / ldx sprDraw / lda Art256,x / sta GRP0` = **17 cycles on every line,
+  drawing or not.** Equal to the old skip path, three better than the old draw path, and — the point
+  for beam racing — *the same number twice*.
+  **The price, now stated: 248 bytes.** A 256-byte table instead of 8, **6.1 % of a 4K cartridge**, per
+  sprite, not shared between sprites with different art. Against it: 3 cycles × 192 lines = **576
+  cycles a frame, 7.6 scanlines' worth**. Which side wins is a budget question and depends on what is
+  binding; this file states both numbers and takes no side.
+  `→ roms/litmus/litmus_switchdraw.asm` / `internal/emu/switchdraw_test.go`, regression-locked
+  `roms/litmus/scenarios/switchdraw.json`. Negative control is the strongest available kind: **the
+  same measurement code run on the branching fixture**, which must still report 20 and 17 — if it
+  cannot see the difference, the agreement is a property of the measurement and not of the kernel.
+  Found by the mailing-list distillation (helper-2 and helper-1, who also found that the first post's
+  code is broken — its wait loop branches to itself — so a reader who finds only that message copies
+  something that hangs).
 - 📖 Mirror templates (woodgrain Memory_Map): TIA at $xyz0 (x even, z∈{0,4}); RAM $80–$FF mirrored
   at **$0180–$01FF — which is why the stack works**, and the mechanism is that the 6507's stack
   pointer is **only eight bits wide** while the address bus is thirteen, so the processor supplies
