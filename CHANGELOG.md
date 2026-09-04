@@ -6,6 +6,38 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — ten scenarios checked line counts over a window that closed before their own events (2026-09-04)
+
+`frame_lines_stable` is ∀ over frames — unlike `ntsc_frame_lines`, which samples one and has passed
+two broken ROMs. **But a check is only ∀ over the frames it runs**, and the window was a default
+nobody re-read.
+
+Measured: **ten scenarios asserted something, or pressed a button, after their own window had
+closed.** The worst was `game_states.json`, which drives a full lifecycle out to frame 1100 —
+transitions at 330, 350, 470, 490, 600, 660, 790, 1100 — and checked line counts for the first
+**130**. **Every state transition it exists to exercise was outside the line-count check.** Nine more
+ran 66 frames past their window. All ten now run past their last event, and all still pass, so no ROM
+was hiding anything; the *check* was.
+
+**The corpus says why this matters, with a price tag.** Andrew Davie, stella-list 2002, on Qb Special
+Edition: *"I have manufactured **100 cartridges**. With a showstopper bug in them. **I didn't see it
+in my own testing.** The scanline count is mostly 262, but sometimes jumps to 288."* Thomas Jentzsch's
+diagnosis: it happened **only when a new game started** — a long timer polled too late, missing the
+first appearance of zero. A month earlier the same shape had hit `warring worms`: intermittent, missed
+by its author, found by someone else. **One is an anecdote; two independent games in the same year is
+a pattern** — and its shape is *tied to a transition, invisible to an average or a representative
+frame*. A third instance, `qb: big woofin bug`, is from a year earlier still: the same project
+stumbled twice and no habit of counting scanlines before manufacture ever formed. **Hand-checking
+does not become a practice by being repeated.**
+
+`internal/scenario/windowcoverage_test.go` makes the class impossible: it fails when any scenario's
+`frame_lines_stable` window is shorter than its last assert or input. Negative control fired
+(restoring `game_states.json` to 130 fails by name, reporting 970 unchecked frames). 48 scenarios
+declare the check; it now covers every event in all of them.
+
+Found by the mailing-list distillation (helper-1), whose question was the whole of it: does the
+golden cover every frame, or the important ones?
+
 ### Changed — "flicker is a last resort" is a position, and the list held the opposite (2026-09-04)
 
 `design-principles.md` carried *"Flicker is a last resort, and only for short-lived objects. Never

@@ -35,7 +35,7 @@
   ],
   "checks": {
     "ntsc_frame_lines": 262,
-    "frame_lines_stable": { "frames": 130, "lines": 262 },
+    "frame_lines_stable": { "frames": 226, "lines": 262 },
     "golden_frame": true
   }
 }

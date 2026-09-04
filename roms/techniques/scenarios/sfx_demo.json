@@ -31,7 +31,7 @@
   ],
   "checks": {
     "ntsc_frame_lines": 262,
-    "frame_lines_stable": { "frames": 130, "lines": 262 },
+    "frame_lines_stable": { "frames": 170, "lines": 262 },
     "golden_audio": true
   }
 }
