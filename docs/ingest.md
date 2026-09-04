@@ -14,6 +14,20 @@ CLI: `go run ./cmd/ingest -in shot.png -out report_dir/` → `overlay.png` + `re
 | **B — conversation grade** | OS screenshots (full screen / window) | "look at this" pointing and discussion. Extraction still runs but warns: non-integer scale and window chrome degrade precision |
 | **C — not usable** | photos of a screen, resized/filtered images, JPEG-artifacted shots | colors and the pixel grid are destroyed; expect garbage |
 
+**The canvas is not the screen. A 2600 pixel is wide.** Anything drawn at 100 % on a
+square-pixel canvas — the form this project's artwork arrives in — is stretched horizontally on a
+real display by somewhere between **1.60× and 1.82×**; the range is not measurement noise, it is the
+question being underspecified, and `design-principles.md` explains why and records that it was
+settled by deleting the constant rather than picking a value. The useful form for whoever is
+drawing is Erik Mooney's (stella-list, 2001-10): **an object 8 pixels tall and 5 pixels wide reads
+as a square.** So a circle is an oval on the canvas, taller than it is wide, and letterforms need
+about half as many pixels across as down.
+
+None of that has to be settled to work. The loop is *draw → build → look at it on the emulator →
+adjust*, and the eye closes the gap in one pass; the number only matters for the first guess. What
+would bite is trusting a square-dot preview and never looking at the render — so **look at the
+render**, always, before deciding a shape is finished.
+
 Why F12: Stella saves straight from its render buffer, so the image is an exact integer
 multiple of the 160-clock TIA raster (e.g. 320×228 = 2×1) regardless of window size or Retina
 display. An OS screenshot of the same window goes through the compositor and is rarely integer.

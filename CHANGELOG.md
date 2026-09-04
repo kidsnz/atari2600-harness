@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — a fourth aspect-ratio datum widens the range, and `ingest.md` learns to say so (2026-09-04)
+
+`design-principles.md` recorded three sources for a 2600 pixel's aspect — 1.67, 1.71, 1.82 — all from
+AtariAge, and the conclusion that the spread is the question being underspecified rather than noise.
+A fourth, from the mailing list, **falls below all three**: Erik Mooney, `paint-tool-for-screen-mock-ups`
+(2001-10), *"The 2600's 160 x 192 is actually at an aspect ratio of 5:8 horz:vert (**an object 8 pixels
+high and 5 pixels wide will be visually square**), and the 40 x 192 is 5:32."* That is 8:5 = **1.60**,
+so the range is now **1.60–1.82**.
+
+**A spread that grows as sources accumulate is not converging**, so this strengthens the decision
+already on record (`STATUS.md`: the constant was deleted, not corrected) rather than reopening it.
+
+Mooney's phrasing is the useful one, and it was missing from the place it is needed. `ingest.md`
+described the input contract in terms of pixel-exactness and said nothing about the pixel not being
+square — so artwork arriving at 100 % on a square-dot canvas had no note that a real display stretches
+it 1.60–1.82× horizontally. Added, in the artist's form: **8 tall × 5 wide reads as a square**, a
+circle is an oval on the canvas, and none of it has to be settled to work, because the loop is
+draw → build → *look at the render* → adjust. What bites is trusting the square-dot preview and never
+looking.
+
+Also, from helper-1 reading the engine rather than measuring it: the opposing-direction cancel is
+**not specific to the stick** — `gamepad.go` carries the same four `cancel()` calls with the same
+comment, and the other two peripherals have no directions. Every direction-carrying peripheral the
+engine has enforces the exclusivity, so the trap recorded earlier is systematic. Noted there.
+
+Found by the mailing-list distillation (helper-2 for the aspect datum, helper-1 for the gamepad).
+
 ### Changed — the 400 µs figure is a rule of thumb, and the question is 26 years old (2026-09-04)
 
 Landed the settling-time trap half an hour earlier from two 2001 posts. The distillation then found

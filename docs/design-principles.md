@@ -196,7 +196,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     `(visible width / visible height)` divided by the display's own `4:3`, and **the visible height is the
     free variable**: 192 lines of a 262-line frame is not the same picture as 210 or 228, and every source
     picked a different one. 5:3 (1.67), 12:7 (1.71) and 20:11 (1.82) are the same physics with three
-    different overscan assumptions. **The sources name two more free variables this line left implicit** 〔found 2026-09-03〕: an NTSC display expects **227.5 colour clocks per line and the 2600 emits 228** 〔169128:12〕, so the horizontal scale is already off a standards-conforming set by half a clock per line; and the 2600 is **240p progressive — the even field of 480i, but at full refresh rather than half** 〔208810:9〕, so "how many visible lines" asks about a signal with no interlaced partner to average against. Neither number lives anywhere else in this tree (227.5: five layers, zero hits; every 228 here is cycle budget, a different quantity). **So no single Stella measurement settles it either** — it settles what
+    different overscan assumptions. **A fourth datum, 2026-09-04, falls BELOW the range and widens it to
+    1.60–1.82** 〔stella-list `paint-tool-for-screen-mock-ups`, 2001-10, Erik Mooney〕: *"The 2600's
+    160 x 192 is actually at an aspect ratio of 5:8 horz:vert (**an object 8 pixels high and 5 pixels wide
+    will be visually square**), and the 40 x 192 is 5:32."* That is 8:5 = **1.60**, and it is the first of
+    these to come from the mailing list rather than AtariAge — a fourth independent overscan assumption.
+    **This strengthens the decision below rather than weakening it**: a spread that grows as sources
+    accumulate is not converging, which is what "underspecified" predicts. Mooney's phrasing is also the
+    most useful one for an artist — **8 tall × 5 wide reads as a square** — so it is the form to hand to
+    whoever is drawing (see `docs/ingest.md`). **The sources name two more free variables this line left implicit** 〔found 2026-09-03〕: an NTSC display expects **227.5 colour clocks per line and the 2600 emits 228** 〔169128:12〕, so the horizontal scale is already off a standards-conforming set by half a clock per line; and the 2600 is **240p progressive — the even field of 480i, but at full refresh rather than half** 〔208810:9〕, so "how many visible lines" asks about a signal with no interlaced partner to average against. Neither number lives anywhere else in this tree (227.5: five layers, zero hits; every 228 here is cycle budget, a different quantity). **So no single Stella measurement settles it either** — it settles what
     STELLA assumes, which is one more source, not an arbiter. (Checked 2026-08-04: Stella 7.0's `-help`
     offers no aspect-correction option at all — only `-tia.vsizeadjust <-5..5>` — so the "Stella 91%" figure
     cited above does not correspond to anything in the current build.)
