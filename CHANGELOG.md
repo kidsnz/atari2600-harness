@@ -6,6 +6,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — what actually makes a code path change a frame's length (2026-09-03)
+
+Building `litmus_flicker_attrib` cost three attempts at a constant frame, so the lesson goes in
+`known-traps.md` section A where the next author will hit it.
+
+I first generalised it as "a routine whose length varies cannot share a line". **That is too broad**,
+and the distillation produced the counterexample from our own tree: `litmus_pf_async` has bands seven
+cycles apart (`cyc 40` against `cyc 33`) and holds 262 on every frame. Re-measured here — 262 across
+nineteen frames, one 35-line boot frame aside.
+
+The accurate statement is narrower. Only two things make a path change a frame's length: **crossing a
+line boundary**, or **exceeding 76 cycles**. A `jsr` started part-way through a line hits the first,
+because whichever branch it takes decides whether it spills — so the frame grows by the *case*, not by
+the code. Bracketing the call with WSYNC on both sides fixes that, and is still not always enough:
+with brackets in place the ROM rendered 263 in three groups and 264 in the fourth, because one
+routine's group-2 path was longer and spilled anyway. **A routine whose length varies by case needs a
+line of its own.**
+
+The detection side is the same lesson as elsewhere this week: `ntsc_frame_lines` samples one frame and
+passed both broken versions. `frame_lines_stable` is the ∀-over-frames check and catches them.
+
 ### Added — `litmus_flicker_attrib`: a flickered slot's collision latch belongs to the frame you read it (2026-09-03)
 
 `fundamentals-audit` called this "a verifiable pattern **once we do flicker**". We have had flicker since
