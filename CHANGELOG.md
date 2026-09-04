@@ -6,6 +6,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — opposing joystick directions cannot be tested here at all (2026-09-04)
+
+Real `SWCHA` is four independent switch lines. A **dance pad**, a homebrew controller or a worn stick
+can close up and down together, and nothing in the RIOT prevents it. Gopher2600's stick peripheral
+does prevent it, and says why in its own comment: *"we don't want to allow impossible positions for
+the stick. for example, holding left and right at the same time is impossible."*
+
+Measured: `SetInput(up)` then `SetInput(down)` reads `$DF` — down only, up silently cancelled. All
+four pressed reads `$5F` (down+right). **`Poke($0280, …)` is not a way round it**: the peripheral
+rewrites SWCHA on the next update, so a poked `$CF` reads back `$FF`. No `UpDown` axis constant
+exists, so `DataStickSet` cannot express it either. **There is no path through this harness that
+produces the state.**
+
+Recorded as a trap because the divergence points the wrong way: **the tool is narrower than the
+hardware**, so a ROM that mishandles up+down passes here and fails on someone's pad — the same shape
+as the F8 hotspot decoding the distillation flagged the same night. `SetInput` does not error on the
+second press; it hands back a different, legal input.
+
+Found by the mailing-list distillation (helper-1), from a 2003 thread about a homemade dance pad —
+a controller for which "you cannot press up and down at once" is simply false.
+
 ### Changed — two constraints written where they help but not where they cost (2026-09-04)
 
 **A mockup only checks the constraints you believed when you drew it.** `design-principles.md` told
