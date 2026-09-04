@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the last three page-cross gaps in `fundamentals-audit.md`, read off the engine's own table (2026-09-04)
+
+`fundamentals-audit.md` carried *"Not measured by us: `(ind),Y` = 6 fixed, RMW abs,X = 7 fixed, and
+reads through abs,Y"* — three claims held on 6502.org's word. All three are answered by
+`Gopher2600/hardware/cpu/instructions/definitions.json`, the table the CPU we ship executes from:
+`(ind),Y` read 8, all page-sensitive, base 5; write 2, fixed 6; **modify 6, fixed 8** — so "always 6"
+is `STA`/`SHA` only, and the illegal RMW forms are a flat 8. RMW `abs,X`: 12 entries, `cycles` exactly
+`[7]`, none page-sensitive. `abs,Y` reads: 10 entries, all page-sensitive.
+
+Marked ✅ for *what our engine believes*, not for hardware — `litmus_6502` still covers only
+`LDA abs,X`, `STA abs,X`, `BNE` and `DCP zp` against Stella, and the note now says so.
+
+**The grouping is the finding.** The table names both `$B6 ldx zp,Y` and true `abs,Y` as
+`absolutey`, separated **only by `bytes`**. Counted by mode name alone, `abs,Y` reads come out as 24
+entries with 10 sensitive — which reads as "some `abs,Y` reads are insensitive", and is false. The
+distillation (helper-1) published that count, then corrected it from the same file; re-run here
+independently and matching in every cell. It is the day's second population error: the first was
+`rg -il` (contents) standing in for `find -iname` (identity) on the Solaris disassemblies. **Both
+were counting before checking what the label meant.**
+
 ### Added — `litmus_resp_pair`: what two RESP strobes on one line actually draw (2026-09-04)
 
 `sprite-placement.md` rule 1 (`x = 3c - 60`) and stella-list `200203/msg00074` read like a conflict.

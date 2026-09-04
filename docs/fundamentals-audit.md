@@ -297,7 +297,24 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   page cross (+1); **STA abs,X** 5cy on both sides (**stores really are fixed** — the basis for
   kernel determinism); **BNE** 2 / 3 / 4 (not taken / taken / taken+page-cross); **DCP zp** 5cy
   (which also proves illegal-opcode support). The ROM measures each with a TIM1T=$80 window.
-  📖 **Not measured by us**: `(ind),Y` = 6 fixed, RMW abs,X = 7 fixed, and reads through **abs,Y**.
+  ✅ **The remaining three, settled from the engine's own instruction table** (2026-09-04,
+  `Gopher2600/hardware/cpu/instructions/definitions.json`, 256 entries, grouped by
+  `addressingMode` AND `bytes`). This is the table the CPU executes from, so it is a reading of the
+  machine we run, not a second opinion about hardware — the litmus stays the authority on what the
+  silicon does, and these three agree with it:
+  **`(ind),Y`** 16 entries — read 8, **all page-sensitive**, base 5 (→6 on a cross); write 2, fixed
+  6; **modify 6, fixed 8**. So "always 6" is true of `STA`/`SHA` and **not** of the illegal RMW
+  forms (`slo`/`rla`/`sre`/`rra`/`dcp`/`isc`), which are a flat 8.
+  **RMW `abs,X`** 12 entries, `cycles` exactly `[7]`, page-sensitive on none — **fixed 7 confirmed**.
+  **Reads through `abs,Y`** 10 entries, **all page-sensitive**, base 4.
+  The grouping is the whole trick: the table names both `$B6 ldx zp,Y` and true `abs,Y` as
+  `absolutey` and separates them **only by `bytes`**. Counted by mode name alone, `abs,Y` reads look
+  like 24 entries with 10 sensitive — "some `abs,Y` reads are insensitive", which is false. Found by
+  the mailing-list distillation (helper-1), who **published the wrong count and then corrected it**
+  from the same table; re-run here independently and matching in every cell.
+  📖 **Still documented-only**: nothing above is a *measurement of hardware* — it is what our engine
+  believes. `litmus_6502` covers `LDA abs,X`, `STA abs,X`, `BNE` and `DCP zp` against Stella; the
+  other three modes have no litmus band.
 - 📖 **NMOS decimal mode: only the C flag is valid** after ADC/SBC (never branch on Z/N/V); D is
   unknown at power-up and survives interrupts → `CLD` in init is mandatory. BCD idiom:
   SED/CLC/ADC…/CLD; multi-byte chains keep the carry.
