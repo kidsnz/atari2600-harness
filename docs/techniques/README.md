@@ -71,5 +71,27 @@ Written 2026-08-21, after doing it once and getting three of the five wrong on t
 | 35 | Sprite placement physics — where RESP/RESM land an object (player x = 3c-60, missile x = 3c-61, clamped at x=3), the 9 px floor between two strobes, the missile-3-cycles-after-player trick that abuts a 4 px tail to an 8 px head with NO HMOVE, when a GRP write is too late (effective at x = 3w-64), and the fact that a strobe cancels only an object's FIRST copy | foundation | [sprite-placement.md](sprite-placement.md) | `roms/litmus/litmus_sprite_place.asm` | ✅ 11 bands, negative-controlled, CI-locked |
 | 36 | RESPx RE-STROBING — how many shaped slots fit on ONE scanline, and **how many depends on the SPACING between strobes**. At 6, 7 or 8 cycles a player in a copy mode draws 3 + k with k mid-line strobes, so one player reaches **eight** and two players reach **sixteen** (measured on its own band, not doubled). At **3 and 5 cycles the ladder is FLAT** — every strobe after the first buys nothing — and at 12 it climbs faster than 3 + k. Where a copy lands moves with the spacing too: off the multiple-of-three grid at 8, **on** it at 6. The mechanism behind the spacing dependence is measured but NOT explained. Slots are not the binding limit though — BYTES are, at six cycles a write | advanced | [restrobe-copies.md](restrobe-copies.md) | `roms/litmus/litmus_restrobe.asm` | ✅ 8 spacings x k=1..5 plus a two-player band, 36 bands, CI-locked; source solidcorp AtariAge 180632 |
 
+## Not a technique, but looked for here: game STATE
+
+Nothing in this directory is about **state machines**, and someone designing a game will look here
+first. The material exists, in `docs/casebook.md`, where it is written as what a commercial title
+does rather than as something to reach for:
+
+- `casebook.md:94` — *"reconstruct the wall normal over multiple frames with a **trial-and-error
+  state machine** … **Lesson: when the hardware UNDER-REPORTS, replace the one-shot formula with an
+  observe-then-choose state machine that SPENDS FRAMES to disambiguate.**"* The 2600 under-reports
+  constantly — collisions say *that*, never *where* — so this is the general shape, not one game's
+  trick.
+- `casebook.md:96` — *"the hit reaction is **its own mode that suppresses input**"*: a mode is how
+  a machine with one button says "not now".
+- `casebook.md:19`, `casebook.md:29` — two more.
+
+A pointer rather than a page, deliberately: writing a third copy is how the same fact ends up stated
+three ways and corrected in one. **`sprite-placement.md` names this failure in its own opening** —
+*"Knowing a table exists is not the same as reaching for it … a rule nobody reads is a rule that gets
+measured again"* — and it earned that sentence by having a measured table re-derived from scratch an
+afternoon later. Found by the mailing-list distillation (helper-2), who checked before claiming it
+was missing and found it was not.
+
 What to absorb next (prioritized, with sources): **[roadmap.md](roadmap.md)** — e.g. 48-px score / 2-line
 kernel / vertical positioning / sound / animation / playfield tricks / general flicker kernel / bank switching.

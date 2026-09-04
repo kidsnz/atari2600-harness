@@ -6,6 +6,34 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a pointer to game state, and "do not depend on a power-up value" (2026-09-04)
+
+**Nothing in `docs/techniques/` is about state machines**, and someone designing a game looks there
+first. The material exists in `casebook.md`, written as what a commercial title does rather than as
+something to reach for — including the general form: *"when the hardware UNDER-REPORTS, replace the
+one-shot formula with an **observe-then-choose state machine that spends frames to disambiguate**."*
+The 2600 under-reports constantly (a collision says *that*, never *where*), so that is the shape, not
+one game's trick.
+
+Added as a **pointer, not a page**. Writing a third copy is how one fact ends up stated three ways
+and corrected in one — and `sprite-placement.md` names this exact failure in its own opening,
+*"Knowing a table exists is not the same as reaching for it … a rule nobody reads is a rule that gets
+measured again"*, a sentence it earned by having a CI-locked table re-derived from scratch an
+afternoon later.
+
+**And a trap the file did not have: depending on a power-up value on purpose.** Existing rows say
+*initialise everything*; `design-principles.md` gives the eight-byte sequence. Neither said *do not
+read an uninitialised value deliberately* — and someone did. stella-list `200111/msg00309`, Chad
+Schell talking an author out of it: *"I think **relying on the state the carry bit comes up in** is a
+little risky myself. You don't know how much hardware will have a problem running it, both now and in
+the future."* The aim was to make the game refuse to run on one cartridge — an undefined value used
+as copy protection — and the argument that stopped him was maintenance cost, not correctness. Worst
+possible direction: green in every emulator, broken on somebody else's console, author never finds
+out. Statically decidable; `defuse`'s `ReadBeforeWrite` already does the RAM half.
+
+Found by the mailing-list distillation (helper-2), who checked `casebook.md` before claiming the
+state-machine material was missing — and found it was not.
+
 ### Added — refuse an assembly DASM called an error, whatever it exited with (2026-09-04)
 
 Manuel Polik, stella-list `200306/msg00003`: *"Should a source producing that `error: Branch out of
