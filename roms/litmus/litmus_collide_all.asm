@@ -11,7 +11,15 @@
 ;
 ;     "each field reports its own pair"   from   "any overlap sets every field"
 ;
-; because nothing here is ever apart. Anyone who wants to read a collision field as a
+; because nothing here is ever apart.
+;
+; Sharpened 2026-09-04, by running a tool that already reported it: `ramtrace activity` prints
+; "collisions that occurred", and for this ROM it prints all fifteen pairs. **So the fifteen
+; asserts are not vacuous — every pair genuinely fires.** The gap is narrower than "the asserts
+; prove nothing": it is precisely the absence of a `== 0` case. For contrast the same tool shows
+; `litmus_flicker_attrib` firing only `p0_pf` and `bullets` only `m0_p1`, so it can also say which
+; pairs a fixture never exercises — an assert on a pair that never fires passes without measuring.
+; Anyone who wants to read a collision field as a
 ; SENSOR — "is P0 over the playfield right now?" — needs the negative direction, which is
 ; not measured anywhere: no fixture puts two objects apart and requires the field to read 0.
 ; Until it exists, establish the negative in your own ROM before relying on it (the way

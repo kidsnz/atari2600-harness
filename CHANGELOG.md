@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — `collide_all`'s asserts are not vacuous, and the tool that said so was already there (2026-09-04)
+
+Yesterday's note said `litmus_collide_all` cannot serve as a sensor, because every object overlaps every
+other and its scenario asserts fifteen `== 1` with no `== 0`. True, and the wording was loose enough to
+read as "the fifteen asserts prove nothing".
+
+`ramtrace activity` prints **"collisions that occurred"**, and for this ROM it prints all fifteen pairs.
+**Every assert really fires.** The gap is narrower and sharper than it was written: it is precisely the
+missing `== 0` case, not the fifteen `== 1`s.
+
+The same command distinguishes fixtures usefully — `litmus_flicker_attrib` fires only `p0_pf`, `bullets`
+only `m0_p1` — so it also answers *which pairs a fixture never exercises*. **An assert on a pair that
+never fires passes without measuring anything**, which is the vacuous case the original note was
+reaching for and had put in the wrong place.
+
+That makes three in two days where a tool was already reporting the answer: `calibrate`'s exclusion of
+saturated points, `ramtrace`'s stack low-water mark, and now this. The audit that surfaced it was a
+deliberate sweep for the pattern — every `json:` tag the Go code exports, filtered to those no document
+mentions, **then re-checked by concept rather than by name**, which dropped three false hits that were
+described in prose under other words.
+
+Found by the mailing-list distillation (helper-2), who added that fourth step after watching a
+name-only search produce a wrong zero earlier the same day.
+
 ### Changed — the `SEI` correction reached one corpus note this morning and five more were waiting (2026-09-03)
 
 This morning's fix removed *"Needs `SEI` (no IRQ)"* from `missiles-bullets.md`, and the distillation
