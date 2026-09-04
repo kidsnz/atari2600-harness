@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — placement holds on PAL, and emulators can be unanimously wrong (2026-09-04)
+
+**Every number in `sprite-placement.md` was measured on NTSC and nothing said so.** Running
+`litmus_resp_pair` unchanged under both specs gives the same four pairs to the clock — 69/78, 62/71,
+69/77, 69/79. **A picture designed here keeps its geometry on a PAL console and loses its palette**
+(ten colour values sampled earlier tonight, ten different). The line numbering shifts +19 because PAL
+blanks longer; the horizontal does not move at all.
+
+The question came from a 2004 PAL bug report (`200407/msg00015`): *"when I shoot, then the shots
+**always start at the same position (a little right of the middle of the screen)** and not where the
+spaceship is. That is not so on the emulator, but it runs in NTSC mode, i guess."* This closes the
+horizontal-placement branch of that explanation. It does not settle the report — two variables moved
+at once there, PAL *and* hardware against NTSC *and* an emulator — and helper-3, who found it, said
+so rather than picking one.
+
+**And a trap that goes to the root of how this repository verifies anything.** Cross-checking one
+emulator against others assumes the errors are independent. stella-list `200211/msg00098`ff, on a
+PAL/NTSC detector tested against real hardware and three emulators at once: *"It **does display NTSC
+on my hardware**. It **displays PAL on every emulator I've tried** (StellaX, Pcaewin and […])."*
+Three emulators, one answer, and it was wrong. A majority vote — `cmd/oraclevote` — would have
+carried that error unanimously, and "Stella 37/37" means two logic models agreed, not that silicon
+was consulted. Recorded with what to say instead: *our engines agree*, not *the hardware does*.
+Nothing here can detect it from the inside; the 2002 thread found it because someone owned a console.
+
+Found by the mailing-list distillation (helper-3 for the placement question, helper-1 for the
+oracle one).
+
 ### Added — a pointer to game state, and "do not depend on a power-up value" (2026-09-04)
 
 **Nothing in `docs/techniques/` is about state machines**, and someone designing a game looks there

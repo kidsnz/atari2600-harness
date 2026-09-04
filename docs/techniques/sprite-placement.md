@@ -41,6 +41,15 @@ no ROM may depend on it.
 
 Too fundamental for anyone on the list to write down twice, which is exactly why it was missing here.
 
+**These rules hold on PAL too — measured 2026-09-04**, `internal/emu/palplacement_test.go`. Every
+number below was taken on NTSC and nothing said which standard it was true of. Running
+`litmus_resp_pair` unchanged under both gives the same four pairs to the clock (69/78, 62/71, 69/77,
+69/79). What *does* differ is the palette (`palspec_test.go`: ten values sampled, ten different) and
+the line numbering, which shifts +19 because PAL blanks longer. **A picture designed here keeps its
+geometry on a PAL console and loses its colours.** The question came from a 2004 PAL bug report where
+shots fired from a fixed position instead of the ship's; this closes the horizontal-placement branch
+of that explanation and leaves the rest open. Found by the mailing-list distillation (helper-3).
+
 ## The rules
 
 | | rule | band |
