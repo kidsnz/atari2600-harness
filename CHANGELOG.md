@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `litmus_resp_pair`: what two RESP strobes on one line actually draw (2026-09-04)
+
+`sprite-placement.md` rule 1 (`x = 3c - 60`) and stella-list `200203/msg00074` read like a conflict.
+Manuel Polik, placing two sprites in one pass: *"STA RESP0 / STA RESP1 in one scannline. With the
+second RESP, I loose one pixel ... So I worked out two tables, that are shifted by one pixel."* Two
+`sta zp` strobes are 3 cycles apart, so rule 1 puts the second exactly 9 clocks right, on the same
+3-clock grid — there is no one-pixel remainder for him to lose.
+
+**Both are right.** He is not measuring against the strobe; he is measuring against the adjacency he
+wants. A player is 8 wide, joining two edge to edge needs +8, the hardware hands him +9, and the
+pixel he loses is **the one background pixel left between the two sprites**. His second table spends
+one HMOVE step to close it — the correction this project already ships as `litmus_p0p1`'s `HMP1=$10`.
+
+Four bands, identical prelude, only the HMOVE nibble differs, P0 white and P1 red so the run boundary
+answers: A (`$00`/`$00`) 69/**78** with one background pixel at clock 77; B (`$70`/`$70`) 62/**71** —
+still 9, because an equal nibble moves the pair and cannot close a gap it travels with, which is
+exactly why a *second* table was needed; C (`$00`/`$10`) 69/**77**, 16 px continuous; D (`$00`/`$F0`)
+69/**79** — the spacing is a free parameter, not a fixed 9 or 8.
+
+The finding that made this worth building is not the agreement, it is what the agreement exposed:
+`litmus_p0p1` states the +9 **in a comment** and asserts 69/77, the numbers *after* the correction.
+The raw +9 was pinned only by inference back through the HMOVE model — rule 1 and the source were
+being compared to each other rather than to the picture. Now the picture answers.
+
+Negative controls, all three fired and recovered: replacing the second `sta RESP1` with `sta $80`
+(RAM, same 3 cycles); taking band C's `$10` away; and adding `$10` to band A, which must break band A
+or band A was never measuring the 9.
+
+Found by the mailing-list distillation (helper-3), who could not decide it — the helpers do not run
+the emulator — and instead wrote down the three things it could be. The third was right.
+
 ### Added — a test for the JSR/stack facts `absint.go` is built on and nothing re-ran (2026-09-04)
 
 `internal/cyclebound/absint.go` says *"Measured on litmus_jsr_stack, whose own header states the ground

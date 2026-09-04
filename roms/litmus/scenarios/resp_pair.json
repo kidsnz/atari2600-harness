@@ -1,0 +1,13 @@
+{
+  "rom": "roms/litmus/litmus_resp_pair.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "tia.player0.hmoved_pixel", "op": "==", "value": 69},
+    {"at_frame": 2, "field": "tia.player1.hmoved_pixel", "op": "==", "value": 79}
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "frame_lines_stable": { "frames": 130, "lines": 262 },
+    "golden_frame": true
+  }
+}

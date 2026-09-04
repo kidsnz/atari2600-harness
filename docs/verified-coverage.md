@@ -48,6 +48,7 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 |---|---|---|
 | GRP bit order (D7 = leftmost), row order (top→bottom) | `litmus_sprite` | ramp widens 1→8 px from clock 3 (`pkg/sprite.Encode`) |
 | P0+P1 combine = seamless ≤16px / multicolor | `litmus_p0p1` | `read_tia` P0=69/P1=77 (+8); `read_row` continuous 16px (no seam) |
+| Two RESP strobes on one line = **+9**, and one HMOVE step is what makes it +8 | `litmus_resp_pair` | `read_row` bands A/B/C/D: 69/78 (one bg pixel between), 62/71, 69/77 (joined), 69/79 — settles stella-list `200203/msg00074` against `sprite-placement.md` rule 1 |
 | NUSIZ double-width (16px) | `litmus_nusiz` | `read_row` len 16; `player0.nusiz=5` |
 | NUSIZ quad-width (32px) | `litmus_nusiz_quad` | `read_row` len 32; `player0.nusiz=7` |
 | NUSIZ three copies (close, 16px spacing) | `litmus_nusiz_copies` | `read_row` 3×8px spans at clock 3/19/35 |

@@ -57,6 +57,33 @@ reachable gap tops out at w + (8 − w) = 8, one short, whatever the split.
 The usual escape is HMOVE, and HMOVE **blanks the leftmost 8 px of the line it is strobed on** —
 fine for a 48 px band parked at x=87 (see `bitmap48.md`), fatal for a picture that starts at x=3.
 
+**This is a 2002 problem with a 2002 answer, and it reads at first like a contradiction of rule 1.**
+Manuel Polik, stella-list `200203/msg00074`: *"STA RESP0 / STA RESP1 in one scannline. With the
+second RESP, I loose one pixel, so using the same HMOVE values for both sprites would produce a one
+pixel gap. ... So I worked out two tables, that are shifted by one pixel."* Rule 1 says the second
+strobe lands 9 clocks right, on the same 3-clock grid, with no one-pixel remainder anywhere — so
+where is a *pixel* lost? He is not measuring against the strobe. He is measuring against the
+adjacency he wants: a player is 8 wide, joining two edge to edge needs +8, the hardware hands him
++9, and **the pixel he loses is the one background pixel left over between the two sprites.** His
+second table spends one HMOVE step to close it. The source and rule 1 are the same fact seen from
+two sides, and his fix is the one this project already ships: `litmus_p0p1` corrects the identical
++9 with `HMP1=$10`.
+
+`litmus_resp_pair` puts that on the screen rather than leaving it as arithmetic (`resp_pair.json`,
+`internal/emu/resppair_test.go`). Four bands, identical prelude, only the HMOVE nibble differs, P0
+white and P1 red so the run boundary answers:
+
+| band | HMP0 | HMP1 | measured x0 / x1 | what the line looks like |
+|---|---|---|---|---|
+| A | `$00` | `$00` | 69 / **78** | 8 white, **one background pixel at clock 77**, 8 red |
+| B | `$70` | `$70` | 62 / **71** | still 9 apart — an equal nibble moves the pair, it cannot close the gap, which is exactly why Polik needed a *second* table |
+| C | `$00` | `$10` | 69 / **77** | 16 px continuous, no background between them (the values `litmus_p0p1` asserts) |
+| D | `$00` | `$F0` | 69 / **79** | two background pixels — the spacing is a free parameter, not a fixed 9 |
+
+Until this ROM, the raw +9 was pinned only by inference: `litmus_p0p1` asserts 69/77, the numbers
+*after* the correction, so rule 1 and the source were being compared to each other through the HMOVE
+model rather than to the picture.
+
 Rule 2 removes the need. A missile strobed three cycles after its player lands at
 3(c+3) − 61 = (3c − 60) + 8, exactly where an 8 px player stops drawing:
 
