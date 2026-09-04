@@ -6,6 +6,34 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a second silent carrier for TIA PCM, and two wrong answers on the way (2026-09-04)
+
+`tia-pcm.md` built PCM on `AUDC=0` alone. Eckhard Stolberg, stella-list `199902/msg00036`: *"If you
+set the AUDCx register to 0 or 11, the output will always be high."* Measured — `litmus_audc_carrier`,
+`internal/emu/audccarrier_test.go` — and he is right: of all sixteen settings, **exactly 0 and 11**
+hold one sample value at every AUDF tried, out to 1000 frames, and hold it **at the volume written**,
+which is the property PCM needs. The other fourteen break within four frames. A second silent carrier
+is the escape route when AUDC is wanted for something else on the channel used as the DC output.
+
+**The two wrong answers are the more useful part.**
+
+*Attempt 1* built sixteen ROMs that wrote AUDC once at boot and sampled 60 frames. It reported four
+more silent carriers — 2, 6, 10 and 14, at AUDF=31 — and that was relayed to the finder before it was
+checked. Widening to 300 frames killed it: bisected, AUDC=2 at AUDF=31 holds one value for **89
+frames and breaks on the 90th**. "Constant" was a claim about the window.
+
+*Attempt 2* assumed the 89 frames belonged to the setting and made the short window the test's
+control. They do not belong to the setting. The litmus rewrites the registers every frame, so its
+polynomial counters reach AUDF=31 by a different history, and there the same AUDC=2 breaks in **one**
+frame. Same register values, same emulator, two ROMs, 89 frames apart.
+
+So the control is now the opposite: every one of the fourteen must break **within 8 frames** (worst
+measured 4), or "only 0 and 11 are constant" has become true by default rather than by measurement —
+and the two survivors are re-checked at 1000 frames. `check_instruments`' own rule, hit live: **a
+value measured in one state cannot be told apart from a constant.**
+
+Found by the mailing-list distillation (helper-1).
+
 ### Added — `AsymPFLineFits`: the 2004 sentence about asymmetric playfields, derived (2026-09-04)
 
 Thomas Jentzsch, stella-list `200409/msg00258`: *"With assymetrical, non striped playfields, you

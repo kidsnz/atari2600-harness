@@ -16,6 +16,20 @@ modulating to specific values across frames, plus golden frame + golden audio).
 
 1. **Silence the tone generators.** `AUDC=0` on both channels → AUDV is the raw
    amplitude, not a tone volume. This is the whole trick.
+   **`AUDC=11` does the same job** — measured 2026-09-04, `litmus_audc_carrier` /
+   `internal/emu/audccarrier_test.go`: of all sixteen settings, **exactly 0 and 11**
+   hold one sample value at every AUDF tried, out to 1000 frames, and they hold it
+   at the volume written. The other fourteen break within four frames. That gives a
+   second silent carrier — the escape route when AUDC is wanted for something else
+   on the channel being used as the DC output. Stated by Eckhard Stolberg in
+   stella-list `199902/msg00036` (*"If you set the AUDCx register to 0 or 11, the
+   output will always be high"*) and unmeasured here until now.
+   **Do not take "constant" from a short window.** The first measurement of this used
+   sixty frames of a ROM that wrote AUDC once at boot and reported four more silent
+   carriers (2, 6, 10, 14 at AUDF=31). All four were false: AUDC=2 holds for 89 frames
+   in that ROM and breaks in **one** frame in a ROM that reaches the same register
+   values by a different path. The polynomial counters carry history, so a value
+   measured in one state cannot be told apart from a constant.
 2. **Decode a sample per frame.** A small **1-bit ADPCM** decoder walks a fixed,
    looped bitstream. Each bit indexes a 16-entry state LUT
    (`nextState = StateLUT[(state<<1)|bit]`), and the state maps to a 0–30 level
