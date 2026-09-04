@@ -6,6 +6,43 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `litmus_flicker_attrib`: a flickered slot's collision latch belongs to the frame you read it (2026-09-03)
+
+`fundamentals-audit` called this "a verifiable pattern **once we do flicker**". We have had flicker since
+technique #10, and `flicker_multiplex.asm` touches no collision register at all — **the condition had been
+met and the sentence had not noticed.** A different kind of stale than a wrong number, and one nothing
+here was looking for.
+
+The claim worth locking is not "a collision latches" (`litmus_cxclr` has that). It is that when two
+objects share a slot on alternate frames, the latch you read belongs to whichever was drawn **that**
+frame — and that this holds *only because* CXCLR runs every frame. Proving the "only because" needs a
+control where CXCLR does not run, and that control's expected result depends on a latch surviving a frame
+boundary. **Nothing had measured that**: `litmus_cxclr` takes all three snapshots inside one frame and
+strobes CXCLR every frame, so a latch never gets the chance there. So group 1 of this ROM measures it
+first, and the control rests on our own measurement instead of an assumption.
+
+    group 1 ($90-$93)  1 1 1 0   a latch survives into the next frame; only CXCLR clears it
+    group 2 ($A0/$B0)  1,0,1,0…  latch and the ROM's own record of what it drew agree cell for cell
+    group 3 ($C0)      1,1,1,1…  without CXCLR, attribution is lost
+    group 4 ($D0)      0,1,0,1…  phase inverted, so frame parity is not the cause
+
+Two things the fixture does on purpose. **Collision is switched by blanking the playfield, not by moving
+P0** — `litmus_cxclr`'s header records losing a day to a positioning bug, and its lesson is to take the
+positioning out of the answer. **Every stored byte is normalised to 0 or 1**: raw CXP0FB would pin the
+preceding instruction too, which is why that ROM's scenario reads 130 and 2 rather than 128 and 0.
+
+**The frame length took three attempts and is measured, not derived.** A `jsr` that starts mid-line
+leaks its own branch structure into the scanline count: the first version rendered 261 lines in some
+frames and 262 in others, and bracketing the calls with WSYNC on *both* sides was not enough while one
+subroutine's group-2 path was longer than the others — group 2's frames stayed a line long until the
+per-frame recording was split into two subroutines, each called from its own line. The scenario therefore
+uses `frame_lines_stable` (∀ over 34 frames) rather than `ntsc_frame_lines`, which samples one frame and
+would have passed the broken versions.
+
+Negative controls, both fired and both recovered: removing CXCLR from group 2 makes it read
+`1 1 1 1 1 1 1 1`, identical to its own control; removing the phase inversion from group 4 makes it match
+group 2. Designed by the mailing-list distillation (helper-3); built, measured and graded here.
+
 ### Changed — `BIT CXxx` returns three predicates, not two, and the mark stays 📖 anyway (2026-09-03)
 
 The audit line said one `BIT CXxx` yields two collision pairs via N and V. True, and incomplete in a way

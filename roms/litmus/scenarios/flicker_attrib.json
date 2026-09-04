@@ -1,0 +1,227 @@
+{
+  "rom": "roms/litmus/litmus_flicker_attrib.asm",
+  "checks": {
+    "frame_lines_stable": {
+      "frames": 34,
+      "lines": 262
+    }
+  },
+  "asserts": [
+    {
+      "at_frame": 30,
+      "field": "ram.0x90",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0x91",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0x92",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0x93",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xA0",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xA1",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xA2",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xA3",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xA4",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xA5",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xA6",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xA7",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xB0",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xB1",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xB2",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xB3",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xB4",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xB5",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xB6",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xB7",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xC0",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xC1",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xC2",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xC3",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xC4",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xC5",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xC6",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xC7",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xD0",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xD1",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xD2",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xD3",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xD4",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xD5",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xD6",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 30,
+      "field": "ram.0xD7",
+      "op": "==",
+      "value": 1
+    }
+  ]
+}

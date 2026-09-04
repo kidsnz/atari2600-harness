@@ -151,8 +151,20 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   change in TIA behaviour at all. With `A = $C0` the residue is masked and Z becomes a third useful
   predicate — "neither of these two pairs collided" — so one `BIT` yields three tests, not two.
   With `A = $00`, Z is always 1 and carries nothing.
-- 📖 flicker collision attribution (za2600 `EN_LAST_DRAWN`): alternating-frame entities must track whose
-  collision the latch belongs to — a verifiable pattern once we do flicker.
+- ✅ **flicker collision attribution** (za2600 `EN_LAST_DRAWN`) — verified `litmus_flicker_attrib`,
+  regression-locked `roms/litmus/scenarios/flicker_attrib.json`, graded by
+  `internal/emu/flickerattrib_test.go`. With **CXCLR strobed every frame**, the latch read in a
+  frame belongs to the object drawn in **that** frame: over eight alternating frames the latch
+  column and the ROM's own record of what it drew agree cell for cell, and inverting the phase
+  inverts the latches, so frame parity is not the cause. **Without CXCLR the attribution is lost** —
+  the same eight frames all read set. The line said "a verifiable pattern *once we do flicker*"
+  while `flicker_multiplex` had existed since technique #10 and touched no collision register at
+  all: **the condition had been met and the sentence had not noticed** (2026-09-03).
+  ⬜ The control above needs a latch to survive a frame boundary, which nothing measured —
+  `litmus_cxclr` takes all three of its snapshots inside one frame and strobes CXCLR every frame,
+  so a latch never gets the chance there. This ROM measures it first, in its own group 1, so the
+  control rests on our measurement. What stays open is whether **real hardware** holds a latch
+  across a frame boundary; this is Gopher2600's behaviour.
 
 ## 6. Audio
 - ✅ AUDC/AUDF/AUDV register readback; audio digest golden.
