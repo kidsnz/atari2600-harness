@@ -29,17 +29,27 @@ the rule fails the selftest by name.
 
 **`$00-$0D` is right about the TIA and wrong about the machine, 2026-09-04.** Those addresses answer
 because the TIA decodes only the low bits — but the *page* they sit in is not exclusively the TIA's,
-and something else in the address space can win. Darrell Spice Jr. tested 135 titles on a
-Supercharger and found three broken; on one of them, stella-list `supercharger-problem-games`
-(2003-08): *"**Air-Sea Battle reads the images of the collision registers at `$00/$01`, as opposed to
-`$30/$31`** … patching the code to use the images at `$3x` makes it [work]."* A shipped commercial
-game, broken by a mirror choice that costs nothing to make differently.
+and something else in the address space can win. Darrell Spice Jr., 2003-08, tested **135 titles on a
+Supercharger and found three broken** — Air-Sea Battle (*"shots either don't register"*), Canyon
+Bomber and Code Breaker (*"screen rolls"*, differently) — and noted the same collision fault in
+Haunted House, Space War and Ghost Manor. **Air-Sea Battle reads the collision registers at
+`$00/$01`, not `$30/$31`.**
 
-**So read collisions at `$30/$31`, not `$00/$01`.** The two are identical on a bare console, one of
-them survives more configurations, and there is no argument on the other side — the reason is
-entirely one-sided, which is the cheapest kind of rule to follow. (The *mechanism* is not settled:
-the reporter says "maybe", and a Supercharger's RAM is meant to live at `$1000-$1FFF`, which does not
-obviously explain it. Recorded as an observed failure, not an explanation.) **This is the false-green
+**Corrected 2026-09-04, hours after this row first landed, and the correction matters.** The proposed
+fix — *"patching the code to use the images at `$3x` makes it work on the supercharger"*, with byte
+offsets — is from **2000-08** (`200008/msg00038`), not 2003. The 2003 post quotes it in full **and
+then reports that it does not work**: *"**I tried this, but no luck.** Running Air-Sea battle thru
+Distella it looks like the `004a` should have been `024a`, but changing that didn't help either."*
+This file cited the refutation as if it were the confirmation.
+
+**Read collisions at `$30/$31` anyway** — but for reasons that survive the retraction, because the
+"it fixes Air-Sea Battle" claim does not. The engine folds TIA reads to the low nibble
+(`maskReadTIA = 0x000f`) and `$00-$2F` overlaps the write side; neither depends on a Supercharger
+being present, and the two mirrors are identical on a bare console. **So the rule stands and the
+evidence for it does not include a working repair.** What is actually established: a shipped game
+reads through `$0x`, and it is one of three in 135 that a Supercharger breaks. Why remains open —
+the 2000 reporter says "maybe", the 2003 reporter could not reproduce the cure, and nobody has
+checked whether ROM revision, cartridge individual or modification accounts for the difference. **This is the false-green
 direction** — the emulator passes it and a real configuration does not — the same side as the F8
 hotspot decoding elsewhere in this file. Found by the mailing-list distillation (helper-2).
 

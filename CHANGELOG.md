@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the `$30/$31` row cited a refutation as if it were the confirmation (2026-09-04)
+
+Landed this morning: *"patching the code to use the images at `$3x` makes it work on the
+supercharger"*, attributed to a 2003 post. Two errors, both caught by the distillation and verified
+here from the primary sources.
+
+**The fix is from 2000-08**, not 2003. **And the 2003 post quotes it in order to report that it
+fails**: *"**I tried this, but no luck.** Running Air-Sea battle thru Distella it looks like the
+`004a` should have been `024a`, but changing that didn't help either."* The row cited the refutation
+as the confirmation.
+
+**The rule survives; its evidence changes.** Read collisions at `$30/$31` because the engine folds
+TIA reads to the low nibble and `$00-$2F` overlaps the write side — neither depends on a Supercharger
+being present, and the mirrors are identical on a bare console. What is *not* established is that
+switching them repairs anything: nobody has a working cure.
+
+Better numbers in exchange: **135 titles tested, 3 broken** — Air-Sea Battle (collisions), Canyon
+Bomber and Code Breaker (*"screen rolls"*, differently), with the same collision fault reported in
+Haunted House, Space War and Ghost Manor. Why is open: the 2000 reporter says "maybe", the 2003
+reporter could not reproduce the cure, and nobody has checked ROM revision, cartridge individual or
+modification.
+
+Found by the mailing-list distillation (helper-2), who shot the *claim* across all 18,900 messages
+rather than the thread it came from — the procedure helper-1 arrived at the same day — and found the
+denial four messages away from the assertion. Coverage on this one is 4 of 4, which is rare.
+
 ### Added — asking the timer without waiting, and the budget the mask throws away (2026-09-04)
 
 **Every INTIM in this repository waits.** Five sites, all `lda INTIM / bne loop`: ask whether the
