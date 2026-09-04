@@ -74,8 +74,31 @@ also why the joystick's 40–44 cycles is the *whole* cost and not a per-line on
   `1194720 × 0.0004 = 477.888 cycles = 6.288 scanlines`, **2.4 % of a 262-line frame, per direction
   change**. That arithmetic is not ours; it is in stella-list `200011` (`more-keyboard-nonsense`),
   where it is also called *"an upper bound as a general rule of thumb"* rather than a specification.
-  What is still unknown is how many direction changes a full scan needs — that is what turns 6.3
-  lines into the actual cost. **Gopher2600 does not model the delay at all** (its own `keypad.go`
+  **How many waits a full scan needs was the open number, and 1998 answers it.** Eckhard Stolberg,
+  `199804/msg00077`, on why keypad input felt slow: *"**They ARE that hard to read.** To read one
+  keyboard controller you have to **write out which row to read, wait for 400ms** and then check all
+  three buttons in that row from three different read ports. If you have to do that for **four rows
+  each on two controllers**, that takes quite some processor cycles."* Four rows × two controllers =
+  **eight waits**:
+
+  | | scanlines | of a 262-line frame |
+  |---|---|---|
+  | one controller (4 rows) | 25.2 | **9.6 %** |
+  | two controllers (8 rows) | **50.4** | **19.2 %** |
+
+  `477.888 × 8 = 3,823` cycles against a frame's `262 × 76 = 19,912`.
+
+  **Whether the wait really applies eight times is a reading of the sources, not a measurement, and
+  this harness cannot settle it.** The exemption is Chad Schell's — *"if you only **read** the port,
+  and thus don't change **its configuration**, the 400 uS delay does not apply"* — and the Guide's
+  requirement is *"between **writing to this port** and reading the TIA input ports."* A row select
+  **is** a write to the port, and Schell's exemption is explicitly for the read-only case, so the
+  wait stands on all eight. The alternative reading — that only a `SWACNT` change costs, and the
+  eight `SWCHA` writes are free — gives **6.3 lines instead of 50.4, an eight-fold difference**.
+  A litmus cannot choose between them: `litmus_swacnt` band 5 measured that **this engine models no
+  settling time at all**, so both readings produce identical output here. **Budget the 19 %** and
+  treat it as the pessimistic reading it is. Found by the mailing-list distillation (helper-2), who
+  proposed the litmus that would have settled it on hardware. **Gopher2600 does not model the delay at all** (its own `keypad.go`
   carries the TODO), so nothing here will make you pay it: see `known-traps.md`.
   A missing fifth peripheral, for the same reason: the **driving controller** (2002 wiring diagrams
   put a Gray code in the low two bits of each SWCHA nibble) is not in that list, so it shares the

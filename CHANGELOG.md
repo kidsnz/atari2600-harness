@@ -6,6 +6,44 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the keypad's real cost, and a name for what this harness cannot reach (2026-09-04)
+
+`input-budget.md` said the 400 µs settling time was 6.288 scanlines *per direction change* and that
+**how many a full scan needs was unknown**. 1998 answers it. Eckhard Stolberg, `199804/msg00077`, on
+why keypad input felt slow: *"**They ARE that hard to read.** To read one keyboard controller you have
+to **write out which row to read, wait for 400ms** and then check all three buttons … If you have to
+do that for **four rows each on two controllers**, that takes quite some processor cycles."*
+
+Four rows × two controllers = eight waits = **50.4 scanlines, 19.2 % of a frame** (`477.888 × 8 =
+3,823` cycles of `19,912`). One controller costs 9.6 %.
+
+**Whether it really applies eight times is a reading of the sources, and this harness cannot settle
+it.** The Guide requires the wait *"between **writing to this port** and reading the TIA input
+ports"*; a row select is a write to the port; Chad Schell's exemption is explicitly for *reading only,
+without changing the configuration*. So the wait stands on all eight. The other reading — only a
+`SWACNT` change costs — gives 6.3 lines, **an eight-fold difference**. A litmus cannot choose:
+`litmus_swacnt` band 5 established that **this engine models no settling time at all**, so both
+readings render identically. The doc now says: budget the 19 % and know it is the pessimistic
+reading. helper-2 proposed the litmus that would settle it on hardware.
+
+### Added — "the analogue glue": five boundaries, one name
+
+A 2001 question to a homebrew author who had cut down a console: *"how do you know **when to use a
+capacitor**, and what size? … doesn't **cutting out the excess 2600 parts alter the voltage, line
+noise, and timing requirements**? … how do you learn all of the **'analogue glue'** that holds the
+digital design together?"*
+
+Five limits recorded separately across this repository turn out to be one category: the TV's contrast
+through RF; console-to-console variation; the TIA's propagation delays and dynamic logic (a VHDL
+model built exactly from the schematic *oscillates* where silicon does not); cable length; and
+operating temperature (the engine's `RESPxHBLANK` calls `HeatThreshold()`).
+
+Recorded not as a gap to close but as **a frontier to name**. This project measures the digital side
+and can now say precisely which side that is — and say *measured* for one and *reported* for the
+other.
+
+Found by the mailing-list distillation (helper-2).
+
 ### Added — the rotate-through-carry trap, third of a family (2026-09-04)
 
 `ROL` shifts bit 7 into C and C into bit 0, so two rotations are not two of one. A 2004 report reads
