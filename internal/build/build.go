@@ -22,6 +22,9 @@ func BinPathFor(asmPath string) string {
 func Assemble(asmPath, binPath string) (output string, err error) {
 	tmp := scratchPath(binPath, "bin")
 	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+tmp, "-I"+filepath.Dir(asmPath)).CombinedOutput()
+	if err == nil {
+		err = diagnosedFailure(string(out))
+	}
 	if err != nil {
 		os.Remove(tmp)
 		return string(out), err
@@ -72,4 +75,31 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 		return string(out), "", "", err
 	}
 	return string(out), string(lb), string(sb), nil
+}
+
+// diagnosedFailure reports an assembly that DASM described as an error while still exiting zero.
+//
+// The exit status is normally enough — measured 2026-09-04, `error: Branch out of range` exits **3**
+// on DASM 2.20.14.1, so `Assemble` already rejects it. This guard exists because the failure it
+// prevents is silent and permanent, and because someone reported the opposite behaviour on the list.
+// Manuel Polik, stella-list `200306/msg00003`: *"Should a source producing that `error: Branch out of
+// range (135 bytes).` compile into a working binary or not? **Well I'm asking because it does...**"*
+// That does not reproduce on the version we pin — but if any DASM diagnostic ever prints `error:`
+// and exits zero, the `.bin` would be accepted, a `golden_frame` would be recorded **from the broken
+// image**, and every run afterwards would compare the damage against itself and pass.
+//
+// This repository has already been bitten once by an input that failed quietly rather than loudly:
+// the umbrella `CLAUDE.md` records that pointing a scenario at a `.bin` makes `prove_line_budget`
+// and `pf_deadlines` SKIP, "and a skip is recorded as a PASS — Frogger's scenarios read green for
+// months that way." Refusing to trust an exit status alone costs one string search.
+//
+// Found by the mailing-list distillation (helper-2), who could not run DASM and so reported it as a
+// question with the command to settle it rather than as a defect.
+func diagnosedFailure(out string) error {
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, "error:") {
+			return fmt.Errorf("dasm reported an error but exited 0: %s", strings.TrimSpace(ln))
+		}
+	}
+	return nil
 }

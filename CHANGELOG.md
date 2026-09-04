@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — refuse an assembly DASM called an error, whatever it exited with (2026-09-04)
+
+Manuel Polik, stella-list `200306/msg00003`: *"Should a source producing that `error: Branch out of
+range (135 bytes).` compile into a working binary or not? **Well I'm asking because it does...**"*
+If that behaviour existed here, `internal/build.Assemble` — which tests only the exit status — would
+accept the `.bin`, a `golden_frame` would be recorded **from the broken image**, and every run
+afterwards would compare the damage against itself and pass.
+
+**Measured first: it does not reproduce.** A branch 200 bytes out of range exits **3** on DASM
+2.20.14.1, so the existing check already rejects it, and `certify.go:72`'s discarded error is a bare
+`dasm` run reading the version banner, where a non-zero exit is expected. Neither is a hole.
+
+The guard went in anyway, because the failure it prevents is silent and permanent and it costs one
+string search: `Assemble` now also fails when the output contains `error:` on a zero exit.
+`TestAssembleRejectsBranchOutOfRange` pins the end-to-end behaviour — refused, and **no `.bin` left
+behind**, so no later step can pick up a partial image. A warning is explicitly not escalated.
+
+This repository has been bitten once already by an input that failed quietly rather than loudly: the
+umbrella `CLAUDE.md` records that pointing a scenario at a `.bin` makes `prove_line_budget` and
+`pf_deadlines` SKIP, *"and a skip is recorded as a PASS — Frogger's scenarios read green for months
+that way."* Same shape, different entrance.
+
+Found by the mailing-list distillation (helper-2), who cannot run DASM and so reported it as a
+question with the command to settle it, rather than as a defect. That is the right way to hand over
+something you cannot check yourself, and it is why the answer here is "measured, does not reproduce,
+guarded anyway" instead of a fix for a bug that was not there.
+
 ### Added — 37 of the 128 palette codes are unreachable, and which layer owns that (2026-09-04)
 
 Artwork for this project is drawn in Photoshop and ingested here, so **an artist can pick two
