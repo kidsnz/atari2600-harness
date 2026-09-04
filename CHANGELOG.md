@@ -6,6 +6,44 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — `rg -rn` silently rewrote two searches, and one of them had already become a claim (2026-09-04)
+
+ripgrep's `-r` is `--replace` and takes an argument, so **`rg -rn` means "replace every match with the
+letter `n`"**. The result reads like an ordinary search whose matched words have gone missing, with no
+line numbers and exit 0. ripgrep recurses by default; `-r` was never needed.
+
+It corrupted the search behind a line already landed in `missiles-bullets.md`. That line said
+`CPU.Interrupt()` *"is called from five places and all five are `mem.arm.Interrupt()`"* — the right
+number attached to the wrong subject, since `mem.arm.Interrupt()` is a different method on the ARM
+coprocessor in ELF/ACE carts. Re-run correctly: **`.Interrupt(` has zero call sites** once its own
+definition, `InInterrupt` and the ARM's five are excluded. **`CPU.Interrupt()` is never called at all**,
+which is the stronger form of the same conclusion — the `SEI` finding stands and its evidence is now
+stated properly.
+
+Recorded in `known-traps.md` section D, because the failure mode is the one this repository keeps
+naming: plausible output, exit 0, nothing to notice. The tell is a quoted line missing the phrase that
+was searched for.
+
+Found by the mailing-list distillation (helper-1), who hit it twice and traced it rather than
+re-running until the output looked right.
+
+### Added — a gate for scenarios that name a `.bin` and ask for a source-only check (2026-09-04)
+
+`prove_line_budget` and `pf_deadlines` need the assembly source, and when a scenario's `rom` is a `.bin`
+they do not fail — they record **"skipped (needs .asm source)" with `Pass: true`**. The umbrella
+`CLAUDE.md` names this by hand ("a skip is recorded as a PASS", after Frogger's scenarios read green for
+months) and nothing enforced it.
+
+Measured: **ten of our 111 scenarios name a `.bin`, and every one has a `.asm` beside it** — so none is a
+`.bin` out of necessity. **None of the ten currently asks for either check**, which is why this has cost
+nothing yet, and is exactly the state in which someone adds `prove_line_budget` to one of them and gets
+a green tick for a proof that never ran.
+
+The gate is on the combination rather than on the `.bin`: smoke and fuzz fixtures have no line-budget
+intent and may keep naming a binary. Asking for a source check while naming one now fails.
+
+Counted by the mailing-list distillation (helper-2).
+
 ### Changed — the two primary sources went into the files that own their subjects, not a new one (2026-09-04)
 
 They were first put in a new `docs/hardware-origins.md`. **That was wrong and the file is gone.** Every
