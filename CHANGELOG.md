@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the rotate-through-carry trap, third of a family (2026-09-04)
+
+`ROL` shifts bit 7 into C and C into bit 0, so two rotations are not two of one. A 2004 report reads
+like a hardware fault: *"1 time gives a good result. **2 times makes a total mess.** First line only →
+good. Second line only → good. **Both lines and it's a total mess!**"* — answered on the spot, *"is
+the carry bit messing you up? **The rotate instructions rotate data through the carry bit.**"* The
+symptom points away from the cause, because each half works alone.
+
+**Deliberately not a static check.** `maze.md` uses exactly this chain — four source bits become
+eight output bits by rotating twice through carry — so a rule would fire on correct code. Recorded at
+the strength that is true: *suspicious, read it*. Third of a family already here (`cmp` clobbering Z
+between a load and a zero test; an immediate `ld_` clobbering N/Z).
+
+Also recorded in the corpus README: **two independent counts of the unfetched attachments agree.**
+Messages declaring `X-Derived` = 1,020; HTML files carrying an attachment `href` = 1,215, of which
+1,018 are `.bin`. Both entry points find **zero** of the files present. Same conclusion by two
+different expressions, so it is not an artefact of one search.
+
+Found by the mailing-list distillation (helper-2).
+
 ### Added — a 2001 hardware report about PAL colour, reproduced exactly (2026-09-04)
 
 Someone playing a game on a PAL woody through a Cuttle Cart, `200111/msg00467`: *"It works fine on my
