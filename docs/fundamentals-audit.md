@@ -19,6 +19,13 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 
 ## 1. Frame & timing
 - ✅ NTSC 262 (3/37/192/30), PAL 312; 1 line = 228 clocks = 76 CPU cycles; cycle-counting invariant.
+  📖 **PAL's breakdown, from the vendor's own table** — `reference/docs_atari/stella_programmers_guide.html`,
+  quoted verbatim (2026-09-04): VBLANK **40 / 48**, KERNEL **192 / 228**, OVERSCAN **30 / 36**,
+  FRAME **262 / 312** lines, and 16686 / 20055 µs. Only the totals were here before. **PAL's kernel is
+  228 lines, not 240** — which matters wherever "how many visible lines" is the free variable, and
+  `design-principles.md`'s aspect-ratio note is exactly such a place. Marked 📖: this is what Atari
+  specified, not what we measured, and the two are different claims. Found by the mailing-list
+  distillation (helper-1), from a 2003 post pointing at page 16 of the Guide.
 - 📖 **VSYNC procedure: set D1, wait ≥2 lines, clear** (Stella PG ~§3). **Split by measurability
   2026-09-03** — the procedure and the threshold are different claims and only one of them is ours
   to measure. The *shape* (set D1, hold, clear, and the frame is accepted) is measurable here. The

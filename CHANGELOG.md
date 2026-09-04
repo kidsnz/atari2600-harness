@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — FlickerSort is one bubble pass, not a sort; and PAL's kernel is 228 lines (2026-09-04)
+
+**`flicker-multiplexing.md` said "sort objects by Y each frame".** Roger Williams, who named the
+technique on stella-list in 2002, describes a **single bubble pass per displayed frame** — **O(n)**,
+run **outside the kernel**. Over successive frames the list converges toward Y order and stays there
+while objects move slowly, which is all it needs. He withdrew the obvious extension himself: doing it
+*inside* the kernel *"increases flicker and gains little."*
+
+Not a cosmetic distinction for anything using `prove_line_budget`: **one pass is a fixed, provable
+cost; a sort is not.** It also pushes the source back five years — this page cited AtariAge 107063
+(2007) and bB, and the 2002 thread is where Manuel Polik coined the name. Worth recording because
+`pkg/design/multiplex.go` already carries a post-mortem on the opposite failure, *a citation that does
+not support the claim is worse than none*.
+
+**And PAL's line breakdown was here only as a total.** `reference/docs_atari/stella_programmers_guide.html`
+carries the vendor's table verbatim: VBLANK 40/48, KERNEL **192/228**, OVERSCAN 30/36, FRAME 262/312,
+16686/20055 µs. Added as 📖 — what Atari specified, not what we measured.
+
+**That immediately makes PAL disagree with itself, which is the point.** The aspect-ratio note landed
+this morning used a 2004 practitioner's *"160x240 is very close to 4:3"* to put PAL at **2.00**. The
+manufacturer's own kernel is **228 lines → 1.90**. Same standard, same free variable, two answers —
+one from Atari and one from someone building on the machine. A 45° line reads as **27.8°** under one
+and **26.6°** under the other. Every addition to this question has widened it; none has narrowed it.
+
+Found by the mailing-list distillation (helper-1), from a 2003 post pointing at page 16 of the Guide.
+
 ### Changed — the `RESPxHBLANK` explanation outruns its citation, and `RandomState` reaches further than one row said (2026-09-04)
 
 Two corrections to work landed earlier the same day, both from distillers reading past the summary.

@@ -23,6 +23,19 @@ drawn per frame by frame parity — locked in CI by `scenarios/flicker_multiplex
 ### The full form (documented, build when a game needs it)
 Real engines improve on fixed pairs: **sort objects by Y each frame**, walk the screen assigning
 the next-starting object to whichever player is free (re-positioning a player mid-screen after
+
+> **★A full sort is not what the technique costs.** Roger Williams, stella-list 2002-04, describing
+> what he named *FlickerSort*: it is a **single bubble pass per displayed frame**, not a sort —
+> **O(n)**, and run **outside the kernel**. Over successive frames the list converges toward Y order
+> and stays there while objects move slowly, which is all the technique needs. He also withdrew the
+> obvious extension himself: doing it **inside** the kernel *"increases flicker and gains little."*
+> The distinction is not cosmetic for anything using `prove_line_budget` — one pass is a fixed,
+> provable cost; a sort is not.
+>
+> **This also pushes the source back five years.** This page cites AtariAge 107063 (2007) and bB; the
+> 2002 thread is where the name was coined (Manuel Polik). Recorded because `pkg/design/multiplex.go`
+> already carries a post-mortem on the opposite failure — *a citation that does not support the claim
+> is worse than none*. Found by the mailing-list distillation (helper-1).
 its previous object ends), and only flicker the objects that actually collide on the same lines —
 with a rotation counter so no object starves. Fixed-parity pairs (this demo) are the verified
 core; sort + dynamic 2-of-N allocation + fairness rotation is the documented extension

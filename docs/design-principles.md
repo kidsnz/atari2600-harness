@@ -225,6 +225,11 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     *"For NTSC **160x200** is very close to 4:3, for PAL **160x240** is very close to 4:3."* PAL's
     240 gives **2.00** — above everything above — and the reason is not another overscan guess, it is
     **the television standard**. So the spread now has *two* free variables, not one.
+    **And PAL immediately disagrees with itself, which is the point.** Atari's own table
+    (`reference/docs_atari/stella_programmers_guide.html`, quoted in `fundamentals-audit`) gives PAL a
+    **228-line kernel**, not 240 — so the vendor's recommendation is **1.90** while filling the frame
+    is **2.00**. Same standard, same free variable, two answers, from the manufacturer and from a
+    2004 practitioner. A 45° line reads as **27.8°** under one and **26.6°** under the other.
     **And all five values come out of one expression**, which is worth stating plainly because it
     makes the disagreement legible rather than mysterious:
     `pixel aspect = (4:3) ÷ (160 ÷ visible lines) = visible_lines / 120`.
