@@ -6,6 +6,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `crtview`: look at a ROM the way a television would, including from a terminal (2026-09-04)
+
+The principle landed alongside this says every visual path here is pixel-exact and pre-television.
+`internal/crt` and `cmd/crtview` are the one place that deliberately is not: chroma bleed (a horizontal
+low-pass, colour blurred harder than luma, because that is the asymmetry a real set has), frame
+persistence (averaging, which turns a flicker into a dim steady object rather than a blink), and the
+wide-pixel aspect applied for viewing.
+
+**Explicitly not evidence.** The package comment says so, the CLI prints it on every run, and nothing
+in the verification path imports it. The engine's real CRT model is OpenGL shaders in its GUI tree
+with no headless entry point, so this is an approximation and is labelled as one.
+
+`-ansi N` prints the frame into the terminal as coloured half-blocks. That exists for a measured
+reason: an inline image does not reach a terminal at all, and `open` reaches a Mac the author may not
+be sitting at. The escape sequence is emitted only when the colour pair changes — the naive version
+produced **102 KB for one 160×214 frame** and was truncated before it could be seen.
+
+Recorded honestly: the author looked at the output, said the visual side is adequately served by
+existing screenshots and the ROM itself, and redirected the work toward timing-critical technique.
+The tool is kept because the terminal path solves a real problem for a remote session, and because
+the principle it implements is worth having reachable rather than only stated.
+
 ### Added — everything measured here is measured before the television (2026-09-04)
 
 `internal/emu` imports `hardware`, `cpu/instructions`, `cartridge/mapper` and `memorymap` — and
