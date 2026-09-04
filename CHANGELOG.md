@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — "interlace" means two different things, and the digest treated them as one (2026-09-04)
+
+`gen_mining_digest.py` classified `flicker|multiplex|interlac` as a single category. They are not
+synonyms. On the 2600 "interlacing" is used both for **drawing objects on alternate scanlines** — a
+kind of multiplexing — and for **true video interlace, two fields making one picture**.
+
+Consequence, measured: `interlac` matches **14 lines** in this repository and **all fourteen mean the
+first sense**. The nearest thing to the second is `design-principles.md` saying the 2600 is *240p
+progressive*, i.e. explicitly not interlaced. **The count is right and "we have it" would be a lie** —
+someone searching would find fourteen hits and conclude the subject was covered.
+
+The pattern is split, `interlac` gets its own row labelled as ambiguous, and `design-principles.md`
+now states plainly that true interlace is absent. People did attempt it on this machine: a 2002
+thread reports a working version, and its author later could not find his own post because the
+subject line was about something else entirely.
+
+Found by the mailing-list distillation (helper-2), who read all 96 hits across five search layers
+before saying so — the same discipline that turned an earlier "harness doesn't have it" into "harness
+has it under a different name".
+
 ### Fixed — ten scenarios checked line counts over a window that closed before their own events (2026-09-04)
 
 `frame_lines_stable` is ∀ over frames — unlike `ntsc_frame_lines`, which samples one and has passed

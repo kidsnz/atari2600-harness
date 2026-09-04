@@ -263,7 +263,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     flagged that the 2004 quote is a description they had not verified and the arithmetic is theirs —
     re-run here and matching. Mooney's phrasing is also the
     most useful one for an artist — **8 tall × 5 wide reads as a square** — so it is the form to hand to
-    whoever is drawing (see `docs/ingest.md`). **The sources name two more free variables this line left implicit** 〔found 2026-09-03〕: an NTSC display expects **227.5 colour clocks per line and the 2600 emits 228** 〔169128:12〕, so the horizontal scale is already off a standards-conforming set by half a clock per line; and the 2600 is **240p progressive — the even field of 480i, but at full refresh rather than half** 〔208810:9〕, so "how many visible lines" asks about a signal with no interlaced partner to average against. Neither number lives anywhere else in this tree (227.5: five layers, zero hits; every 228 here is cycle budget, a different quantity). **So no single Stella measurement settles it either** — it settles what
+    whoever is drawing (see `docs/ingest.md`). **The sources name two more free variables this line left implicit** 〔found 2026-09-03〕: an NTSC display expects **227.5 colour clocks per line and the 2600 emits 228** 〔169128:12〕, so the horizontal scale is already off a standards-conforming set by half a clock per line; and the 2600 is **240p progressive — the even field of 480i, but at full refresh rather than half** 〔208810:9〕,
+    **and TRUE interlace — two fields making one picture — is not in this repository at all**, which is
+    worth saying because searching for it suggests otherwise: `interlac` matches **14 lines** here and
+    **all fourteen mean line-interleaving of sprites**, the flicker/blinds sense. The count is right
+    and "we have it" would be a lie. People did attempt the real thing on this machine (a 2002 thread
+    reports a working version, and its author could not find his own post again afterwards because
+    the subject line said something else). Recorded 2026-09-04 by the mailing-list distillation
+    (helper-2), who read all 96 hits across five layers before saying so; so "how many visible lines" asks about a signal with no interlaced partner to average against. Neither number lives anywhere else in this tree (227.5: five layers, zero hits; every 228 here is cycle budget, a different quantity). **So no single Stella measurement settles it either** — it settles what
     STELLA assumes, which is one more source, not an arbiter. (Checked 2026-08-04: Stella 7.0's `-help`
     offers no aspect-correction option at all — only `-tia.vsizeadjust <-5..5>` — so the "Stella 91%" figure
     cited above does not correspond to anything in the current build.)

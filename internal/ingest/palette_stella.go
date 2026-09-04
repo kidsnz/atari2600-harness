@@ -137,7 +137,6 @@ var stellaNTSC = [128][3]uint8{
 	{0xFF, 0xDB, 0x67}, // $FE
 }
 
-
 // NewStellaNTSCQuantizer は Stella 実測パレットの逆引き表を作る（Stella スナップショット用）。
 //
 // ★★これは NTSC 専用であり、それは選択ではなく【唯一の表しか無い】という事実である。

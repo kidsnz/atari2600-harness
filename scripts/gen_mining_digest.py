@@ -139,7 +139,15 @@ KEYWORD_RULES = [
     (r"hmove|positioning|reposition|div15|respx?|hmxx", ("Sprite", "§スプライト / design.PositionSplit, CLAUDE.md HMOVE")),
     (r"48-?(px|pixel|bit)|sprite", ("Sprite", "§スプライト / pkg/sprite, design.PositionSplit")),
     (r"color|colour|palette|hue|luminance", ("Color", "§色 / design.Hue/Luminance ほか")),
-    (r"flicker|multiplex|interlac", ("Multiplex", "§多重化 / design.NeedsFlicker")),
+    # ★2026-09-04: `interlac` をこの行から外した。**同義ではない。**
+    #   ★2600 の文脈で "interlacing" は【走査線ごとに物を交互に描く】＝多重化の一種を指すことも、
+    #   ★★【2フィールドで1枚の絵を作る本来のインターレース】を指すこともある。
+    #   ★★★harness で `interlac` に当たる 14 行は【14 行とも前者】——後者は 1 行も無い
+    #   （唯一の近い行は design-principles の「2600 は 240p progressive」＝インターレースでは【ない】）。
+    #   ★3語を同義にしていたので、撃った人が「持っている」と読める形になっていた。
+    #   ★★件数は正しく、結論だけが嘘になる形。★見つけたのは蒸留（helper-2）。
+    (r"flicker|multiplex", ("Multiplex", "§多重化 / design.NeedsFlicker")),
+    (r"interlac", ("Interlace?", "§多重化 / ★語が2つの意味を持つ — 本文を読むこと")),
     (r"scroll|playfield|\bpf\b|asym|reflect", ("Playfield", "§PF / design.AsymRightWindow,ScrollScanlinesConstant")),
     (r"title|text|hud|score|font|char", ("Text/HUD", "§PF(HUD) / design.MaxChars")),
     (r"music|sound|audio|speech|digiti|atarivox|tia.?track|sara|savekey", ("Audio", "techniques/sound・music-driver")),

@@ -205,8 +205,6 @@ Distilled index of the mined AtariAge threads. Raw thread captures stay in the u
 | [168253](https://forums.atariage.com/topic/168253) | `flicker-picker` | Flicker Picker Utility | §多重化 / design.NeedsFlicker |
 | [160537](https://forums.atariage.com/topic/160537) | `flicker-to-enhance-graphics` | 160537 — Using flicker to enhance graphics | §多重化 / design.NeedsFlicker(意図フリッカ) |
 | [78021](https://forums.atariage.com/topic/78021) | `intelligent-flicker` | How to implement intelligent flicker? | §多重化 / design.NeedsFlicker |
-| [318346](https://forums.atariage.com/topic/318346) | `interlace-mode` | Accidentally doing interlace mode? | §多重化 / design.NeedsFlicker |
-| [296924](https://forums.atariage.com/topic/296924) | `interlacing-fonts` | Thoughts on How to improve code - interlacing and fonts | §多重化 / design.NeedsFlicker |
 | [107063](https://forums.atariage.com/topic/107063) | `interlacing-multi-sprites` | Interlacing, Multi-sprites, and More | §多重化 / design.NeedsFlicker |
 | [195260](https://forums.atariage.com/topic/195260) | `multiplexing-flat-panel-tvs` | Multiplexing and modern | §多重化 / design.NeedsFlicker |
 | [162521](https://forums.atariage.com/topic/162521) | `stayfrosty-flickering-magic` | StayFrosty flickering magic | §多重化 / design.NeedsFlicker |
