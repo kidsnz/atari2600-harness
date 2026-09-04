@@ -6,6 +6,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the dropped-`#` detector covers one of three landing zones (2026-09-04)
+
+Yesterday's row said `defuse`'s `ReadBeforeWrite` catches a forgotten `#`, using the 1997 example
+`AND $f0`. True of that example and not of the mistake in general. Where the operand lands decides
+whether anything sees it:
+
+- **a small constant** — `AND $0F` reads `$0F`, a TIA *read* register. A real value comes back and
+  nothing flags it.
+- **`$0E`–`$2C`** — a write-only TIA register, bus residue. `check_traps`' static rule has this one.
+- **`$80`–`$FF`** — RAM. `ReadBeforeWrite` fires only if *nothing* wrote the address.
+
+`$F0` is unwritten, so the 1997 case is caught. But **a binary immediate with bit 7 set is always
+`$80`–`$FF`** — which is exactly where live variables live — so `ORA %10000000` reads a working
+variable and passes every check here. That is the idiomatic form: the second report (2003) comes from
+someone describing it as a habit rather than an accident.
+
+Found by the mailing-list distillation (helper-2), on a row they had supplied the day before —
+narrowing their own finding rather than defending it.
+
 ### Added — placement holds on PAL, and emulators can be unanimously wrong (2026-09-04)
 
 **Every number in `sprite-placement.md` was measured on NTSC and nothing said so.** Running
