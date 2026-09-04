@@ -97,6 +97,26 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - Beyond 2 objects, multiplex by Y band; a horizontal repositioning costs one scanline; **an empty Y lane is mandatory**; the price is 30Hz flicker. 〔Bumbershoot〕 `→ design.NeedsFlicker/NeedsEmptyYLane/RepositionCostScanlines`
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
 - **Multi-kernel = reuse one object per region**: switch `REFP` / position / picture per Y band and reuse a single player for different purposes (Stay Frosty). Match a "never overlap on the same line" placement constraint with an AI that "never enters an occupied column" and flicker is zero. 〔mining 303364, 318140, 164247〕
+- **★Everything measured here is measured BEFORE the television.** `internal/emu` imports
+  `hardware`, `cpu/instructions`, `cartridge/mapper` and `memorymap` — and nothing from the engine's
+  GUI, where the CRT model lives (`gui/sdlimgui/gl32_crtseq_effects.go`, `preferences_crt.go`).
+  Counted 2026-09-04: **zero references** from `internal`, `cmd` or `pkg`. So `vismatch`, `read_row`,
+  `framesim`, `visual_ceiling` and `get_screen_annotated` all see **pixel-exact output that no console
+  ever produced**, and `ingest.md` deliberately instructs turning TV effects *off*, which is right for
+  measuring and wrong for judging.
+  **This matters because the machine's visual style depends on the blur.** A 1997 post on the list:
+  *"the TV screen seems to act as an **anti-aliasing device** … especially true for the 2600 because
+  its games made a **massive use of colour-striping effects**, that look much better on TV"* — and
+  then the question nobody here had answered: *"wouldn't it be possible for an emulator to emulate
+  also the **good imperfections**?"* The engine can. We do not.
+  Three pages already say a local version of this — `invisible-probe.md` (*"pixel equality is stricter
+  than a CRT, so passing here is necessary and not sufficient"*), `text24.md` twice — **so the fact
+  was known three times and generalised zero times.** As a principle: **pixel-exact agreement is
+  necessary and never sufficient, and a picture judged only here is judged on a display sharper than
+  any 2600 ever had.** The remedy is not to soften the measurements; it is to **look at the artwork
+  once through a CRT model before calling it finished**, as a separate act from verifying it.
+  〔stella-list, *pixel smoothing (slightly OT)*, 1997; found by the mailing-list distillation
+  (helper-2)〕
 - **Flicker is a last resort, and only for short-lived objects.** Never over a large area. Don't trust the emulator — verify by compositing several frames. 〔flicker-to-enhance-graphics〕
   **This is a POSITION, not a measurement, and the list held the opposite one.** It rested on a single
   source and stated no cost for following it. Glenn Saunders, then the list's administrator, 1997:

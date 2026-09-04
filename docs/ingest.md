@@ -71,6 +71,11 @@ unmodified), not a fixed pixel size.
 
 Checklist for grade A:
 1. Stella → Options → Video & Audio → **TV effects: Disabled** (phosphor/blending shift colors).
+   **That setting is for MEASURING, and it is the wrong one for LOOKING.** Everything this pipeline
+   reports is pixel-exact and pre-television; the 2600's own style — colour striping read as a blend —
+   only exists after the blur. Turn the effects back **on** for at least one pass before deciding a
+   picture is finished, and treat that as a different activity from verifying it. See
+   `design-principles.md`, *"Everything measured here is measured before the television."*
 2. Press **F12** in-game; find the PNG via Options → Snapshot settings (save directory shown there).
    Tip: point the snapshot directory anywhere under `~/Documents` and give the path — the tools take
    a directory argument.

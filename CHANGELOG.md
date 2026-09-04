@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — everything measured here is measured before the television (2026-09-04)
+
+`internal/emu` imports `hardware`, `cpu/instructions`, `cartridge/mapper` and `memorymap` — and
+nothing from the engine's GUI, where the CRT model lives. Counted: **zero references** to
+`gui/sdlimgui` from `internal`, `cmd` or `pkg`, though `gl32_crtseq_effects.go` and
+`preferences_crt.go` are sitting there. So `vismatch`, `read_row`, `framesim`, `visual_ceiling` and
+`get_screen_annotated` all see **pixel-exact output no console ever produced** — and `ingest.md`
+instructs turning TV effects *off*, which is right for measuring and wrong for judging.
+
+**The machine's visual style depends on the blur.** From 1997: *"the TV screen seems to act as an
+**anti-aliasing device** … especially true for the 2600 because its games made a **massive use of
+colour-striping effects**, that look much better on TV"*, followed by the question nobody here had
+answered — *"wouldn't it be possible for an emulator to emulate also the **good imperfections**?"*
+The engine can. We do not.
+
+**Three pages already said a local version of this** — `invisible-probe.md` (*"pixel equality is
+stricter than a CRT, so passing here is necessary and not sufficient"*) and `text24.md` twice. Known
+three times, generalised zero times. Now a principle: **pixel-exact agreement is necessary and never
+sufficient, and a picture judged only here is judged on a display sharper than any 2600 ever had.**
+
+The remedy is not softer measurements. It is to **look at the artwork once through a CRT model before
+calling it finished**, as an act distinct from verifying it — which matters here specifically, because
+`get_screen_annotated` is the main channel between this repository and the person drawing.
+
+Found by the mailing-list distillation (helper-2).
+
 ### Added — the mirror ladder, and why three free bits in a pointer are actually free (2026-09-04)
 
 The 6507 has thirteen address lines, so **A13–A15 are never emitted**. Measured: the same ROM byte
