@@ -18,6 +18,40 @@ boundary, 262, golden).
 Hardware basis: `litmus_bank` / `_f6` / `_f4` (v0.43.0; hotspots, AUTO fingerprint, per-bank
 vectors all verified).
 
+## What A12 actually is, and what every scheme is answering
+
+The connector omitted *"lines for addresses greater than 4096"*, and the consequence is concrete:
+**on a plain 4K cartridge, A0–A11 go straight to the ROM and A12 goes to the ROM's chip-enable.**
+The 6507 has thirteen address lines; the thirteenth is not an address as far as the cartridge is
+concerned, it is *"are you being talked to."* Chris Wilkson, stella-list 1999, adding the detail that
+turns this into wiring: **mask ROMs have active-HIGH CE/OE and a standard EPROM (2716) has active-LOW
+/CE and /OE**, so building a cartridge from an EPROM means **putting A12 through an inverter**.
+
+That single fact is behind a set of otherwise unrelated observations from the archive: why homebrew
+cartridge PCBs carry a **7404 hex inverter** and nothing else logical; why **2532 wants OE high while
+2732 and EEPROMs want it low**; and why a "double-ender" — one board, two 4K games — works by
+**tying A12 to Vcc on one edge connector and to GND on the other**.
+
+**And it reframes bank switching itself.** A larger ROM needs address pins A12…A(n) that the console
+does not provide, so *every* scheme is an answer to one question: **who supplies the value for those
+extra pins?**
+
+| scheme | who supplies it |
+|---|---|
+| F8/F6/F4 | the ROM itself, by touching a **hotspot address** |
+| FE | the **stack** — `$01FE` on the bus after a JSR, then `data >> 5` (no hotspot at all) |
+| Supercharger | a **stateful arming sequence** (`$F0xx`, then the next `$Fxxx` is a write) |
+| double-ender | **the connector**, wired once and never changed |
+
+A caution the same thread supplies: **the two A12s are different pins.** The console's A12 is a
+chip-enable *output* as far as the cartridge sees it; a bank-switched cartridge's A12 is an address
+*input* on a bigger ROM, driven by the decoder. Same name, opposite role — the fourth same-name
+collision the mailing-list distillation has catalogued this week (`asr`/`alr` as spellings,
+`absolutex` covering zp and abs, two files called `fingerprint.go`, and now A12).
+
+Found by the mailing-list distillation (helper-1), who assembled it from four separate threads and
+then found the author had stated the conclusion himself further down the one they were reading.
+
 ## The three standard pieces
 
 1. **Identical reset stub + vectors in every bank** (`$FFE0: lda $FFF8 / jmp $F000`,

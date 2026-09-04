@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — what A12 actually is, and what every bank-switching scheme is answering (2026-09-04)
+
+`bankswitching.md` was 49 lines and opened, as of this morning, with the 24-pin connector that
+*"omitted lines for addresses greater than 4096"*. The next step down was missing: **on a plain 4K
+cartridge A0–A11 go straight to the ROM and A12 goes to the ROM's chip-enable.** The 6507's
+thirteenth address line is not an address to the cartridge, it is *"are you being talked to."*
+Chris Wilkson, 1999, supplies what turns that into wiring: **mask ROMs are active-HIGH CE/OE, a 2716
+EPROM is active-LOW**, so building from an EPROM means **putting A12 through an inverter**.
+
+That one fact explains a set of unrelated-looking observations from the archive: why homebrew PCBs
+carry a **7404 hex inverter** and nothing else logical; why **2532 wants OE high and 2732 wants it
+low**; and why a **double-ender** — one board, two 4K games — works by tying A12 to Vcc on one edge
+connector and GND on the other.
+
+**And it reframes bank switching.** A bigger ROM needs address pins the console does not provide, so
+every scheme answers one question — *who supplies the value for those pins?* F8/F6/F4: the ROM
+itself, via a hotspot. FE: the **stack**, `$01FE` on the bus after a JSR (no hotspot exists). The
+Supercharger: a stateful arming sequence. A double-ender: **the connector**, wired once.
+
+With the caution that makes it usable: **the two A12s are different pins** — a chip-enable output as
+the cartridge sees the console, an address input on the bigger ROM. Same name, opposite role, and the
+fourth same-name collision catalogued this week (`asr`/`alr`, `absolutex` covering zp and abs, two
+files called `fingerprint.go`, now A12).
+
+Found by the mailing-list distillation (helper-1), who assembled it across four threads and then read
+far enough down the current one to find the author stating the conclusion himself.
+
 ### Changed — one line was the cause of three others, and nothing said so (2026-09-04)
 
 `known-traps.md` recorded *"no R/W line to the cart → bus contention"* as a footnote to "don't `STA`
