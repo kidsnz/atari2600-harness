@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — say where the sound pipeline ends (2026-09-04)
+
+Everything this repository checks about audio reads the **registers** — `read_audio`, the audio
+golden, `pkg/audio`'s spectra, the scenario asserts. That answers *what was written to
+`AUDC`/`AUDF`/`AUDV` and when*, which is a strong guarantee and is not the same guarantee as *how it
+sounds*. Nothing said so.
+
+Manuel Polik, `200405/msg00275`, on his own finished game: *"[on Z26] brilliant and crystal clear …
+[on hardware, via a Cuttle Cart] horribly distorted … the voice-line 'vibrated'."* He suspected his
+driver, read trace logs for hours, and concluded *"the driver did precisely what I wanted it to do."*
+**A register-level check would have passed, because the registers were right.** Minimum reproduction:
+six lines from `CLEAN_START` writing `AUDF1=$3A`, `AUDC1=$06`, `AUDV1=$0F`. The fix was turning the
+volume down — voice 10, bass 8. Hypothesis: `AUDC` 6 and 12 mixed at full volume distort in a PAL
+console's mono summing; reproduced on a 6-switch, a Jr., and a third person's machine.
+
+`pkg/audio`'s `MeasuredSpectra` covers `{1,2,4,6,7,12,14,15}` **individually** and says nothing about
+combinations, which is now written both in `sound-driver.md` and at the table itself. Two
+consequences stated plainly there: register-correct is the claim, audible-correct is not; and
+somebody has to listen, with full-volume combinations deserving the most suspicion.
+
+This is the shape of the limit, not a missing feature — an oracle that reads registers cannot see an
+analogue summing problem downstream of them. The same author noted the same month that Stella and Z26
+had separate sound implementations, both with problems: reading registers means never inheriting
+either one's bugs, and never seeing the distortion either.
+
+Found by the mailing-list distillation (helper-1).
+
 ### Changed — read collisions at `$30/$31`, and why a placement table has to exist (2026-09-04)
 
 **A shipped commercial game was broken by a mirror choice that costs nothing.** `known-traps.md` says

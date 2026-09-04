@@ -499,6 +499,14 @@ func EmitSFX(label string, frames []SFXFrame) string {
 // MeasuredSpectra is the normalised amplitude of harmonics 1..8 of each pitched waveform,
 // measured on the emulator at AUDF 9 and pinned here.
 //
+// EACH WAVEFORM ALONE. Nothing here describes what two of them do together, and the list reports
+// that the difference can be the whole ball game: mixing AUDC 6 and 12 at full volume was heard as
+// "horribly distorted" on real hardware while the same ROM was "brilliant and crystal clear" on an
+// emulator, with the driver provably writing what it meant to (stella-list 200405/msg00275, Manuel
+// Polik; the fix was turning the volume down). A register-level oracle cannot see that, so these
+// numbers support choosing a timbre and do not support predicting a mix. See
+// docs/techniques/sound-driver.md.
+//
 // WHY IT LIVES HERE AND NOT IN A TEST. It was in internal/emu/audioshape_test.go, which meant
 // no tool could reach it: choosing a waveform by TIMBRE — the thing an author actually does —
 // had numbers behind it that only a test could see. That is the third time in this repository
