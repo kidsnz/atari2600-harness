@@ -60,6 +60,36 @@ type Fit struct {
 	OneWorst  float64  `json:"one_voice_worst"` // its worst degree
 	Detune    float64  `json:"detune_cents"`    // how far this tonic sits from the reference, in cents. SweepDetuned sets it; Sweep leaves it 0.
 
+	// Spread is the distance from the flattest degree to the sharpest, in cents, and Mean is where
+	// the key sits on average. READ THEM WITH Worst, not instead of it -- they answer a different
+	// question, and it is usually the one an ear is asking.
+	//
+	// Glenn Saunders put the rule on stella-list in 1998, and it is the reason these fields exist:
+	//
+	//   "you make sure you choose an octave and a key that presents notes that are ALL IN TUNE WITH
+	//    EACH OTHER. If one value is A4+12 and another is A3-4 then you shouldn't use these notes
+	//    just because they are both As. It would be wiser to pick ... an entire key that ranges from
+	//    +5 to +10 out of tune (since it will be IN TUNE RELATIVE TO ITSELF to within 5 cents
+	//    accuracy)."
+	//
+	// A key sitting uniformly +10 cents sharp has Worst = 10 and Spread = 0, and sounds fine on its
+	// own: a listener hears intervals, not absolute pitch. A key spanning -6 to +9 has a smaller
+	// Worst and a Spread of 15, and it is the one that sounds wrong. **Ranking candidates by Worst
+	// therefore prefers the worse-sounding key whenever the better one is uniformly displaced.**
+	//
+	// This project's own data shows the gap. `docs/techniques/pitch-dither.md` records D2 -0.9,
+	// E2 -6.0, F#2 +14.7: Worst 14.7, Spread 20.7, Mean +2.6. Those three numbers order candidates
+	// differently, and nothing here had computed the last two.
+	//
+	// Spread is not automatically the right criterion either: a piece played against a recording, or
+	// alongside a sample, is judged against an external reference and then absolute error is what
+	// matters. Both are reported; the caller chooses, which is the same division of labour the
+	// "What it does NOT do: CHOOSE" note at the top of this file describes.
+	//
+	// Found by the mailing-list distillation (helper-2).
+	Spread float64 `json:"spread_cents"`
+	Mean   float64 `json:"mean_cents"`
+
 	// OneVoiceFundamental is how much of OneVoice's energy is in the FUNDAMENTAL
 	// (audio.FundamentalStrength). READ IT WITH OneWorst, never instead of it. "In tune"
 	// and "audible as a pitch" are different questions and this file answers only the
@@ -118,6 +148,20 @@ func FitTonic(tonicHz float64, degrees []int, baseClock float64) Fit {
 			f.Worst, f.WorstDeg = e, d
 		}
 	}
+	if len(f.Choices) > 0 {
+		lo, hi, sum := f.Choices[0].Cents, f.Choices[0].Cents, 0.0
+		for _, c := range f.Choices {
+			if c.Cents < lo {
+				lo = c.Cents
+			}
+			if c.Cents > hi {
+				hi = c.Cents
+			}
+			sum += c.Cents
+		}
+		f.Spread, f.Mean = hi-lo, sum/float64(len(f.Choices))
+	}
+
 	f.OneWorst = math.Inf(1)
 	for _, c := range waves {
 		w := 0.0

@@ -155,20 +155,27 @@ func main() {
 	best := keyfit.Best(fits, *oneVoice)
 	fmt.Printf("figure %s over %d tonic(s); ranked by %s\n", *degrees, len(fits),
 		map[bool]string{true: "best SINGLE waveform", false: "best per degree"}[*oneVoice])
-	fmt.Printf("  %-9s %-7s %10s %10s  %s\n", "tonic", "Hz", "worst", "1-voice", "detune")
+	fmt.Printf("  %-9s %-7s %10s %8s %8s %10s  %s\n", "tonic", "Hz", "worst", "spread", "mean", "1-voice", "detune")
 	shown := 0
+	// spread and mean sit next to worst deliberately. A key displaced uniformly is IN TUNE WITH
+	// ITSELF and a listener hears intervals, not absolute pitch -- so ranking by `worst` alone
+	// prefers a key that straddles zero over one that is uniformly sharp, which is backwards for
+	// anything played on its own. See internal/keyfit's Fit.Spread for the 1998 source and the
+	// worked example from this repository's own pitch-dither figures. Neither number is applied
+	// automatically; a piece played against an external reference wants `worst` after all.
 	for _, f := range fits {
 		if shown >= *top {
 			break
 		}
-		fmt.Printf("  %-9s %-7.2f %+9.1fc %+9.1fc  %+.0fc\n",
-			f.TonicName, f.TonicHz, f.Worst, f.OneWorst, f.Detune)
+		fmt.Printf("  %-9s %-7.2f %+9.1fc %7.1fc %+7.1fc %+9.1fc  %+.0fc\n",
+			f.TonicName, f.TonicHz, f.Worst, f.Spread, f.Mean, f.OneWorst, f.Detune)
 		shown++
 	}
 	if len(fits) > shown {
 		fmt.Printf("  ... %d more (raise -top, or -json for all)\n", len(fits)-shown)
 	}
-	fmt.Printf("\nbest: %s (%.2f Hz), worst degree %+.1f cents", best.TonicName, best.TonicHz, best.Worst)
+	fmt.Printf("\nbest: %s (%.2f Hz), worst degree %+.1f cents, spread %.1f, mean %+.1f",
+		best.TonicName, best.TonicHz, best.Worst, best.Spread, best.Mean)
 	if *oneVoice {
 		fmt.Printf(" on one waveform (AUDC %d, %+.1f cents)", best.OneVoice, best.OneWorst)
 	}

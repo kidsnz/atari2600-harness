@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `keyfit` reports SPREAD and MEAN, not only WORST (2026-09-04)
+
+Glenn Saunders, stella-list 1998: *"you make sure you choose an octave and a key that presents notes
+that are **all in tune with each other**. If one value is A4+12 and another is A3−4 then you shouldn't
+use these notes just because they are both As. It would be wiser to pick … an entire key that ranges
+from +5 to +10 out of tune (since it will be **in tune relative to itself** to within 5 cents
+accuracy)."*
+
+`keyfit` ranked candidates by `Worst` — the largest absolute error across the degrees — and computed
+nothing else. **A key sitting uniformly +10 cents sharp has Worst 10 and spread 0, and sounds right**;
+a key spanning −6 to +9 has a smaller Worst and sounds wrong. Ranking by Worst prefers the second.
+A listener hears intervals, not absolute pitch.
+
+`Fit` now carries `Spread` (flattest degree to sharpest) and `Mean`, and the CLI prints both. The
+numbers disagree in this repository's own data: on the F# minor bass figure, `A#1` has worst +38.5
+with spread 40.2 while `B1` has worst +43.5 with **spread 68.8** — a different ordering. The chosen
+tonic, F#2, comes out worst +12.0, spread 19.8, mean +0.5. And from `pitch-dither.md`'s recorded
+figures (D2 −0.9, E2 −6.0, F#2 +14.7): worst 14.7, spread 20.7, mean +2.6.
+
+**Neither number is applied automatically**, which is the same division of labour as the file's
+existing *"What it does NOT do: CHOOSE"*. Spread is right for a piece heard on its own; a piece
+played against a recording or a sample is judged against an external reference, and there absolute
+error is what matters.
+
+Found by the mailing-list distillation (helper-2), who also said plainly what they had not checked —
+that they had not read all of `keyfit.go` and that `SweepDetuned` might already cover part of it.
+
 ### Added — a shipped game depends on bus residue, which is the third direction (2026-09-04)
 
 This file already says *do not read a write-only TIA register* (residue comes back) and *do not read
