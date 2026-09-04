@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — one line was the cause of three others, and nothing said so (2026-09-04)
+
+`known-traps.md` recorded *"no R/W line to the cart → bus contention"* as a footnote to "don't `STA`
+to ROM". **It is the cause of three separate entries elsewhere**, and the connection was never drawn.
+
+The cartridge connector carries address and data and **no direction signal**, so a cartridge that
+wants writable memory has to encode direction in the address. Everything follows: a SuperChip's 128
+bytes occupy **256 addresses** — first 128 write, second 128 read — which is why its write port is not
+statically decidable and why a naive dumper reads back whatever it just wrote; the Supercharger uses a
+stateful arming sequence instead (touch `$F0xx` and the next `$Fxxx` becomes a write regardless of the
+instruction); and every "is this a read or a write" question in the mappers is answered by convention
+rather than by a signal. Erik Mooney and Eckhard Stolberg, 1998, stated the fork: with no R/W line you
+either **spend an address line as the direction bit** (halving the RAM) or **do something more
+complicated**.
+
+The engine says it too, in the file that decides what a cartridge is:
+`memory/cartridge/fingerprint.go:584` — *"because there is no r/w line in the cartridge bus, there 256
+addresses related to the superchip."*
+
+**Two corrections to the report that prompted this, both verified here.** It claimed `rg 'R/W line'
+docs/` returns zero — it returns one, the line quoted above; and it cited
+`hardware/peripherals/fingerprint.go:584`, which is 427 lines long. There are **two files named
+`fingerprint.go`** in the engine and the fact is in the other one. Same-name-different-thing, the
+fifth instance the distillation has catalogued this week, hit while reporting a finding about it.
+
+Found by the mailing-list distillation (helper-1).
+
 ### Fixed — `divtable.md`'s formula did not produce two of its own four constants (2026-09-04)
 
 The page said `RECIP = round(256 / d)`. **`round(256/3) = 85` and the table holds 86; `round(256/15) =
