@@ -6,6 +6,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the TIA manual's "one line after" is a consequence written as a mechanism (2026-09-03)
+
+The manual says a VDELx object's second graphics bit is loaded *"one line after the first was loaded
+from the data bus"*. A 2005 post calls that **"baloney"** — the registers *"look for writes to GRPx;
+they don't monitor the scanline counter"*.
+
+**Both are right, and that is the interesting part.** The same post continues: *"when that was written,
+you were expected to write to GRP0 and GRP1 every other line during your kernel (as Combat does). If you
+actually do that, all three VDEL registers behave exactly as advertised."* The manual describes the
+consequence of an idiom that was universal when it was written, in the words of a mechanism. Do anything
+else and the delay follows your writes, not your lines.
+
+Our engine is on the writes side, read from source: `ball.go`'s `setEnableDelay` is called from exactly
+two places, both `case cpubus.GRP1`, and nothing in that file reads a scanline counter — its two
+mentions of the word are drawing comments. No fixture yet, and the entry says so: **source semantics are
+not a measurement**, the same line held today for `BIT CXxx` and for the ball-width disagreement.
+
+This is a third kind, and worth naming because the first two are being counted: **the source is wrong**
+(ASR's stability, skipdraw's "constant 18"), **we misread the source** (the interlace rule, the
+indirect-jump attribution, the 3CC derivation), and now **the source is right under a premise it does not
+state**. The test that separates the third from the first is whether the person denying it goes on to
+say when it does hold. Mooney does, so the manual is not to be discarded — it is to be quoted with its
+premise attached.
+
+Found by the mailing-list distillation (helper-1), who was asked to check whether harness took a side and
+came back with a better answer than the question assumed. They also confirmed, from the same `case`, our
+existing claim that a GRP1 write copies both P0's graphics and the ball's enable — a line they had
+previously flagged as unsupported by its 1998 quote.
+
 ### Added — `invisible-probe.md`: the hardware computes a hit test if you can hide the instrument (2026-09-03)
 
 Park a missile or the ball on a region the hardware has no register for, read the collision latch, and
