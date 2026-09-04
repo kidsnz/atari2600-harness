@@ -81,8 +81,14 @@ on-screen value at `$B0` (÷15 of 90 = 6). 13 exact RAM asserts in total, `ntsc_
   | ÷15, RECIP=18 (ceil) | 111 | 0 or +1 |
 
   So `ceil` halves the corrections for ÷3 and multiplies them by **6.5** for ÷15. What the shipped
-  table actually is, is *ceil throughout*; **why** is not the correction count, and this file does not
-  know. Recorded rather than rationalised. (Found by the mailing-list distillation, helper-1, who
+  table actually is, is *ceil throughout*; **why** is not the correction count.
+  **Nor is it the implementation, checked 2026-09-04.** `divtable.asm`'s correction runs **both
+  ways** — it shrinks `quot` while `quot*divd > num` and then grows it while `rem >= divd`, and its
+  own comment says so: *"the reciprocal estimate is within ±1 of the true quotient, so we correct in
+  BOTH directions"*. An asymmetric corrector would have forced a one-sided reciprocal and explained
+  everything; this one does not. **Either constant is equally correct here, and neither the code nor
+  this page knows why ceil was chosen.** Recorded rather than rationalised — the alternative was to
+  invent a reason, and a plausible reason that is not the real one is worse than an open question. (Found by the mailing-list distillation, helper-1, who
   measured ÷3 and read the `round`/`ceil` mismatch off it; the ÷15 half is re-run here and reverses
   the advantage, so the "ceil is better" reading did not survive checking.)
 - **Cycle cost (NMOS timing, no page-cross), in=100:** ÷3 ≈ 873 cy, ÷7 ≈ 556 cy, ÷10 ≈ 497 cy,

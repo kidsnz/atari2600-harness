@@ -6,6 +6,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — and it is not the implementation either: `divtable`'s reciprocal choice stays open (2026-09-04)
+
+Earlier today the `round`/`ceil` mismatch was fixed and the obvious rationalisation ("ceil needs fewer
+corrections") was measured and rejected — true for ÷3, **6.5× worse for ÷15**. The distillation then
+asked the right follow-up: *maybe the implementation forces it — has anyone opened `divtable.asm`?*
+
+Opened. **The correction runs both ways**, and says so itself: *"the reciprocal estimate is within ±1
+of the true quotient, so we correct in BOTH directions"* — it shrinks `quot` while `quot*divd > num`,
+then grows it while `rem >= divd`. An asymmetric corrector would have forced a one-sided reciprocal
+and explained the whole thing. This one does not.
+
+**So: either constant is equally correct, and neither the code nor the page knows why ceil was
+chosen.** Left open in the doc rather than rationalised — a plausible reason that is not the real one
+is worse than an admitted gap, and this file has spent the day removing exactly that kind of sentence.
+
+helper-1 raised the question after accepting the correction to their own claim, noting they had not
+opened the ROM. That is the second time today a finding improved because someone said which file they
+had not read.
+
 ### Added — how many colours each TV standard actually has: 126 / 104 / 8 (2026-09-04)
 
 A 1997 post says PAL has *"half the colours"*, hedged with *"I vaguely remember"*. Nobody on the list
