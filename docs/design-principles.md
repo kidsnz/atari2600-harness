@@ -153,8 +153,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   and the note says it shipped anyway, which would be the more interesting outcome.** It cannot be
   settled here: the source was a list attachment (other people's commented assembly — outside the
   clean-room line, not opened) and **no Qb ROM exists in this tree** — checked, 319 `.bin` images
-  under `reference/`, none of them Qb. A byte scan of a ROM would not settle it either, since `$AB`
-  as data is indistinguishable from `$AB` as an opcode without disassembling from the entry point.
+  under `reference/`, none of them Qb. A raw byte scan would not settle it — `$AB` as data
+  is indistinguishable from `$AB` as an opcode — but **disassembling from the entry point would**, and
+  this tree has the machinery: `Gopher2600/disassembly`'s `FromCartridge`/`bless` follow flow and
+  separate code from data, and `cmd/dissect` drives them. **The method exists; the ROM does not.**
+  (Corrected the same day: this line first said a byte scan settles nothing and stopped there, which
+  understated what is available — helper-1 caught it.) With a `.bin`, this is a question that can be
+  closed without opening anyone's source.
   Recorded as an open question with its falsifier named. Found by the distillation (helper-1), who
   declined to quote it as evidence for the same reason. 〔mining 168616 illegal-opcode stability (ASR caveat in the same note); 294471 §32 for the independent second report〕 **Corrected 2026-09-02**: this line previously listed ASR as stable and claimed it was "already used in 48px / dyn_multisprite". Both were wrong — those three ROMs use no illegal opcode at all, and no ROM in the corpus uses ASR/ALR (measured with two structurally different expressions, both exit 1). `scripts/check_traps.py:73` had already omitted ASR from what it recommends, so the docs were the outlier.
 - **The resource triangle + a register convention**: RAM (128B) / CPU (76cy) / ROM are mutually exclusive = growing one shrinks the others (plus the human cost). The Thomas Jentzsch convention = inside the kernel, pin the roles to **Y = scanline and sprite index, X = PF, A = everything else** and it runs faster. Use subroutines for code reuse only (the call cost is high). 〔mining 146817〕

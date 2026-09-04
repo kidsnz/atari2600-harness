@@ -7,6 +7,7 @@ package ingest
 
 import (
 	"image/color"
+	"sort"
 
 	"github.com/jetsetilly/gopher2600/hardware/television/signal"
 	"github.com/jetsetilly/gopher2600/hardware/television/specification"
@@ -46,7 +47,7 @@ func (q *Quantizer) Nearest(c color.RGBA) (code uint8, dist int) {
 }
 
 // Canonical は「同一 RGB を持つ最小の TIA コード」を返す。パレットには同色衝突がある
-//（例: 本パレットでは $0C と $0E が同一 RGB）。量子化結果は常にこの正準値で報告される。
+// （例: 本パレットでは $0C と $0E が同一 RGB）。量子化結果は常にこの正準値で報告される。
 func (q *Quantizer) Canonical(code uint8) uint8 {
 	c, _ := q.Nearest(specification.SpecNTSC.GetColor(signal.ColorSignal(code)))
 	return c
@@ -55,4 +56,50 @@ func (q *Quantizer) Canonical(code uint8) uint8 {
 // RGB は TIA 色コードのパレット RGB を返す（overlay の再描画用）。
 func (q *Quantizer) RGB(code uint8) color.RGBA {
 	return specification.SpecNTSC.GetColor(signal.ColorSignal(code))
+}
+
+// Aliases returns the groups of TIA colour codes this quantiser cannot tell apart: every entry is
+// two or more codes that share one RGB value. The reverse lookup necessarily returns just one of
+// them, and until now nothing said which information was being thrown away.
+//
+// Measured on the Stella NTSC table (2026-09-04): **128 codes, 91 distinct colours, 28 alias groups,
+// 37 codes that no image can ever ask for.** Four codes ($26 $28 $F6 $F8) are one colour; the
+// adjacent greys $08/$0A and $0C/$0E are pairs.
+//
+// Why this is worth a function rather than a comment. Artwork for this project is drawn in
+// Photoshop and ingested here, so an artist can pick two swatches that look different, get two
+// different TIA codes out of a table, and see one colour on the screen — with no warning anywhere in
+// the chain. `Nearest` cannot warn, because by the time it runs the two swatches have already
+// collapsed. A caller that wants to warn has to ask this first.
+//
+// **The count belongs to this table, and measurement says so sharply.** Run the same two functions
+// over the engine's own palette (`NewNTSCQuantizer`) and the answer is **126 distinct colours with 2
+// alias groups** — against Stella's 91 and 28. The collapse is therefore overwhelmingly a property
+// of the *measured Stella table*, not of the TIA's colour generation, and the person who measured
+// that palette said as much in 2001: the colours in Stella "seem to be idealized a bit". Three
+// layers exist — the colour code, an emulator's RGB, and a real television — and this measures the
+// middle one of one emulator. Do not read "91 colours" as a hardware limit.
+func (q *Quantizer) Aliases() [][]uint8 {
+	byRGB := map[color.RGBA][]uint8{}
+	for i, p := range q.rgbs {
+		byRGB[p] = append(byRGB[p], q.codes[i])
+	}
+	var out [][]uint8
+	for _, codes := range byRGB {
+		if len(codes) > 1 {
+			out = append(out, codes)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i][0] < out[j][0] })
+	return out
+}
+
+// DistinctColours returns how many different colours this quantiser can actually produce, which is
+// smaller than the number of codes whenever Aliases is non-empty.
+func (q *Quantizer) DistinctColours() int {
+	seen := map[color.RGBA]bool{}
+	for _, p := range q.rgbs {
+		seen[p] = true
+	}
+	return len(seen)
 }

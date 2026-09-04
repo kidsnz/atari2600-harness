@@ -14,6 +14,15 @@ CLI: `go run ./cmd/ingest -in shot.png -out report_dir/` → `overlay.png` + `re
 | **B — conversation grade** | OS screenshots (full screen / window) | "look at this" pointing and discussion. Extraction still runs but warns: non-integer scale and window chrome degrade precision |
 | **C — not usable** | photos of a screen, resized/filtered images, JPEG-artifacted shots | colors and the pixel grid are destroyed; expect garbage |
 
+**Some swatches are the same colour.** The palette this pipeline quantises against holds 128 codes
+but only **91 distinct colours** — 28 groups collide, 37 codes are unreachable, and four codes
+(`$26 $28 $F6 $F8`) are a single tone. The two adjacent grey pairs (`$08`/`$0A`, `$0C`/`$0E`) matter
+most: a luminance ramp that looks smooth on the canvas has steps in it that do not exist. `Nearest`
+cannot warn about this — by the time it runs, the two swatches have already collapsed — so ask
+`Quantizer.Aliases()` first if you want to check a palette before drawing with it.
+**This is the measured Stella table's shape, not the TIA's**: the engine's own palette gives 126
+distinct colours in 2 groups. Which of the two a real television resembles is not established here.
+
 **The canvas is not the screen. A 2600 pixel is wide.** Anything drawn at 100 % on a
 square-pixel canvas — the form this project's artwork arrives in — is stretched horizontally on a
 real display by somewhere between **1.60× and 1.82×**; the range is not measurement noise, it is the

@@ -6,6 +6,41 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — 37 of the 128 palette codes are unreachable, and which layer owns that (2026-09-04)
+
+Artwork for this project is drawn in Photoshop and ingested here, so **an artist can pick two
+swatches that look different, get two different TIA codes, and see one colour on the screen** — with
+nothing in the chain saying so. `Nearest` cannot warn: by the time it runs the two have already
+collapsed into one entry.
+
+Measured on the Stella NTSC table: **128 codes, 91 distinct colours, 28 alias groups, 37 codes no
+image can ever ask for.** Four codes (`$26 $28 $F6 $F8`) are one tone. The two adjacent grey pairs
+(`$08`/`$0A`, `$0C`/`$0E`) matter most — a luminance ramp that looks smooth in the swatch has steps
+that do not exist.
+
+`Quantizer.Aliases()` and `Quantizer.DistinctColours()` added so a caller can ask before drawing,
+pinned by `aliases_test.go`, and written into `ingest.md` where the artist's side of the loop is
+described.
+
+**And then the control changed the claim.** Running the same two functions over the *engine's* own
+palette gives **126 distinct colours in 2 alias groups**, against Stella's 91 and 28. So the collapse
+is overwhelmingly a property of the measured Stella table, **not of the TIA's colour generation** —
+which matches what the person who measured that palette wrote in 2001, that Stella's colours "seem to
+be idealized a bit". The test asserts the engine's numbers too, so the day the two converge, the
+caveat fails loudly instead of quietly becoming false. Three layers exist — the colour code, an
+emulator's RGB, a real television — and this measures the middle one of one emulator.
+
+Found by the mailing-list distillation (helper-2), who counted it first and flagged the layering
+caveat in the same message.
+
+### Fixed — a claim about what a byte scan cannot settle (2026-09-04)
+
+Yesterday's Qb/`LAX` note said a byte scan could not decide whether an `$AB` is an opcode or data and
+left it there. True of a raw scan and an understatement of what is available: `Gopher2600/disassembly`
+`FromCartridge`/`bless` follow flow and separate code from data, and `cmd/dissect` drives them. **The
+method exists; the ROM does not.** Corrected — helper-1 caught it the same day, having read the rule
+in the umbrella `CLAUDE.md` that names those exact entry points.
+
 ### Added — two 1997 assembly traps, one of which we could already detect (2026-09-04)
 
 Greg Miller found both in one reading of someone else's code on the list (`199712/msg00194`), which
