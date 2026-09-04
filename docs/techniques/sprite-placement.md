@@ -15,6 +15,15 @@ this catalogue says what to DO with sprites
 (`nusiz-shaping.md`, `dynamic-multisprite.md`, `bitmap48.md`); none of it said where they land, so
 the numbers were re-derived from throwaway probes twice in one session. This file is the fix.
 
+**It was re-derived a third time on 2026-09-03, and the fix did not hold.** Building a litmus for
+something else, a quad-width probe was parked near the right edge and read the *left* copy of the
+playfield — rule 12 below, rediscovered from scratch, costing most of an afternoon. The file was in
+the session's own startup context, named in `STATUS.md` as technique #35 with its litmus and its
+Stella check. **Knowing a table exists is not the same as reaching for it**, and what decided it was
+subject: the work was about collision latches, so the *placement* document was never opened.
+**Cite this table from any technique whose fixture places an object** — a rule nobody reads is a
+rule that gets measured again.
+
 ## The rules
 
 | | rule | band |
@@ -30,7 +39,7 @@ the numbers were re-derived from throwaway probes twice in one session. This fil
 | 9 | a DOUBLE-width or QUAD-width player lands at **x = 3c − 59**, never left of x = 4 | — |
 | 10 | a missile is clamped at **x = 2** — one clock LEFT of anywhere a player can be — and **each clamp is a WINDOW of write cycles, not one** | 8, 9, 11, 12 |
 | 11 | the **BALL** places exactly like a missile: same `x = 3c − 61`, same clamp at 2 — **placement only, and they part company on everything else.** Re-strobed mid-line the ball draws **1 + k** blocks and a missile draws **1**; struck inside its own block a missile is EXTENDED past 8 px while the ball restarts and cuts the old one. Measured below, `litmus_restrobe_objects` | 13, 14 |
-| 12 | a NUSIZ copy past 160 **wraps to the left edge and draws there on the same line** | 15 |
+| 12 | a NUSIZ copy past 160 **wraps to the left edge and draws there on the same line** — 2026-09-03: a quad-width P1 at x≈150 wrapped to 0-22 and collided with a playfield copy at the *other* end, which read as "the probe is on both copies" and sent an entire band chasing the wrong boundary (`litmus_pf0_reflect`'s points E and F are what caught it) | 15 |
 | 13 | **a mid-line `RESP` re-strobe is a placement mechanism, not only HMOVE**: it puts an object anywhere on the 3 px grid *during a drawn line*, for the price of a three-cycle store — see `restrobe-copies.md` | — |
 
 Rule 9 is from the same session's probes rather than from this litmus, which grades normal width.

@@ -6,7 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
-### Added — `input-budget.md`: on this machine the controller is a line item (2026-09-03)
+### Changed — the wrap at clock 160 was measured thirteen days ago, and we derived it again anyway (2026-09-03)
+
+Most of an afternoon went into finding that a quad-width probe parked near the right edge was also
+drawing at the left, because the TIA's horizontal counter wraps at 160. It is rule 12 in
+`sprite-placement.md`, measured on 2026-08-21, fixed by `litmus_restrobe_objects`, graded by
+`internal/emu/restrobeobjects_test.go`, and cross-checked against Stella 37/37.
+
+**That file's own preamblepredicted this:** *"none of it said where they land, so the numbers were
+re-derived from throwaway probes twice in one session. This file is the fix."* Today was the third
+time, and the file was **named in this session's startup context** — `STATUS.md` lists it as technique
+#35, with its litmus and its Stella check.
+
+So the lesson is not "write it down". It was written down, verified, locked in CI and announced at
+launch. **Knowing a table exists is not the same as reaching for it**, and what decided it was subject:
+the work was about collision latches, so a document about *placement* was never opened. That is the
+fourth instance this week of a tool being missed because of what was being built just before.
+
+Both ends now carry it. The preamble records the third derivation and asks to be cited from any
+technique whose fixture places an object; rule 12 carries the concrete failure, because a rule stated
+abstractly reads as somebody else's problem — *a quad-width P1 at x≈150 wrapped to 0-22 and collided
+with a playfield copy at the other end, which read as "the probe is on both copies"*. And
+`invisible-probe.md`, whose fixture caused it, opens by pointing at the table.
+
+Found by the mailing-list distillation (helper-3), who went looking for something else and recognised
+our afternoon in a row of a table they had not written.
+
+ (2026-09-03)
 
 Which device a game can use is decided by where the cost of reading it lands, not by preference. The
 joystick is 40-44 cycles **once a frame**, in VBLANK, where there is slack. A paddle is 8-16 cycles

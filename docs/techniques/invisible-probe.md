@@ -1,5 +1,10 @@
 # Technique — the invisible probe (a hidden missile or ball as a hit box)
 
+> **Before placing a probe, read `sprite-placement.md`'s rule table.** Rule 12 — a copy past clock
+> 160 wraps to the left edge and draws on the same line — was measured and CI-locked on 2026-08-21
+> and rediscovered from scratch while this page's own fixture was being built. Placement has its own
+> document precisely so that a page about something else does not have to derive it again.
+
 **Goal:** get a hit test the hardware computes for you, on a region the hardware has no register
 for. Park a missile or the ball on the region you want to test, read the collision latch, and hide
 the object so the player never sees the instrument.
