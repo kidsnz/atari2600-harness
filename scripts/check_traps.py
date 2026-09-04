@@ -86,6 +86,15 @@ def scan_text(asm):
         # independent confirmation from omegamatrix on real hardware. No ROM in the corpus
         # uses it (measured with two structurally different expressions, both exit 1), so
         # adding it costs nothing and closes the gap between the docs and this check.
+        # Five spellings, three instructions, and only three of the five assemble.
+        # Measured with DASM 2.20.14.1 on 2026-09-04 (found by the mailing-list distillation,
+        # helper-1; re-run here): `asr`, `ane` and `lxa` are accepted; **`alr` and `xaa` are
+        # rejected**, so they cannot appear in a .asm that builds. They stay in the pattern
+        # anyway. Matching a mnemonic the assembler would refuse costs nothing — such a file is
+        # already broken — while removing them makes this check specific to one assembler, and a
+        # macro or a different tool could still emit them. The measurement is recorded here so
+        # the next reader does not take it again: this file's own subject is a rule that was
+        # re-derived from scratch because nobody wrote down that it had been settled.
         m = re.search(r"\b(lxa|xaa|ane|asr|alr)\b", low)
         if m:
             errors.append((n, f"unstable illegal opcode `{m.group(1)}` — HW-unreliable (use LAX/SAX/SBX/DCP instead)"))

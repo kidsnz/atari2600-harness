@@ -100,9 +100,16 @@ also why the joystick's 40–44 cycles is the *whole* cost and not a per-line on
   treat it as the pessimistic reading it is. Found by the mailing-list distillation (helper-2), who
   proposed the litmus that would have settled it on hardware. **Gopher2600 does not model the delay at all** (its own `keypad.go`
   carries the TODO), so nothing here will make you pay it: see `known-traps.md`.
-  A missing fifth peripheral, for the same reason: the **driving controller** (2002 wiring diagrams
-  put a Gray code in the low two bits of each SWCHA nibble) is not in that list, so it shares the
-  keypad's hole rather than having one of its own.
+  **A missing fifth peripheral — but not the keypad's hole.** The **driving controller** is not in
+  that list either (`controllers/` holds `stick.go`, `paddle.go`, `keypad.go`, `gamepad.go` and no
+  `driving.go`; the engine folds its events into the stick's horizontal/vertical). The reason it is
+  absent is *different*, and an earlier version of this line got that wrong: the keypad's cost is the
+  **400 µs settling wait** because the port is driven as an output, while the driving controller is
+  **read like a joystick** — a Gray code in the low two bits of a `SWCHA` nibble, sampled once a
+  frame, no direction change and therefore no wait. Two peripherals missing for two reasons; the
+  costs do not transfer. (Corrected 2026-09-04 — helper-1 caught the category error and supplied the
+  earlier source: Eckhard Stolberg, 2000-08-14, two years before the wiring diagrams this file
+  originally cited.)
 
 
 ---

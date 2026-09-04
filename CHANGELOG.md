@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — record that two of the five illegal-opcode spellings do not assemble (2026-09-04)
+
+`check_traps.py` rejects `lxa|xaa|ane|asr|alr` — five spellings for three instructions. Measured with
+DASM 2.20.14.1: **`asr`, `ane` and `lxa` are accepted; `alr` and `xaa` are rejected**, so those two
+cannot appear in a `.asm` that builds.
+
+**The pattern is unchanged, deliberately.** Matching a mnemonic the assembler would refuse costs
+nothing — such a file is already broken — while narrowing it makes the check specific to one
+assembler, and a macro or a different tool could still emit them. What was missing was the
+*measurement*, now in the source so the next reader does not take it again. The file's own subject is
+a rule that got re-derived from scratch because nobody wrote down that it had been settled.
+
+Measured by the mailing-list distillation (helper-1) with two negative controls, re-run here and
+matching.
+
+### Fixed — the driving controller is missing for a different reason than the keypad
+
+`input-budget.md` said the driving controller *"shares the keypad's hole"*. It does not, and the
+distinction matters because the costs do not transfer. The keypad's cost is the **400 µs settling
+wait**, incurred because the port is driven as an output. The driving controller is **read like a
+joystick** — a Gray code in the low two bits of a `SWCHA` nibble, sampled once a frame — so there is
+no direction change and no wait. Two peripherals absent from the engine (`controllers/` has no
+`driving.go`; events fold into the stick's axes) for two unrelated reasons.
+
+helper-1 caught the category error and supplied an earlier source than the one this file cited:
+Eckhard Stolberg, 2000-08-14, two years before the 2002 wiring diagrams.
+
 ### Changed — one formula behind all five aspect-ratio sources, and PAL is 2.00 (2026-09-04)
 
 The aspect-ratio note listed four disagreeing sources (1.60, 1.67, 1.71, 1.82) and explained the
