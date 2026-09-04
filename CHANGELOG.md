@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the `RESPxHBLANK` explanation outruns its citation, and `RandomState` reaches further than one row said (2026-09-04)
+
+Two corrections to work landed earlier the same day, both from distillers reading past the summary.
+
+**The engine's comment says more than its source does.** `RESPxHBLANK` is described as an HBLANK
+threshold *"affected by operating temperature"* and cites stella-list `199901/msg00089`. Counted: that
+post contains **zero occurrences of "HBLANK" and zero of "temperature"**. What it has is a
+console-to-console difference in how many sprite copies appear — *"I get only two copies at Hit5 …
+**what version of the VCS are you using?**"* — and its author's hedge, *"maybe I need to revise my 5
+pixel delay theory again."* The citation is genuine, same phenomenon and same test ROM; the mechanism
+comes from later work the code does not name. **So the flag models a real effect on an unstated
+basis**, which is a second reason not to read our flag-off numbers as hardware. helper-3 read the
+cited post rather than the comment about it.
+
+**And `RandomState` governs far more than the boot bank.** The existing row covered one consequence.
+Counted: the preference is read in **18 places**, and the two that matter are not cartridges —
+`riot/timer/timer.go:101` randomises the divider and **INTIM**, `memory/vcs/ram.go:51` fills **all 128
+bytes of RAM** with random values instead of zero. Nothing here sets it. **A bank-switching quirk
+touches bank-switching ROMs; a deterministic INTIM and a zeroed RAM touch every ROM there is** — and
+the corpus names the damage: Thomas Jentzsch, 2003, **Berzerk seeds its maze from INTIM**, so a
+console that always reads the same value draws the same maze every time. For a ROM of our own the
+rule is unchanged (initialise everything); for **studying a commercial ROM**, determinism here can
+hide the behaviour being studied. helper-1 counted the reach.
+
 ### Added — "frying", the player-side proof that the power-up trap is real (2026-09-04)
 
 Yesterday's row says *do not depend on a power-up value on purpose*. This is the same fact from the

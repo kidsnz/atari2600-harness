@@ -19,6 +19,14 @@ import (
 // operating temperature"* and cites `199901/msg00089` — **a post in the corpus being distilled here**,
 // in which Eckhard Stolberg, unable to reproduce a colleague's result, asks *"what version of the VCS
 // are you using?"* and writes *"maybe I need to revise my 5 pixel delay theory again."*
+//
+// **The comment's explanation outruns that citation.** Counted 2026-09-04: the post contains **zero
+// occurrences of "HBLANK" and zero of "temperature"**. It reports a console-to-console difference in
+// how many copies appear, and nothing about a mechanism. The citation is genuine — same phenomenon,
+// same test ROM — so the HBLANK threshold and the heat model come from later work the code does not
+// name. That is a second reason not to read the flag-off numbers below as hardware: **the flag itself
+// rests on an unstated basis.** Found by the distillation (helper-3), who read the cited post rather
+// than the comment about it.
 var revisionFlags = []string{
 	"LateVDELGRP0", "LateVDELGRP1", "LateRESPx", "EarlyScancounter",
 	"LatePFx", "LateColor", "LostMOTCK", "RESPxHBLANK",
