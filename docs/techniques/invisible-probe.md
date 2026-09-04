@@ -4,6 +4,13 @@
 > 160 wraps to the left edge and draws on the same line — was measured and CI-locked on 2026-08-21
 > and rediscovered from scratch while this page's own fixture was being built. Placement has its own
 > document precisely so that a page about something else does not have to derive it again.
+>
+> **And before building a band to discover WHICH object drew a pixel, call `decompose_row`.** It
+> returns run-length runs of `{clock, len, element}` across visible clocks 0..159 and describes
+> itself as *"the attribution sibling of read_row"*. The calibration band in `litmus_pf0_reflect`
+> exists because a probe's identity was unknown; one `decompose_row` call would have shown the
+> quad-width `P1` starting at clock 0 immediately. Neither fixture built here calls it — the
+> question asked was about attribution and the tool reached for was the one about colour.
 
 **Goal:** get a hit test the hardware computes for you, on a region the hardware has no register
 for. Park a missile or the ball on the region you want to test, read the collision latch, and hide

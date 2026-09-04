@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the question that cost an afternoon has a tool, documented in the file loaded at launch (2026-09-04)
+
+The expensive question yesterday was *"which copy of the playfield is this probe standing on?"*, and it
+was answered by writing a calibration band into a ROM. `decompose_row` answers it directly. Its own
+description reads *"WHICH TIA OBJECT drew each pixel … the attribution sibling of read_row"*, and
+**`CLAUDE.md` carries a worked example of the same shape** — *"`decompose_row` shows P0 occupying clock
+2..9"* — in the file that is loaded into every session at launch.
+
+Neither fixture written yesterday calls it. Zero occurrences in `litmus_pf0_reflect.asm`,
+`pf0reflect_test.go`, `flickerattrib_test.go`.
+
+The mechanism is in the tool's own sentence: the question was about **attribution** and the tool reached
+for was the one about **colour** (`read_row`), whose sibling this is. One call would have shown a
+quad-width `P1` starting at clock 0 and ended the confusion in a minute.
+
+**This is the fifth of these in two days and the first of its kind.** The other four were facts sitting
+inside code — `calibrate`'s exclusion of saturated points, `ramtrace`'s stack low-water mark and its
+`collisions_seen`, `sprite-placement`'s rule 12. This one was in the always-loaded contract file, with
+an example. **Writing it down where it is always read is not sufficient either.**
+
+`invisible-probe.md` now says so at the top, next to the placement pointer added yesterday for the same
+reason.
+
+A smaller instance of the same thing while checking this: the quote above was searched for by hand and
+missed, because a backtick was dropped when copying it out of a message. **Today's own rule — extract
+verbatim mechanically, never type it — broken while verifying a report about not using the tools we
+have.**
+
+Found by the mailing-list distillation (helper-3), who could not run the tool themselves and named the
+real failure as not having said "call `decompose_row`" out loud.
+
 ### Changed — the DDR line's counterexamples may be Combat and Air-Sea Battle, and we cannot check (2026-09-04)
 
 Yesterday "rarely game-relevant" was withdrawn for the port DDRs on the strength of one line in
