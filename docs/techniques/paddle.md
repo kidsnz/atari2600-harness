@@ -13,7 +13,12 @@ Hardware basis: `litmus_paddle` (v0.54.0; INPT0 dump/charge transfer curve measu
 - **Overscan + VBLANK: `VBLANK = $82`** — D1 blanks the screen as usual, **D7 dumps the paddle
   caps** (discharge). Both functions live in one register; keep dump on through blanking.
 - **Visible start: `VBLANK = 0`** — releases the dump, capacitor starts charging.
-- **Kernel, each line** (cheap: ~12 cycles when already latched):
+- **Kernel, each line** (cheap: ~12 cycles when already latched). ⬜ **Unresolved 2026-09-03:**
+  adding the same instructions up from the engine's own table gives **8 or 16** depending on which
+  form is counted, not 12. Neither figure has been run, so the doc keeps its number and records the
+  disagreement rather than picking a side. The shape survives either way — see
+  `input-budget.md`, whose argument is the ratio between a per-frame and a per-line read, not the
+  exact count.
   ```
   lda padNew / cmp #$FF / bne done   ; already latched this frame?
   bit INPT0 / bpl done               ; D7 still 0 = charging

@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `input-budget.md`: on this machine the controller is a line item (2026-09-03)
+
+Which device a game can use is decided by where the cost of reading it lands, not by preference. The
+joystick is 40-44 cycles **once a frame**, in VBLANK, where there is slack. A paddle is 8-16 cycles
+**per visible line**, in the kernel, where there is not — over 192 lines that is 35× to 77× the
+joystick's total, and 7.7% to 15.4% of the whole frame, spent on the side that has nothing to spare.
+
+That is why the list's answer to "why is there no proportional trackball game" is a cycle count rather
+than a taste: *"the 2600 doesn't have much CPU time left over to read controller ports … that's why
+trackballs have a joystick emulation mode"* 〔stella 1997, Glenn Saunders〕. Keypads are worse again and
+stay ⬜ — the ledger has `keypad-read-delay` and `reading-trackball` as titles only, so the table can be
+finished by mining them.
+
+`①lint` and `②techniques/litmus` were both empty for this: choosing an input device was in neither our
+rules nor our hardware verification, and `paddle.md` was the only input technique we had.
+
+**Two measurement notes came with it, both worth more than the page.** The engine's instruction table
+**does not distinguish zero-page from absolute by mode name** — `LDA` appears twice as `absolute`, at 2
+bytes/3 cycles and 3 bytes/4 cycles — so a query by mode alone silently counts a zero-page access as
+four cycles. (`branch-always`'s figures were addressed by opcode and are unaffected; checked.) And
+`paddle.md`'s "~12 cycles" does not match 8 or 16 from that table, which is now recorded on the line as
+⬜ rather than quietly corrected, because neither number has been run.
+
+Also added, to `zone-multiplexing.md`: a **third** way past two players on a line, next to flicker and
+the missile/ball/PF — interleave both players at a wide `NUSIZ` so each sits in the other's gaps, six
+figures and no flicker, paid for in width instead of in frames 〔stella 2000, Glenn Saunders〕. The line
+had listed two escapes and there are three.
+
+From the mailing-list distillation (helper-2).
+
 ### Added — the TIA manual's "one line after" is a consequence written as a mechanism (2026-09-03)
 
 The manual says a VDELx object's second graphics bit is loaded *"one line after the first was loaded

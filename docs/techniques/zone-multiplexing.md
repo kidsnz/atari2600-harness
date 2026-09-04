@@ -18,7 +18,11 @@ DaveC's `landscape.asm` (AtariAge; `reference/files-dave/`) and the 8bitworkshop
 - The timing-sensitive display loop that does it is **the kernel**; one that draws many sprites is a
   **multi-sprite kernel**.
 - **Hard limit: at most 2 player-objects per scanline.** Bands stack *vertically*; within any single scanline
-  you still get only two. Going beyond two *on the same line* needs **flicker** (below) or the missile/ball/PF.
+  you still get only two. Going beyond two *on the same line* needs **flicker** (below), the
+  missile/ball/PF, **or a third route this line used to omit: interleave the two players at a wide
+  `NUSIZ` so each sits in the other's gaps.** Glenn Saunders describes it on the list in 2000 —
+  P1 P2 P1 P2 P1 P2 across one line, **six figures and no flicker**, paid for in width rather than
+  in frames. Added 2026-09-03; not measured here.
 - **Single-line vs 2-line kernel.** A *single-line* kernel updates the TIA every scanline (almost no spare
   CPU). A *2-line (double-line) kernel* repeats each sprite line over 2 scanlines, buying CPU time for logic —
   the more common choice for real games. Ours is effectively single-line.
