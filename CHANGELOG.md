@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `blank-a-frame.md`, and a shipped precedent for a tightening we called untried (2026-09-03)
+
+**`blank-a-frame`** is the third answer to a setup that will not fit, next to trimming the work and
+spending more lines. It is the one that changes nothing about the kernel, and it applies exactly when
+the other two do not: **when the cost is per-event rather than per-frame** — a respawn, a level load, a
+state transition. The page is explicit that the danger is not slowness but that **the frame length
+changes**, and carries forward what this week measured about detecting that: a scenario reading
+`ntsc_frame_lines` samples *one* frame, so a one-off overrun at frame 40 is invisible to an assert at
+frame 4. Use it with `frame_lines_stable`. Hardware basis is stated as not measured here — the source
+proposes the approach rather than demonstrating it.
+
+**Separately: `multicolor48.md` proposed `LAX` to fuse `LDA`+`TAX` "verify on Gopher2600 first",
+and it had shipped in 2000.** Thomas Jentzsch, in Thrust, for the same purpose this line wants it —
+*"i'm using `LAX (ptr),Y` to get the data faster into the X-register (5 vs 7 clocks). This gives me the
+time to do the color-cycling"* 〔stella `200006/msg00037`〕. His numbers check against our own
+instruction table: `LDA (zp),Y` 5 cy / 2 bytes plus `TAX` 2 cy / 1 byte against `LAX (zp),Y` 5 cy /
+2 bytes — two cycles and one byte. `LAX` is on our hardware-stable list, unlike `LXA`/`XAA`.
+
+The caution stays; what changed is that the idea is no longer untried, which is different information
+from "it should work".
+
+Both from the mailing-list distillation (helper-3), who also reported an error of their own worth
+recording: they hand-wrote two thread manifests and got both wrong — and on the second, **the message
+count matched while the contents did not**. `sl_extract.py` has a `manifest()` function that exists to
+stop exactly that, in a file they had read this session. Their own diagnosis: they were writing prose,
+so they filled the manifest in as prose.
+
 ### Added — `flicker-collision-attribution.md`, and a hand-written count removed from `branch-always` (2026-09-03)
 
 `litmus_flicker_attrib` settles what the latches do. It does not carry **why the problem exists, what

@@ -68,4 +68,13 @@ scanline; vary it to taste (here a 16-step rainbow).
 - For pixel-exact X placement of the band (1px instead of the 3px coarse grid), combine with the
   ÷3 coarse/fine table + clockslide from topic/209137 (technique ledger ⑯); orthogonal to the color trick.
 - Budget headroom is small (~73 cy used). Adding more per-row work (e.g. a second color register
-  for the PF) needs an illegal-opcode tightening (LAX to fuse LDA+TAX) — verify on Gopher2600 first.
+  for the PF) needs an illegal-opcode tightening (LAX to fuse LDA+TAX).
+  **Shipped precedent, added 2026-09-03: this was not a proposal.** Thomas Jentzsch used it in
+  Thrust and said why 〔stella `200006/msg00037`〕: *"i'm using `LAX (ptr),Y` to get the data faster
+  into the X-register (5 vs 7 clocks). This gives me the time to do the color-cycling"* — the same
+  purpose this line proposes it for, in June 2000. His figures check out against our own instruction
+  table (`Gopher2600/hardware/cpu/instructions/definitions.json`): `LDA (zp),Y` 5 cy / 2 bytes plus
+  `TAX` 2 cy / 1 byte against `LAX (zp),Y` 5 cy / 2 bytes, so **2 cycles and 1 byte**. `LAX` is
+  hardware-stable — `known-traps.md` lists it with `SAX/SBX/DCP`, unlike `LXA/XAA`.
+  "Verify on Gopher2600 first" still stands for our own kernel; what has changed is that the idea
+  is no longer untried.
