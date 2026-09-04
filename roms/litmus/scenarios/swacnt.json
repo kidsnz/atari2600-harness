@@ -5,7 +5,8 @@
     {"at_frame": 2, "field": "ram.0x80", "op": "==", "value": 255},
     {"at_frame": 2, "field": "ram.0x81", "op": "==", "value": 165},
     {"at_frame": 2, "field": "ram.0x82", "op": "==", "value": 95},
-    {"at_frame": 2, "field": "ram.0x83", "op": "==", "value": 255}
+    {"at_frame": 2, "field": "ram.0x83", "op": "==", "value": 255},
+    {"at_frame": 2, "field": "ram.0x84", "op": "==", "value": 165}
   ],
   "checks": { "ntsc_frame_lines": 262, "frame_lines_stable": { "frames": 130, "lines": 262 } }
 }

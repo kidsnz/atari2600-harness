@@ -67,6 +67,21 @@ Clr:    sta $00,x
         lda SWCHA
         sta $83
 
+        ; band 5 — the SAME as band 2, but waiting the 400 us the Programmer's Guide demands
+        ; between writing this port and reading it. 400 us x 1.19318 MHz = 477 cycles = 6.3 lines.
+        ; Bands 1-4 read on the very next instruction, ~4 cycles, so they all violate it. If band 5
+        ; equals band 2, the engine models no delay at all and the table above is the engine's
+        ; answer rather than the console's.
+        lda #$FF
+        sta SWACNT
+        ldy #96                 ; 96 iterations x 5 cy = 480 cycles > 477
+Wait:   dey
+        bne Wait
+        lda #$A5
+        sta SWCHA
+        lda SWCHA
+        sta $84
+
 NextFrame:
         lda #2
         sta VSYNC

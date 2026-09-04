@@ -298,6 +298,17 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   direction is reversible — a program that drives the port can give it back. Neither is in the
   Programmer's Guide's one-line description of the register. Negative controls: not setting the
   direction makes the `$A5` write vanish; making band 3 fully output removes the split.
+  ⚠️ **This is the engine's answer, not the console's, and the engine says so itself.** The
+  Programmer's Guide requires **400 µs — 477 cycles, 6.3 scanlines — between writing this port and
+  reading it**, and every band above reads on the very next instruction (~4 cycles).
+  `Gopher2600/hardware/peripherals/controllers/keypad.go`: *"We're not emulating this here … I'm not
+  sure what's supposed to happen if the 400ms is not adhered to. **!!TODO: Consider adding 400ms
+  delay for SWACNT settings to take effect.**"* Band 5 repeats band 2 *with* the wait and gets the
+  same byte, which is the evidence that no settling time exists here. The list answers the engine's
+  TODO where the engine could not — Chad Schell, running serial off the port at 38.4 kbps
+  (`200111/msg00194`): *"If you only read the port, and thus don't change it's configuration, the
+  400 uS delay does not apply"* — so **the constraint is about changing the direction**, which is
+  exactly what every band does. Found by the distillation (helper-1).
   **What drove this was a working report, not a document.** stella-list `poor-man-s-cart-dumper`
   (2005-08) is a cartridge dumper in which the 2600 talks serial out of a joystick port at 1200 baud,
   and a third party reports getting it running on hardware. Only the fact that it writes SWACNT was

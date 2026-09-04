@@ -59,6 +59,23 @@ func TestSWACNTTruthTable(t *testing.T) {
 		t.Errorf("SWACNT=$F0 after writing $5A: low nibble is $%X, want $F (from the peripheral — "+
 			"a half-input port is what a two-console link needs)", got&0x0F)
 	}
+	// Band 5 is band 2 with the 400 us the Programmer's Guide demands between writing this port
+	// and reading it (477 cycles at 1.19318 MHz; bands 1-4 read on the next instruction, ~4 cycles,
+	// so every one of them violates it). Equal results mean the engine models no delay — which its
+	// own source says outright, in `Gopher2600/hardware/peripherals/controllers/keypad.go`:
+	// "We're not emulating this here … I'm not sure what's supposed to happen if the 400ms is not
+	// adhered to. !!TODO: Consider adding 400ms delay for SWACNT settings to take effect."
+	// The mailing list answers the TODO where the engine could not: Chad Schell, running serial at
+	// 38.4 kbps (200111/msg00194), "If you only read the port, and thus don't change it's
+	// configuration, the 400 uS delay does not apply" — so the constraint is about CHANGING the
+	// direction, which is what every band here does.
+	if delayed, immediate := at(0x84), at(0x81); delayed != immediate {
+		t.Errorf("waiting 480 cycles before the read gives $%02X where reading immediately gives "+
+			"$%02X. If these ever differ, the engine has started modelling the 400 us settling "+
+			"time and the rest of this table — all of which reads ~4 cycles after the write — "+
+			"needs re-measuring", delayed, immediate)
+	}
+
 	if last := at(0x83); last != 0xFF {
 		t.Errorf("after setting SWACNT back to $00 the port reads $%02X, want $FF — the output "+
 			"latch must not survive handing the port back, or the direction cannot be reversed", last)

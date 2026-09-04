@@ -6,6 +6,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the SWACNT truth table is the engine's answer; the 400 µs settling time is not modelled (2026-09-04)
+
+Landed `litmus_swacnt` an hour earlier and then learned what qualifies it. The Programmer's Guide
+requires **400 µs between writing the port-direction register and reading the port** — 477 cycles at
+1.19318 MHz, **6.3 scanlines** — and every band of that litmus reads on the very next instruction,
+about four cycles later. Gopher2600 does not model the delay, and names the gap in its own source:
+*"We're not emulating this here … I'm not sure what's supposed to happen if the 400ms is not adhered
+to. **!!TODO: Consider adding 400ms delay for SWACNT settings to take effect.**"*
+
+Band 5 added: band 2 repeated **with** the wait. It returns the same byte, which is the evidence that
+no settling time exists here rather than an assumption that none does. The truth table stands as a
+statement about this engine; `fundamentals-audit` now says so.
+
+**The list answers the engine's TODO.** Chad Schell, running serial off a joystick port at 38.4 kbps
+(`200111/msg00194`): *"If you only read the port, and thus don't change it's configuration, the
+400 uS delay does not apply."* So the constraint binds **when the direction changes** — which is
+what every band does — and not on every read. The engine's author wrote "I'm not sure what's supposed
+to happen"; a 2001 post by someone who had it working says exactly what.
+
+Recorded in `known-traps.md`, and worth pairing with the joystick trap from the same night: **that
+one is the tool being narrower than the hardware, this one is the tool being looser.** Both pass a
+ROM that a console would not.
+
+Found by the mailing-list distillation (helper-1).
+
 ### Added — the same colour byte is a different colour on PAL, and this project has one palette (2026-09-04)
 
 Eckhard Stolberg, stella-list `the-demo-image-series-7` (2003-02), looking at someone's demo on his
