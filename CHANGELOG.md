@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the mirror ladder, and why three free bits in a pointer are actually free (2026-09-04)
+
+The 6507 has thirteen address lines, so **A13–A15 are never emitted**. Measured: the same ROM byte
+reads back from all eight odd 4K windows — `$1000 $3000 $5000 $7000 $9000 $B000 $D000 $F000`, all
+`$78`. The ladder was in no document here (`upper 3 bits`: zero hits).
+
+**Three people put the three halves of this on the list in 1997, and it takes all three.** Erik
+Mooney gave the ladder (*"the upper 3 bits are completely unused by the 6507 and the bus"*). Eckhard
+Stolberg gave the convention (*"setting all unused bits to 1 is the VCS standard"* — which is why
+everyone writes `$F000`). **Greg Miller gave the guarantee**, and it is the half that makes the trick
+usable: the bits are not merely ignored, they are **never driven**, so *"no other part of the system
+can detect the difference."*
+
+That turns a curiosity into a technique: **a 16-bit pointer in RAM has three bits free for flags, a
+counter or a type tag, and they cost no instruction to strip** — unlike ordinary bit-packing there is
+nothing to mask on the way out. `design-principles.md`'s rule that packing is only worth paying for
+when RAM is genuinely short does **not** apply here, because the price is zero. (The 7800's 2600 mode
+gives those bits meaning, so it costs portability.)
+
+Recorded next to the A12 material landed earlier today, which is its complement: A12 decides
+console-versus-cartridge, and everything above it does not exist.
+
+Found by the mailing-list distillation (helper-1), who first reported it from a single 2005 remark at
+33% coverage and then, six rounds later, found the 1997 thread where it was established properly —
+raising the coverage to 41% and, more to the point, supplying the guarantee the 2005 remark assumed.
+
 ### Changed — and it is not the implementation either: `divtable`'s reciprocal choice stays open (2026-09-04)
 
 Earlier today the `round`/`ceil` mismatch was fixed and the obvious rationalisation ("ceil needs fewer

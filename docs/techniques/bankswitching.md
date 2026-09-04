@@ -43,6 +43,26 @@ extra pins?**
 | Supercharger | a **stateful arming sequence** (`$F0xx`, then the next `$Fxxx` is a write) |
 | double-ender | **the connector**, wired once and never changed |
 
+**Above A12 there is nothing at all, and that is a resource.** The 6507 has thirteen address lines,
+so A13–A15 of a 16-bit pointer are **never emitted** — measured 2026-09-04, the same ROM byte reads
+back from all eight odd 4K windows:
+
+```
+$1000 $3000 $5000 $7000 $9000 $B000 $D000 $F000   -> all $78
+```
+
+Three people put the three halves of this on the list in 1997, and it takes all three to make it
+safe to use. Erik Mooney gave the ladder — *"the upper 3 bits are completely unused by the 6507 and
+the bus"*. Eckhard Stolberg gave the convention — *"setting all unused bits to 1 is the VCS
+standard"*, which is why everyone writes `$F000`. And Greg Miller gave the guarantee, which is the
+part that matters: **the upper bits are not merely ignored, they are never driven**, so *"no other
+part of the system can detect the difference."*
+
+That is what makes the trick safe: **a 16-bit pointer in RAM has three bits you may use for anything**
+— flags, a small counter, an object type — and they cost **no instruction to strip**, because the
+hardware never looks at them. Unlike ordinary bit-packing, there is nothing to mask off on the way
+out. (Portability caveat: the 7800's 2600 mode does give those bits meaning.)
+
 A caution the same thread supplies: **the two A12s are different pins.** The console's A12 is a
 chip-enable *output* as far as the cartridge sees it; a bank-switched cartridge's A12 is an address
 *input* on a bigger ROM, driven by the decoder. Same name, opposite role — the fourth same-name
