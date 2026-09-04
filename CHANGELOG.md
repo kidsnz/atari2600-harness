@@ -6,6 +6,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — "unverifiable" was wrong: the Combat ROM is in `sandbox/`, and it does write SWBCNT (2026-09-04)
+
+An hour ago this recorded the list's DDR counterexamples as impossible to check, *"neither ROM is in
+`reference/`"*. **The search was scoped to one of the four repositories and the conclusion was written as
+if it covered all of them.** `sandbox/studies/combat/Combat.bin` has been there the whole time.
+
+Decoded from its bytes: `78 D8 A2 FF 9A A2 5D 20 BD F5 A9 10 8D 83 02 …` — `SEI / CLD / LDX #$FF / TXS /
+LDX #$5D / JSR $F5BD /` **`LDA #$10 / STA $0283`**. One write to SWBCNT, at file+`$000C`, of **`$10`,
+D4 alone** — the same bit the 2004 post reports Air-Sea Battle setting. **Zero** writes to SWACNT
+anywhere in the 4K image.
+
+No annotated disassembly was opened for this. A ROM image carries no interpretation; deriving meaning
+from it is the skill, and that is where our clean-room line sits.
+
+What the write is *for* stays 📖, and is now a sharper question than the line started with: the 2004
+thread's *"does anyone know if SWBCNT has any use?"* went unanswered, and the same post reports Combat's
+own comment claiming the write stops joystick response **when it does not**. Two commercial titles do it;
+nobody has said why.
+
+The attribution dispute this entry recorded an hour ago also dissolves — the distillation measured it
+themselves rather than arguing about who had measured it before, which is the right way to end that kind
+of disagreement. Found and measured by helper-1; re-derived here from the same bytes.
+
 ### Added — two assembler traps from the list, checked and NOT applicable here (2026-09-04)
 
 Both were reported as costing someone a day, and both are version-specific. Ours is not that version,

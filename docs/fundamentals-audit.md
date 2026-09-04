@@ -268,10 +268,20 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   SWCHB as output**, and **Combat doing the same with its comments mislabelled**: *"it says this
   stops the response from the joysticks but it doesn't"*. If that holds, "rarely game-relevant" was
   wrong about two of the best-known cartridges there are.
-  **Unverified here, and stating why:** neither ROM is in `reference/` — the only `Combat.bin` present
-  is a twelve-byte fragment. Reading a commercial ROM's *bytes* would be inside our clean-room line
-  (bytes carry no interpretation); we simply do not have them. The 2004 thread also records the
-  question going **unanswered**, so the list does not settle it either.
+  ✅ **Combat verified from its own bytes, 2026-09-04.** `sandbox/studies/combat/Combat.bin`, first
+  eighteen bytes: `78 D8 A2 FF 9A A2 5D 20 BD F5 A9 10 8D 83 02 …` — `SEI / CLD / LDX #$FF / TXS /
+  LDX #$5D / JSR $F5BD /` **`LDA #$10 / STA $0283`**. One write to SWBCNT, at file+`$000C`, of
+  **`$10` — D4 alone**, which is the same bit the 2004 post reports Air-Sea Battle setting. Zero
+  writes to SWACNT (`8D 81 02`) anywhere in the 4K image. Decoded from the bytes here; no annotated
+  disassembly was opened, which keeps this inside the clean-room line — a ROM image carries no
+  interpretation, and reading meaning out of it is the skill.
+  📖 **What the DDR write is FOR is still open.** The 2004 thread's question — *"does anyone know if
+  SWBCNT has any use?"* — went unanswered, and the same post reports Combat's own comment claiming
+  the write stops joystick response **when it does not**. So we know two commercial titles do it and
+  we do not know why, which is a sharper open question than the one this line started with.
+  **A search note:** this was recorded as unverifiable an hour earlier because `reference/` holds no
+  Combat ROM. It is in `sandbox/`, a sibling repository — **the search was scoped to one of the four
+  and the conclusion was stated as if it covered all of them.**
   ⬜ **The power-up value is the engine's choice, not a measurement.** `Reset` zeroes the memory
   explicitly; whether a real 6532 clears its DDR on RES is not established here. Measure **what
   writing SWACNT does**, which is the truth table (`riot/ports/ports.go`, 8 rows, all four
