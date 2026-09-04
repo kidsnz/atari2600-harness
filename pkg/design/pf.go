@@ -96,3 +96,132 @@ func FitsAsymRightWrite(reg PFReg, cycle int) bool {
 	s, e := AsymRightWindow(reg)
 	return cycle >= s && cycle <= e
 }
+
+// ═══ Asymmetric playfield vs. repositioning ═══════════════════════════════════════════════
+//
+// Thomas Jentzsch, stella-list 200409/msg00258 (2004-09-17), on Jumpman's kernel:
+//
+//	"With assymetrical, non striped playfields, you won't be able to reposition at all.
+//	 So, how about striping it?"
+//
+// That reads like advice. It is arithmetic, and it follows from two tables this package already
+// carries: AsymRightWindow (and its left-half twin, docs/fundamentals-audit.md:120) says WHEN each
+// playfield store must complete, and sprite-placement.md rule 1 says a reposition's strobe must
+// land on ONE specific cycle to reach a given x. A line that rewrites a full asymmetric playfield
+// spends six loads and six stores inside those windows; whether a three-cycle strobe still fits at
+// the one cycle that reaches your x is a scheduling question with a yes/no answer.
+//
+// AsymPFLineFits answers it. Measured consequence (locked by TestAsymPFRepositionBudget):
+//
+//	graphics writes | cycles used | strobe positions still reachable (of 53)
+//	              0 |       53/76 | 53 — every one
+//	              1 |       60/76 | 49
+//	              2 |       67/76 | 16, and all of them on the RIGHT (x >= 102)
+//	              3 |       74/76 |  0  <- "you won't be able to reposition at all"
+//
+// So the 2004 sentence is exact, and it is exact for the kernel Jentzsch was writing: Jumpman puts
+// several objects on a line. **The playfield alone does not cost you the reposition** — six PF
+// writes plus a strobe fit at every x with 23 cycles to spare. It is the graphics registers, added
+// to the playfield, that close the window. That distinction is not in the source and is worth
+// having: it names the escape routes (his own "stripe it", or fewer objects on the repositioning
+// line) and it says which one buys what.
+//
+// This is a DERIVATION over two documented tables, not a measurement of silicon. The windows are
+// woodgrain's (📖 in fundamentals-audit), the instruction costs are the engine's table. The 2004
+// sentence is the independent check on it, which is why it is quoted above rather than cited.
+const (
+	// pfWriteCost is `lda table,y` (4) + `sta PFn` (3). A non-striped asymmetric playfield reads
+	// its values from a table every line, so the immediate-operand form does not apply.
+	pfWriteCost = 7
+	// strobeCost is `sta RESPx` — three cycles, writing on the last.
+	strobeCost = 3
+	// wsyncCost and loopCost are what a per-line kernel spends on nothing but being a loop.
+	wsyncCost = 3
+	loopCost  = 5 // dey (2) + bne (3)
+)
+
+// asymOp is one scheduled write: cost cycles long, its write landing on start+writeOff, which must
+// fall in [lo,hi].
+type asymOp struct {
+	cost, writeOff, lo, hi int
+}
+
+// AsymPFLineFits reports whether one 76-cycle line can rewrite a full asymmetric playfield (all six
+// windows), write nGraphics graphics registers from a table, run WSYNC and the loop, AND strobe a
+// reposition whose write cycle is strobeCycle. Pass strobeCycle < 0 to ask only whether the line
+// fits without a reposition.
+func AsymPFLineFits(nGraphics, strobeCycle int) bool {
+	ops := []asymOp{{wsyncCost, 2, 0, 2}}
+	// Left half of the line, from the same table (fundamentals-audit.md:120, repeated mode):
+	// LPF0 must complete by 21, LPF1 by 27, LPF2 by 37.
+	for _, dl := range []int{21, 27, 37} {
+		ops = append(ops, asymOp{pfWriteCost, pfWriteCost - 1, 0, dl})
+	}
+	for _, r := range []PFReg{PF0, PF1, PF2} {
+		s, e := AsymRightWindow(r)
+		ops = append(ops, asymOp{pfWriteCost, pfWriteCost - 1, s, e})
+	}
+	// A graphics write takes effect at screen x = 3w - 64 (sprite-placement.md rule 6), so writing
+	// for an object around mid-screen means completing by cycle (40+64)/3.
+	for i := 0; i < nGraphics; i++ {
+		ops = append(ops, asymOp{pfWriteCost, pfWriteCost - 1, 0, (40 + 64) / 3})
+	}
+	ops = append(ops, asymOp{loopCost, loopCost - 1, 0, 75})
+	if strobeCycle >= 0 {
+		ops = append(ops, asymOp{strobeCost, 2, strobeCycle, strobeCycle})
+	}
+	// Every ordering is allowed; what matters is that each write lands in its own window. Held as
+	// a subset DP over "earliest cycle still free" rather than permutations, which blows up at 12.
+	const infeasible = 1 << 30
+	n := len(ops)
+	free := make([]int, 1<<n)
+	for i := range free {
+		free[i] = infeasible
+	}
+	free[0] = 0
+	for mask := 0; mask < 1<<n; mask++ {
+		t := free[mask]
+		if t >= infeasible {
+			continue
+		}
+		for i, op := range ops {
+			if mask>>i&1 == 1 {
+				continue
+			}
+			s := t
+			if op.lo-op.writeOff > s {
+				s = op.lo - op.writeOff
+			}
+			if s < 0 {
+				s = 0
+			}
+			if s > op.hi-op.writeOff || s+op.cost-1 > 75 {
+				continue
+			}
+			if nm := mask | 1<<i; s+op.cost < free[nm] {
+				free[nm] = s + op.cost
+			}
+		}
+	}
+	return free[1<<n-1] < infeasible
+}
+
+// AsymPFReachableX returns every screen x a NORMAL-width player can still be repositioned to on a
+// line that also rewrites a full asymmetric playfield and writes nGraphics graphics registers.
+// Empty means Jentzsch's sentence, literally.
+func AsymPFReachableX(nGraphics int) []int {
+	var out []int
+	for x := 0; x < 160; x++ {
+		if (x+60)%3 != 0 {
+			continue // rule 1: placement is on a 3-clock grid
+		}
+		c := (x + 60) / 3
+		if c < 16 || c > 72 {
+			continue // outside the cycles a line can strobe on at all
+		}
+		if AsymPFLineFits(nGraphics, c) {
+			out = append(out, x)
+		}
+	}
+	return out
+}

@@ -6,6 +6,57 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `AsymPFLineFits`: the 2004 sentence about asymmetric playfields, derived (2026-09-04)
+
+Thomas Jentzsch, stella-list `200409/msg00258`: *"With assymetrical, non striped playfields, you
+won't be able to reposition at all. So, how about striping it?"* That reads like advice. It is
+arithmetic, and **both halves were already in this repository**: `AsymRightWindow` (plus its
+left-half twin in `fundamentals-audit.md`) says when each playfield store must complete, and
+`sprite-placement.md` rule 1 says a reposition's strobe must land on ONE cycle to reach a given x.
+Nothing had written down what happens when a line needs both.
+
+`pkg/design.AsymPFLineFits` schedules them — six table-driven playfield writes, WSYNC, the loop,
+n graphics writes and the strobe, each landing in its own window — as a subset DP over "earliest
+free cycle". `AsymPFReachableX` turns that into positions:
+
+| graphics writes | cycles used | strobe positions still reachable (of 53) |
+|---|---|---|
+| 0 | 53/76 | **53 — every one** |
+| 1 | 60/76 | 49 |
+| 2 | 67/76 | 16, **all of them on the right** (x ≥ 102) |
+| 3 | 74/76 | **0** — the sentence, literally |
+
+**The first row is the finding.** The playfield alone does not cost the reposition: six PF writes
+plus a strobe fit at every x with 23 cycles to spare. It is the graphics registers, added on top,
+that close the window — one object costs 4 positions, two costs 37, three costs all 53. Jentzsch was
+writing Jumpman, which puts several objects on a line, so his "at all" is exact for his kernel and
+an overstatement for a bare playfield. **That distinction is not in the source**, and it is the part
+worth having: it says which escape buys what — his own "stripe it", or simply fewer objects on the
+line that repositions.
+
+A derivation over two documented tables, not a measurement of silicon, and labelled as such: the
+windows are woodgrain's (still 📖 in `fundamentals-audit`), the instruction costs are the engine's.
+The 2004 sentence is the independent check, which is why it is quoted rather than cited. Negative
+controls: making a playfield write immediate-operand (5 cycles instead of a table load's 7) makes
+three objects fit; dropping the left-half deadlines makes everything fit. Both fired.
+
+Found by the mailing-list distillation (helper-2), who read the source, shot five layers for the
+consequence, found nothing, and asked for the one measurement they could not run.
+
+### Changed — the illegal-opcode stability map was right and incomplete (2026-09-04)
+
+`design-principles.md` named LAX/SAX/SBX/DCP stable and LXA/XAA unstable. The engine's table carries
+`stability` on exactly 8 of 256 opcodes: **magic** on `$8B ane` and `$AB lax #imm` — the two already
+named — and **unstable** on six the map never mentioned, all stores: `$93 sha (zp),Y`, `$9B tas
+abs,Y`, `$9C shy abs,X`, `$9E shx abs,Y`, `$9F sha abs,Y`, `$BB las abs,Y`. They AND the high byte
+of the target address into the value written.
+
+And a sharp edge inside the map's own wording: **`LAX` and `LXA` are the same mnemonic in that
+table.** Six of the seven `lax` entries are stable; the seventh is `$AB lax #imm`, which IS LXA and
+IS magic. A generator reading the family name rather than the opcode emits the one unstable member.
+
+Found by the distillation (helper-1), re-run here independently.
+
 ### Changed — the last three page-cross gaps in `fundamentals-audit.md`, read off the engine's own table (2026-09-04)
 
 `fundamentals-audit.md` carried *"Not measured by us: `(ind),Y` = 6 fixed, RMW abs,X = 7 fixed, and
