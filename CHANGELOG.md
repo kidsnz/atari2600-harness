@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — `litmus_collide_all` cannot be used as a sensor, and now says so (2026-09-03)
+
+Found while trying to *use* it: the ROM overlaps every object with every other, so all fifteen pairs
+read true, and `scenarios/collide_all.json` asserts exactly that — **fifteen asserts, all `== 1`, not
+one `== 0`.**
+
+That pins the bit assignment, which is what it was written for. It does not distinguish *"each field
+reports its own pair"* from *"any overlap sets every field"*, because nothing in the fixture is ever
+apart. So anyone reading a collision field as a **sensor** — "is P0 over the playfield right now?" —
+is relying on a direction nothing here measures: **no fixture puts two objects apart and requires the
+field to read 0.**
+
+Recorded in the ROM's own header rather than fixed, because fixing it is a separate ROM. Until then
+the instruction is the one this week keeps arriving at: establish the negative in your own fixture
+before relying on it, the way `litmus_flicker_attrib`'s group 1 establishes frame-crossing stickiness
+before its control depends on it.
+
+Found by the mailing-list distillation (helper-3), who needed exactly the unmeasured direction and
+checked before assuming it. Comment-only; binary byte-identical to HEAD.
+
 ### Added — what actually makes a code path change a frame's length (2026-09-03)
 
 Building `litmus_flicker_attrib` cost three attempts at a constant frame, so the lesson goes in

@@ -3,6 +3,19 @@
 ; read_collisions の全フィールド true を確認。既存 litmus_collide(bl_pf)/_pp(p0_p1)/_mp(m0_p0) を包含。
 ; 実機裏取り済（Gopher2600, v0.48.0）: 全6オブジェクト+PF を左端で重ね、read_collisions の【15ペア全部 true】を確認。
 ; （ball幅8で p0_bl/p1_bl も成立）。回帰固定=scenarios/collide_all.json。既存 collide/_pp/_mp を包含。
+;
+; LIMIT (found 2026-09-03, by the mailing-list distillation, while trying to USE this as a
+; measuring instrument). Every object overlaps every other, so every pair reads true, and
+; `scenarios/collide_all.json` asserts exactly that: **15 asserts, all `== 1`, not one `== 0`.**
+; That pins the bit assignment, which is what it was written for. It does NOT distinguish
+;
+;     "each field reports its own pair"   from   "any overlap sets every field"
+;
+; because nothing here is ever apart. Anyone who wants to read a collision field as a
+; SENSOR — "is P0 over the playfield right now?" — needs the negative direction, which is
+; not measured anywhere: no fixture puts two objects apart and requires the field to read 0.
+; Until it exists, establish the negative in your own ROM before relying on it (the way
+; litmus_flicker_attrib's group 1 establishes frame-crossing stickiness before using it).
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
