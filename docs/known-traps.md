@@ -111,6 +111,7 @@ controls: the too-strict rule fails `litmus_superchip` by name; blinding the hot
 
 | trap | fix | detect | source |
 |---|---|---|---|
+| **two assembler traps from the list that our toolchain does NOT have — checked 2026-09-04** | 1997: an assembler accepted `jmp (abs,x)`, a 65C02 addressing mode the 6507 does not have, and the author lost time to a program that assembled and misbehaved. 2003: DASM silently promoted `LDX zp,Y` to `abs,Y` (+1 cycle, no error) while *rejecting* `LAX zp,Y`, so a documented and an undocumented instruction with the same addressing mode were treated differently; half a day lost. | Nothing to do. **DASM 2.20.14.1 here rejects `jmp ($F800,x)` outright** — *"error: Illegal Addressing mode"*, fatal — and assembles `lax tbl,y` to `b7 80`, two bytes, no promotion and no error, matching `ldx tbl,y` at `b6 80`. | Re-run the two one-line fixtures if the toolchain version changes; both traps are version-specific. |
 | missing `CLD` | BCD math gives garbage; D is undefined at power-up | static (`CLD` in init) | 318346, (CLAUDE.md) |
 | `ADC` without `CLC` / `SBC` without `SEC` | carry contaminates the result | manual | 157598, 75335, 63853, 63389 |
 | **post-reset SP / RAM / flags undefined** | uninitialised everything → `CLEAN_START` is mandatory (proven on 5 consoles) | static (CLEAN_START) | 261488, 312005, 316071 |

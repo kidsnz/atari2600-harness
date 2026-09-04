@@ -6,6 +6,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — two assembler traps from the list, checked and NOT applicable here (2026-09-04)
+
+Both were reported as costing someone a day, and both are version-specific. Ours is not that version,
+and saying so is the point: a trap that cannot reach us should not become a gate.
+
+**1997 — an assembler accepted `jmp (abs,x)`**, a 65C02 addressing mode the 6507 does not have, so the
+program assembled and misbehaved. DASM 2.20.14.1 here **rejects it outright**: *"error: Illegal
+Addressing mode 'jmp ($F800,x)'"*, fatal, source not resolvable.
+
+**2003 — DASM silently promoted `LDX zp,Y` to `abs,Y`** (+1 cycle, no error) while *rejecting*
+`LAX zp,Y`, so a documented and an undocumented instruction with the same addressing mode were handled
+differently, and half a day went into "why does this not assemble". Ours assembles `lax tbl,y` to
+**`b7 80`** — two bytes, no promotion, no error — matching `ldx tbl,y` at `b6 80`.
+
+Recorded in `known-traps.md` section D with the fixtures, because "checked and not applicable" is worth
+as much as a trap: it stops the next reader adding a check for something that cannot happen, and says
+what to re-run if the toolchain moves.
+
+Relevant to yesterday's `multicolor48` note, which recommends `LAX` to fuse `LDA`+`TAX`: the objection
+raised on the list against `LAX` addressing does not apply to this toolchain.
+
+From the mailing-list distillation (helper-2), who raised both and could not test either.
+
 ### Changed — the question that cost an afternoon has a tool, documented in the file loaded at launch (2026-09-04)
 
 The expensive question yesterday was *"which copy of the playfield is this probe standing on?"*, and it
