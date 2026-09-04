@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — two 1997 assembly traps, one of which we could already detect (2026-09-04)
+
+Greg Miller found both in one reading of someone else's code on the list (`199712/msg00194`), which
+is the interesting part: no tool was involved.
+
+**`BPL`/`BMI` after `CMP` is a signed test on an unsigned compare.** `CMP` sets *carry*; `BPL`/`BMI`
+read *N*, bit 7 of the difference, which flips across `$80`. `LDA #$7F / CMP #$80 / BPL bigger` takes
+the branch although $7F < $80. **2600 kernels compare scanline counts and screen positions**, which
+cross $80 routinely. Nothing here detects it — `prove_line_budget` and `defuse` look at cycles and at
+read/write order, not at what a branch *means*, and a wrong branch costs the same cycles as a right
+one. *"You sure this is working with `bpl`?"* — *"Ummm.... because I forgot."*
+
+**A forgotten `#` turns an immediate into a zero-page read.** `AND $f0` reads RAM `$F0`; the
+assembler accepts it, and on the 2600 it usually reads a byte nothing ever wrote, so it "works" in an
+emulator that zeroes RAM. **This one we can already catch**: `defuse.go`'s `ReadBeforeWrite` flags a
+read that some path reaches with no write to that address having definitely happened first, and `$F0`
+is exactly that. The capability existed; nothing pointed a reader at this use of it — and it is the
+concrete use for the `Writers`/`Readers` pair previously noted as unused.
+
+That asymmetry is the reason both rows are in the same commit: one is a gap in what the tools can
+see, the other was a gap only in what was written down.
+
+Found by the mailing-list distillation (helper-2).
+
 ### Changed — say where the sound pipeline ends (2026-09-04)
 
 Everything this repository checks about audio reads the **registers** — `read_audio`, the audio
