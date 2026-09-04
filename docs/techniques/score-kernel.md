@@ -1,5 +1,10 @@
 # Technique — 6-digit score kernel (48px, BCD)
 
+> **Placement: see `sprite-placement.md`'s rule table before trusting where anything lands.**
+> Rule 12 in particular — a copy past clock 160 wraps to the left edge and draws there on the
+> same line — applies here because its fixture writes `NUSIZ = $03`, so the rightmost copy sits at base+32 and a base past ~128 wraps. That rule was measured and CI-locked on 2026-08-21 and
+> re-derived from scratch anyway on 2026-09-03, which is why these pointers exist.
+
 **Goal:** the standard score display every real game needs: a 6-digit decimal score rendered with
 the two players in 3-copies-close mode + VDEL 6-store choreography (48px), updated from BCD bytes.
 

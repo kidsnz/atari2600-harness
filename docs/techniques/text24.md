@@ -1,5 +1,10 @@
 # Technique — 24-character text line (50% flicker, two blocks)
 
+> **Placement: see `sprite-placement.md`'s rule table before trusting where anything lands.**
+> Rule 12 in particular — a copy past clock 160 wraps to the left edge and draws there on the
+> same line — applies here because its fixture writes `NUSIZ = $03`, so the rightmost copy sits at base+32 and a base past ~128 wraps. That rule was measured and CI-locked on 2026-08-21 and
+> re-derived from scratch anyway on 2026-09-03, which is why these pointers exist.
+
 **Goal:** double the text width to 24 characters by alternating two 12-character blocks across
 frames — the left 12 on one field, the right 12 on the next, so the eye reads a continuous
 24-char line at 50% flicker (CRT/venetian-blind friendly).

@@ -1,5 +1,10 @@
 # Technique — 48px bitmap zone with window scrolling
 
+> **Placement: see `sprite-placement.md`'s rule table before trusting where anything lands.**
+> Rule 12 in particular — a copy past clock 160 wraps to the left edge and draws there on the
+> same line — applies here because its fixture writes `NUSIZ = $03`, so the rightmost copy sits at base+32 and a base past ~128 wraps. That rule was measured and CI-locked on 2026-08-21 and
+> re-derived from scratch anyway on 2026-09-03, which is why these pointers exist.
+
 **Goal:** a logo / picture / message band of arbitrary height drawn with the verified 48px
 6-store choreography, plus a **window** into a taller bitmap so the band can scroll vertically
 (or jump between frames of a larger image).

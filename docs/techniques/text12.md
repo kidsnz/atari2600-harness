@@ -1,5 +1,10 @@
 # Technique — 12-character text line (flicker-free)
 
+> **Placement: see `sprite-placement.md`'s rule table before trusting where anything lands.**
+> Rule 12 in particular — a copy past clock 160 wraps to the left edge and draws there on the
+> same line — applies here because its fixture writes `NUSIZ = $03`, so the rightmost copy sits at base+32 and a base past ~128 wraps. That rule was measured and CI-locked on 2026-08-21 and
+> re-derived from scratch anyway on 2026-09-03, which is why these pointers exist.
+
 **Goal:** readable text for menus, messages, and titles: 12 characters per line, flicker-free,
 using the same hardware-verified 48px VDEL 6-store choreography as the score kernel — with a
 4×5 font packed two characters per player byte.

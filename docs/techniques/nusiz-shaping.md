@@ -1,5 +1,10 @@
 # Technique — per-scanline NUSIZ + HMOVE shaping (one player, an irregular shape wider than 8px)
 
+> **Placement: see `sprite-placement.md`'s rule table before trusting where anything lands.**
+> Rule 12 in particular — a copy past clock 160 wraps to the left edge and draws there on the
+> same line — applies here because its fixture drives `NUSIZ` from a table and sweeps every mode, so it is the most exposed of all. That rule was measured and CI-locked on 2026-08-21 and
+> re-derived from scratch anyway on 2026-09-03, which is why these pointers exist.
+
 **Goal:** draw a single creature that is wider than eight pixels and not a rectangle — a shark, a
 whale, a boss, a vehicle — out of **one** player object, with no flicker and no second sprite.
 

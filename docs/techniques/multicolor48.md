@@ -1,5 +1,10 @@
 # Technique — multicolor 48px graphic (per-row color)
 
+> **Placement: see `sprite-placement.md`'s rule table before trusting where anything lands.**
+> Rule 12 in particular — a copy past clock 160 wraps to the left edge and draws there on the
+> same line — applies here because its fixture writes `NUSIZ = $03`, so the rightmost copy sits at base+32 and a base past ~128 wraps. That rule was measured and CI-locked on 2026-08-21 and
+> re-derived from scratch anyway on 2026-09-03, which is why these pointers exist.
+
 **Goal:** the 48px-wide image (the standard 3×NUSIZ + P1 offset + VDEL technique used by
 `score-kernel` / `bitmap48`) but **multicolored vertically** — `COLUP0`/`COLUP1` are rewritten
 every scanline from a color table, so a single 48px graphic spans many colors top-to-bottom

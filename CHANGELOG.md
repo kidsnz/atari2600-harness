@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — seven technique pages now point at the placement table, chosen by measurement (2026-09-03)
+
+Thirty-six technique pages touch a placement register and three cited `sprite-placement.md` — two of
+those three being the index and the roadmap, so **one actual technique**. Adding the pointer to all
+thirty-six would have been noise; the question is which pages have a **fixture that can actually be
+bitten**.
+
+The criterion was measured rather than chosen: a fixture qualifies if it strobes `RESxx` **and** writes
+a `NUSIZ` that makes copies (low bits 1,2,3,4,6), widens (5,7 or the size field), or is table-driven.
+Strobing alone gives sixteen of twenty-two — rule 12 is about a *copy* passing clock 160, so without
+copies or width it cannot fire. That leaves **seven**: `nusiz-shaping` (table-driven, sweeps every mode,
+the most exposed), `rts-dispatch` (`$06`, three copies at the wide spacing, so a base past ~96 goes over
+the edge), and `bitmap48`, `multicolor48`, `score-kernel`, `text12`, `text24` (all `$03`, rightmost copy
+at base+32).
+
+The placement litmus itself writes `$20`/`$26` — missile width — which is why width joined copies in the
+criterion, and is the same shape as the quad-width probe that started this.
+
+Two measurement notes, both about the same defect. The distillation's first pass disagreed with its own
+`grep` on `text24`, and opening the file settled it: a fixed three-line window before `sta NUSIZ` was
+picking up an earlier `lda #0` shared by three stores. **Checking their `litmus_sprite_place` claim here,
+a two-line window missed the `$20`/`$26` writes entirely** — the same defect in the opposite direction,
+found while verifying the report of it.
+
+Selected by the mailing-list distillation (helper-1), who declined all three criteria offered and
+derived one.
+
 ### Changed — the wrap at clock 160 was measured thirteen days ago, and we derived it again anyway (2026-09-03)
 
 Most of an afternoon went into finding that a quad-width probe parked near the right edge was also
