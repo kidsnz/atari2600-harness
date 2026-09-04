@@ -6,6 +6,52 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `litmus_pf0_reflect`: two PF0 writes in one line, and where the window ends (2026-09-03)
+
+The audit line held two claims under one mark: *"asymmetric PF under reflection via double PF0 rewrite
+per line is real-game practice"*. Whether games do it is a fact about someone else's source. Whether it
+works, and where its boundaries are, is ours. Split; the second half is now measured.
+
+**Most of the work was in the instrument.** Four calibration points show the probes respond to PF0 in
+both directions — and cannot say *which* copy a probe is on, because they set PF0 for the whole line,
+so both copies always agree and a probe on either returns the same 1,0,1,0. That is the failure this
+week keeps naming, inside the fixture built to avoid it. Two more points (E and F) write in the blind
+gap between the copies so the copies disagree, and the probe's answer names where it is standing.
+
+It mattered immediately. A first version gave P1 quad width to be sure of reaching the right copy at
+pixels 144-159; **it reached the copy at the other end too, because the TIA's horizontal counter wraps
+at 160** — a 32-px object at 151 draws 151-159 and then 0-22, straight across the left copy. E and F
+read 1,1. The earlier sweep had been tracking the *left* boundary at cy ~27.7 while the header claimed
+the right one.
+
+**The window is bounded on the right by the scanline itself.** The right copy is drawn at cy ~70.7-75.7
+and the line ends at 76, so there is no room to place a store after it: the last usable point lands
+*inside* the copy and splits it old|new. The measured column is `0 0 0 0 0 0 1` over seven five-cycle
+steps, and the step being at the last index is the result, not a defect. An earlier design swept cy
+40-55 — the blind gap — and would have found no step at all.
+
+Also measured, and stated narrowly on purpose: **an `sta HMCLR` about two cycles after `sta HMOVE`
+killed the move.** P1 needed a seven-pixel fine adjust, which div-15 cannot give (it quantises to 15),
+and the HMOVE did nothing until HMCLR was moved to the next line.
+
+**"Same line" is not the rule, and saying so would contradict a fixture already in CI.**
+`litmus_hmxx_freeze` puts `sta HMCLR` about fifty cycles after its `sta HMOVE`, on the same line, and
+`scenarios/hmxx_freeze.json` pins the player moving +8 a frame right through it. The plausible reading
+is the ✅ rule this file already carries — **do not write HMxx within 24 cycles of HMOVE** — with the
+addition that **HMCLR counts as an HMxx write**, since it clears them all. That is a reading, not a
+measurement: our case changed two variables at once (two cycles instead of fifty, and HMCLR instead of
+a single-register rewrite), so which one did the work is not separated. Two small bands would separate
+them and neither exists yet.
+
+The scenario checks `ntsc_frame_lines == 262` **and** `frame_lines_stable`, because they catch different
+things: this ROM ran at a rock-steady 251 lines for several iterations, which the stability check passes
+happily. Negative controls, both fired: widening the probe makes E,F read 1,1; removing the HMOVE makes
+the step disappear.
+
+Designed by the mailing-list distillation (helper-3), who also found the two defects in their own design
+once it met the emulator — a calibration band that could not discriminate, and a sweep range that was
+impossible inside a line.
+
 ### Changed — the new litmus is queued for a Stella capture, because the gate caught that it was not (2026-09-03)
 
 Pushing `litmus_flicker_attrib` was blocked by the pre-push run, and correctly: the Stella oracle

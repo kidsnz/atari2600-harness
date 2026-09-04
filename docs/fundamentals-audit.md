@@ -130,8 +130,19 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   ✅ **SCORE×PFP interaction measured** (v1.53.0): **PFP dominates** — with D2 set, D1 has no
   effect (PF renders in COLUPF on BOTH halves, with priority over players); $02→halves colored,
   $04 and $06→identical COLUPF rendering.
-- 📖 Asymmetric PF under reflection via double PF0 rewrite per line is real-game practice
-  (DaveC's Random-Dungeon `_room_loop`). ⬜ unverified by us.
+- ✅ **Asymmetric PF under reflection: writing PF0 twice in one line does show different values
+  at the two edges** — verified `litmus_pf0_reflect`, regression-locked
+  `roms/litmus/scenarios/pf0_reflect.json`, graded by `internal/emu/pf0reflect_test.go`.
+  Under reflection PF0 draws at cols 0-3 and again at 36-39, and a second write between them
+  changes the right edge alone. **The window is bounded on the right by the line itself**: the
+  right copy is drawn at cy ~70.7-75.7 and the line ends at 76, so no store lands after it —
+  the last usable point lands *inside* the copy and splits it old|new, which is where the
+  measured step is (`0 0 0 0 0 0 1` over seven five-cycle steps). Two negative controls, both
+  fired: widening the probe makes it read both copies (the TIA counter wraps at 160), and
+  removing its HMOVE fine-adjust puts it past the split and the step disappears.
+  📖 **Still documented-only: that real games do it** (DaveC's Random-Dungeon `_room_loop`) —
+  that is a fact about someone else's source, not about the hardware, and the line had the two
+  claims under one mark (2026-09-03).
 
 ## 5. Collisions
 - ✅ 3 of 15 pairs (BL-PF, P0-P1, M0-P0), sticky latches, CXCLR.

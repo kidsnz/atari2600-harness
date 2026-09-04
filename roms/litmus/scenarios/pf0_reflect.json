@@ -1,0 +1,102 @@
+{
+  "rom": "roms/litmus/litmus_pf0_reflect.asm",
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "frame_lines_stable": {
+      "frames": 8,
+      "lines": 262
+    }
+  },
+  "asserts": [
+    {
+      "at_frame": 3,
+      "field": "ram.0x88",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0x89",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0x8A",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0x8B",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0x8C",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0x8D",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0x92",
+      "op": "==",
+      "value": 1
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0x93",
+      "op": "==",
+      "value": 6
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0xA0",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0xA1",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0xA2",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0xA3",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0xA4",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0xA5",
+      "op": "==",
+      "value": 0
+    },
+    {
+      "at_frame": 3,
+      "field": "ram.0xA6",
+      "op": "==",
+      "value": 1
+    }
+  ]
+}
