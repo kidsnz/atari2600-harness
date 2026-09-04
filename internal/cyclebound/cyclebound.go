@@ -313,6 +313,24 @@ func analysisUnits(rom []byte, binPath string) ([]analysisUnit, string) {
 		// a data value (3E, 3F), by bus behaviour outside the cartridge (UA, SB), by
 		// bus timing (FE, WD), or by a coprocessor. An address model does not lose
 		// precision there, it misses the switch entirely.
+		//
+		// FE is the sharpest case and worth spelling out, because it is the one where
+		// a reader might assume a hotspot exists and simply was not published. It does
+		// not exist. European Patent 84300730.3, quoted in mapper_scabs.go: after a JSR
+		// the address $01FE necessarily appears on the address bus, and one cycle later
+		// the destination's high byte appears on the data bus; the cartridge latches
+		// that and selects the bank from `data >> 5`. **So the bank can change on every
+		// JSR and every RTS, from any address, with no instruction in the ROM referring
+		// to a switch at all.** Disassembled, such a cartridge appears to contain no
+		// bank-switching code — which is exactly why a static CFG must decline rather
+		// than proceed: there is nothing for it to notice.
+		//
+		// The list tried and failed to work this out from behaviour: Adam Wozniak, 2003,
+		// found a working procedure, disproved his own explanation of it ("what gets
+		// written by JSR is the RETURN address"), and closed with the trigger still
+		// unexplained. The patent answers him. Surfaced by the mailing-list distillation
+		// (helper-1), whose concern — that a hotspot-shaped analysis has nothing to catch
+		// here — is correct, and is why this branch exists.
 		return nil, fmt.Sprintf("cartridge is mapper %s with %d banks and publishes no bank-switch "+
 			"hotspot addresses; its switch is driven by data, bus behaviour or a coprocessor, which "+
 			"an address-based analysis cannot see at all", id, banks)

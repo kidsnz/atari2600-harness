@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — spell out why FE cannot be analysed, in the branch that already declines it (2026-09-04)
+
+The distillation raised a sharp worry: the **FE mapper has no hotspot at all**, so a hotspot-shaped
+analysis has nothing to catch, and a static CFG might proceed as if banks never switch — a false
+green in the worst direction.
+
+**Checked: `cyclebound` already declines it, and names FE in the comment.** The branch fires when a
+mapper publishes no hotspots, with the right reasoning: *"an address model does not lose precision
+there, it misses the switch entirely."* Nothing to fix.
+
+What was missing is **why**, and FE is the case where a reader would most likely assume the hotspot
+merely went unpublished. It does not exist. European Patent 84300730.3, quoted in the engine's
+`mapper_scabs.go`: after a JSR the address `$01FE` necessarily appears on the address bus, and one
+cycle later the destination's high byte appears on the data bus; the cartridge latches it and selects
+the bank from `data >> 5`. **The bank can therefore change on every JSR and every RTS, from any
+address, with no instruction in the ROM referring to a switch.** Disassembled, such a cartridge looks
+like it contains no bank-switching code — which is precisely why a static analysis must decline
+rather than proceed.
+
+The list tried to work this out from behaviour and could not: Adam Wozniak, 2003, found a working
+procedure, **disproved his own explanation of it** (*"what gets written by JSR is the RETURN
+address"*), and closed with the trigger unexplained. The patent answers him, twenty-three years later
+and one file away.
+
+Found by the mailing-list distillation (helper-1), who said plainly that they had not tested it
+against `internal/cyclebound` — so this is the answer to a question asked at the right strength.
+
 ### Changed — FlickerSort is one bubble pass, not a sort; and PAL's kernel is 228 lines (2026-09-04)
 
 **`flicker-multiplexing.md` said "sort objects by Y each frame".** Roger Williams, who named the
