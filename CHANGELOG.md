@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — two constraints written where they help but not where they cost (2026-09-04)
+
+**A mockup only checks the constraints you believed when you drew it.** `design-principles.md` told
+you to verify feasibility with a mockup, listing "colour budget" first. Kurt Woloch, on the 2600
+conversions he drew in 1984: *"I did MISUNDERSTAND some of the constraints. I thought it would be
+allowed to have four colors on one scanline of playfield if you reduced the vertical resolution to
+double-scanline … which, I'm afraid, ISN'T POSSIBLE THIS WAY."* He got the colour budget wrong — the
+very item the line says to check — and the drawings looked good the whole way through. A mockup
+cannot catch a rule you do not know you are breaking, which makes the artist's constraints only as
+good as whoever supplied them. The line now says to take the budget from a measured page rather than
+from memory. Note also that "trade vertical resolution for playfield colours" is *plausible* — that
+swap is true elsewhere on this machine — and `known-traps.md` had nothing on it.
+
+**A missile has no colour of its own**, and `missiles-bullets.md` did not say so. The fact is in this
+repository, but only where it is an advantage: `invisible-probe.md` lists it under **Free**, because
+a probe indistinguishable from its player is what that technique wants. Someone opening the *bullets*
+page to build a coloured laser has no reason to read the *probe* page. Added there as a cost, with
+Manuel Polik's three-way table from Star Fire (`200209/msg00153`): a second player has its own colour
+but flickers; a missile does not flicker but borrows `COLUPx`; the playfield has its own colour at
+4-clock grain.
+
+Both found by the mailing-list distillation (helper-2). The shared shape is worth naming: **a
+constraint written only where it helps reads as an absence where it costs.**
+
 ### Added — a second silent carrier for TIA PCM, and two wrong answers on the way (2026-09-04)
 
 `tia-pcm.md` built PCM on `AUDC=0` alone. Eckhard Stolberg, stella-list `199902/msg00036`: *"If you

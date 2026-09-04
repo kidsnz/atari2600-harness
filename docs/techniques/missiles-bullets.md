@@ -15,6 +15,28 @@ New hardware verification: `litmus_resmp` + `scenarios/resmp.json`.
   happens while the player counter scans during the frame — a lock+unlock in the same logic pass
   does NOT move the missile (measured; Gopher2600 syncs at the player's scan `Pixel==2`).
 
+## A missile has no colour of its own
+
+`M0` draws in `COLUP0` and `M1` in `COLUP1` — there is no `COLUM` register. **A bullet cannot be a
+different colour from the player that fires it**, and changing `COLUPx` mid-line to recolour the
+missile recolours the player on the same line.
+
+This is stated elsewhere in this repository, but only where it is an *advantage*:
+`invisible-probe.md` lists it under **Free** (a probe that cannot be told apart from its player is
+exactly what that technique wants). Someone opening *this* page to build a coloured laser has no
+reason to read that one, so the same fact is written here, where it is a cost.
+
+The three-way choice, from Manuel Polik on Star Fire (stella-list `200209/msg00153`):
+
+| object | own colour? | flickers? | horizontal grain |
+|---|---|---|---|
+| a second **player** | yes (`COLUP1`) | yes, if the line already carries two | 1 clock |
+| a **missile** | **no** — borrows `COLUPx` | no | 1 clock |
+| the **playfield** | yes (`COLUPF`) | no | **4 clocks** |
+
+So a coloured bullet costs either a flickering object or a 4-clock-wide one. Pick before drawing:
+this is the kind of constraint that a mockup cannot catch by itself (`design-principles.md`).
+
 ## The pattern
 
 - **Spawn**: fire edge (and no live bullet) → `RESMP0=2`, mark state "locking" (`bulY=$FF`).

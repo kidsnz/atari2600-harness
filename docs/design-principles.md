@@ -174,6 +174,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - The exemplars = the AtariAge Homebrew Awards "Best Graphics" category. **The strongest ground truth = the homebrew "Pizza Boy", every pixel of which the user drew personally** (designed in Photoshop; constraints confirmed with DaveC). More accurate than mining external threads = put the design questions (colour bands / NUSIZ / flicker tolerance) to the author directly.
 - **Endorsement from a real production (the Pizza Boy dissection)**: professional-grade visuals were achieved **by craft on top of a STANDARD kernel** (batari Basic multisprite = 5 moving objects, P1 flickersort + P0 + M0/M1/BL + a 6-digit score). Not exotic code tricks — what works is **role separation (buildings = static asymmetric PF / moving things = sprites) + window rhythm (alternating solid and window across PF rows = vertical window texture) + colour and density design**. → a real production endorses TIA Studio's premise that "the designer composes the screen on top of a standard kernel". Details `reference/pizza-boy/dissection.ja.md` 〔Pizza Boy, bB multisprite kernel〕
 - Verify feasibility with a mockup before building (colour budget + scanline count + multiplexing on paper).
+  **A mockup only checks the constraints you believed when you drew it.** Kurt Woloch, stella-list
+  `199805/msg00187` era post in `new-members`, on the 2600 conversions he drew in 1984: *"I tried to
+  figure out what the capabilities of graphics and sound were, roughly, and did some drawings …
+  However, I did MISUNDERSTAND some of the constraints. I thought it would be allowed to have four
+  colors on one scanline of playfield if you reduced the vertical resolution to double-scanline …
+  which, I'm afraid, ISN'T POSSIBLE THIS WAY."* **The thing he got wrong was the colour budget** —
+  the very item this line tells you to check — and the drawings looked good the whole way through.
+  A mockup cannot catch a rule you do not know you are breaking, so the artist's constraints are only
+  as good as whoever supplied them; get the budget from a measured page (`docs/techniques/`,
+  `verified-coverage.md`), never from memory. *(And "trade vertical resolution for playfield colours"
+  is not merely wrong here, it is plausible — swapping resolution for something else is true
+  elsewhere on this machine. `known-traps.md` had nothing on it; see there.)*
 
 ## Drawing craft (making the sprite/character pictures = the concrete rules of ⑥craft)
 - **Start from thumbnail legibility**: verify **first** that it is still identifiable when shrunk to about one dot, then add detail. Shrink without interpolation (nearest, halving each step). 〔326595, 106110〕
