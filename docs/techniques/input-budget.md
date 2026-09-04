@@ -69,6 +69,17 @@ also why the joystick's 40–44 cycles is the *whole* cost and not a per-line on
 - The engine implements exactly four peripherals — `Gopher2600/hardware/peripherals/controllers/`
   holds `stick.go`, `paddle.go`, `keypad.go`, `gamepad.go` — so the keypad *can* be driven; it has
   simply never been budgeted.
+  **One number for it now exists, and it is large.** A keypad scan drives the port as an output and
+  then reads it, and the Programmer's Guide asks for **400 µs between the write and the read** —
+  `1194720 × 0.0004 = 477.888 cycles = 6.288 scanlines`, **2.4 % of a 262-line frame, per direction
+  change**. That arithmetic is not ours; it is in stella-list `200011` (`more-keyboard-nonsense`),
+  where it is also called *"an upper bound as a general rule of thumb"* rather than a specification.
+  What is still unknown is how many direction changes a full scan needs — that is what turns 6.3
+  lines into the actual cost. **Gopher2600 does not model the delay at all** (its own `keypad.go`
+  carries the TODO), so nothing here will make you pay it: see `known-traps.md`.
+  A missing fifth peripheral, for the same reason: the **driving controller** (2002 wiring diagrams
+  put a Gray code in the low two bits of each SWCHA nibble) is not in that list, so it shares the
+  keypad's hole rather than having one of its own.
 
 
 ---

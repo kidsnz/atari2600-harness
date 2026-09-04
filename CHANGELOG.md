@@ -6,6 +6,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the 400 µs figure is a rule of thumb, and the question is 26 years old (2026-09-04)
+
+Landed the settling-time trap half an hour earlier from two 2001 posts. The distillation then found
+the 2000 thread they descend from (`more-keyboard-nonsense`), which changes two things and adds one.
+
+**It is not a specification.** That post does the arithmetic — *"1194720 cycles per second times
+0.0004 seconds = 477.888 cycles = 6.288 scanlines?"*, which matches what was computed here
+independently — and then hedges it in the same breath: *"**I assume 400 microseconds is an upper
+bound as a general rule of thumb**."* The trap treated it as a requirement. It now says to budget the
+full 6.3 lines *until someone measures the real settling time on hardware*, which is a different
+claim.
+
+**The question it opens with is the one this repository answered last night**: *"has anyone written a
+small program to **verify this**?"* Nobody in the thread had. `litmus_swacnt` is that program, 26
+years later — and it answers for this engine only, which is exactly the caveat added an hour ago.
+
+**And it settles a wrong theory in passing.** Someone proposes the delay is switch debounce; it is
+refuted on the spot — *"what if the user presses the button a short while **after** you do the
+output?"* — with the right separation stated: *"the better way to debounce is simply to read slowly …
+which is a **different thing** than waiting between the reads and writes."* That is the same
+distinction Chad Schell reaches a year later, arrived at independently.
+
+**`input-budget.md` gets its first number.** It said the keypad "has simply never been budgeted";
+6.288 scanlines is **2.4 % of a frame per direction change**, with the number of changes per scan
+still unknown. The driving controller is noted there as a fifth missing peripheral sharing the same
+hole.
+
+Found by the mailing-list distillation (helper-2, on a trap helper-1 had landed the same night).
+
 ### Changed — the score kernel's cost, and blinds+flicker as one technique (2026-09-04)
 
 Two more of the same shape as the missile-colour fix earlier tonight: **a fact written where it is a
