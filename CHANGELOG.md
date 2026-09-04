@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `invisible-probe.md`: the hardware computes a hit test if you can hide the instrument (2026-09-03)
+
+Park a missile or the ball on a region the hardware has no register for, read the collision latch, and
+hide the object so the player never sees it. Described on the list in 1998, with three ways to hide it;
+**the engine carries the mechanism and the catalogue had nothing.** Searching `docs/techniques/` for the
+idea returns nothing — five apparent hits are the word "invisible" in unrelated sentences.
+
+The value the page adds over the source is **what each way of hiding costs**, worked out from the
+engine's priority chain rather than assumed:
+
+    default             P0 > M0 > P1 > M1 > BL > PF > BG
+    CTRLPF D2 set       PF/BL > P0/M0 > P1/M1 > BG
+
+So *"put the ball under the player"* is **free by default** — and its price is `CTRLPF` D2, because with
+D2 set the ball rises above both players. **A kernel that uses playfield priority and a kernel that
+hides a probe by priority cannot be the same kernel.** Colour-matching a missile to its player is free
+too, but the probe reappears over the *other* player, and that missile is no longer available as a
+bullet. Setting `COLUPF = COLUBK` hides it everywhere and costs the playfield everywhere.
+
+It also states something the distillation noticed about its own week: **a litmus probe and a game probe
+have opposite requirements.** A litmus probe may be visible (nobody is looking at the picture) and must
+be exact and calibrated in both directions; a game probe must be invisible and may be approximate.
+Which is why the same technique reads as two different ones depending on who wrote it down — and why
+`collide_all` asserting fifteen 1s and no 0s is survivable for a game and not for a measurement.
+
+Hiding is not measured here. Written by the mailing-list distillation (helper-3).
+
 ### Changed — we measured what a ball-width write does, never when, and a 1997 source disagrees (2026-09-03)
 
 `litmus_ctrlpf` fixes the four ball widths, and searching it for `delay|latch|mid.?line` returns
