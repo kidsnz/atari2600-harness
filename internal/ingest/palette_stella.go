@@ -139,6 +139,20 @@ var stellaNTSC = [128][3]uint8{
 
 
 // NewStellaNTSCQuantizer は Stella 実測パレットの逆引き表を作る（Stella スナップショット用）。
+//
+// ★★これは NTSC 専用であり、それは選択ではなく【唯一の表しか無い】という事実である。
+// 2026-09-04 実測: 同じ COLUxx が PAL では別の色になる。色相のずれではなく別の色。
+//
+//	COLU $36  NTSC EA5928 橙 → PAL 51C00C 緑     ← 2003年に Stolberg が実機で見た通り
+//	COLU $C6  NTSC 34A334 緑 → PAL 904AFF 紫
+//	COLU $86  NTSC 2D32EA 青 → PAL E044B5 桃
+//	COLU $1A  NTSC FFFF2F 黄 → PAL CFCFCF 灰
+//	（10色を撃って10色とも違う。輝度だけの $0E だけが近い）
+//
+// ★したがってこの量子化器を通した絵は「NTSC 向けに設計された絵」である。
+// 作品を PAL でも出すなら、色の選択そのものをやり直す必要がある——
+// ★★同梱エンジンは5仕様（NTSC/PAL/PAL60/PAL-M/SECAM）を持つが、この層には表が1枚しかない。
+// 固定してあるのは internal/emu/palspec_test.go。
 func NewStellaNTSCQuantizer() *Quantizer {
 	q := &Quantizer{}
 	for i, rgb := range stellaNTSC {

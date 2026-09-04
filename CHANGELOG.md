@@ -6,6 +6,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the same colour byte is a different colour on PAL, and this project has one palette (2026-09-04)
+
+Eckhard Stolberg, stella-list `the-demo-image-series-7` (2003-02), looking at someone's demo on his
+own television: *"I tried this demo out on my TV … But what is funny is that the NTSC RED you chose
+comes out as GREEN on a PAL VCS."* Reproduced. It is not a shift, it is a different colour:
+
+| COLU | NTSC | PAL |
+|---|---|---|
+| `$36` | `EA5928` orange | **`51C00C` green** — the 2003 sentence, in our engine |
+| `$C6` | `34A334` green | `904AFF` violet |
+| `$86` | `2D32EA` blue | `E044B5` pink |
+| `$1A` | `FFFF2F` yellow | `CFCFCF` grey |
+| `$D4` | `3C6F1E` dark green | `3A34FC` blue |
+
+Ten values sampled, ten differ; only luminance-only `$0E` stays close, which is the test's control —
+without it the assertions would also pass on a build where PAL simply rendered nothing.
+
+**The gap this exposes is in our layer, not the engine's.** `internal/ingest` holds exactly one
+palette (`palette_stella.go`, `stellaNTSC`) and `NewStellaNTSCQuantizer` is the only quantiser there
+is, so **artwork ingested here is mapped to NTSC colour bytes with nothing recording that the choice
+is spec-specific**. Nothing in `internal/` or `pkg/` mentions a PAL palette, though the engine ships
+five specs. The comment at the quantiser now says so, and `internal/emu/palspec_test.go` makes the
+premise falsifiable: if the specs ever agree, "a picture designed here is designed for NTSC" has
+stopped being true and someone should be told.
+
+Found by the mailing-list distillation (helper-2), who also noted the second half of the same post:
+PAL flicker at 50 Hz is *"unbearable … too noticeable with such large objects"* — a second variable
+(object size) next to the frequency this project already tracks.
+
 ### Added — `litmus_swacnt`: the first ROM here that drives a port as an output (2026-09-04)
 
 `fundamentals-audit.md` carried the port-A direction register as ⬜ with the measurement already
