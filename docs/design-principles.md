@@ -267,9 +267,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     **and TRUE interlace — two fields making one picture — is not in this repository at all**, which is
     worth saying because searching for it suggests otherwise: `interlac` matches **14 lines** here and
     **all fourteen mean line-interleaving of sprites**, the flicker/blinds sense. The count is right
-    and "we have it" would be a lie. People did attempt the real thing on this machine (a 2002 thread
-    reports a working version, and its author could not find his own post again afterwards because
-    the subject line said something else). Recorded 2026-09-04 by the mailing-list distillation
+    and "we have it" would be a lie. People did attempt the real thing on this machine, and the way that
+    thread went is the sharper illustration: the method was described on the list in **2000**; two
+    other people built a working version in **2002** having *searched the archive first and missed
+    it*; and the original author had to point them at his own post afterwards. Billy Eno, who built
+    it, replying to Erik Mooney, who described it: *"I searched the archives while I was doing this
+    and **never saw your post**. Perhaps if the title had had something to do with interlacing :)"*
+    **A subject line records where a conversation started, not what it produced** — which is also why
+    the search above returns fourteen hits and none of them is this. Recorded 2026-09-04 by the mailing-list distillation
     (helper-2), who read all 96 hits across five layers before saying so; so "how many visible lines" asks about a signal with no interlaced partner to average against. Neither number lives anywhere else in this tree (227.5: five layers, zero hits; every 228 here is cycle budget, a different quantity). **So no single Stella measurement settles it either** — it settles what
     STELLA assumes, which is one more source, not an arbiter. (Checked 2026-08-04: Stella 7.0's `-help`
     offers no aspect-correction option at all — only `-tia.vsizeadjust <-5..5>` — so the "Stella 91%" figure

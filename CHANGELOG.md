@@ -18,9 +18,14 @@ progressive*, i.e. explicitly not interlaced. **The count is right and "we have 
 someone searching would find fourteen hits and conclude the subject was covered.
 
 The pattern is split, `interlac` gets its own row labelled as ambiguous, and `design-principles.md`
-now states plainly that true interlace is absent. People did attempt it on this machine: a 2002
-thread reports a working version, and its author later could not find his own post because the
-subject line was about something else entirely.
+now states plainly that true interlace is absent. People did attempt it on this machine, and how that
+thread went is the sharper illustration — **corrected the same day, from the primary source, after
+the distillation caught two errors in one clause**. The method was described on the list in **2000**;
+two *other* people built a working version in **2002** having searched the archive first and missed
+it; the original author then pointed them at his post. Billy Eno to Erik Mooney: *"I searched the
+archives while I was doing this and **never saw your post**. Perhaps if the title had had something to
+do with interlacing :)"* Not the author, and not his own post — **a subject line records where a
+conversation started, not what it produced.**
 
 Found by the mailing-list distillation (helper-2), who read all 96 hits across five search layers
 before saying so — the same discipline that turned an earlier "harness doesn't have it" into "harness
