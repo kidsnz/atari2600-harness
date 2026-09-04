@@ -1,6 +1,9 @@
 package emu
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 // TestSameColourByteIsADifferentColourOnPAL measures a fact this project's own tooling does not
 // carry: **the same COLUxx value is a different hue on a PAL console**, often unrecognisably so.
@@ -67,6 +70,35 @@ func TestSameColourByteIsADifferentColourOnPAL(t *testing.T) {
 			t.Errorf("COLU $%02X renders as %s on both NTSC and PAL. If the specs now agree, then "+
 				"colour choices are no longer spec-specific and `internal/ingest`'s single NTSC "+
 				"palette has stopped being a limitation worth naming", c, n)
+		}
+	}
+
+	// **A hardware report from 2001, reproduced.** Someone running a game on a PAL woody through a
+	// Cuttle Cart: *"It works fine on my PAL woody, although **the red cards are green** (changed RED
+	// to `$62` and RED is red for PAL)."* So `$62` should be red under PAL and something else under
+	// NTSC. Measured: NTSC `521196` -- purple -- and PAL `7C0A15`, red by any reading.
+	//
+	// This is the strongest check in the file, and not because it is the largest difference. Every
+	// other assertion here compares one emulator against itself under two settings; **this one
+	// agrees with a person who owned the console.** known-traps.md records the case where three
+	// emulators agreed with each other and were all wrong, so a datum from outside the models is
+	// worth more than another from inside them.
+	//
+	// It does not establish a mapping. Eckhard Stolberg, 1997: "there is not necessarily a
+	// corresponding hue for each hue in the other system." One point is one point.
+	if n62, ok := sample("NTSC", 0x62); ok && n62 != "521196" {
+		t.Errorf("$62 renders %s on NTSC, want 521196 (purple) -- the 2001 report's premise was "+
+			"that this value is NOT red on NTSC", n62)
+	}
+	if p62, ok := sample("PAL", 0x62); ok {
+		var r, g, b int
+		if _, err := fmt.Sscanf(p62, "%02x%02x%02x", &r, &g, &b); err != nil {
+			t.Fatalf("cannot parse %q: %v", p62, err)
+		}
+		if !(r > 100 && r > 3*g && r > 3*b) {
+			t.Errorf("$62 renders %s on PAL; the 2001 hardware report says this is the value that "+
+				"made red look red on a PAL console, so it should be dominantly red (R=%d G=%d B=%d)",
+				p62, r, g, b)
 		}
 	}
 

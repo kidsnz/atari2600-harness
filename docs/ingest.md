@@ -23,6 +23,16 @@ cannot warn about this — by the time it runs, the two swatches have already co
 **This is the measured Stella table's shape, not the TIA's**: the engine's own palette gives 126
 distinct colours in 2 groups. Which of the two a real television resembles is not established here.
 
+**And the palette is per TV standard, with one point checked against hardware.** The same byte is a
+different colour on PAL — `$36` orange becomes green, `$C6` green becomes violet — so a picture
+designed here is designed *for NTSC*. A 2001 post from someone playing on a PAL console through a
+Cuttle Cart reports *"the red cards are green (changed RED to `$62` and RED is red for PAL)"*, and
+that reproduces exactly: `$62` renders purple (`521196`) on NTSC and red (`7C0A15`) on PAL. It is the
+one datum here that comes from outside the emulators rather than from comparing them with each other.
+It does not give a conversion table — one point is one point, and the 1997 source warns there is *"not
+necessarily a corresponding hue"* — but it does mean **a PAL release is a re-choice of colours, not a
+re-mapping of them.**
+
 **The canvas is not the screen. A 2600 pixel is wide.** Anything drawn at 100 % on a
 square-pixel canvas — the form this project's artwork arrives in — is stretched horizontally on a
 real display by somewhere between **1.60× and 1.82×**; the range is not measurement noise, it is the

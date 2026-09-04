@@ -6,6 +6,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a 2001 hardware report about PAL colour, reproduced exactly (2026-09-04)
+
+Someone playing a game on a PAL woody through a Cuttle Cart, `200111/msg00467`: *"It works fine on my
+PAL woody, although **the red cards are green** (changed RED to `$62` and RED is red for PAL)."*
+
+Measured: `$62` renders **`521196` — purple — on NTSC** and **`7C0A15` — red — on PAL**. The report
+reproduces, twenty-five years later, in an emulator that was not written against it.
+
+**This is now the strongest check in `palspec_test.go`, and not because it is the largest
+difference.** Every other assertion there compares one emulator against itself under two settings.
+This one agrees with a person who owned the console — and this file recorded, earlier the same night,
+the 2002 case where three emulators agreed with each other and were all wrong. A datum from outside
+the models is worth more than another from inside them.
+
+It gives no conversion table: one point is one point, and the 1997 source warns *"there is not
+necessarily a corresponding hue for each hue in the other system"*. What it does settle is the shape
+of the work — **a PAL release is a re-choice of colours, not a re-mapping of them** — which is now in
+`ingest.md` where the artwork enters.
+
+Found by the mailing-list distillation (helper-2), who also marked which part was their own inference
+(that the author had been using hue 4x) and left it out of the claim.
+
 ### Added — `keyfit` reports SPREAD and MEAN, not only WORST (2026-09-04)
 
 Glenn Saunders, stella-list 1998: *"you make sure you choose an octave and a key that presents notes
