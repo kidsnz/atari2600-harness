@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — "hoping the two never meet" now has numbers, measured with a tool we already had (2026-09-03)
+
+The stack/variable convention was stated as *"stack from $FF down, variables from $80 up, hoping the two
+never meet"*. `internal/ramtrace`'s activity report prints a stack low-water mark and the observed SP
+range, and **had never been run for this question**. Run now over our own technique ROMs:
+
+    $FD (2 bytes)   bullets, flicker_multiplex, two_line_kernel, score6, paddle_demo, procgen_demo
+    $FB (4 bytes)   game_states, dyn_multisprite
+    $F5 (10 bytes)  rts_dispatch
+
+`rts_dispatch` is the outlier by construction: it pushes return addresses as its dispatch mechanism, so
+its stack use *is* the technique. Everything else is two or four. The list agrees from the other side —
+**Space Instigators uses no stack, Fade Out and Marble Craze two bytes**, with 6-8 offered as enough for
+two or three levels of nesting 〔stella 2004〕. A variable at `$F8` is therefore safe in every kernel here
+except the one that dispatches through the stack, **which is what a convention phrased as "hoping"
+cannot tell you.**
+
+Also added: the *mechanism* behind "$0180–$01FF is why the stack works", which the line stated as a
+conclusion. The 6507's stack pointer is **eight bits** against a thirteen-bit address bus, so the
+processor supplies `$01` as the upper bits on every stack access — no software choice involved — and the
+PIA being mapped into both pages is what makes the two addresses the same memory 〔stella 1999-08〕.
+
+And marked 📖: the reverse trick, deliberately using the stack region as scratch, which the list offers
+with its own caveat. `known-traps.md` covers a variable at `$FF` being clobbered by a `JSR` push and says
+nothing about going the other way.
+
+Found by the mailing-list distillation (helper-1), whose point was the sharp one: **the numbers were
+missing because nobody ran the tool, not because the tool was missing.** A 2004 post proposes measuring
+exactly this by watching the stack pointer in a tracer; we have had that since `ramtrace`.
+
 ### Added — a benefit `subpixel-velocity.md` had and never claimed (2026-09-03)
 
 The Stella Programmer's Guide sentence about PAL conversion is normally quoted as an argument for 8.8

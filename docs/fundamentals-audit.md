@@ -306,7 +306,10 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   costs 5 and the emulator runs it, which this fixture also exercises.
   `→ internal/emu/skipdraw_test.go` (1 grading, 1 negative control: asserting 18/18 fails on both paths)
 - 📖 Mirror templates (woodgrain Memory_Map): TIA at $xyz0 (x even, z∈{0,4}); RAM $80–$FF mirrored
-  at **$0180–$01FF — which is why the stack works**; ROM $1000–$1FFF mirrored at every odd $x000
+  at **$0180–$01FF — which is why the stack works**, and the mechanism is that the 6507's stack
+  pointer is **only eight bits wide** while the address bus is thirteen, so the processor supplies
+  `$01` as the upper bits on every stack access — the programmer has no say in it, and the PIA
+  being mapped into both pages is what makes the two views the same memory 〔stella 1999-08〕; ROM $1000–$1FFF mirrored at every odd $x000
   (incl $F000).
   ✅ **Two of the three measured** (`docs/verified-coverage.md:27`, `litmus_mirror` v0.49.0,
   regression-locked `roms/litmus/scenarios/mirror.json`): the **RAM mirror holds in both
@@ -314,7 +317,28 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   and **one TIA mirror**, $0049 → COLUBK, checked by rendering ($84 blue at `read_row(100)`).
   📖 **Not measured by us**: the TIA template as a rule ($xyz0 for x even, z∈{0,4}) — one mirror is
   not the pattern — and the ROM mirroring of $1000–$1FFF at every odd $x000.
-- 📖 Convention: stack from $FF down (`LDX #$FF/TXS`), variables from $80 up "hoping the two never meet"
+- ✅ **Convention: stack from $FF down (`LDX #$FF/TXS`), variables from $80 up — and the gap is now
+  measured rather than hoped for.** `internal/ramtrace`'s activity report prints the stack
+  low-water mark and the observed SP range, and it had never been run for this. Our own technique
+  ROMs, 2026-09-03 (`go run ./cmd/ramtrace activity -rom <rom>`; SP points at the next free byte,
+  so usage is `$FF − low`):
+
+  | ROM | SP low | bytes |
+  |---|---|---|
+  | `bullets`, `flicker_multiplex`, `two_line_kernel`, `score6`, `paddle_demo`, `procgen_demo` | `$FD` | **2** |
+  | `game_states`, `dyn_multisprite` | `$FB` | **4** |
+  | `rts_dispatch` | `$F5` | **10** |
+
+  `rts_dispatch` is the outlier by construction — it pushes return addresses as its dispatch
+  mechanism, so its stack use *is* the technique. Everything else sits at two or four.
+  Shipped games agree, from the list: **Space Instigators uses none, Fade Out and Marble Craze two**,
+  and 6-8 is offered as enough for two or three levels of nesting 〔stella 2004〕. So a variable at
+  `$F8` is safe in every kernel here except the one that dispatches through the stack — which is
+  exactly the kind of thing a convention phrased as "hoping" cannot tell you.
+  📖 **Not measured: the reverse trick** — deliberately using the stack region as scratch. The list
+  offers it with its own caveat (*"just be careful about which temp variables each subroutine
+  uses"*); `known-traps.md` covers a variable at `$FF` being clobbered by a `JSR` push and says
+  nothing about going the other way.
   (Stella PG). Real-game RAM budgets: Pitfall ≈ all 128 bytes (world = 1 byte!), Random-Dungeon ≈45 with
   aliased overlays, za2600 overflows into cart RAM. ⬜ a RAM-map audit feature (symbols → read/write
   coverage) would catch dead variables (Pitfall's `cxHarry` is stored, never read).
