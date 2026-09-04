@@ -282,10 +282,29 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   **A search note:** this was recorded as unverifiable an hour earlier because `reference/` holds no
   Combat ROM. It is in `sandbox/`, a sibling repository — **the search was scoped to one of the four
   and the conclusion was stated as if it covered all of them.**
-  ⬜ **The power-up value is the engine's choice, not a measurement.** `Reset` zeroes the memory
-  explicitly; whether a real 6532 clears its DDR on RES is not established here. Measure **what
-  writing SWACNT does**, which is the truth table (`riot/ports/ports.go`, 8 rows, all four
-  SWCHA_W×SWACNT combinations present), not the default.
+  ✅ **The truth table is measured, 2026-09-04** — `roms/litmus/litmus_swacnt.asm`,
+  `internal/emu/swacnt_test.go`, regression-locked `roms/litmus/scenarios/swacnt.json`. This is the
+  first ROM here that drives a port as an output, which is what the line above said was missing:
+
+  | SWACNT | wrote | reads back | |
+  |---|---|---|---|
+  | `$00` | — | `$FF` | the peripheral owns the port (idle stick) |
+  | `$FF` | `$A5` | `$A5` | every bit driven; the write reads back |
+  | `$F0` | `$5A` | `$5F` | **split** — high nibble from the latch, low from the peripheral |
+  | `$00` | — | `$FF` | handing it back is clean; the latch does not linger |
+
+  The third row is the one that goes beyond dumping: **half the port can be an output while the
+  other half is still an input**, which is what a two-console link needs. The fourth says the
+  direction is reversible — a program that drives the port can give it back. Neither is in the
+  Programmer's Guide's one-line description of the register. Negative controls: not setting the
+  direction makes the `$A5` write vanish; making band 3 fully output removes the split.
+  **What drove this was a working report, not a document.** stella-list `poor-man-s-cart-dumper`
+  (2005-08) is a cartridge dumper in which the 2600 talks serial out of a joystick port at 1200 baud,
+  and a third party reports getting it running on hardware. Only the fact that it writes SWACNT was
+  taken from that post; no code was (clean-room). Found by the mailing-list distillation (helper-2).
+  ⬜ **The power-up value is still the engine's choice, not a measurement.** `Reset` zeroes the RIOT
+  memory explicitly; whether a real 6532 clears its DDR on RES is not established here. The table
+  above measures what a *write* does, which is a different question from what reset leaves behind.
 
 ## 8. 6502/6507 precision
 - ✅ cycle accounting (76/line; WSYNC-stall exclusion).

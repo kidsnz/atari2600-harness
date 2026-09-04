@@ -1,0 +1,11 @@
+{
+  "rom": "roms/litmus/litmus_swacnt.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    {"at_frame": 2, "field": "ram.0x80", "op": "==", "value": 255},
+    {"at_frame": 2, "field": "ram.0x81", "op": "==", "value": 165},
+    {"at_frame": 2, "field": "ram.0x82", "op": "==", "value": 95},
+    {"at_frame": 2, "field": "ram.0x83", "op": "==", "value": 255}
+  ],
+  "checks": { "ntsc_frame_lines": 262, "frame_lines_stable": { "frames": 130, "lines": 262 } }
+}

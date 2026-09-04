@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `litmus_swacnt`: the first ROM here that drives a port as an output (2026-09-04)
+
+`fundamentals-audit.md` carried the port-A direction register as ⬜ with the measurement already
+named: *"Measure what writing SWACNT does, which is the truth table … not the default."* It stayed
+unmeasured because **no ROM in this repository wrote SWACNT at all** — the engine resets the RIOT to
+all-inputs and every fixture was content with that, so a DDR litmus had nothing to confirm.
+
+| SWACNT | wrote | reads back | |
+|---|---|---|---|
+| `$00` | — | `$FF` | the peripheral owns the port (idle stick) |
+| `$FF` | `$A5` | `$A5` | every bit driven; the write reads back |
+| `$F0` | `$5A` | `$5F` | **split** — high nibble from the latch, low from the peripheral |
+| `$00` | — | `$FF` | handing it back is clean; the latch does not linger |
+
+Row three is the one that goes beyond cartridge dumping: **half the port can be an output while the
+other half is still an input.** That is what a link between two consoles needs, and it pairs with the
+receiving side, which `litmus_input` already pins (the VBLANK D6 latch). Row four says the direction
+is reversible. Neither is in the Programmer's Guide's one-line description.
+
+**A working report, not a document, is what moved this off 📖.** stella-list `poor-man-s-cart-dumper`
+(2005-08) is a dumper in which the 2600 itself talks serial out of a joystick port at 1200 baud, and
+a third party reports getting it running: *"I was able to get this and your original send.bin program
+WORKING! … The 1200 baud timing seems to work out just fine."* Only the fact that it writes SWACNT
+was taken from that post; no code was (clean-room). Negative controls: not setting the direction
+makes the `$A5` write vanish; making band 3 fully output removes the split. Both fired.
+
+Still ⬜: what a real 6532 leaves in its DDR at reset. Measuring what a *write* does is a different
+question from what reset leaves behind, and the line now says so.
+
+Found by the mailing-list distillation (helper-2).
+
 ### Added — opposing joystick directions cannot be tested here at all (2026-09-04)
 
 Real `SWCHA` is four independent switch lines. A **dance pad**, a homebrew controller or a worn stick
