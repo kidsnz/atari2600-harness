@@ -13,5 +13,3 @@
 #
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
-roms/litmus/litmus_flicker_attrib.bin  # 2026-09-03  added mid-session; the machine is in use
-roms/litmus/litmus_pf0_reflect.bin  # 2026-09-03  added mid-session; the machine is in use

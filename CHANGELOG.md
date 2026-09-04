@@ -6,6 +6,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — Stella cross-check for both new litmus ROMs, 37/37 each; the queue is empty again (2026-09-04)
+
+`litmus_flicker_attrib` and `litmus_pf0_reflect` were queued yesterday because capturing drives Stella's
+GUI and takes the screen for about thirteen seconds per ROM, and the machine was in use. Captured now,
+with the author's go-ahead:
+
+    PASS: 37/37 write-only TIA registers agree (litmus_flicker_attrib.bin @ frame 5)
+    PASS: 37/37 write-only TIA registers agree (litmus_pf0_reflect.bin  @ frame 5)
+
+Both queue lines removed; `CAPTURE_QUEUE` holds no ROMs. The oracle covers the whole corpus again.
+
+Worth noting what this does and does not add. It says Gopher2600 and Stella agree on every write-only
+TIA register these ROMs touch — two independent implementations reaching the same state. It does not
+make either of them hardware, which is the line the ⬜ entries in `fundamentals-audit.md` keep.
+
 ### Fixed — "unverifiable" was wrong: the Combat ROM is in `sandbox/`, and it does write SWBCNT (2026-09-04)
 
 An hour ago this recorded the list's DDR counterexamples as impossible to check, *"neither ROM is in
