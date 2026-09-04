@@ -50,7 +50,14 @@ processor status — whose **bit 1 is the Z flag** — straight into ENAM.D1 (th
                      PHP          ; [$011D]=ENAM0, D1=Z  → lit only on its row
                      PLA          ; restore SP=$1D
 ```
-Needs **no `JSR` in the kernel/VBLANK/overscan** (SP is borrowed). **Corrected 2026-09-03:** this line read "Needs `SEI` (no IRQ)" and `SEI` does nothing here — **the 2600 has no path by which an IRQ can reach the 6507**. Measured in the vendored engine: `CPU.Interrupt()` is called from five places and all five are `mem.arm.Interrupt()`, the ARM coprocessor in ELF/ACE carts; the RIOT's PA7 flag is a status bit software polls (TIMINT) and never reaches the CPU. Most ROMs here still open with `sei` (139 of 173 .asm files) and that is fine as convention — the error was calling it a requirement of this technique. Trap: **ENAM0=$1D,
+Needs **no `JSR` in the kernel/VBLANK/overscan** (SP is borrowed). **Corrected 2026-09-03:** this line read "Needs `SEI` (no IRQ)" and `SEI` does nothing here — **the 2600 has no path by which an IRQ can reach the 6507**. Measured in the vendored engine: `CPU.Interrupt()` is called from five places and all five are `mem.arm.Interrupt()`, the ARM coprocessor in ELF/ACE carts; the RIOT's PA7 flag is a status bit software polls (TIMINT) and never reaches the CPU.
+**Corroborated externally, added 2026-09-03:** the list said it first and drew the same distinction.
+Erik Mooney, 1999: *"There are no interrupts on the 2600."* Two years later someone asks *"is the
+`SEI` at the beginning of most games unnecessary then?"*, and Eckhard Stolberg answers by separating
+exactly what we separated from the engine — the RIOT's own flag (*"everytime the timer wraps from $00
+to $FF the interrupt flag is set (if timer interrupts are enabled)"*) from anything the 6507 can see.
+The derivation here was independent and reached the same split; this is the rarer sort of source, the
+kind that **confirms** a decision rather than correcting one. Most ROMs here still open with `sei` (139 of 173 .asm files) and that is fine as convention — the error was calling it a requirement of this technique. Trap: **ENAM0=$1D,
 ENAM1=$1E, ENABL=$1F** — mixing them lights the wrong object; verify with `read_motion` height, not the
 annotated position marker (a proxy).
 

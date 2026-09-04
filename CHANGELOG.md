@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the `SEI` correction reached one corpus note this morning and five more were waiting (2026-09-03)
+
+This morning's fix removed *"Needs `SEI` (no IRQ)"* from `missiles-bullets.md`, and the distillation
+pointed at one reference note still quoting the old line. It was pointed at, so it was fixed. **The
+search was never run.**
+
+Run now: **seven occurrences across five notes**, and several of them are notes that had *found the
+error* — *"`SEI` does nothing on the 2600 (no interrupt line, and `BRK` cannot be masked)"*, *"this
+disagrees with harness head-on"*, *"the 6507 has no IRQ pin, and yet…"*. **The corpus had flagged this
+repeatedly and harness was corrected this morning.** With harness fixed and the notes untouched, every
+one of them now reads as a live disagreement that no longer exists.
+
+The quotes are left in place — they are accurate records of what this repository said at the time — and
+each carries a note that the line has since been corrected, with the current wording. Same treatment as
+the half-stale criticism in `scanline-counts` earlier today: strike the resolved half, keep the rest.
+
+**The rule this breaks is one I wrote into my own memory this morning**, after the first instance:
+*when you correct a claim in harness, shoot `rg -F '<the old verbatim>' reference/` in the same turn.*
+I fixed what I was shown and did not run the search — which is how the count went from one to seven.
+
+Separately, and in the other direction: the `SEI` finding gains **external corroboration**, which is the
+fourth kind of relationship a source can have with us. Erik Mooney, 1999: *"There are no interrupts on
+the 2600."* In 2001 someone asks whether the `SEI` at the top of most games is therefore unnecessary,
+and Eckhard Stolberg answers by drawing exactly the distinction we drew from the engine — the RIOT's own
+timer-interrupt flag against anything the 6507 can see. The derivation here was independent and landed
+on the same split.
+
+Found by the mailing-list distillation (helper-3), who also declined to open the duplicate they spotted
+because it belongs to another session's thread key, and named it instead.
+
 ### Changed — "hoping the two never meet" now has numbers, measured with a tool we already had (2026-09-03)
 
 The stack/variable convention was stated as *"stack from $FF down, variables from $80 up, hoping the two
