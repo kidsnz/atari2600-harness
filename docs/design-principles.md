@@ -98,6 +98,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
 - **Multi-kernel = reuse one object per region**: switch `REFP` / position / picture per Y band and reuse a single player for different purposes (Stay Frosty). Match a "never overlap on the same line" placement constraint with an AI that "never enters an occupied column" and flicker is zero. 〔mining 303364, 318140, 164247〕
 - **Flicker is a last resort, and only for short-lived objects.** Never over a large area. Don't trust the emulator — verify by compositing several frames. 〔flicker-to-enhance-graphics〕
+  **This is a POSITION, not a measurement, and the list held the opposite one.** It rested on a single
+  source and stated no cost for following it. Glenn Saunders, then the list's administrator, 1997:
+  *"Oystron and Rescue avoid flicker but constrain sprite placement and movement to do it. That's
+  fine, but it narrows the horizon of what's possible on the 2600."* — *"flicker is another 2600
+  programming strategy and it opens up a lot of territory."* His exemplars were **Solaris** and
+  **Star Wars: The Arcade Game**, *"paragons of intelligent sprite flicker and reuse."*
+  **The default here stays "last resort"**, because this project's own recorded preference is to cut
+  rather than to add and not to let a technique show — a taste decision, made once, not re-argued per
+  page. What changes is that the alternative is now written down with its advocate, and that **the
+  cost of avoidance is named**: refusing to flicker forces objects apart in Y, and that is a
+  measurable narrowing (`pkg/design/multiplex.go`'s `NeedsEmptyYLane` is the existing foothold —
+  how many placements survive the constraint is a number, not an opinion).
+  Two things remain matters for the eye and not for this file: whether a given flicker reads as
+  motion or as damage, and how large an area is too large. Found by the mailing-list distillation
+  (helper-1), who flagged it as belonging to the artist rather than to the harness.
 - **Flickering more than 2 objects: list reordering REPLACED age-based, and it costs priority.**
   The older way is **age-based** — count how many times each object has been shown and display the
   oldest next. The newer one is **list reordering**: try each object in FLICKERLIST order, move the ones

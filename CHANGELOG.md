@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — "flicker is a last resort" is a position, and the list held the opposite (2026-09-04)
+
+`design-principles.md` carried *"Flicker is a last resort, and only for short-lived objects. Never
+over a large area."* — one line, one source, stated as settled, with **no cost given for following
+it**. `rg 'last resort|flicker.*strategy'` over the docs returns that line alone.
+
+The list's own administrator argued the other side in 1997. Glenn Saunders: *"Oystron and Rescue
+avoid flicker but constrain sprite placement and movement to do it. That's fine, but it narrows the
+horizon of what's possible on the 2600."* — *"flicker is another 2600 programming strategy and it
+opens up a lot of territory."* His exemplars were **Solaris** and **Star Wars: The Arcade Game**,
+*"paragons of intelligent sprite flicker and reuse."*
+
+**The default is unchanged** — this project's recorded preference is to cut rather than add and not
+to let a technique show, which is a taste decision made once and not re-argued per page. What changes
+is that the alternative is written down with its advocate, and that **the cost of avoidance is
+named**: refusing to flicker forces objects apart in Y, and how many placements survive that
+constraint is a number (`multiplex.go`'s `NeedsEmptyYLane` is the foothold), not an opinion.
+
+Two things stay outside this file, in the eye: whether a given flicker reads as motion or as damage,
+and how large an area is too large.
+
+Found by the mailing-list distillation (helper-1), who identified it as the artist's call rather than
+the harness's and asked for the default to be stated explicitly if both were recorded.
+
 ### Added — the AUDF ladder's crowding at the top is a resource (2026-09-04)
 
 `pitch-dither.md` exists because the AUDF ladder is uneven. **The same unevenness runs the other way
