@@ -148,7 +148,10 @@ D0:     sbc #15
         sta RESP0
 
         sta WSYNC
-        lda #193        ; P1: as far right as one line of div-15 reaches (~px 139)
+        lda #193        ; P1: as far right as one line of div-15 reaches. MEASURED, not
+                        ; predicted: ResetPixel 150. A linear extrapolation from two
+                        ; earlier points said 139, which is what predicting instead of
+                        ; measuring gets you when the underlying step is quantised.
         sec
 D1:     sbc #15
         bcs D1
@@ -158,7 +161,11 @@ D1:     sbc #15
         ; 16-px band; HMOVE is what the hardware provides for the remainder. It matters
         ; here because the sweep's last useful point lands INSIDE the copy, splitting it
         ; old|new, and a probe sitting at the copy's trailing edge sees only the new half.
-        lda #$70                ; +7 = seven pixels left
+        lda #$70                ; +7 = seven pixels left. Closes exactly: ResetPixel 150,
+                                ; HmovedPixel 143, and PF0's mirrored copy starts at 144,
+                                ; so the probe's 8 px sit 143-150 with 144-150 inside it.
+                                ; (`$70` = left 7 is measured — CLAUDE.md's nibble table
+                                ; and internal/emu/hmovenibble_test.go.)
         sta HMP1
         sta WSYNC
         sta HMOVE
