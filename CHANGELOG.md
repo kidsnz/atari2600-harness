@@ -6,6 +6,51 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — ten litmus ROMs measure a TIA with no revision bugs, because ours has them off (2026-09-04)
+
+`known-traps.md` already asks this question about `EmulateSARA`: *"A litmus written for phantom reads
+today would come back green because THE FEATURE IS OFF, not because the hardware behaves — it would
+be MEASURING OUR OWN DEFAULT."* The distillation found that the same sentence applies to **eight more
+switches**, and that one of them governs a fact certified two days ago.
+
+The engine models eight TIA-revision behaviours — `LateVDELGRP0/1`, `LateRESPx`, `EarlyScancounter`,
+`LatePFx`, `LateColor`, `LostMOTCK`, `RESPxHBLANK` — **all false by default, none ever set here**.
+They are not hypothetical: `hardware/tia/revision/bugs.go` names shipped cartridges (`LostMOTCK` →
+Cosmic Ark's starfield, `LateColor` → QuickStep and *"some TIAs on the edge of tolerance … such as an
+RGB MOD"*, `LatePFx` → Pesco) and notes that `RESPxHBLANK` *"seems to be affected by operating
+temperature"*.
+
+**Measured across all 145 litmus ROMs, rendering each with every flag off and then one flag on: ten
+change, each under exactly one flag.**
+
+| flag | ROMs |
+|---|---|
+| `LateColor` | `litmus_bpl_trip`, `litmus_dag_region`, `litmus_deadbranch`, `litmus_pagealign`, `litmus_pcm` |
+| `LatePFx` | `litmus_pf0_reflect`, `pf_late`, `pf_wraps` |
+| `LostMOTCK` | `litmus_hmove_mid`, `litmus_hmove_side` |
+
+Not a defect — a **scope** that was never written down. `tiarevision_test.go` pins it in both
+directions: each ROM must still change under its flag, and must not start changing under others.
+
+**And the one that prompted it is clean, for a reason worth having.** `RESPxHBLANK` looked likely to
+disturb the **+5 / +4** strobe phase certified on 2026-09-03. It does not — `litmus_respx_phase` is
+checked against all eight and none moves it — because `video/player.go` applies `RESPxHBLANK` only to
+a strobe at `hsync == 16 || 18` on rising phi2 and `LateRESPx` only inside HBLANK during a starting
+HMOVE ripple, while that ROM strobes in the visible area. **So +5/+4 holds for the case it measures
+and is unmeasured for the two those flags govern**, which `fundamentals-audit` now says.
+
+The engine's citation for `RESPxHBLANK` is stella-list `199901/msg00089` — **a post inside the archive
+being distilled** — where the author of the five-pixel figure, unable to reproduce a colleague's
+result, asks *"what version of the VCS are you using?"* and adds *"maybe I need to revise my 5 pixel
+delay theory again."* The same number, doubted by its own source, twenty-seven years before we
+measured it.
+
+Five flags move nothing here: no fixture reaches their conditions.
+
+Found by the mailing-list distillation (helper-2), who counted the engine's untouched preferences and
+noticed one of them sat under a fact we had just certified — and who wrote down, unprompted, the four
+things they had not proved.
+
 ### Changed — the dropped-`#` detector covers one of three landing zones (2026-09-04)
 
 Yesterday's row said `defuse`'s `ReadBeforeWrite` catches a forgotten `#`, using the 1997 example

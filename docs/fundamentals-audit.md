@@ -67,7 +67,16 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   earlier; that is recorded rather than dropped. `→ internal/emu/hmoveside_test.go` (4 gradings,
   2 negative controls: removing the +8 fails on every step; claiming the comb in the mid-visible
   bands fails by name)
-- ✅ **RESPx / RESMx / RESBL reset phase** — measured 2026-09-03; this line was documented-only until then. The player's first visible pixel lands **+5 colour clocks** past the strobe's own end clock (the value Towers' *TIA Hardware Notes* states), and the **missile and the ball land +4** — a one-clock difference between an 8-clock object and a 1-clock object that the document does not carry. One extra CPU cycle before the strobe moves any of them exactly **+3** clocks. Offsets are read against the strobe instruction's own beam position (`TraceClocks`, visible coordinates), so nothing is derived from cycle arithmetic. 〔Towers, *TIA Hardware Notes*, RESPx pipeline〕 `→ roms/litmus/litmus_respx_phase.asm` / `internal/emu/respxphase_test.go` (3 gradings, 2 negative controls: the player's offset forced to 4 fails by name; a flat sweep trips the slope control)
+- ✅ **RESPx / RESMx / RESBL reset phase** — measured 2026-09-03; this line was documented-only until then. The player's first visible pixel lands **+5 colour clocks** past the strobe's own end clock (the value Towers' *TIA Hardware Notes* states), and the **missile and the ball land +4** — a one-clock difference between an 8-clock object and a 1-clock object that the document does not carry. One extra CPU cycle before the strobe moves any of them exactly **+3** clocks. Offsets are read against the strobe instruction's own beam position (`TraceClocks`, visible coordinates), so nothing is derived from cycle arithmetic. **Scope, added 2026-09-04:** this is the phase of a TIA with the engine's eight revision bugs
+  switched off, which is the default and which nothing here has ever changed. Checked specifically —
+  `internal/emu/tiarevision_test.go` renders this ROM under each of the eight and none of them moves
+  it, and the reason is in `video/player.go`: `RESPxHBLANK` applies only to a strobe at the very end
+  of HBLANK and `LateRESPx` only inside HBLANK during a starting HMOVE ripple, while this ROM strobes
+  in the visible area. **So +5/+4 holds for the case measured and says nothing about those two.**
+  The engine cites stella-list `199901/msg00089` for `RESPxHBLANK`, where the author of the five-pixel
+  figure writes *"maybe I need to revise my 5 pixel delay theory again"* — the same number, doubted by
+  its own source, twenty-seven years earlier.
+  〔Towers, *TIA Hardware Notes*, RESPx pipeline〕 `→ roms/litmus/litmus_respx_phase.asm` / `internal/emu/respxphase_test.go` (3 gradings, 2 negative controls: the player's offset forced to 4 fails by name; a flat sweep trips the slope control)
   point (explains our verified +5 family offsets). **RESBL re-emits START (ball restartable mid-line);
   RESPx does not** (player needs a 160-clock wrap). ⬜ double-strobe behavior unmeasured.
 - ✅ **missile-locked-to-player (RESMP D1)** — the ⬜ was stale: `roms/litmus/litmus_resmp.asm` +
