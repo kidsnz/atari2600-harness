@@ -6,6 +6,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — we measured what a ball-width write does, never when, and a 1997 source disagrees (2026-09-03)
+
+`litmus_ctrlpf` fixes the four ball widths, and searching it for `delay|latch|mid.?line` returns
+nothing: **the values are verified and the timing has never been touched.** Gopher2600 applies the
+write immediately (`ball.go`: `bs.Size = (value & 0x30) >> 4`). A stella post from 1997 reports the
+opposite — a width write not taking effect for about **eighty colour clocks**, and a width changed
+part-way through a draw rendering as `X......X` rather than as either width.
+
+Recorded as ⬜ rather than resolved. Neither side has been measured here: the 1997 report was made
+against real hardware, ours is a reading of the emulator's source, and reading a source is not a
+measurement — the same distinction that kept `BIT CXxx` at 📖 earlier today.
+
+Worth noting why nobody would have suspected it: `design-principles.md`'s register-timing rules cover
+PF writes (2-3 colour clocks late) and colour writes (immediate) and **say nothing about CTRLPF at
+all**, so the table gives a reader no reason to look. The entry carries a way to settle it — change
+the width mid-visible, read back the first x where the drawn run changes, with the same change during
+HBLANK as the control.
+
+Found by the mailing-list distillation (helper-2), who measured all three states — what the litmus
+covers, what the engine does, what the doc says — before concluding anything, and said plainly that
+they cannot tell which side is right.
+
 ### Changed — `flicker-multiplexing.md` now says why the list told you not to do this (2026-09-03)
 
 The page had **nothing about collisions** — zero mentions of a collision register or `CXCLR` — while

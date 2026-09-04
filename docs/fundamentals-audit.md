@@ -130,6 +130,18 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   ✅ **SCORE×PFP interaction measured** (v1.53.0): **PFP dominates** — with D2 set, D1 has no
   effect (PF renders in COLUPF on BOTH halves, with priority over players); $02→halves colored,
   $04 and $06→identical COLUPF rendering.
+  ⬜ **WHEN a ball-width write takes effect is not measured — and a 1997 source disagrees with our
+  engine.** `litmus_ctrlpf` fixes the four widths (`rg -i "delay|latch|mid.?line"` over it returns
+  nothing), so we have the values and not the timing. Gopher2600 applies the write immediately
+  (`hardware/tia/video/ball.go`: `bs.Size = (value & 0x30) >> 4`). A stella post from 1997 reports
+  the opposite — a width write not taking effect **for about eighty colour clocks**, and a width
+  changed part-way through a draw rendering as `X......X` rather than as either width. Which is
+  right is open: neither has been measured here, and the 1997 report was made against real
+  hardware while ours is a reading of the emulator's source.
+  Note also that `design-principles.md`'s register-timing rules cover PF writes (2-3 colour clocks
+  late) and colour writes (immediate) and say nothing about CTRLPF, so a reader has no reason to
+  suspect a difference. To settle it: change the width mid-visible and read back the first x where
+  the drawn run changes, with the same change made during HBLANK as the control (2026-09-03).
 - ✅ **Asymmetric PF under reflection: writing PF0 twice in one line does show different values
   at the two edges** — verified `litmus_pf0_reflect`, regression-locked
   `roms/litmus/scenarios/pf0_reflect.json`, graded by `internal/emu/pf0reflect_test.go`.
