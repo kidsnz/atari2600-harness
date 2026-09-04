@@ -143,7 +143,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   opcode will emit the one unstable member. `SAX` (4), `SBX` (1) and `DCP` (7) carry no stability
   field in any mode, so the rest of the line stands. Counted from
   `Gopher2600/hardware/cpu/instructions/definitions.json` by the mailing-list distillation
-  (helper-1) and re-run here independently. 〔engine instruction table〕 〔mining 168616 illegal-opcode stability (ASR caveat in the same note); 294471 §32 for the independent second report〕 **Corrected 2026-09-02**: this line previously listed ASR as stable and claimed it was "already used in 48px / dyn_multisprite". Both were wrong — those three ROMs use no illegal opcode at all, and no ROM in the corpus uses ASR/ALR (measured with two structurally different expressions, both exit 1). `scripts/check_traps.py:73` had already omitted ASR from what it recommends, so the docs were the outlier.
+  (helper-1) and re-run here independently. 〔engine instruction table〕
+  **A shipped homebrew used `LAX`, and which one is an open question this repository cannot close.**
+  Andrew Davie's release note for Qb v0.04, quoted on the list (`200102/msg00205`): *"Mac users
+  should recompile the source, exchanging all **"lax"** instructions with **"lda"** — this will give
+  a buggered score display, but that's all that will be different."* So the instruction was load
+  bearing in released code, and swapping it degraded exactly one thing. **If those were the
+  addressed forms the map is confirmed by practice; if any was `$AB` (immediate) the map says magic
+  and the note says it shipped anyway, which would be the more interesting outcome.** It cannot be
+  settled here: the source was a list attachment (other people's commented assembly — outside the
+  clean-room line, not opened) and **no Qb ROM exists in this tree** — checked, 319 `.bin` images
+  under `reference/`, none of them Qb. A byte scan of a ROM would not settle it either, since `$AB`
+  as data is indistinguishable from `$AB` as an opcode without disassembling from the entry point.
+  Recorded as an open question with its falsifier named. Found by the distillation (helper-1), who
+  declined to quote it as evidence for the same reason. 〔mining 168616 illegal-opcode stability (ASR caveat in the same note); 294471 §32 for the independent second report〕 **Corrected 2026-09-02**: this line previously listed ASR as stable and claimed it was "already used in 48px / dyn_multisprite". Both were wrong — those three ROMs use no illegal opcode at all, and no ROM in the corpus uses ASR/ALR (measured with two structurally different expressions, both exit 1). `scripts/check_traps.py:73` had already omitted ASR from what it recommends, so the docs were the outlier.
 - **The resource triangle + a register convention**: RAM (128B) / CPU (76cy) / ROM are mutually exclusive = growing one shrinks the others (plus the human cost). The Thomas Jentzsch convention = inside the kernel, pin the roles to **Y = scanline and sprite index, X = PF, A = everything else** and it runs faster. Use subroutines for code reuse only (the call cost is high). 〔mining 146817〕
 - **The canonical kernel vocabulary** (Andrew Davie): "**N-scanline kernel**" (one picture row = N scanlines) plus 4 shape axes = sprite spacing / PF spacing / symmetry (sym/asym) / reflection (mirrored). Adopted as the harness's internal kernel vocabulary. 〔mining 320714〕
 - **Movement = fixed-point subpixels**: hold position as 8.8 fixed point and add `vel` every frame → the carry moves the integer part = smooth slow motion, friction, gravity and wind in one framework. **A parabola = constant velocity in X × constant acceleration in Y** (no trigonometry). Enemy chasing = proportional homing from the sign-shift of `(target−pos)/16` (no division; 16 directions = octant + slope threshold — **but a signed shift is not free**: keeping the sign through `(target−pos)/16` costs a `cmp #$80` before each of the four `ror`s, so "no division" means four extra instructions, not none 〔107024:16〕). 〔mining 178177, 270373, 107024〕 (technique-candidate ㉕)
