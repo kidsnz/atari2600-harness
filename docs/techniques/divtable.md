@@ -15,7 +15,7 @@ Source studied: `reference/atariage/113254-fast-divide-by-seven/notes.ja.md` (Ap
 Constant division `A / d` is computed as:
 
 ```
-q ≈ (A * RECIP) >> 8          RECIP = round(256 / d)
+q ≈ (A * RECIP) >> 8          RECIP = ceil(256 / d)   -- NOT round; see below
                               d=3 → 86   d=7 → 37   d=10 → 26   d=15 → 18
 ```
 
@@ -65,8 +65,26 @@ on-screen value at `$B0` (÷15 of 90 = 6). 13 exact RAM asserts in total, `ntsc_
 
 - **Exactness:** all four helpers reproduce `A/d` and `A%d` for **every** input 0..255 (verified in
   a Go reference model). The ±1 reciprocal bound is what makes the single-step correction sufficient.
-- **Reciprocal constants:** `round(256/d)` — 86 / 37 / 26 / 18. (18 vs 17 for ÷15 both work because
-  the correction absorbs the rounding; 18 is used.)
+- **Reciprocal constants:** `ceil(256/d)` — 86 / 37 / 26 / 18. **The formula said `round` and did not
+  produce two of its own four constants** (corrected 2026-09-04): `round(256/3) = 85` but the table
+  holds **86**, and `round(256/15) = 17` but the table holds **18**. `ceil` gives all four. ÷7 and ÷10
+  are unaffected because 256/d already rounds up there.
+  **Both choices are correct** — every one stays inside the ±1 the single-step correction absorbs, so
+  this was a wrong description of right constants, not a wrong constant. **But `ceil` is not uniformly
+  the better pick, and the earlier note's parenthetical implied it was.** Measured over all 256 inputs:
+
+  | | corrections needed | error values |
+  |---|---|---|
+  | ÷3, RECIP=85 (round) | 85 | −1 or 0 |
+  | ÷3, **RECIP=86 (ceil)** | **43** | 0 or +1 |
+  | ÷15, **RECIP=17 (round)** | **17** | −1 or 0 |
+  | ÷15, RECIP=18 (ceil) | 111 | 0 or +1 |
+
+  So `ceil` halves the corrections for ÷3 and multiplies them by **6.5** for ÷15. What the shipped
+  table actually is, is *ceil throughout*; **why** is not the correction count, and this file does not
+  know. Recorded rather than rationalised. (Found by the mailing-list distillation, helper-1, who
+  measured ÷3 and read the `round`/`ceil` mismatch off it; the ÷15 half is re-run here and reverses
+  the advantage, so the "ceil is better" reading did not survive checking.)
 - **Cycle cost (NMOS timing, no page-cross), in=100:** ÷3 ≈ 873 cy, ÷7 ≈ 556 cy, ÷10 ≈ 497 cy,
   ÷15 ≈ 552 cy. `MulHi8` is a fixed ~150 cy; the variable cost is the `q*d` remainder term, computed
   here by **repeated addition** (Y = q iterations) for clarity, so cost grows with quotient size

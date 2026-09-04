@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — `divtable.md`'s formula did not produce two of its own four constants (2026-09-04)
+
+The page said `RECIP = round(256 / d)`. **`round(256/3) = 85` and the table holds 86; `round(256/15) =
+17` and the table holds 18.** `ceil` gives all four. ÷7 and ÷10 were unaffected, which is why it went
+unnoticed — and an existing parenthetical had already spotted the ÷15 case (*"18 vs 17 for ÷15 both
+work"*) without noticing that ÷3 had the same discrepancy or that the rule itself was misnamed.
+
+Both choices are correct: every one stays inside the ±1 the single-step correction absorbs. **A wrong
+description of right constants.**
+
+**And the obvious rationalisation does not survive measurement.** Over all 256 inputs, ÷3 needs **85**
+corrections at RECIP=85 and **43** at 86 — so ceil halves the work. ÷15 needs **17** at RECIP=17 and
+**111** at 18 — so ceil multiplies it by 6.5. The shipped table is ceil throughout; *why* is not the
+correction count, and the file now says so rather than inventing a reason.
+
+Found by the mailing-list distillation (helper-1), from a 2003 thread on dividing by 3 where two
+people posted routines and **both hedged** — *"I think that's right"*, *"untested"* — and both hedges
+were warranted. helper-1 measured ÷3; the ÷15 half is re-run here and reverses the advantage, so the
+"ceil is better" reading did not survive checking.
+
 ### Fixed — "interlace" means two different things, and the digest treated them as one (2026-09-04)
 
 `gen_mining_digest.py` classified `flicker|multiplex|interlac` as a single category. They are not
