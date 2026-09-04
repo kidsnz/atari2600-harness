@@ -6,6 +6,16 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the new litmus is queued for a Stella capture, because the gate caught that it was not (2026-09-03)
+
+Pushing `litmus_flicker_attrib` was blocked by the pre-push run, and correctly: the Stella oracle
+reported `1 corpus ROM(s) have no Stella capture and are not queued`. Adding a ROM to the corpus adds
+it to what the oracle is expected to cover, and I had not done the second half.
+
+Queued rather than captured, which is the path the queue exists for — capturing drives Stella's GUI
+and takes over the screen for about thirteen seconds per ROM, and the machine is in use. The queue is
+not an exemption: every line prints on every run and the test fails once the queue outgrows its cap.
+
 ### Changed — `litmus_collide_all` cannot be used as a sensor, and now says so (2026-09-03)
 
 Found while trying to *use* it: the ROM overlaps every object with every other, so all fifteen pairs
