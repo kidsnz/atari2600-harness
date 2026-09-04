@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `flicker-collision-attribution.md`, and a hand-written count removed from `branch-always` (2026-09-03)
+
+`litmus_flicker_attrib` settles what the latches do. It does not carry **why the problem exists, what
+it costs a shipped game, or the idioms the list converged on**, and those are what the page adds — with
+the failure stated by an author who hit it (*"you can swing the pod through all other objects, except
+the playfield … I'm not sure if i can fix this"*), the mechanism from the message that explains it, and
+both idioms marked ⬜ unverified here.
+
+The exception in that quote is the whole shape: the playfield is not flickered, so PF collisions never
+miss, and everything that *is* flickered can pass through everything else that is.
+
+**Separately: `branch-always.md` opened with "The third entry in this catalogue that corrects its own
+source", followed by three hand-written items.** Two things wrong with that. Nothing reads the number
+(one occurrence, in the file that writes it) — a count with no invalidation mechanism, which is the
+failure this repository names at the top of its own `CLAUDE.md`. And it was **already wrong when
+written**: the distillation enumerated the family and found five, not three, because two more
+corrections had landed without anyone updating a sentence nobody was watching.
+
+It also mixed two families that read identically from inside and should not be added together:
+**the source was wrong** (page-cross, the byte economics, the LFSR step direction, ASR's stability,
+skipdraw's "constant 18") versus **we misread the source** (the interlace-colour rule, the indirect-jump
+attribution, the 3CC derivation). The line now states the fact without counting it and points at
+`CHANGELOG.md`, where both kinds are recorded where they were found.
+
+Page written by the mailing-list distillation (helper-1), who also enumerated the two families.
+
 ### Fixed — "Irreducible" in `missiles-bullets.md`, contradicted two lines below it (2026-09-03)
 
 The missile-strobe kernel's cost was written as *"20 cy, both missiles, no branches. **Irreducible:** the

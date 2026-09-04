@@ -1,7 +1,10 @@
 # Technique — branch-always / "simulated BRA" (a conditional branch whose flag is already fixed)
 
-*The third entry in this catalogue that corrects its own source.* (1) the page-cross cycle; (2) the
-byte-and-cycle economics below; (3) helper-3's LFSR step direction.
+*This entry corrects the source it cites* — the economics below are the correction. That happens often
+enough to expect, and rarely enough to say out loud; **it is not the same thing as us having misread a
+source**, which happens too and reads identically from inside. Both kinds are recorded in `CHANGELOG.md`
+at the point they were found, which is where to count them if a count is ever wanted — **this line used
+to carry one, written by hand, and it was already wrong when it was written.**
 
 **Goal:** replace a 3-byte `JMP abs` with a 2-byte relative branch when the *preceding*
 instruction has already fixed the flag the branch tests.
