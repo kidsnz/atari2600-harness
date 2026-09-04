@@ -74,3 +74,29 @@ in Breakout 1978 (`breakout.asm` 8.8 position, 2.6-packed speed) and djmips APon
 speed table `$80/$c0/$00` = 0.5/0.75/1.0). In-game verified in sandbox PONG
 `steps/pong_top_paddle_pf2_06_feel-rally-ai-serve`. Standalone demo ROM + CI scenario: TODO (would
 promote 🔶 → ✅).
+
+## PAL/NTSC portability — a benefit this page did not claim (added 2026-09-03)
+
+The Stella Programmer's Guide's line about conversion is usually quoted as an argument *for* 8.8
+fixed-point position. Read to the end of its condition, it is not:
+
+> If the NTSC version is designed with 2 byte fractional addition techniques **(or anything not based
+> on frames per second)** to move objects, then PAL conversion can be as simple as changing the
+> fraction tables.
+
+**The condition is "not tied to frames per second", not "8.8".** A DDA carries its fraction in the
+*velocity* instead of the *position*, and converts the same way — by swapping the increment table. So
+the reason 8.8 is quoted here applies to this technique too, and this page had never said so: before
+today it contained no mention of PAL, NTSC, or a refresh rate at all.
+
+**The conversion factor, from our own constants** (`television/specification/specifications.go`):
+NTSC is `15734.26 / 262` = **60.0544 Hz**, PAL is `15625.00 / 312` = **50.0801 Hz**, so a PAL increment
+must be **83.39%** of the NTSC one to move at the same speed per second — 0.06 points from the nominal
+50/60. Worth stating precisely, because the list did not: the author who raised it wrote *"just ensure
+the NTSC m to be ~80%"* and then, parenthetically and unsurely, *"can someone provide the correct
+value? 83,4%?"*. **The confident figure was 3.4 points out and the hesitant one was right to two
+decimal places.**
+
+⬜ Untested here, from the same thread: that for speeds of 0-2 px/frame the **zero** flag can replace
+the carry, and for 0-4 px the **overflow** flag. No mechanism is given in the source and it has not
+been reproduced.

@@ -6,6 +6,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a benefit `subpixel-velocity.md` had and never claimed (2026-09-03)
+
+The Stella Programmer's Guide sentence about PAL conversion is normally quoted as an argument for 8.8
+fixed-point position. Its condition is wider than that: *"if the NTSC version is designed with 2 byte
+fractional addition techniques **(or anything not based on frames per second)**"*. A DDA carries its
+fraction in the velocity rather than the position and converts the same way — swap the increment table.
+
+So the argument usually made against this page's approach is an argument for it, and **the page had
+never mentioned PAL, NTSC or a refresh rate at all** — the benefit was there and unwritten. It is now,
+with the factor computed from our own constants: NTSC `15734.26/262` = 60.0544 Hz, PAL `15625.00/312`
+= 50.0801 Hz, so a PAL increment must be **83.39%** of the NTSC one, 0.06 points off the nominal 50/60.
+
+Worth the precision, because the thread shows what happens without it. The author wrote *"just ensure
+the NTSC m to be ~80%"* and then asked, parenthetically, *"can someone provide the correct value?
+83,4%?"*. **The confident number was 3.4 points out; the hesitant one was right to two decimal places.**
+
+Also carried across as ⬜: that the zero flag can replace the carry for 0-2 px/frame and the overflow
+flag for 0-4. The source gives no mechanism and the distillation did not reproduce it.
+
+From the mailing-list distillation (helper-3), who noted this is the rarer direction — a source that
+**strengthens** a choice already made here rather than correcting it — and that no query would have
+found it, because the answer is in a subordinate clause of a sentence quoted for something else.
+
 ### Fixed — an open item in `litmus-results.md` had an answer waiting in a 2004 post (2026-09-03)
 
 The file's "Unverified (optional, low priority)" list asked for *"an exact explanation of the boundary
