@@ -153,15 +153,25 @@ def _resolves(path):
     it. (Found the third time this check turned CI red for citing something real:
     first the umbrella, then the commercial corpus, then this.)"""
     import glob as _glob
+    candidates = [path]
     if path.endswith(".bin"):
-        path = path[:-4] + ".asm"
-    for root in (HARNESS, UMBRELLA):
-        full = os.path.join(root, path)
-        if "*" in path:
-            if _glob.glob(full):
+        # A .bin we BUILD is gitignored, so resolve it through its .asm. A .bin we did
+        # NOT build — a commercial ROM image under `sandbox/studies/` or `reference/` —
+        # has no .asm beside it and never will: not having Atari's source is the whole
+        # point of the clean-room line, so rewriting to .asm asks for a file whose
+        # absence is deliberate. Try the .bin as cited first, then its source.
+        # (Fourth time this check turned CI red for citing something real: the umbrella,
+        # the commercial corpus, the build-product rewrite — and now the rewrite applied
+        # to a ROM that is not a build product. 2026-09-04.)
+        candidates.append(path[:-4] + ".asm")
+    for cand in candidates:
+        for root in (HARNESS, UMBRELLA):
+            full = os.path.join(root, cand)
+            if "*" in cand:
+                if _glob.glob(full):
+                    return True
+            elif os.path.exists(full):
                 return True
-        elif os.path.exists(full):
-            return True
     return False
 
 

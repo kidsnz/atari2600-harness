@@ -212,6 +212,7 @@ round trip. Also return `png_path` in JSON.
 | 1b. case studies — how real commercial games solved a situation (situation → technique, evidence-backed by disassemblies) | `docs/casebook.md` |
 | 1c. build-to-learn — reusable template for reproducing a real game mechanic-by-mechanic to turn "can read" into "can author" | `docs/build-to-learn.md` |
 | 1d. the reproduction LOOP — automated visual (`vismatch`) + behavioural (`behavmatch`) diff of a target ROM vs your build, plus `ramtrace` (what the target's 128 bytes of state DO, and what each byte's next value depends on). Palette-independent object-attribution + PF-table generation + a RAM-equivalence gate. Use from the START of a reproduction, not by-eye | `docs/reproduce-loop.md` |
+| 0. **why the machine is shaped this way** — the designers' own account and the patent behind the re-strobe trick; cause rather than behaviour, and not a measurement | `docs/hardware-origins.md` |
 | 2. the design rules (color budget, layout, positioning ground-truth, the distilled rules) | `docs/design-principles.md` |
 | 2b. run the executable feasibility checks (color bands, line budget, multiplex, PF windows, craft) | `pkg/design/` |
 | 3. clone the nearest verified technique | `docs/techniques/` (+ catalog `README.md`) |

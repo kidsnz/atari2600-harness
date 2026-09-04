@@ -6,6 +6,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — `check_provenance` rewrote a commercial ROM's `.bin` to a `.asm` that will never exist (2026-09-04)
+
+Citing `sandbox/studies/combat/Combat.bin` turned the gate red locally. The rule it hit is a good one:
+a `.bin` we **build** is gitignored, so it is absent from a fresh checkout and present on any machine
+that has run the build — its existence is a fact about the working copy, not about the citation — so
+the check resolves it through the `.asm` beside it.
+
+**A commercial ROM image is not a build product.** There is no `Combat.asm` beside it and there never
+will be: not having Atari's source is the clean-room line, so the rewrite was asking for a file whose
+absence is deliberate. `_resolves` now tries the path as cited first and falls back to the `.asm`.
+Negative control: `Combat.bin` resolves, `NOSUCH.bin` does not, and `roms/techniques/bullets.bin` still
+resolves through its source.
+
+The file's own docstring counts the times this check has gone red for citing something real — the
+umbrella, the commercial corpus, the build-product rewrite. **This is the fourth**, and it is recorded
+there.
+
+Worth noting how it surfaced. The pre-push hook mirrors CI in a throwaway worktree, where `sandbox/`
+does not exist, so `_umbrella_present()` short-circuits and umbrella citations are skipped entirely —
+the push went through and CI stayed green. **The gate is stricter on a working machine than in CI**,
+by design, and it caught something CI structurally cannot see.
+
 ### Added — Stella cross-check for both new litmus ROMs, 37/37 each; the queue is empty again (2026-09-04)
 
 `litmus_flicker_attrib` and `litmus_pf0_reflect` were queued yesterday because capturing drives Stella's
