@@ -6,6 +6,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the AUDF ladder's crowding at the top is a resource (2026-09-04)
+
+`pitch-dither.md` exists because the AUDF ladder is uneven. **The same unevenness runs the other way
+at the top of the register**, and nothing said so. Glenn Saunders, 1997: up there the steps *"crowd to
+less than a semitone"*, which makes the 2600 **better** at vibrato than an evenly chromatic source.
+
+Measured: the interval between adjacent AUDF values is `1200 × log2((n+2)/(n+1))`. `0→1` is
+**1200.0** cents — exactly an octave; `1→2` is **702.0** — a perfect fifth; `16→17` is **99.0**, the
+first step narrower than a semitone; `30→31` is **55.0**, near a quarter-tone. **Fifteen of the 31
+steps are sub-semitone** — the whole upper half. So ±1 AUDF is a quarter-tone at the top and a whole
+tone in the middle: same instruction, different musical size, decided by where you sit.
+
+`internal/keyfit` treats the ladder purely as a constraint. This is the other use of the same
+measurement, and this page's machinery — the two-value swap, the roughness figure — applies unchanged
+with the target being *deliberate* motion rather than a mean that lands on a note.
+
+A checked aside from the same arithmetic: Nick Bensema's guide says value 3 is an octave below value
+1 (**exact**, 1200.0) and value 2 is 600 cents below value 1 (**wrong**, it is 702.0, a perfect
+fifth). One sentence, one exact claim and one off by more than a semitone. His separate remark that
+the distorted waveforms *"sound like two or three notes at once and don't register on a tuner"* is
+supported by `MeasuredSpectra`: AUDC 1 and 7 have eight near-equal harmonics, flat enough to have no
+fundamental.
+
+Found by the mailing-list distillation (helper-1); ladder re-computed here and matching.
+
 ### Changed — spell out why FE cannot be analysed, in the branch that already declines it (2026-09-04)
 
 The distillation raised a sharp worry: the **FE mapper has no hotspot at all**, so a hotspot-shaped

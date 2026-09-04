@@ -15,6 +15,45 @@ length -- D2 -0.9 c, E2 -6.0 c, F#2 +14.7 c, where the nearest single registers 
 was rejected because D and E are more than 23 cents out in every bass octave, and this is the
 mechanism that would have let it be kept.
 
+
+## The crowding at the top is a resource, not only a constraint
+
+This page exists because the AUDF ladder is uneven. The same unevenness runs the other way at the top
+of the register, and nothing here said so. Glenn Saunders, stella-list 1997: at the high end the steps
+*"crowd to less than a semitone"*, which makes the 2600 **better** at vibrato than an evenly
+chromatic source — you can wobble a note by a musically small amount, which an even ladder cannot do
+without arithmetic.
+
+Measured (2026-09-04): the interval between adjacent AUDF values is `1200 × log2((n+2)/(n+1))`.
+
+| AUDF step | cents |
+|---|---|
+| 0 → 1 | **1200.0** — exactly one octave |
+| 1 → 2 | **702.0** — a perfect fifth |
+| 15 → 16 | 105.0 |
+| **16 → 17** | **99.0** — the first step narrower than a semitone |
+| 25 → 26 | 65.3 |
+| **30 → 31** | **55.0** — near a quarter-tone |
+
+**Fifteen of the 31 steps are narrower than a semitone**, i.e. the whole upper half of the register.
+So a vibrato or a slow bend written as ±1 AUDF is worth about a quarter-tone up there and a whole
+tone in the middle — the same instruction, a different musical size, decided by where you sit.
+
+`internal/keyfit` treats the ladder purely as a constraint (which note is reachable, how far out).
+This is the other use of the same measurement, and the machinery on this page — the two-value swap,
+the roughness figure — applies unchanged, with the target being *deliberate* motion rather than a
+mean that lands on a note.
+
+**A checked aside, because it is the same arithmetic.** Nick Bensema's guide says value 3 is an
+octave below value 1 and value 2 is **600 cents** below value 1. The first is exact — 1200.0. The
+second is **702.0**, a perfect fifth, off by more than a semitone. One sentence, one exact claim and
+one wrong one, which is the ordinary condition of a secondary source. (His separate observation that
+the distorted waveforms *"sound like two or three notes at once and don't register on a tuner"* is
+supported by `pkg/audio`'s `MeasuredSpectra`: AUDC 1 and 7 have eight near-equal harmonics — flat
+enough to have no fundamental.)
+
+Found by the mailing-list distillation (helper-1); the ladder re-computed here and matching.
+
 ## The problem it solves
 
 `freq = clock / divisor / (AUDF+1)`. The rungs are set by an integer divide, so they crowd
