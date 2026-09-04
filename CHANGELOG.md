@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — the random boot bank is a preference too, and ours defaults to off (2026-09-04)
+
+The trap says F8/F6/F4 cartridges boot in a random bank, so every bank's reset entry must `JMP` to a
+common init. **True of hardware. Not true of what we measure with.** `mapper_atari.go`'s `reset()` picks
+`Random.Intn(len(cart.banks))` **only when `RandomState` is set**, `SetDefaults` sets it to **false**, and
+nothing here changes it. Our boot bank is `SetBank(Loader.Bank)` — deterministic. A litmus for "the boot
+bank is random" would show it fixed, and the fixed result would be about our settings.
+
+**Third of these in two days**, after the SuperChip SARA emulation and the VSYNC line threshold. Same
+shape each time: a hardware claim the engine answers from a preference nobody set.
+
+The advice is unchanged — what hardware does is what a cartridge has to survive.
+
+The list drew the same distinction first-hand and in one message: *"what if the cart startup is
+**random (I think so)**"* about the machine, and *"from testing my games, I think Stella always starts in
+the last bank of an image. Not randomly"* about the emulator 〔`199801/msg00368`, Greg Troutman〕.
+
+Found by the mailing-list distillation (helper-1), who first reported it as a disagreement with our
+trap, then **retracted their own framing** on re-reading: the two halves are the same author separating
+hardware from emulator, and quoting only the second half made it look like a contradiction. They also
+withdrew an attribution — a "12 bytes" figure they had credited to Troutman sits inside a `>>>` quote
+block from someone else. Their summary of both, and of the `CPU.Interrupt()` correction above, is the
+same sentence: **quote the parts correctly and assemble the whole wrongly.**
+
 ### Fixed — `rg -rn` silently rewrote two searches, and one of them had already become a claim (2026-09-04)
 
 ripgrep's `-r` is `--replace` and takes an argument, so **`rg -rn` means "replace every match with the
