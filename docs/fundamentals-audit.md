@@ -46,10 +46,28 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   `ram.0x93 == 192` and `ram.0x95 == 0`, so the clear is a regression, not an observation.
   📖 Still documented-only (Stella PG PIA §2.3): **"INTIM holds 0 for one interval before the
   $FF wrap"** — the ROM steps straight through expiry and never samples the 0 interval.
+  ✅ **The other way to use the timer — ask without waiting — measured 2026-09-04.** Every INTIM site
+  in this repository *waits* (`lda INTIM / bne loop`, five of them). stella-list 2002 polls instead:
+  `lda #$FC / and INTIM / beq NoTime / <work> / jmp back` — ask whether there is room for one more
+  unit, and if not, drop it. **The mask is what makes the question cheap and also what makes it
+  lossy: the bits it hides are budget the program can no longer see.** Over a 20-unit `TIM64T`
+  interval, the waste is exactly **(2^k − 1) × 64 cycles** — `$FE` 64, `$FC` **192 (2.5 scanlines)**,
+  `$F8` 448, `$F0` 960. The 2002 post's own `$FC` gives away **15 % of the interval** to save the two
+  cycles a full compare costs. **And past a threshold the idiom silently does nothing**: `$E0` cannot
+  resolve below 32 units, so with a 20-unit interval it answers "no time" on the first read and
+  completes **zero** work — while the frame is still 262 lines and everything else looks right. The
+  rule, which nothing here stated because nothing here used the idiom: **the mask must resolve a
+  value smaller than the interval** (`2^k ≤ INTIM at the start`).
+  `→ roms/litmus/litmus_askdontwait.asm` / `internal/emu/askdontwait_test.go`, regression-locked
+  `roms/litmus/scenarios/askdontwait.json`. Found by the mailing-list distillation (helper-1).
   ⬜ **Exact first-decrement offset.** The countdown band pins three successive reads at
   $3C/$35/$2E from TIM1T=$40 — that fixes the rate (−7 per `lda abs`+`sta zp` iteration) and the
   value 4 ticks after the write **for that instruction sequence**; it does not isolate how many
   cycles after the store the first decrement lands.
+  ✅ **What a program actually reads is pinned, though**: writing **20** to `TIM64T` and reading INTIM
+  in the next instruction gives **19** — the first decrement has already happened by then
+  (`litmus_askdontwait`, asserted). That is the value any caller sees; it does not settle where inside
+  the store the decrement falls.
 - ⬜ SECAM; real-game variable line counts (we already treat 262 as a range).
 
 ## 2. Horizontal positioning & HMOVE

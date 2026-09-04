@@ -6,6 +6,48 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — asking the timer without waiting, and the budget the mask throws away (2026-09-04)
+
+**Every INTIM in this repository waits.** Five sites, all `lda INTIM / bne loop`: ask whether the
+interval has finished, stand still until it has. stella-list 2002 (Roger Williams) uses the timer the
+other way — *ask whether there is room for one more unit of work, and if not, drop the unit and carry
+on* — `lda #$FC / and INTIM / beq NoTime / <work> / jmp back`.
+
+The mask is what makes the question cheap and also what makes it lossy: **the bits it hides are budget
+the program can no longer see.** Measured over a 20-unit `TIM64T` interval (one unit = 64 cycles):
+
+| mask | hidden bits | work done | thrown away |
+|---|---|---|---|
+| `$FF` | 0 | 58 units | 0 |
+| `$FE` | 1 | 55 | 64 cycles (0.8 scanlines) |
+| `$FC` | 2 | 49 | **192 (2.5 scanlines)** |
+| `$F8` | 3 | 36 | 448 (5.9) |
+| `$F0` | 4 | 12 | 960 (12.6) |
+| `$E0` | 5 | **0** | 1216 (16.0) |
+
+The waste is exactly **(2^k − 1) × 64**, so the 2002 post's own `$FC` gives away **15 % of the
+interval** to save the two cycles a full compare would cost.
+
+**And past a threshold the idiom silently does nothing.** `$E0` cannot resolve below 32 units, so with
+a 20-unit interval it answers "no time" on the first read and completes **zero** work — while the
+frame is still 262 lines and everything else looks correct. The rule that prevents it, which nothing
+here stated because nothing here used the idiom: **the mask must resolve a value smaller than the
+interval** (`2^k ≤ INTIM at the start`).
+
+Also pinned along the way: writing **20** to `TIM64T` and reading INTIM in the next instruction gives
+**19**. `fundamentals-audit` carries the exact first-decrement offset as ⬜ and still does; this fixes
+the value a caller actually sees, which is what the waste figures depend on.
+
+**A measurement error worth recording, because it was mine and it was silent.** The first reading said
+3 units of work under every mask. `units` is zeroed at the top of each frame, and `RunFrames` returns
+at a frame boundary — so the value being read was *mid-loop*, not the result. The ROM now latches the
+completed count to a separate address that is never reset. Nothing about the ROM was wrong; the
+instrument was sampling at the wrong time, which is the same shape as the scenario windows fixed
+earlier today.
+
+Found by the mailing-list distillation (helper-1), who ranked it first among the timing items with the
+reason: harness's five INTIM sites are all "wait" or "measure elapsed", and none is "ask".
+
 ### Added — `litmus_switchdraw`: a sprite kernel that costs the same on every line, and what that costs (2026-09-04)
 
 `fundamentals-audit` recorded the problem on 2026-09-03: the classic skipDraw idiom is **20 cycles on
