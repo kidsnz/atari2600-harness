@@ -1,0 +1,25 @@
+{
+  "rom": "roms/litmus/litmus_lsradcror.asm",
+  "warmup_frames": 31,
+  "asserts": [
+    { "at_frame": 30, "field": "ram.0x88", "op": "==", "value": 1,
+      "note": "seeds of period 1 — $00 is the only fixed point" },
+    { "at_frame": 30, "field": "ram.0x89", "op": "==", "value": 3,
+      "note": "seeds of period 3 — exactly one 3-cycle" },
+    { "at_frame": 30, "field": "ram.0x8a", "op": "==", "value": 252,
+      "note": "seeds of period 63 — 252/63 = four whole 63-cycles" },
+    { "at_frame": 30, "field": "ram.0x8b", "op": "==", "value": 0,
+      "note": "no seed has any other period; 1+3+252 = 256, the whole map" },
+    { "at_frame": 30, "field": "ram.0x80", "op": "==", "value": 63 },
+    { "at_frame": 30, "field": "ram.0x81", "op": "==", "value": 63 },
+    { "at_frame": 30, "field": "ram.0x83", "op": "==", "value": 63 },
+    { "at_frame": 30, "field": "ram.0x84", "op": "==", "value": 1,
+      "note": "the entry carry does not change the result — Polik's own worry, answered" },
+    { "at_frame": 30, "field": "ram.0x85", "op": "==", "value": 0,
+      "note": "stepping $00 gives $00" }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "frame_lines_stable": { "frames": 40, "lines": 262 }
+  }
+}

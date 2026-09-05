@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a question the list asked in 2002 and nobody answered (2026-09-04)
+
+`200201/msg00015`. Manuel Polik posts five instructions lifted from a disassembly —
+`LDA $82 / LSR / ADC #$00 / LSR / ROR $82` — and asks *"Is this some sort of a random
+number/sequence generator, or what is in $82?"*, noting that **"the carry state on entry of this
+part may vary"**. The thread is two messages long. Nobody replied.
+
+It is a question about the 6507, not about anyone's opinion, so it can be closed by measurement.
+`litmus_lsradcror.asm` runs the posted instructions on the real CPU and walks **all 256 seeds**:
+
+| period | seeds | |
+|---|---|---|
+| 1 | **1** | `$00`, the fixed point |
+| 3 | **3** | one 3-cycle |
+| 63 | **252** | 252/63 = **four** whole 63-cycles |
+| anything else | **0** | |
+
+**So it is a generator, and a weak one.** A given seed only ever visits 63 values and returns to
+its exact starting point after 63 steps — at 60 Hz, **1.05 seconds**, short enough that anything
+driven by it repeats visibly. And the entry carry does not matter: the first `LSR` overwrites it,
+which answers the question Polik was actually worried about.
+
+★The enumeration came from the distillation (helper-3) as Python arithmetic done off the machine,
+marked as unmeasured. That is why it could be tested. ★★The census walks the whole map rather than
+sampling, because three seeds agreeing is three samples and the claim is about 256 of them — the
+first assertion in the test checks the census adds to 256 precisely so an unfinished walk cannot be
+read as an answer, and it caught exactly that at 3 frames before 30 was measured (3 -> 19 seeds,
+8 -> 63, 15 -> 126, 20 -> 170, 30 -> 256). Negative control: changing `ADC #$00` to `ADC #$01`
+makes the test fail.
+
 ### Fixed — the 3F bankswitch trap was checked at one address out of sixty-four (2026-09-04)
 
 `check_traps.py` warned on `NOP $00` / `BIT $00` as a skip that can bankswitch a 3F/X07 cart. The
