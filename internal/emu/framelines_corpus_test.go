@@ -14,6 +14,14 @@ import (
 // for real (banked_game, exerciser, lint_bank_hazard, lint_bank_split) were repaired rather
 // than listed.
 var framelinesExclusions = map[string]string{
+	"litmus_lsradcror": "it computes for thirty frames before it displays anything. The ROM walks " +
+		"the orbit of every one of the 256 seeds of the 2002 LSR/ADC/ROR sequence, ~600k cycles " +
+		"with no VSYNC in between, and only then enters its frame loop. Measured progress: after " +
+		"3 frames the census has classified 19 seeds, after 8 it has 63, after 20 it has 170, and " +
+		"it finishes at 30. This sweep allows 3 warmup frames, so it would be measuring the " +
+		"computation and not the display. The frame length IS pinned, at the point where it means " +
+		"something: `scenarios/lsradcror.json` warms up 31 frames and then requires 262x40",
+
 	"framelines_trap": "the witness for scenario check frame_lines_stable — it spends an extra line every 128th frame ON PURPOSE",
 	"pf_wraps": "the third witness for the playfield-DEADLINE check, and it overruns its line ON " +
 		"PURPOSE: forty nops at the head of the kernel push every playfield store onto the FOLLOWING " +
