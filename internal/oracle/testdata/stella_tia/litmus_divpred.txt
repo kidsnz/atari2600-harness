@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_divpred.bin
+# binsha256: deb55cc34405ba4ae0d1467498f804f9a3683b1fd98f763242669d08b69a44d2
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

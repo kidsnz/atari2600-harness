@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/cb_deadpred.bin
+# binsha256: b81d4f8a864e5a8e4b646a3ebe32d6232970325f1940392f14ffde5377c2c25a
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

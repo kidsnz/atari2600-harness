@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_pagecross.bin
+# binsha256: 9349c2e1a43c110457781c4941a0eca56c71c09a62385549435cd37a536df30a
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

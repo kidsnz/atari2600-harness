@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_hmxx_freeze.bin
+# binsha256: 5a7bc9bf20d09dd268e774cd67823b94a5a2cb1eb836b59fe2114c345a91c39e
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

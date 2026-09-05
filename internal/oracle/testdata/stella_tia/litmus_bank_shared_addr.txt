@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_bank_shared_addr.bin
+# binsha256: e43ae44859fb814bf1cb4c479f557c84249c6ffcf455731f2dfccb0ae7abe5f6
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

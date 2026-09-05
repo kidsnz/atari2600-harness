@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/motion_xclamp.bin
+# binsha256: eab44fb04fe38da9d0993810a788b564f8a9c0a1bda1fd7f909479638dd4c8fb
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

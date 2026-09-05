@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/smoke.bin
+# binsha256: 5068d17caac4a0a43f833e7dc8de7d01bfdbc87eaecc166cda99926948fd363b
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

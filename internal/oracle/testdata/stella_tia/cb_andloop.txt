@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/cb_andloop.bin
+# binsha256: 435068a9aa3f6dd328cd1433bbfc496e1f59bfe0cf804908d54209bd8d38ee74
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/pf_modes.bin
+# binsha256: 110504de88bb4b7d7a33533fe8ad9cb2b6d1c0d8f36a6e8550cc2a17d3aa21e9
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

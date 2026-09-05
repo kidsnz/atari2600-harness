@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/venetian.bin
+# binsha256: 2673d7064d8507dd54e92c2800f5ef3a6fc9ce2dbd7063964bf3c27462349ac7
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

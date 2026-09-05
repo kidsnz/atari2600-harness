@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/tia_pcm.bin
+# binsha256: 0371e86d3869873bec93e9c14a8ff520f42f32f5216fc6564e5d9f63a5d53558
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

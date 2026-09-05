@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/game_states.bin
+# binsha256: e1c905f0f7b42f45d5a1732a9ef4f1ed2a69b6d3998e5317d91d2d420144a7bc
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/vertical_pos_dcp.bin
+# binsha256: da9d2199f56b5a6715f0cb8729b3459865b4986c555f7e82ea33ca711d8f7a36
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

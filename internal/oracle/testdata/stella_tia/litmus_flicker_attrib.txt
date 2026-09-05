@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_flicker_attrib.bin
+# binsha256: b805c50559d2e02b8f6830ec48285ba4a29ffd585a73cef59bf8c413eddc29b9
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-09-03

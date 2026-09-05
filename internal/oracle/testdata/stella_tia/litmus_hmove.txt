@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_hmove.bin
+# binsha256: 533e5d04140e081c4aedfa0980fb9adcdc22406c388056ec6a5d87545ff4a951
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_color.bin
+# binsha256: 16a1e7b14a232929724d56cab8c6d24faf7824bac77163063aacf25feaddbb9c
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

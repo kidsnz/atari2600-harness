@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/motion_stutter.bin
+# binsha256: 3e47ffd1c771e77494b9036e30a182e6d9f33692a1b84f4cb7a66d0d75a4017b
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

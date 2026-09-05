@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_timerwrap_hit.bin
+# binsha256: 0c0a0214898d3cc410285cb665622c92e0f27631280ecfdd5e98bb5f401359bb
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-04

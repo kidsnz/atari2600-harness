@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/motion_glide.bin
+# binsha256: 4fd7cf970642a6559e796d3e2260ef2a5fe49669183828c589ac61e825c775c8
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

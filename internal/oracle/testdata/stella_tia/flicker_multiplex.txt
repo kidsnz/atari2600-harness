@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/flicker_multiplex.bin
+# binsha256: 41d1c78645df4965f6326273f817a8e0454baac52b643b677a0cf7f45091b42a
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

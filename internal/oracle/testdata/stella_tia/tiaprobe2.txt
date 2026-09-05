@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: internal/oracle/testdata/tiaprobe2.bin
+# binsha256: 852d618e732cec6a8b58e44e8e6272ec0386c51e0a5b9d3c63b86819802fcf8d
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 7.0 (/Applications/Stella.app/Contents/MacOS/Stella)
 # captured: 2026-08-03

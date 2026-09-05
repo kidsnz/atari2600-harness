@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/beamtrace_grp0.bin
+# binsha256: d43ebe84d74d768c1eb42cd7f7be476918aa57dcaeb44d480f29c8cf5b4f281b
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

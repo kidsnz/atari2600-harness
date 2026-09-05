@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_siblingloops.bin
+# binsha256: 5a3ba129b0e5e5bf3ed5ac9cfb790b56c0ad8022076d5e09806ad18e55a64ca4
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

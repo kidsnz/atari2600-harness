@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/cyclebound_branch.bin
+# binsha256: 9fdc4fd3805fa8539bd8b5b56172d651cb6c451c732e039ca975e3d5738fc4e1
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

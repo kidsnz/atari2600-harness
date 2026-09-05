@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/maze.bin
+# binsha256: b1b69a0be3a0f29bdd2a226bcc6ea0f5a40f55f20585f30aadaee9fa8677820c
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

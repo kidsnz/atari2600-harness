@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/zone_multiplex.bin
+# binsha256: 378a85915d230a3b1783feeca9d4274ebba93464d2db4fbe387c0a2325f108da
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

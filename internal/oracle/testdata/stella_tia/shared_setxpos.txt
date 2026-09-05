@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/shared_setxpos.bin
+# binsha256: 54e943afbab0cbc9183f98fa8b92e7903882a070b9b2ee77cc037e6577ed67e3
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

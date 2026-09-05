@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/two_line_vdel.bin
+# binsha256: 902ec0dd181838fb6f692a5a6ee2f5d656ce943155faccef6890b914a729b3a2
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

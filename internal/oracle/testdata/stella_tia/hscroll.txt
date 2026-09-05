@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/hscroll.bin
+# binsha256: cbe8bf7e125e1983eecd98fff3692fdcb7e8401f3149e0c56fb0f6e11d2e3d82
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

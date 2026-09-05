@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/cb_blank_noamax.bin
+# binsha256: a76945ab10d80fc0b62d38e7ec2f4d49515b20d442f1f38b7e492340e0635cf1
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

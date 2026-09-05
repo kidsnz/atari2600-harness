@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_score_pfp.bin
+# binsha256: b2fc7977c1f7814902659b585ad4b6a4f1d2979d968d968179d4fed993ca9f72
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

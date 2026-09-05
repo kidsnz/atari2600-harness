@@ -1,7 +1,10 @@
 package oracle
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -66,7 +69,7 @@ var TIARegNames = []string{
 var TIARegsNotReported = map[string]string{
 	"VBLANK": "Stella's `tia` prints only the D1 blanking flag (as VBLANK/vblank), " +
 		"not D6/D7 (INPT latch / dump-to-ground), and emu.TIARegisters does not expose VBLANK at all",
-	"VSYNC":  "printed only as a flag, and it is a strobe-like state rather than a stored value",
+	"VSYNC": "printed only as a flag, and it is a strobe-like state rather than a stored value",
 	"NUSIZ_RAW": "neither side reports the raw NUSIZ byte: Stella prints the decoded player mode and " +
 		"the missile size field, so bit 3 and bits 6-7 (unused by the TIA) are not compared",
 	"CTRLPF_RAW": "same shape as NUSIZ: reflect/score/priority/ball-size are compared, " +
@@ -424,14 +427,34 @@ func ParseStellaSession(session string) (TIARegs, error) {
 // CaptureHeader is the provenance block scripts/stella_oracle.sh writes above a
 // captured session: which ROM it came from and how many frames from power-on.
 // Without it a stored session is an orphan number with nothing to compare to.
+//
+// ★`BinSHA256` binds the capture to the BYTES it captured, not to the path. Without it a capture
+// is bound to a FILE NAME, and 2026-09-04 showed what that costs: `roms/litmus/litmus_framephase.asm`
+// was overwritten by a different program under the same name, and this oracle went on grading the
+// month-old capture against the new ROM — then reported the mismatch as **"Gopher2600 and Stella
+// disagree"**. The two emulators had never run the same program. A wrong answer with a confident
+// explanation is worse than no answer, so the binding is now checked before anything is graded.
 type CaptureHeader struct {
-	ROM    string
-	Frames int
+	ROM       string
+	Frames    int
+	BinSHA256 string // sha256 of the .bin at capture time; "" only in captures older than this field
+	SHASource string // "captured" or "backfilled-YYYY-MM-DD" — provenance of the hash itself
 }
 
-var reHdr = regexp.MustCompile(`(?m)^# (rom|frames): *(.+?) *$`)
+var reHdr = regexp.MustCompile(`(?m)^# (rom|frames|binsha256|binsha256-source): *(.+?) *$`)
 
-// ParseCaptureHeader reads the `# rom:` / `# frames:` provenance lines.
+// BinSHA256 is the hash the capture header records. One definition, used by the capture script,
+// the backfill and the grader, so they cannot drift apart.
+func BinSHA256(path string) (string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+// ParseCaptureHeader reads the `# rom:` / `# frames:` / `# binsha256:` provenance lines.
 func ParseCaptureHeader(session string) (CaptureHeader, error) {
 	var h CaptureHeader
 	for _, m := range reHdr.FindAllStringSubmatch(session, -1) {
@@ -444,6 +467,10 @@ func ParseCaptureHeader(session string) (CaptureHeader, error) {
 				return h, fmt.Errorf("bad `# frames:` header %q: %w", m[2], err)
 			}
 			h.Frames = n
+		case "binsha256":
+			h.BinSHA256 = m[2]
+		case "binsha256-source":
+			h.SHASource = m[2]
 		}
 	}
 	if h.ROM == "" || h.Frames <= 0 {

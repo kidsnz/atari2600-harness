@@ -1,6 +1,7 @@
 package oracle
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -82,6 +83,11 @@ func TestStellaAgreesWithHarnessOnWriteOnlyTIARegisters(t *testing.T) {
 	caps := loadCaptures(t)
 
 	totalReadings, totalDiffs, graded := 0, 0, 0
+	// ★stale: the capture's `# binsha256:` does not match the .bin on disk, so the two sides would
+	//   not be running the same program. Grading such a pair produces a confident wrong answer —
+	//   on 2026-09-04 exactly that was reported as "Gopher2600 and Stella disagree" when the real
+	//   event was a ROM being overwritten under its own name. Never grade one; name it instead.
+	var stale, unbound []string
 	// Witness: a register that reads the same value in every ROM was never
 	// actually discriminated by this corpus, however big the denominator looks.
 	// Count the distinct values each one takes so a vacuous column is visible.
@@ -91,6 +97,19 @@ func TestStellaAgreesWithHarnessOnWriteOnlyTIARegisters(t *testing.T) {
 		rom := filepath.Join("..", "..", c.header.ROM)
 		if _, err := os.Stat(rom); err != nil {
 			failures = append(failures, c.name+": ROM "+c.header.ROM+" is gone")
+			continue
+		}
+		switch sum, err := BinSHA256(rom); {
+		case err != nil:
+			failures = append(failures, c.name+": cannot hash "+c.header.ROM+": "+err.Error())
+			continue
+		case c.header.BinSHA256 == "":
+			unbound = append(unbound, c.name)
+			continue
+		case c.header.BinSHA256 != sum:
+			stale = append(stale, fmt.Sprintf("%s: %s changed since capture (%s)\n"+
+				"        captured %s\n        on disk  %s",
+				c.name, c.header.ROM, c.header.SHASource, c.header.BinSHA256[:16], sum[:16]))
 			continue
 		}
 		stella, err := ParseStellaSession(c.session)
@@ -160,6 +179,18 @@ func TestStellaAgreesWithHarnessOnWriteOnlyTIARegisters(t *testing.T) {
 	if varied < minVariedRegisters {
 		t.Fatalf("only %d of %d registers vary across the corpus (want >= %d) — most of this "+
 			"denominator is comparing a constant against a constant", varied, len(TIARegNames), minVariedRegisters)
+	}
+	if len(stale) > 0 {
+		t.Errorf("%d capture(s) were taken from a DIFFERENT build of their ROM and were NOT graded "+
+			"— re-capture with `scripts/stella_oracle.sh <rom> 5 tia`, or if the ROM was replaced "+
+			"rather than edited, delete the capture. This is not an emulator disagreement:\n  %s",
+			len(stale), strings.Join(stale, "\n  "))
+	}
+	if len(unbound) > 0 {
+		t.Errorf("%d capture(s) carry no `# binsha256:` and so are bound to a FILE NAME, not to the "+
+			"bytes they captured — the hole that let a replaced ROM be graded as an emulator "+
+			"disagreement on 2026-09-04. Run `python3 scripts/backfill_capture_sha.py`:\n  %s",
+			len(unbound), strings.Join(unbound, "\n  "))
 	}
 	if len(failures) > 0 {
 		t.Errorf("Gopher2600 and Stella disagree on the write-only TIA registers:\n  %s",

@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/sound_driver.bin
+# binsha256: f44dbe2bf7426c5871b51d9f41360643fa505ebf6b27b4bde7babefa6b897068
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

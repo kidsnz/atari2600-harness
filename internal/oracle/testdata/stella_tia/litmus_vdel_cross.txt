@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_vdel_cross.bin
+# binsha256: 522c53ba02e12853756db39a11d8962e8b0a3db3340d897d3b5938186469220b
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-09-03

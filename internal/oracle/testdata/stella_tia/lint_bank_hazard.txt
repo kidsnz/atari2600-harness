@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/lint_bank_hazard.bin
+# binsha256: e63bb8e3da91e318fb8e979f720cf1635f519c1e1dacdb98f0daad38faacc335
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

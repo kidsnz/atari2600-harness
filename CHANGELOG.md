@@ -6,6 +6,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — oracle captures are bound to bytes, not to a file name (2026-09-04)
+
+`scripts/stella_oracle.sh` now writes `# binsha256:` and `# binsha256-source:` into every capture,
+`internal/oracle` refuses to grade a capture whose ROM has changed, and
+`scripts/backfill_capture_sha.py` filled the field in for the 175 captures taken before it existed.
+
+The hole this closes is not hypothetical. A capture recorded only `# rom: <path>`. When a different
+program was written to that path, the grader loaded the month-old capture, ran the new ROM, found
+COLUP0 and COLUBK different and reported **"Gopher2600 and Stella disagree on the write-only TIA
+registers"**. The two emulators had never run the same program. The numbers were right and the
+sentence was false, which is worse than no answer: an oracle that cannot separate "the other side
+ran something else" from "the other side disagrees" will eventually say the second when it means
+the first.
+
+Stale captures are now named as stale and not graded. A capture with no hash is refused outright.
+`internal/oracle/capturebinding_test.go` is the negative control: it plants a wrong hash and a
+missing hash and requires each to be caught, and it checks the whole corpus is bound.
+
+★What a backfilled hash proves is narrower than a captured one, and the header says which it is.
+Backfilling proves the .bin will not change from here without the grader noticing. It does not
+prove the .bin is the one Stella ran in August. The evidence for that is that the corpus grades
+clean today, which is why `backfill_capture_sha.py` refuses to run when it does not.
+
 ### Added — where in the frame the work goes is capacity, not ordering (2026-09-04)
 
 `prove_line_budget` proves the worst case within a scanline. Nothing here said anything about the
@@ -2696,6 +2719,7 @@ is `311795-576-1008-characters`) so `check_provenance.py` was red; `litmus_restr
 the corpus with neither a Stella capture nor a queue line, so `TestStellaAgreesWithHarnessOnWriteOnlyTIARegisters` was red — captured at 37/37, then retired again here because the ROM changed and a
 capture records no hash, so a stale one would compare silently rather than fail. `pf_wraps.bin`,
 queued since 2026-08-23, was captured in the same pass at 37/37.
+
 
 
 ## [Unreleased]

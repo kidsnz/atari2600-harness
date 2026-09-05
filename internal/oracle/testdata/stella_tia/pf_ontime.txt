@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/pf_ontime.bin
+# binsha256: fbc0d29e4aaff13aff61f7f621c59bf8550cf03ea1ffa329ba259b502d5b9a92
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-21

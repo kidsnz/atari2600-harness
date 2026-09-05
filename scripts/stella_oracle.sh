@@ -96,6 +96,11 @@ capture_tia() {
   {
     echo "# stella-tia-oracle capture"
     echo "# rom: $rom"
+    # ★Bind the capture to the BYTES, not to the path. A capture that names only a file is graded
+    #   against whatever later occupies that name — on 2026-09-04 a replaced ROM was reported as
+    #   "Gopher2600 and Stella disagree" when the two had never run the same program.
+    echo "# binsha256: $(shasum -a 256 "$rom" | cut -d' ' -f1)"
+    echo "# binsha256-source: captured"
     echo "# frames: $frames"
     echo "# stella: $($STELLA -help 2>&1 | head -1)"
     echo "# captured: $(date +%Y-%m-%d)"

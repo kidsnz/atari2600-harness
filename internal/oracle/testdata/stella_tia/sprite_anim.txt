@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/sprite_anim.bin
+# binsha256: 0810298ada7da05e7835bbfc447979266292e83f67c7a799c1cc5334197d8558
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

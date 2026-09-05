@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_pf_allcols.bin
+# binsha256: 4f9760d8b1ecc4d38049a03601cd8975dd78286bd10255976ce9554c264c30b0
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

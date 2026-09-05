@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/multicolor48.bin
+# binsha256: 7360442f337ac20ef64b302d921528d2960c014269cb6a248dff37f9f104aa43
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

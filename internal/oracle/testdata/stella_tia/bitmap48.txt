@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/bitmap48.bin
+# binsha256: ccb7eaa43c6d084ae4c71fa9467e4decf1a7b66329760dc5f0526d0f0dad633d
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

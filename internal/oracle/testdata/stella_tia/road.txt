@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/road.bin
+# binsha256: 6de6d810054987373bec5b4fabb8ba9841b267cc042a7f1ef4daeca42dc27dbe
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/dyn_multisprite.bin
+# binsha256: db2b2afdf55aa3be24c03540de3b2882ef62f0797f617cd00b5c46b78ee1fff4
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

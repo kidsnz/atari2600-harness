@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/rpgmap.bin
+# binsha256: 42c47adf5113d7846cf1434265ab75203fbb62040215ba3ddb7749681488bd14
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

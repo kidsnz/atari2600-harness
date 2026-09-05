@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/sfx_demo.bin
+# binsha256: e110e62785483297fdd38d61cfbe92a1e0bf462f37e005cb4cae95d5222e774e
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

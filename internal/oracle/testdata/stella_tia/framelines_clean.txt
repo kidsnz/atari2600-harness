@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/framelines_clean.bin
+# binsha256: 139d267a95fb6db42fe964a739befc1f9a06526e0eec246aa1e6b1e2516a0395
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-05

@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/techniques/text12.bin
+# binsha256: 8bde4214f494765c905e60af17b1f0fdd2df1e9e0b3c05720b27c599a33a5844
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03

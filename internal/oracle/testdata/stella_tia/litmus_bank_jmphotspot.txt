@@ -1,5 +1,7 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_bank_jmphotspot.bin
+# binsha256: 6ab22a30444abb6ef96cfd6f431e41065545a6ddef06e9941a7d018395db054f
+# binsha256-source: backfilled-2026-09-04
 # frames: 5
 # stella: 
 # captured: 2026-08-03
