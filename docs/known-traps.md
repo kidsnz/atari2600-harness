@@ -27,6 +27,30 @@ repeatable while real hardware does not. Measured false positives: **0 across 12
 pairs in that corpus, so it is looking at something. Bait-tested in `--selftest`; negative control: disabling
 the rule fails the selftest by name.
 
+**A setup database can patch our ROMs, and its path is relative — measured 2026-09-05.**
+`internal/emu` attaches every cartridge through `setup.AttachCartridge`, and the engine's
+`setup/doc.go` says what that is for: *"Toggling of panel switches / **Apply patches to cartridge** /
+Television specification ... `<DB Key>, patch, <SHA-1 Hash>, <patch file>, <notes>`"*. An entry keyed
+by a ROM's SHA-1 can flip the console switches, **rewrite the cartridge's bytes**, or change the TV
+standard, and `setup.go` will *"silently ignore absence of setup database"*.
+
+★The path is not one well-known location. `resources/dev_path.go` is `//go:build !release` and
+returns the **relative** string `.gopher2600`; this repository builds without the `release` tag. So
+which database is consulted depends on the directory the command ran from — and `CLAUDE.md` requires
+that variation: *"Run commands from each repo's root."* **Two mandated working directories, two
+possible databases.**
+
+Measured: four `.gopher2600` directories exist (umbrella root, `roms/`, `harness/`, `sandbox/`),
+**all four empty**; `~/.gopher2600` does not exist. `resources.JoinPath` creates the folder just for
+being asked the path, which is why they are there at all. **The mechanism is live and the data is
+absent** — and absence is the only reason this has never mattered.
+
+★★`internal/emu/setupdb_test.go` asserts the absence. The `.gitignore` files already carry
+`/.gopher2600/`, which says "do not commit this" and says nothing about what it can do. Negative
+control: touching one file in any of them fails the test. Found by the mailing-list distillation
+(helper-2), who closed the population of engine defaults and then followed `AttachCartridge` into
+this.
+
 **`VSYNCsyncedOnStart` hides the first frames' vertical instability, and 42% of our measurement
 points are inside that window — measured 2026-09-05, and it hides almost nothing.** The engine will
 not move the picture's vertical origin until the frame is Stable (`stabilityThreshold = 6`), and
