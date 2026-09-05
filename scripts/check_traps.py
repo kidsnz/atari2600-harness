@@ -133,6 +133,35 @@ def scan_text(asm):
             warns.append((n, f"`{m.group(1).upper()} ${m.group(2).upper()}` reads TIA space (A6 and A7 both low, "
                              f"$00-$3F) and can trigger a bankswitch on 3F/X07 carts — use `NOP $80` "
                              f"or any address with A6 or A7 set"))
+        # 2c) DASM's SLEEP macro, which hides the same bytes behind a macro call.
+        #     ★Measured 2026-09-05 by assembling dasm 2.20.14.1's machines/atari2600/macro.h:
+        #        SLEEP 2 -> EA          nop                      2 cy, legal, touches nothing
+        #        SLEEP 3 -> 04 00       nop $00   ILLEGAL opcode, and READS $00
+        #        SLEEP 4 -> EA EA
+        #        SLEEP 5 -> 04 00 EA
+        #     and with -DNO_ILLEGAL_OPCODES=1 the 04 becomes 24 (`bit $00`) — legal, SAME ADDRESS.
+        #     ★★So the switch everyone recommends fixes the opcode and leaves the bankswitch trap.
+        #     Even values are safe: they are plain `nop`s. This is the answer to Kirk Israel's
+        #     question in 200403 ("if it's a multiple of 2, isn't SLEEP safe?"), which nobody in
+        #     that thread answered. Hence a CONDITION, not a ban.
+        # ★`n` is the LINE NUMBER in the enclosing loop; the SLEEP value gets its own name.
+        #   Shadowing it made the first version report the wrong line, which is the quiet kind of
+        #   wrong a linter must not be.
+        m = re.search(r"\bsleep\s+#?\$?([0-9a-fx]+)\b", low)
+        if m:
+            tok = m.group(1)
+            try:
+                val = int(tok[1:], 16) if tok.startswith("$") else int(tok, 0)
+            except ValueError:
+                val = None
+            if val is not None and val >= 3 and val % 2 == 1:
+                warns.append((n, f"`SLEEP {val}` is ODD, so DASM emits `nop $00` (an ILLEGAL "
+                                 f"opcode) — or `bit $00` under NO_ILLEGAL_OPCODES, which is legal "
+                                 f"but READS THE SAME ADDRESS and can bankswitch a 3F/X07 cart. "
+                                 f"Even SLEEP values are plain NOPs and are fine. For an odd delay "
+                                 f"use PHP/PLP: 7 cycles, 2 bytes, all flags restored, no address "
+                                 f"touched (measured — internal/emu/oddsleep_test.go)"))
+
         # 2b) the same skip written as a RAW BYTE, which the mnemonic matcher above cannot see.
         #     ★The gap is real in this tree: `roms/techniques/tia_pcm.asm` skips with `.byte $2C`.
         #     $04/$0C/$14/$1C/$34/$3C/$44/$54/$64/$74/$80/$82/$89/$C2/$D4/$E2/$F4 are the NOP family
@@ -223,6 +252,8 @@ Start
         lax #$ff          ; immediate LAX = unstable
         nop $00           ; bankswitch trap on 3F
         bit $2c           ; ★same trap, an address the old $00-only check could not see
+        SLEEP 3           ; ★odd SLEEP: the same trap again, hidden behind a macro call
+        SLEEP 4           ; ★even SLEEP: plain NOPs — must NOT fire
         .byte $2c         ; ★same trap again, written as a raw byte (mnemonic matcher is blind)
 flag    = $ff             ; var in stack-collision zone
         lda GRP0          ; read of a write-only TIA register
@@ -234,7 +265,7 @@ flag    = $ff             ; var in stack-collision zone
 def selftest():
     errors, warns = scan_text(BAIT)
     want = ["lxa", "LAX #imm", "bankswitch", "variable at $FF", "no CLD", "WRITE-ONLY TIA register",
-            "cartridge ROM", "BIT $2C", "raw byte"]
+            "cartridge ROM", "BIT $2C", "raw byte", "`SLEEP 3` is ODD"]
     blob = " ".join(m for _, m in errors + warns)
     missing = [w for w in want if w not in blob]
     if missing:

@@ -6,6 +6,49 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — spending an odd number of cycles, and why both usual answers are traps (2026-09-05)
+
+`ds N, $EA` spends 2N cycles: this repository's only padding idiom, and it cannot make an ODD
+delay. Sprite positioning asks for odd delays routinely and the obvious reach is DASM's `SLEEP`
+macro. Assembling dasm 2.20.14.1's `machines/atari2600/macro.h` settles what it emits:
+
+| | default | `-DNO_ILLEGAL_OPCODES=1` |
+|---|---|---|
+| `SLEEP 2` | `EA` | `EA` |
+| `SLEEP 3` | `04 00` = `nop $00` — **illegal** | `24 00` = `bit $00` — legal |
+| `SLEEP 4` | `EA EA` | `EA EA` |
+| `SLEEP 5` | `04 00 EA` | `24 00 EA` |
+
+So Kirk Israel's unanswered question from 200403 — *"though if it's a multiple of 2, isn't SLEEP
+'safe' re: undocumented opcodes?"* — is answered: **yes, even is safe.**
+
+★And the switch both 2004 threads recommend does not make odd safe. `bit $00` is legal and **reads
+the same address**. $00 has A6 and A7 low, so on a 3F/X07 cart it is a bankswitch hotspot — the
+pattern `check_traps.py` warns about and the engine's tigervision mapper defines
+(`addr&0x10c0 == 0x0000`). The switch fixes the opcode and leaves the trap. **Both branches of odd
+SLEEP are unsafe on a bankswitched cart**, and both are invisible to a source-level grep because
+the bytes only exist after macro expansion.
+
+`litmus_oddsleep.asm` measures the third answer, from Jim Nitchals (199704): *"if you need to delay
+for 7 cycles, a PHP/PLP is a code-compact way to do it."*
+
+    nop $00  3 cy    bit $00  3 cy    php  3 cy    plp  4 cy    php/plp  7 cy    ds 2,$EA  4 cy
+    a status byte of $B5 round-trips through plp/php unchanged; A, X and Y survive
+
+★The measurement's own overhead is measured, not assumed: `$8F` records an EMPTY interval and every
+figure is read against it, so nothing here asserts this harness's timing in place of the CPU's.
+
+★★And the reason php/plp is not universal is measured too. `docs/techniques/missiles-bullets.md`
+points SP at the ENAM mirror so that `PHP` *writes a TIA register*. With SP at `$1E`, two pushes
+leave ENAM0 and ENAM1 both enabled and SP at `$1C` — the ladder the doc describes. Inside such a
+kernel, seven cycles of php/plp does not spend seven cycles; it fires the missile. The two uses are
+mutually exclusive, and now that is a test rather than a caution.
+
+`check_traps.py` gains the condition — `SLEEP` with an odd value >= 3 warns and names PHP/PLP as
+the fix; even values stay silent, because they are plain NOPs. **A condition, not a ban.** Origin:
+helper-3's distillation of `finalish joustpong feedback` and `uses for php`, helper-1's of
+`200401`; the illegal-opcode half was theirs, the address half was not in either thread.
+
 ### Added — a question the list asked in 2002 and nobody answered (2026-09-04)
 
 `200201/msg00015`. Manuel Polik posts five instructions lifted from a disassembly —

@@ -1,0 +1,26 @@
+{
+  "rom": "roms/litmus/litmus_oddsleep.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 2, "field": "ram.0x8f", "op": ">=", "value": 100,
+      "note": "the empty measurement; every cycle figure is read against it, so pin its range" },
+    { "at_frame": 2, "field": "ram.0x80", "op": "==", "value": 134, "note": "nop $00 = 3 cy" },
+    { "at_frame": 2, "field": "ram.0x81", "op": "==", "value": 134, "note": "bit $00 = 3 cy" },
+    { "at_frame": 2, "field": "ram.0x82", "op": "==", "value": 134, "note": "php = 3 cy" },
+    { "at_frame": 2, "field": "ram.0x83", "op": "==", "value": 135, "note": "plp = 4 cy" },
+    { "at_frame": 2, "field": "ram.0x84", "op": "==", "value": 138,
+      "note": "php/plp = 7 cy — the legal odd delay that touches no address" },
+    { "at_frame": 2, "field": "ram.0x87", "op": "==", "value": 135, "note": "ds 2,$EA = 4 cy" },
+    { "at_frame": 2, "field": "ram.0x85", "op": "==", "value": 181,
+      "note": "$B5 round-trips through plp/php unchanged: every flag restored" },
+    { "at_frame": 2, "field": "ram.0x86", "op": "==", "value": 1, "note": "A, X, Y survive php/plp" },
+    { "at_frame": 2, "field": "ram.0x88", "op": "==", "value": 1,
+      "note": "witness: the stack-into-TIA section actually ran" },
+    { "at_frame": 2, "field": "ram.0x89", "op": "==", "value": 28,
+      "note": "SP descended $1E -> $1C, one TIA register per PHP" }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "frame_lines_stable": { "frames": 60, "lines": 262 }
+  }
+}
