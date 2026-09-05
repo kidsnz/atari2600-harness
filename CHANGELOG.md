@@ -6,6 +6,38 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — TIMINT's `$C0` is half a measurement and half a power-on choice (2026-09-05)
+
+`fundamentals-audit.md` recorded the RIOT timer's expiry as *"TIMINT $285 D7 = expired ($93=$C0,
+D7+D6 set)"* and `scenarios/timer.json` locked `ram.0x93 == 192`. Both true, and neither said what
+D6 is.
+
+It is not a second expiry bit. The 6532 gives D7 = timer IRQ and D6 = **PA7** IRQ as independent
+flags (Rockwell's table, transcribed to the list in 199708), and the engine implements them as two
+separate booleans. But `Timer.Reset()` opens with `tmr.pa7 = true`, unconditionally, before the
+`RandomState` branch — so **D6 is set at power-on in a ROM that never touches PA7.**
+
+`litmus_timint_pa7` reads TIMINT before any timer is written:
+
+    $80  $40  at boot — D6 alone, no edge anywhere, D7 clear
+    $81  $00  the read cleared the PA7 flag
+    $82  $80  after a real expiry: D7 alone; D6 does not come back without an edge
+    $84  $00  and reading INTIM clears it — the audit's other claim, measured
+
+★So half of `$C0` is hardware and half is this emulator's initial condition, and the old scenario
+pinned the sum. **A sum cannot report which half moved**: if `tmr.pa7 = true` were removed, `192`
+would fail without saying why. The new scenario pins the halves; `timer.json` now points at it.
+This is the witness principle from `check_instruments` applied to an assertion rather than a branch.
+
+★★Two of the three hypotheses offered for why D6 was set turned out wrong, and reading the engine
+settled it in a minute: it is not a `$C0` constant (the bits are computed independently) and PA7 is
+not being driven (it is never cleared after reset until something reads it). Found by the
+mailing-list distillation (helper-1), who asked the question and supplied the datasheet table.
+
+★★★One measurement error is recorded in the ROM: TIMINT was read AFTER INTIM the first time, which
+gave `$00` and looked like "expiry does not set D7" — a statement about the read order, not the
+timer.
+
 ### Added — which floating-bus model this engine implements, and that it is not Stella's (2026-09-05)
 
 `known-traps.md` has said since July that reading a write-only TIA register "returns bus residue".

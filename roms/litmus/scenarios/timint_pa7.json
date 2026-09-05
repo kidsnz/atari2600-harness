@@ -1,0 +1,20 @@
+{
+  "rom": "roms/litmus/litmus_timint_pa7.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 2, "field": "ram.0x80", "op": "==", "value": 64,
+      "note": "$40 at boot: D6 (PA7 flag) set with no edge anywhere, D7 clear. This half of $C0 is the engine's power-on choice, not a measurement" },
+    { "at_frame": 2, "field": "ram.0x81", "op": "==", "value": 0,
+      "note": "reading TIMINT clears the PA7 flag" },
+    { "at_frame": 2, "field": "ram.0x82", "op": "==", "value": 128,
+      "note": "$80 after a real expiry: D7 alone. D6 does not return without an edge" },
+    { "at_frame": 2, "field": "ram.0x83", "op": "==", "value": 239,
+      "note": "the INTIM value at that moment, so a change in the timer's rate is visible here too" },
+    { "at_frame": 2, "field": "ram.0x84", "op": "==", "value": 0,
+      "note": "reading INTIM clears TIMINT — the audit's claim, measured" }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "frame_lines_stable": { "frames": 40, "lines": 262 }
+  }
+}

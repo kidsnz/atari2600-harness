@@ -42,6 +42,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   regression-locked `roms/litmus/scenarios/timer.json`, table row `docs/verified-coverage.md:26`.
   Write 1–255; the counter decrements 1/cycle; **after underflow it continues from $FF, still
   1/cycle** ($94=$EF then $96=$E1). TIMINT $285 D7 = expired ($93=$C0, D7+D6 set).
+  ✅ **$C0's two bits are not both measurements** (2026-09-05, `litmus_timint_pa7`). The 6532 gives
+  D7 = timer IRQ and D6 = **PA7** IRQ as independent flags (Rockwell's table, transcribed to the
+  list in 199708), and the engine implements them as two separate booleans — but `Timer.Reset()`
+  opens with `tmr.pa7 = true` unconditionally, before the `RandomState` branch. So D6 is set at
+  power-on in a ROM that never touches PA7. Measured by reading TIMINT before writing any timer:
+  **$40 at boot** (D6 alone), **$00** on the next read (the access clears it), **$80** after a real
+  expiry (D7 alone — D6 does not come back without an edge). ★`scenarios/timer.json` pins the SUM
+  as `ram.0x93 == 192`, which cannot report which half moved; `scenarios/timint_pa7.json` pins the
+  halves separately. Found by the mailing-list distillation (helper-1), who asked why D6 was set.
   **Reading INTIM clears TIMINT** — $95=$00 after the INTIM read at $94; the scenario pins
   `ram.0x93 == 192` and `ram.0x95 == 0`, so the clear is a regression, not an observation.
   📖 Still documented-only (Stella PG PIA §2.3): **"INTIM holds 0 for one interval before the
