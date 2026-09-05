@@ -27,6 +27,30 @@ repeatable while real hardware does not. Measured false positives: **0 across 12
 pairs in that corpus, so it is looking at something. Bait-tested in `--selftest`; negative control: disabling
 the rule fails the selftest by name.
 
+**"Bus residue" names three different models, and this engine picks one, 2026-09-05.** The row above
+says a read of a write-only register "returns bus residue", which is true and does not say *what*. The
+engine's own source names two candidates and B. Watson's 200508 post names the third:
+
+| model | what the floating bits become | who |
+|---|---|---|
+| the ADDRESS | bits 0-6 read as the address being read from | **Stella and z26, 2005** — *"in both emulators, the disconnected bits will read as the address being read from, so bits 0-6 will be `$2B`, which has bit 0 set"* |
+| the LAST BUS BYTE | `data \|= mem.LastCPUData & ^mem.DataBusDriven` | **this engine, by default** — its comment says the pattern matches a PlusCart, and *"a different bit pattern can be seen on the Harmony"* |
+| a fixed pseudo-random pattern | `data \|= Random.Rewindable(0xff) & ^mem.DataBusDriven` | this engine with `RandomPins` |
+
+**Measured, not read off the source**: `litmus_floatbits` reads register `$0B` twice, once where the
+last bus byte is the address (`lda $2B`) and once where it is not (`lda $00,X`, X=`$2B`), and the two
+answers differ — bit 0 set then clear. Under the address model they would agree. So **this engine is
+the last-bus-byte model and is NOT doing what Stella and z26 did.**
+
+That matters because Eckhard Stolberg (200110) names three commercial ROMs whose behaviour turns on
+it: Video Pinball's ball *"won't bounce off of the paddles properly"*, Dodge'em gets *"a reversed score
+display"* if bit 0 comes back 1, and Berzerk enables a missile at `$F093`. **None of the three is in
+this tree**, so the model is pinned here and the consequences are not.
+
+★And `RandomPins` does not mean unpredictable: it draws from `Random.Rewindable`, so it produces a
+*different fixed* pattern, reproducible run to run. Measured — the default gives (1, 0) every time and
+`RandomPins` gives (0, 1) every time. A test written expecting noise there would be wrong.
+
 **`$00-$0D` is right about the TIA and wrong about the machine, 2026-09-04.** Those addresses answer
 because the TIA decodes only the low bits — but the *page* they sit in is not exclusively the TIA's,
 and something else in the address space can win. Darrell Spice Jr., 2003-08, tested **135 titles on a

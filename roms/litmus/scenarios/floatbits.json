@@ -1,0 +1,16 @@
+{
+  "rom": "roms/litmus/litmus_floatbits.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 2, "field": "ram.0x80", "op": "==", "value": 1,
+      "note": "lda $2B — the last bus byte IS the address $2B, which is odd" },
+    { "at_frame": 2, "field": "ram.0x81", "op": "==", "value": 0,
+      "note": "lda $00,X (X=$2B) — same register, last bus byte $00, which is even" },
+    { "at_frame": 2, "field": "ram.0x82", "op": "==", "value": 1,
+      "note": "the two disagree: this engine follows the LAST BUS BYTE, not the address" }
+  ],
+  "checks": {
+    "ntsc_frame_lines": 262,
+    "frame_lines_stable": { "frames": 40, "lines": 262 }
+  }
+}

@@ -6,6 +6,40 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — which floating-bus model this engine implements, and that it is not Stella's (2026-09-05)
+
+`known-traps.md` has said since July that reading a write-only TIA register "returns bus residue".
+True, and it does not say *what* residue. Three models are in circulation:
+
+| model | the floating bits become | who |
+|---|---|---|
+| the ADDRESS | bits 0-6 read as the address | **Stella and z26, 2005** (B. Watson, 200508) |
+| the LAST BUS BYTE | `data \|= LastCPUData & ^DataBusDriven` | **this engine, default** |
+| a fixed pattern | `Random.Rewindable(0xff) & ^DataBusDriven` | this engine, `RandomPins` |
+
+`litmus_floatbits` decides it in one bit: read register `$0B` twice, once where the last bus byte
+IS the address (`lda $2B`) and once where it is not (`lda $00,X` with X=`$2B`). **Measured: bit 0
+set then clear — the two disagree, so this engine is the last-bus-byte model and is NOT doing what
+Stella and z26 did.** Under the address model they would agree.
+
+This is not a detail. Stolberg (200110) names three commercial ROMs that turn on it: Video Pinball's
+ball "won't bounce off of the paddles properly", Dodge'em gets "a reversed score display" if bit 0
+comes back 1, Berzerk enables a missile at `$F093`. None of the three is in this tree, so the model
+is pinned and the consequences are not — and the docs now say which is which.
+
+★The first version of this experiment did not discriminate and looked like it did. It read the same
+register through `$002B` and `$012B`, reasoning that the operand's high byte is the last thing on
+the bus; both came back with bit 0 set, which reads exactly like the address model. **For a direct
+read the last bus byte is the address's LOW byte**, and those two addresses share it — the
+experiment was measuring the same thing twice and calling the agreement a result. The ROM's header
+keeps the failed design next to the working one.
+
+★★Negative control, asserted rather than logged: flipping `RandomPins` must change the answer, and
+it does — but reproducibly. `Random.Rewindable` gives a *different fixed* pattern, (0, 1) on every
+run against the default's (1, 0). "Random pins" does not mean unpredictable here, and a test written
+expecting noise would have been wrong. Origin: helper-3's distillation of `lsr hmclr` (200508),
+ranked first in their own ordering of what to measure.
+
 ### Added — spending an odd number of cycles, and why both usual answers are traps (2026-09-05)
 
 `ds N, $EA` spends 2N cycles: this repository's only padding idiom, and it cannot make an ODD
