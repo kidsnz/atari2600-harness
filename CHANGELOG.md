@@ -6,6 +6,39 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — eleven ROMs rest on the fixed power-on state, and nothing said so (2026-09-05)
+
+`RandomState` defaults to false and nothing in this repository overrides it (grep: zero hits
+outside tests). With it off, INTIM starts at 0, all 128 RAM bytes start at 0, and the CPU status
+register starts at 0. **Every scenario here runs from the same power-on state every time** — the
+right default for regression, and it means a ROM that reads uninitialised memory produces a stable
+answer, and a scenario pinning that answer is pinning the emulator's convention as much as the
+ROM's behaviour.
+
+Measured across **189 ROMs, run twice**: eleven differ. Four RAM-bearing carts, the superchip
+litmus, the two uninitialised-read witnesses (which are supposed to), `litmus_cycles` (whose HM
+registers still hold the power-on nibble), `litmus_bound_proxy` and `litmus_timerwrap_nearmiss`.
+
+`TestWhichROMsRestOnTheFixedPowerOnState` pins the list in both directions: a ROM that starts
+depending on it must be added with a reason, and one that stops must be removed — a witness list
+that has drifted is worse than none, because the next reader trusts it.
+
+Origin: helper-1 asked whether our scenarios are "passing because the randomness is fixed". For
+these eleven, yes.
+
+### Changed — the odd-`SLEEP` warning now says why it is a warning (2026-09-05)
+
+helper-3 found the macro's own source in the archive, posted by Thomas Jentzsch in 200110, and his
+own summary of the alternatives in 200207: *"For using nop $00, your DASM version must be compiled
+for accepting illegal opcodes. Else you could use bit $00 (changes some flags) or write
+.byte $04, $00 ($04 = opcode for nop zp) instead."*
+
+**All three forms read `$00`.** The author knew and listed them; there was no fourth. Measured
+usage across the corpus: `SLEEP` appears in 45 messages, **67 odd uses against 70 even — 49%** —
+across 23 threads. So the warning fires on a common, deliberate idiom of 1997-2003, and the message
+now says that instead of implying a mistake: even is fine, odd reads `$00`, `bit $00` is the cheap
+form if flags are expendable, `PHP`/`PLP` is 7 cycles in 2 bytes if they are not.
+
 ### Added — TIMINT's `$C0` is half a measurement and half a power-on choice (2026-09-05)
 
 `fundamentals-audit.md` recorded the RIOT timer's expiry as *"TIMINT $285 D7 = expired ($93=$C0,

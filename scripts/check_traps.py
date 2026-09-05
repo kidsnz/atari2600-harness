@@ -155,12 +155,16 @@ def scan_text(asm):
             except ValueError:
                 val = None
             if val is not None and val >= 3 and val % 2 == 1:
-                warns.append((n, f"`SLEEP {val}` is ODD, so DASM emits `nop $00` (an ILLEGAL "
-                                 f"opcode) — or `bit $00` under NO_ILLEGAL_OPCODES, which is legal "
-                                 f"but READS THE SAME ADDRESS and can bankswitch a 3F/X07 cart. "
-                                 f"Even SLEEP values are plain NOPs and are fine. For an odd delay "
-                                 f"use PHP/PLP: 7 cycles, 2 bytes, all flags restored, no address "
-                                 f"touched (measured — internal/emu/oddsleep_test.go)"))
+                warns.append((n, f"`SLEEP {val}` is ODD, so it emits a read of `$00` — `nop $00` "
+                                 f"(illegal) by default, `bit $00` (legal, but CHANGES FLAGS and "
+                                 f"reads the SAME address) under NO_ILLEGAL_OPCODES. Either can "
+                                 f"bankswitch a 3F/X07 cart. Even values are plain NOPs and are "
+                                 f"fine. ★There is no legal 3-cycle filler that touches no memory, "
+                                 f"which is why this is a warning and not an error: the macro's own "
+                                 f"author listed all three forms in 200207 and all three read $00. "
+                                 f"If flags are expendable, `bit $00` is the cheapest; if they are "
+                                 f"not, `PHP`/`PLP` costs 7 cycles in 2 bytes and touches nothing "
+                                 f"(measured — internal/emu/oddsleep_test.go)"))
 
         # 2b) the same skip written as a RAW BYTE, which the mnemonic matcher above cannot see.
         #     ★The gap is real in this tree: `roms/techniques/tia_pcm.asm` skips with `.byte $2C`.
