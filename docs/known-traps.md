@@ -27,6 +27,34 @@ repeatable while real hardware does not. Measured false positives: **0 across 12
 pairs in that corpus, so it is looking at something. Bait-tested in `--selftest`; negative control: disabling
 the rule fails the selftest by name.
 
+**`VSYNCsyncedOnStart` hides the first frames' vertical instability, and 42% of our measurement
+points are inside that window — measured 2026-09-05, and it hides almost nothing.** The engine will
+not move the picture's vertical origin until the frame is Stable (`stabilityThreshold = 6`), and
+`VSYNCsyncedOnStart` — **default true, never set here** — is the gate. The distillation (helper-2)
+closed the population of engine defaults, found five preferences named nowhere in this repository,
+and counted the exposure: **722 time references across 122 scenarios, 303 of them at frame < 6**.
+
+Measured across 192 ROMs rendered twice at six read points:
+
+| after | differ | | after | differ |
+|---|---|---|---|---|
+| 2 frames | 0 | | 5 frames | **1** — `cart_f4sc` |
+| 3 frames | 0 | | 6 frames | **1** — `pf_wraps` |
+| 4 frames | 0 | | 8 frames | 0 |
+
+**At most one ROM differs at any point, which one depends on the point, and by frame 8 everything
+agrees.** The effect is real, transient and self-correcting; the 42% is exposure, not damage.
+
+★The first version of this measurement read at six frames only and said "one ROM differs:
+`pf_wraps`". That was **one sample of a moving quantity**, and helper-2 caught it — six is the
+threshold itself, so reading there can miss what the flag does. `internal/emu/vsyncstart_test.go`
+now sweeps all six points and pins the witness list at each. ★★They also predicted `cb_roll` would
+differ; it does not, at any point.
+
+★★★Family: this is the fifth entry of *"TRUE OF HARDWARE, AND NOT OF WHAT WE MEASURE WITH"* —
+after `RandomState`, the random boot bank, the VSYNC threshold and SuperChip SARA. helper-2 proposes
+the four be gathered into one table with a name; that is not done here and is worth doing.
+
 **The 3F hotspot is a 74LS173, and that explains two things the condition alone does not, 2026-09-05.**
 The engine states the condition (`addr&0x10c0 == 0x0000`, quoting alex_79) but not the circuit. Adam
 Wozniak posted the wiring in 200506 — *"`/G1`→A7, `/G1`→A6, `CLK`→enable/A12 ... When A7 and A6 are
