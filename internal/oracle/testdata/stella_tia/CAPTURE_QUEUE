@@ -18,4 +18,4 @@ roms/litmus/litmus_audc_carrier.bin  # 2026-09-04  added mid-session; capture ta
 roms/litmus/litmus_swacnt.bin  # 2026-09-04  added mid-session; capture takes the screen for ~13 s and the author is at the machine
 roms/litmus/litmus_switchdraw.bin  # 2026-09-04  added mid-session; capture takes the screen for ~13 s and the author is at the machine
 roms/litmus/litmus_askdontwait.bin  # 2026-09-04  added mid-session; capture takes the screen for ~13 s and the author is at the machine
-roms/litmus/litmus_framephase.bin  # 2026-09-04  added mid-session; capture takes the screen for ~13 s and the author is at the machine
+roms/litmus/litmus_workplacement.bin  # 2026-09-04  added mid-session; capture takes the screen for ~13 s and the author is at the machine

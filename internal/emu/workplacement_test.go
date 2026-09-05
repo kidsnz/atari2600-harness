@@ -42,7 +42,7 @@ func TestFramePhaseDoesNotChangeWhatTheKernelSees(t *testing.T) {
 		if err != nil {
 			t.Skip("emulator unavailable")
 		}
-		if err := e.LoadROM("../../roms/litmus/litmus_framephase.bin"); err != nil {
+		if err := e.LoadROM("../../roms/litmus/litmus_workplacement.bin"); err != nil {
 			t.Skipf("litmus unavailable: %v", err)
 		}
 		if err := e.RunFrames(2); err != nil {

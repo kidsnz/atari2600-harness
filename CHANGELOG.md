@@ -15,7 +15,7 @@ routine from the overscan to the vertical bl[ank]**"* to stop a game losing vert
 Debro, 2004, moved a console-switch check **the other way** for the same class of symptom.
 
 **The obvious explanation is ordering, and it is wrong.** VBLANK runs before the picture and overscan
-after it, so overscan work "should" reach the screen a frame late. `litmus_framephase` runs the
+after it, so overscan work "should" reach the screen a frame late. `litmus_workplacement` runs the
 identical work in each region: **the kernel uses the same value on the same frame either way**,
 because it reads the variable at a fixed moment and cannot tell when the write happened.
 
