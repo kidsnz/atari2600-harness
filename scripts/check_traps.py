@@ -222,6 +222,23 @@ def scan_text(asm):
                     v = int(operand[1:], 16)
                 except ValueError:
                     v = -1
+                # ★2026-09-05: fold the address the way the machine does before deciding.
+                #   The TIA occupies $00-$3F and `memorymap.go:95` masks WRITES with
+                #   `maskWriteTIA = MemtopTIA` = **$3F** — so `$02`, `$42`, `$82` and `$C2` are all
+                #   WSYNC, and `$5B` is GRP0 exactly as `$1B` is. This rule compared the raw
+                #   operand, so **`lda $1B` fired and `lda $5B` did not** (measured). A kernel
+                #   written against mirrors slipped past every address-based rule here.
+                #   ★★The read mask is a different number ($0F, used below for what comes BACK);
+                #   this one decides WHICH register the address names. Found by the AtariAge
+                #   cross-check (helper-2), who also warned that the two masks are not
+                #   interchangeable.
+                #   ★★★And the fold must not be greedy. RAM is $80-$FF and `MapAddress` tests
+                #   `address & OriginRAM == OriginRAM` (bit 7) BEFORE falling through to TIA, so
+                #   **$80-$FF is RAM, not a TIA mirror**. The first version of this folded every
+                #   address and immediately reported `lda $8E` in `game_states.asm` as "reads PF1"
+                #   — twice. It is a RAM read. Fold only when bit 7 is clear.
+                if 0 <= v <= 0x7F:
+                    v &= 0x3F
                 if 0x0E <= v <= 0x2C:
                     reg = next((k for k, a in TIA_WRITE_ONLY.items() if a == v), "$%02X" % v)
             if reg:
