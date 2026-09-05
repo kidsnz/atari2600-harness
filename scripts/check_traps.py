@@ -111,7 +111,10 @@ def scan_text(asm):
         # re-derived from scratch because nobody wrote down that it had been settled.
         m = re.search(r"\b(lxa|xaa|ane|asr|alr)\b", low)
         if m:
-            errors.append((n, f"unstable illegal opcode `{m.group(1)}` — HW-unreliable (use LAX/SAX/SBX/DCP instead)"))
+            errors.append((n, f"unstable illegal opcode `{m.group(1)}` — HW-unreliable. `LAX/SAX/SBX/DCP` are the stable "
+                            f"family ON ORIGINAL NMOS SILICON; `SBX` and `ARR` are reported to fail on the "
+                            f"Flashback 2 (a reimplementation, not a 6507), so scope the claim if the target "
+                            f"is not an original console — see docs/known-traps.md"))
         if re.search(r"\blax\s+#", low):
             errors.append((n, "`LAX #imm` (immediate) is the unstable LXA form — avoid"))
         # 2) NOP/BIT reading TIA space, used as a skip (spurious bankswitch on 3F/X07)

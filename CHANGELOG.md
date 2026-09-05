@@ -6,6 +6,43 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — "HW-stable" did not say which hardware, in four places (2026-09-05)
+
+The two distillations — stella-list (3,324 notes) and AtariAge (1,764) — had never been checked
+against each other. The first pass found this, independently by two readers.
+
+`SBX` is recommended as hardware-stable in **four** places: `known-traps.md`, `design-principles.md`,
+`check_traps.py`'s error message, and `techniques/multicolor48.md` — the last being a technique page
+telling an author something is safe. AtariAge `113732-clean-assembly` reports **`SBX` and `ARR`
+failing on the Flashback 2**, a chip-level reimplementation rather than a 6507.
+
+★Both are probably right, and the problem is the wording. A reader of "stable on real hardware"
+concludes "safe everywhere". This repository already scopes `ASR` to *late Taiwanese Atari Jr units*
+in the same table; the same scoping was missing here. All four now say **original NMOS silicon**,
+name the Flashback 2 report, and say we cannot check it — no Flashback 2 here, and the engine models
+a 6507.
+
+★★`rg -i flashback docs/` returned three lines, all in the unmined ledger: the docs carried no
+clone caveat at all. That is the same gap the technique catalogue's hardware column addresses, only
+in the illegal-opcode rows.
+
+### Added — the 2K mirror makes two separate traps, not one (2026-09-05)
+
+Two archive reports look like they contradict each other. CMB-6 says a 2K cart mirrors
+$F000-$F7FF into $F800-$FFFF, so live data on the vector slot "booby-traps a 2K->4K port". A 1997
+report says the opposite: *"games not working ... When I doubled them up to 4k, they worked fine."*
+
+`litmus_2k_mirror` is a 2K ROM that measures the fold. **They are two traps, and the address
+decides** — under the same mirror the hazards sit six bytes apart:
+
+    offset $7FE/$7FF -> $F7FE/$F7FF == $FFFE/$FFFF   the IRQ/BRK vector      (CMB-6)
+    offset $7F8/$7F9 -> $F7F8/$F7F9 == $FFF8/$FFF9   the Supercharger hotspot
+
+A 2K image can trip either, both or neither, and doubling to 4K only helps the second: the top half
+stops being a mirror, so those bytes stop landing on $1FF8/$1FF9, while the vector slot still holds
+whatever the author put there. **The reports do not contradict each other.** Found by the
+mailing-list distillation (helper-3), who confirmed both verbatims and declined to judge.
+
 ### Added — BIT sets three flags from two sources, and the docs named two (2026-09-05)
 
 `docs/resources.md` said of the collision registers: *"Test with `BIT CXxx` -> `BMI`(D7)/`BVS`(D6)."*

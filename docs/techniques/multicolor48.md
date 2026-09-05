@@ -80,6 +80,6 @@ scanline; vary it to taste (here a 16-step rainbow).
   purpose this line proposes it for, in June 2000. His figures check out against our own instruction
   table (`Gopher2600/hardware/cpu/instructions/definitions.json`): `LDA (zp),Y` 5 cy / 2 bytes plus
   `TAX` 2 cy / 1 byte against `LAX (zp),Y` 5 cy / 2 bytes, so **2 cycles and 1 byte**. `LAX` is
-  hardware-stable — `known-traps.md` lists it with `SAX/SBX/DCP`, unlike `LXA/XAA`.
+  hardware-stable — `known-traps.md` lists it with `SAX/SBX/DCP` ★on original NMOS silicon. `SBX` and `ARR` are reported dead on the **Flashback 2** (AtariAge `113732-clean-assembly`), which is a reimplementation rather than a 6507 — unmeasured here, and stated because this is a technique page telling an author something is safe, unlike `LXA/XAA`.
   "Verify on Gopher2600 first" still stands for our own kernel; what has changed is that the idea
   is no longer untried.
