@@ -104,6 +104,32 @@ Strobe:
         lda #0
         sta $84             ; (HMP0 is write-only; the test reads it through the emulator)
 
+        ; --- $85 / $86: the Haunted House test vector -----------------------------------
+        ; ★A 2001 emulator author posted the exact CPU state Haunted House reaches, because his own
+        ; emulator disagreed with two others there (Nicolas Olhaberry, 200107/msg00044):
+        ;
+        ;	A=02 X=04 Y=18 S=FD PC=1441 ... C=1
+        ;	1441 E50F  SBC $0F  [000F]=00
+        ;	"Both PCAE and Z26, after executing this opcode, leave the accumulator with $F3,
+        ;	 so, the value subtracted was $F.  In my emu, since is subtracting zero, the carry
+        ;	 remains set"
+        ;
+        ; ★★So the vector is a three-way discriminator that needs no commercial ROM:
+        ;	$F3  -> $0F was subtracted (PCAE / z26 / the address model)
+        ;	$02  -> zero was subtracted (his emulator; nothing on the floating pins)
+        ;	other-> something else entirely
+        ; ★★★And $0F is the one address where the address model and the last-bus-byte model
+        ; AGREE, because the operand byte and the address are the same value — which is why this
+        ; vector is worth pinning separately from the discriminator above: it says whether we
+        ; reproduce a real game's behaviour, not which model we implement.
+        lda #$02
+        sec
+        sbc $0F             ; the posted instruction, from the posted state
+        sta $85
+        lda #0
+        rol                 ; A := carry after the SBC
+        sta $86
+
 Frame:
         lda #2
         sta VBLANK

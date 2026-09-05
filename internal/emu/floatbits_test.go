@@ -111,6 +111,31 @@ func TestWhichFloatingBusModelThisEngineImplements(t *testing.T) {
 		}
 	}
 
+	// --- the Haunted House vector: does the model DIFFERENCE change a real game's behaviour? ---
+	// Identifying the model is one question; whether it makes any game behave differently is
+	// another, and the archive supplies a vector that answers it without the ROM. Nicolas
+	// Olhaberry posted the exact CPU state his emulator disagreed at (200107/msg00044):
+	//
+	//	A=02 ... C=1 ; 1441 E50F SBC $0F [000F]=00
+	//	"Both PCAE and Z26, after executing this opcode, leave the accumulator with $F3, so, the
+	//	 value subtracted was $F. In my emu, since is subtracting zero, the carry remains set"
+	//
+	// ★$0F is the one address where the two models AGREE — the operand byte and the address are
+	// the same value — so this is not a second discriminator. It says something else, and something
+	// worth having: **on the only real-game vector we possess, this engine gives PCAE's and z26's
+	// answer.** The models differ; here the difference does not reach the game.
+	if got := r[0x05]; got != 0xF3 {
+		t.Errorf("`sbc $0F` from A=$02 with carry set gives $%02X, want $F3. $02 means nothing was "+
+			"on the floating pins (the behaviour whose author posted this vector BECAUSE his "+
+			"emulator was the odd one out); anything else means we now differ from PCAE and z26 on "+
+			"a vector taken from a shipped game, which is a bigger claim than the model difference "+
+			"above and needs its own evidence", got)
+	}
+	if got := r[0x06]; got != 0 {
+		t.Errorf("the carry after `sbc $0F` is %d, want 0 — $02 - $0F borrows. A carry left SET is "+
+			"exactly the symptom that told the 2001 author his emulator was subtracting zero", got)
+	}
+
 	// --- the read half has to be a real bus cycle, or none of the above is about the bus -----
 	// `$2B` is HMCLR, a strobe. The ROM sets HMP0 to $70 and then performs `lsr HMCLR`, whose
 	// read-modify-write must drive the strobe and clear the horizontal-motion registers. The

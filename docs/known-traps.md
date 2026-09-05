@@ -47,6 +47,16 @@ it: Video Pinball's ball *"won't bounce off of the paddles properly"*, Dodge'em 
 display"* if bit 0 comes back 1, and Berzerk enables a missile at `$F093`. **None of the three is in
 this tree**, so the model is pinned here and the consequences are not.
 
+**Does the difference reach a game? On the one vector we have, no.** Nicolas Olhaberry posted the
+exact CPU state Haunted House reaches, because his own emulator disagreed there (200107/msg00044):
+`A=$02`, carry set, `SBC $0F`. *"Both PCAE and Z26, after executing this opcode, leave the
+accumulator with `$F3`... In my emu, since is subtracting zero, the carry remains set."* Measured
+here: **`$F3`, carry clear** — PCAE's and z26's answer. `$0F` happens to be an address where the
+two models agree (the operand byte and the address are the same value), so this is not a second
+discriminator; it is the separate and more useful statement that **the model difference does not
+reach this game.** Whether it reaches Video Pinball, Dodge'em or Berzerk is still unmeasured, and
+will stay that way while their ROMs are not in this tree.
+
 ★And `RandomPins` does not mean unpredictable: it draws from `Random.Rewindable`, so it produces a
 *different fixed* pattern, reproducible run to run. Measured — the default gives (1, 0) every time and
 `RandomPins` gives (0, 1) every time. A test written expecting noise there would be wrong.

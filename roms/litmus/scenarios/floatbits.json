@@ -7,7 +7,11 @@
     { "at_frame": 2, "field": "ram.0x81", "op": "==", "value": 0,
       "note": "lda $00,X (X=$2B) — same register, last bus byte $00, which is even" },
     { "at_frame": 2, "field": "ram.0x82", "op": "==", "value": 1,
-      "note": "the two disagree: this engine follows the LAST BUS BYTE, not the address" }
+      "note": "the two disagree: this engine follows the LAST BUS BYTE, not the address" },
+    { "at_frame": 2, "field": "ram.0x85", "op": "==", "value": 243,
+      "note": "Haunted House vector (200107/msg00044): sbc $0F from A=$02 gives $F3 — PCAE's and z26's answer" },
+    { "at_frame": 2, "field": "ram.0x86", "op": "==", "value": 0,
+      "note": "and the carry is clear; a carry left set is the symptom of subtracting zero" }
   ],
   "checks": {
     "ntsc_frame_lines": 262,
