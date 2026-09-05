@@ -127,7 +127,7 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   its own source, twenty-seven years earlier.
   〔Towers, *TIA Hardware Notes*, RESPx pipeline〕 `→ roms/litmus/litmus_respx_phase.asm` / `internal/emu/respxphase_test.go` (3 gradings, 2 negative controls: the player's offset forced to 4 fails by name; a flat sweep trips the slope control)
   point (explains our verified +5 family offsets). **RESBL re-emits START (ball restartable mid-line);
-  RESPx does not** (player needs a 160-clock wrap). ⬜ double-strobe behavior unmeasured.
+  RESPx does not** (player needs a 160-clock wrap). ✅ **double-strobe measured 2026-09-05** (`litmus_hmove_double`, `internal/emu/hmovedouble_test.go`). With `HMP0 = $70` (one strobe = -7) and the same `RESP0` each time: one strobe **3 -> 156**; two **back to back** `3 -> 4` (**+1** — neither one move nor two, a strobe inside the running ripple is a third outcome); two **24 cycles apart** `3 -> 156` (**the second adds nothing**); the same with `HMCLR` between, `3 -> 156` (control). ★So within one scanline this engine does **not** accumulate, which is what AtariAge `198577` reports of real hardware. ★★It does not settle the `known-traps.md` warning about strobes on DIFFERENT scanlines with positioning code between — that is a different experiment and is still open. Found by the mailing-list distillation (helper-2), cross-checking the two corpora against each other.
 - ✅ **missile-locked-to-player (RESMP D1)** — the ⬜ was stale: `roms/litmus/litmus_resmp.asm` +
   `scenarios/resmp.json` already lock the offset at **+4** (player0.hmoved_pixel 24, missile0 28) and
   confirm it follows an HMOVE'd player. What that fixture could not answer is the word **"centered"**,

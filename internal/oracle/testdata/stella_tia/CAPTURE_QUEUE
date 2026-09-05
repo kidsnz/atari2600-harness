@@ -18,3 +18,4 @@ roms/litmus/litmus_floatbits.bin  # 2026-09-05  added mid-session; capture takes
 roms/litmus/litmus_timint_pa7.bin  # 2026-09-05  added mid-session; capture takes the screen for ~13 s and the author is at the machine
 roms/litmus/litmus_bit_flags.bin  # 2026-09-05  added mid-session; capture takes the screen for ~13 s and the author is at the machine
 roms/litmus/litmus_2k_mirror.bin  # 2026-09-05  added mid-session; capture takes the screen for ~13 s and the author is at the machine
+roms/litmus/litmus_hmove_double.bin  # 2026-09-05  added mid-session; capture takes the screen for ~13 s and the author is at the machine
