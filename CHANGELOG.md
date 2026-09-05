@@ -6,6 +6,41 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the 3F bankswitch trap was checked at one address out of sixty-four (2026-09-04)
+
+`check_traps.py` warned on `NOP $00` / `BIT $00` as a skip that can bankswitch a 3F/X07 cart. The
+engine states the actual condition in `Gopher2600/hardware/memory/cartridge/mapper_tigervision.go`,
+quoting alex_79:
+
+> "The bankswitch happens if **any address with both A6 and A7 low** is accessed, and if A12 goes
+> from low to high right after that access."
+
+and implements it as `addr&0x10c0 == 0x0000`. In zero page that is **$00-$3F, all sixty-four of
+them**: `nop $04`, `bit $2C` and `nop $3F` were exactly as dangerous as `nop $00` and the check said
+nothing about any of them. $40-$7F, $80-$BF and $C0-$FF are outside it, which is *why* `NOP $80` is
+the recommended replacement — a fact the old message asserted without the reason.
+
+Also added: the same skip written as a **raw byte** (`.byte $2C`), which a mnemonic matcher cannot
+see. `roms/techniques/tia_pcm.asm` skips that way.
+
+★The raw-byte check is scoped to files that target a mapper decoding TIA space, because a 4K cart
+has no such hardware and a warning that fires on every correct use is a warning nobody reads.
+★★Scoping it cost two attempts and the first failure is worth recording: asking `\b3[EF]\b` of the
+whole file matched **`$3F` in sprite bitmap data** (`bitmap48.asm:211`, `multicolor48.asm:241`), so a
+picture of a shape was read as a cartridge mapper — five false positives, in the gate whose job is
+catching mistakes. The name must now appear outside a hex literal and on a line about cartridges.
+
+Verified in three directions: silent on a 4K file whose data contains `$3F`, fires on a 3F cart,
+fires on `tigervision`. Origin: helper-3's distillation of `finalish joustpong feedback` (200403),
+where DASM's `SLEEP` macro emits illegal opcodes for odd cycle counts unless `NO_ILLEGAL_OPCODES`
+is defined.
+
+★Two of that thread's three questions were answered by measuring this tree rather than the archive:
+all **26** `ds N, $EA` pads carry a comment of exactly `2N` cycles (no drift between the written
+count and the bytes), and the tree already has a legal odd-cycle idiom — `exerciser.asm:971` spends
+7 cycles as `cmp zp` (3, legal, flags only) plus two NOPs. harness never reaches for DASM's `SLEEP`
+because it writes the bytes itself, and `NO_ILLEGAL_OPCODES` appears nowhere in the tree.
+
 ### Fixed — oracle captures are bound to bytes, not to a file name (2026-09-04)
 
 `scripts/stella_oracle.sh` now writes `# binsha256:` and `# binsha256-source:` into every capture,

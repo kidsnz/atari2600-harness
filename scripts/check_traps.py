@@ -69,6 +69,20 @@ READ_OP = re.compile(
 
 def scan_text(asm):
     """Check an asm string and return (errors, warns), each a list of (line number, message)."""
+    # ★2026-09-04: does this file target a mapper that decodes TIA space? Only then can a
+    # NOP/BIT skip bankswitch. 3F/tigervision, 3E and X07 all do; a 4K or Fx cart does not.
+    #
+    # ★★The first version of this asked `\b(3f|3e|...)\b` of the whole file and got FIVE false
+    # positives immediately: `$3F` is an ordinary byte in sprite data (`bitmap48.asm:211`,
+    # `multicolor48.asm:241`), so a picture of a shape was read as a cartridge mapper. That is the
+    # measuring-the-wrong-quantity error, in the gate that exists to catch mistakes. So: the name
+    # must appear NOT as a hex literal, and on a line that is talking about cartridges.
+    bankswitch_context = bool(
+        re.search(r"\b(tigervision|x07)\b", asm, re.I)
+        or re.search(r"(?im)^.*\b(cart(ridge)?|bank(switch(ing)?)?|mapper|scheme|hotspot)\b.*"
+                     r"(?<![$\w])3[EF]\b.*$", asm)
+        or re.search(r"(?im)^.*(?<![$\w])3[EF]\b.*"
+                     r"\b(cart(ridge)?|bank(switch(ing)?)?|mapper|scheme|hotspot)\b.*$", asm))
     errors, warns = [], []
     has_cld = has_cleanstart = False
     lines = asm.splitlines()
@@ -100,9 +114,40 @@ def scan_text(asm):
             errors.append((n, f"unstable illegal opcode `{m.group(1)}` — HW-unreliable (use LAX/SAX/SBX/DCP instead)"))
         if re.search(r"\blax\s+#", low):
             errors.append((n, "`LAX #imm` (immediate) is the unstable LXA form — avoid"))
-        # 2) NOP $00 / BIT $00 used as a skip (spurious bankswitch on 3F/X07) 〔known-traps C / mined 139089〕
-        if re.search(r"\b(nop|bit)\s+\$00\b", low):
-            warns.append((n, "`NOP $00`/`BIT $00` can trigger a bankswitch on 3F/X07 carts — use `NOP $80` or a safe address"))
+        # 2) NOP/BIT reading TIA space, used as a skip (spurious bankswitch on 3F/X07)
+        #    〔known-traps C / mined 139089〕
+        #
+        # ★2026-09-04: this used to match `$00` ALONE, which is one address out of sixty-four.
+        # The engine states the real condition in
+        # `Gopher2600/hardware/memory/cartridge/mapper_tigervision.go` (alex_79, quoted there):
+        #
+        #     "The bankswitch happens if any address with both A6 and A7 low is accessed,
+        #      and if A12 goes from low to high right after that access."
+        #
+        # and implements it as `addr&0x10c0 == 0x0000`. In zero page that is **$00-$3F, all
+        # sixty-four of them** — `nop $04`, `bit $2C` and `nop $3F` were as dangerous as `nop $00`
+        # and this said nothing about any of them. $40-$7F ($40 sets A6), $80-$BF ($80 sets A7)
+        # and $C0-$FF are all outside it, which is why `NOP $80` is the recommended replacement.
+        m = re.search(r"\b(nop|bit)\s+\$([0-9a-f]{1,2})\b", low)
+        if m and (int(m.group(2), 16) & 0x10C0) == 0:
+            warns.append((n, f"`{m.group(1).upper()} ${m.group(2).upper()}` reads TIA space (A6 and A7 both low, "
+                             f"$00-$3F) and can trigger a bankswitch on 3F/X07 carts — use `NOP $80` "
+                             f"or any address with A6 or A7 set"))
+        # 2b) the same skip written as a RAW BYTE, which the mnemonic matcher above cannot see.
+        #     ★The gap is real in this tree: `roms/techniques/tia_pcm.asm` skips with `.byte $2C`.
+        #     $04/$0C/$14/$1C/$34/$3C/$44/$54/$64/$74/$80/$82/$89/$C2/$D4/$E2/$F4 are the NOP family
+        #     and $24/$2C are BIT; the ones that TAKE AN OPERAND are the ones that read an address,
+        #     so a raw-byte skip is exactly as capable of hitting TIA space as the spelled form.
+        # ★★And it fires only where the hazard can exist. The bankswitch needs a mapper that
+        #    decodes TIA space; a plain 4K cart has no such hardware, so warning there is noise,
+        #    and a warning that fires on every correct use is a warning nobody reads. Measured
+        #    2026-09-04: the unscoped version fired 8 times in this tree, all on 4K technique ROMs
+        #    where the trap cannot happen. `bankswitch_context` is set once per file below.
+        m = re.search(r"^\s*\.?byte\s+\$(04|0c|14|1c|24|2c|34|3c|44|54|64|74|d4|f4)\b", low)
+        if m and bankswitch_context and "@skip-ok" not in raw:
+            warns.append((n, f"`.byte ${m.group(1).upper()}` is a NOP/BIT skip written as a raw byte — the "
+                             f"operand it swallows is READ, so if that address has A6 and A7 low it can "
+                             f"bankswitch a 3F/X07 cart. Say why with `@skip-ok` if the address is safe"))
         # 3) Variable assigned into the stack-collision zone ($F8-$FF) 〔known-traps C / mined 302998,301766〕
         m = re.search(r"=\s*\$(f[89a-f])\b", low) or re.search(r"\bequ\s+\$(f[89a-f])\b", low)
         if m:
@@ -177,6 +222,8 @@ Start
         lxa #$00          ; unstable illegal opcode
         lax #$ff          ; immediate LAX = unstable
         nop $00           ; bankswitch trap on 3F
+        bit $2c           ; ★same trap, an address the old $00-only check could not see
+        .byte $2c         ; ★same trap again, written as a raw byte (mnemonic matcher is blind)
 flag    = $ff             ; var in stack-collision zone
         lda GRP0          ; read of a write-only TIA register
         sta $F123         ; write into cartridge ROM, undeclared
@@ -186,7 +233,8 @@ flag    = $ff             ; var in stack-collision zone
 
 def selftest():
     errors, warns = scan_text(BAIT)
-    want = ["lxa", "LAX #imm", "bankswitch", "variable at $FF", "no CLD", "WRITE-ONLY TIA register", "cartridge ROM"]
+    want = ["lxa", "LAX #imm", "bankswitch", "variable at $FF", "no CLD", "WRITE-ONLY TIA register",
+            "cartridge ROM", "BIT $2C", "raw byte"]
     blob = " ".join(m for _, m in errors + warns)
     missing = [w for w in want if w not in blob]
     if missing:
