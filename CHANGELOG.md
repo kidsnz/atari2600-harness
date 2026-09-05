@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the technique catalogue now says which techniques the verification does not cover (2026-09-05)
+
+The engine models eight TIA-revision behaviours and **all eight default to false**. Real consoles
+have some of them, and `bugs.go` names shipped cartridges that depend on each. So every technique in
+`docs/techniques/README.md` is verified on **a TIA without those bugs**, and the table never said
+which techniques that mattered for.
+
+The table gains a **★TIA revision** column, and the entries are measured rather than reasoned: each
+demo ROM was rendered twice per flag — clean and with that one flag on — and its whole 262-line
+output hashed. **Seven of thirty-one move:**
+
+    zone_multiplex   LostMOTCK          rts_dispatch  LateColor
+    two_line_kernel  LateColor          tia_pcm       LateColor
+    two_line_vdel    LateColor          rpgmap        LatePFx
+    bitmap48         LateVDELGRP0, LateVDELGRP1
+
+A dash is a measurement, not an absence of one.
+
+★And measuring it surfaced a second thing: **the table lists 18 of the 31 demo ROMs.** Three of the
+seven revision-dependent ones — `two_line_vdel`, `rpgmap` (which has its own `rpgmap.md`) and
+`bitmap48` — have demos and no row, so the new column is incomplete because the table is. That is
+said in the README rather than papered over, and `check_wiring.py` now counts the gap against a
+ceiling of 13 so it cannot grow quietly; the ceiling prints a note when the gap falls, asking to be
+lowered. Negative control: setting the ceiling to 12 fails the gate.
+
+Origin: helper-2's distillation of `2600 jr incompatibilities` (200302), where the list's own
+conclusion was *"we should isolate certain techniques that may fail on some systems and enforce the
+usage of lowest-common-denominator standards"*. The isolating is this column. ★★The enforcing is
+not attempted, and the README says what the column cannot see: console variation the engine does
+not model — components removed on cost-reduced boards, the 7800's 2600 mode, one-chip Jr revisions.
+
 ### Added — eleven ROMs rest on the fixed power-on state, and nothing said so (2026-09-05)
 
 `RandomState` defaults to false and nothing in this repository overrides it (grep: zero hits

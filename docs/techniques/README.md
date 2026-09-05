@@ -41,35 +41,68 @@ Written 2026-08-21, after doing it once and getting three of the five wrong on t
 
 ## Catalog
 
-| # | Technique | Level | Doc | Demo ROM | Status |
-|---|---|---|---|---|---|
-| 1 | Sprite multiplexing (vertical zones) — many players past the 2-per-line limit | intermediate | [zone-multiplexing.md](zone-multiplexing.md) | `roms/techniques/zone_multiplex.asm` | ✅ 12 moving sprites, CI-locked |
-| 2 | Sprite animation — GRP frame cycling + free REFP flip | easy | [sprite-animation.md](sprite-animation.md) | `roms/techniques/sprite_anim.asm` | ✅ 4-phase walker, pos(v)=v calibrated, CI-locked |
-| 3 | Vertical positioning — any-Y placement, per-line compare | intermediate | [vertical-positioning.md](vertical-positioning.md) | `roms/techniques/vertical_pos.asm` | ✅ bouncing ball, art verified bit-for-bit, CI-locked |
-| 4 | 2-line kernel — art rows over 2 scanlines = CPU headroom | intermediate | [two-line-kernel.md](two-line-kernel.md) | `roms/techniques/two_line_kernel.asm` | ✅ 2 sprites + gradient, shared HMOVE, CI-locked |
-| 8 | Playfield modes — score mode & PF priority | intermediate | [pf-modes.md](pf-modes.md) | `roms/techniques/pf_modes.asm` | ✅ both modes pixel-verified, CI-locked |
-| 10 | Flicker multiplexing — N objects through 2 players | advanced | [flicker-multiplexing.md](flicker-multiplexing.md) | `roms/techniques/flicker_multiplex.asm` | ✅ 4 balls @30Hz, alternation CI-asserted |
-| 12 | Venetian Blinds — 2 figures through 1 player, zero flicker | intermediate | [venetian-blinds.md](venetian-blinds.md) | `roms/techniques/venetian.asm` | ✅ alternating rows pixel-verified, CI-locked |
-| 10b | Dynamic multi-sprite kernel — Y-sort + 2-of-N + mid-screen reposition | advanced | [dynamic-multisprite.md](dynamic-multisprite.md) | `roms/techniques/dyn_multisprite.asm` | ✅ 5 crossing objects, zero budget spills, CI-locked |
-| M | Instrument-envelope music driver — per-frame volume envelopes + per-note instrument (TIATracker-derived) | advanced | [music-driver.md](music-driver.md) | `roms/techniques/music_driver.asm` | ✅ envelopes/sustain/pluck-gate/loop CI-locked, audio golden |
-| 13 | Text on screen — 12 characters flicker-free, 24 with column flicker, and **the width ladder above them**: 12 (flicker-free) → 24 (column flicker) → 26 (supercat) → 28 (Jentzsch) → 32 (solidcorp 2011, interleaved RESP re-strobing) → 36 / 576 / 1008 (omegamatrix). **Read this row before starting a text kernel**: every rung above 24 is a re-strobe route, and the re-strobe itself is measured in #36 — a kernel designed without it will conclude that 12 or 24 is the ceiling | intermediate | [text12.md](text12.md) · [text24.md](text24.md) | `roms/techniques/text12.asm`, `roms/techniques/text24.asm` | ✅ both CI-locked (`scenarios/text12.json` / `text24.json`). The ladder ABOVE 24 is what the AtariAge 32-character-display thread records and is **not measured here**; #36 is the measured part |
-| 15 | Constant divide (÷3/7/10/15) — corrected reciprocal-multiply, exact 0..255 + remainder | intermediate | [divtable.md](divtable.md) | `roms/techniques/divtable.asm` | ✅ Go-model exhaustive (0 errors), 13 RAM asserts, CI-locked |
-| 16 | Multicolor 48-px — 3×NUSIZ+VDEL 48px with per-row COLUPx (~73/76 cy) | advanced | [multicolor48.md](multicolor48.md) | `roms/techniques/multicolor48.asm` | ✅ per-row color verified, CI-locked, golden |
-| 18 | RTS-stack dispatch — data-driven zone chaining via push(addr-1)+RTS, ~6cy/zone | advanced | [rts-dispatch.md](rts-dispatch.md) | `roms/techniques/rts_dispatch.asm` | ✅ 4 zones, RAM-list driven, 262 held, CI-locked |
-| 19 | Procedural maze PF — LFSR bits doubled to 2px cells, scrolled, reflected | intermediate | [maze.md](maze.md) | `roms/techniques/maze.asm` | ✅ deterministic seed, symmetric maze, CI-locked |
-| 21 | TIA PCM — digitized sample via AUDV (AUDC=0), 1-bit ADPCM, pseudo-5bit DAC | advanced | [tia-pcm.md](tia-pcm.md) | `roms/techniques/tia_pcm.asm` | ✅ AUDV envelope + audio golden, CI-locked |
-| 22 | Shared SetXPos — position all 5 objects via one indexed RESPx,x/HMPx,x loop | intermediate | [shared-setxpos.md](shared-setxpos.md) | `roms/techniques/shared_setxpos.asm` | ✅ 5 objects at distinct X (hmoved_pixel), CI-locked |
-| 23 | Pseudo-3D road — M0/M1 shoulders + BL dashed centre, widening per band | advanced | [road.md](road.md) | `roms/techniques/road.asm` | ✅ widening wedge verified, steerable, CI-locked |
-| 27 | HMOVE two-step — reach screen edges past the ÷15 budget wall (clamp input + 2nd HMOVE drift) | intermediate | [hmove-two-step.md](hmove-two-step.md) | (in-game: sandbox PONG `pf2_02_flyoff-right`) | 🔶 in-game verified (read_row edge pixels + budget); standalone demo/CI TODO |
-| 28 | Asymmetric-PF two-digit score — mid-line PF1/PF2 rewrite = 4 independent digit fields | advanced | [asymmetric-pf-score.md](asymmetric-pf-score.md) | (in-game: sandbox PONG `pf2_score-2digit-playfield`+) | 🔶 in-game verified (all digits read_row); standalone demo/CI TODO |
-| 29 | Sub-pixel velocity (DDA accumulator) — fractional speed while the POSITION stays a 1-byte integer | intermediate | [subpixel-velocity.md](subpixel-velocity.md) | (in-game: sandbox PONG `pf2_06_feel-rally-ai-serve`) | 🔶 in-game verified (per-tier px/frame measured exact); standalone demo/CI TODO |
-| 30 | Audio-envelope idioms (Combat) — free envelopes from gameplay counters: counter-IS-register, self-clearing SFX counter, per-player detune, gear-shift pitch curve | idiom | [audio-envelope-idioms.md](audio-envelope-idioms.md) | (reference — `Combat.asm`) | 📖 studied from Combat disassembly (harvest 2026-07-23); reimplement + CI = TODO |
-| 31 | Kernel micro-idioms (Combat) — HMP low-nibble 2nd axis, `$FF`/`$00` AND-mask blank, −4 pointer bias, PF mirror via counter-EOR, compare-via-EOR A=0 | idiom | [kernel-micro-idioms.md](kernel-micro-idioms.md) | (reference — `Combat.asm`) | 📖 studied from Combat disassembly (harvest 2026-07-23); reimplement + CI = TODO |
-| 32 | Per-scanline NUSIZ+HMOVE shaping — one player into an irregular silhouette wider than 8px (G9a) | advanced | [nusiz-shaping.md](nusiz-shaping.md) | `roms/litmus/litmus_nusiz_shape.asm` | ✅ intended outline matched on 40/40 scanlines + 120/120 control rows, two-axis decomposition, CI-locked |
-| 33 | Fractional-HMOVE slope — arbitrary-angle 1px line on a missile/ball via an error accumulator (G9b) | advanced | [hmove-slope.md](hmove-slope.md) | `roms/litmus/litmus_hmove_slope.asm` | ✅ max error 0 px vs the line equation over 160 scanlines × 2 slopes, static control 160/160, CI-locked |
-| 34 | Pitch dither — play a note the TIA has NO register for by alternating two adjacent AUDF values every TWO frames, so the mean PERIOD lands on the target (E1: -26.9 c -> +8.8 c). Swapping every FRAME is worse than not doing it. | idiom | [pitch-dither.md](pitch-dither.md) | `litmus_pitchdither` | ✅ measured on the machine (5 tests incl. the failing case + a roughness figure); not yet used in a piece |
-| 35 | Sprite placement physics — where RESP/RESM land an object (player x = 3c-60, missile x = 3c-61, clamped at x=3), the 9 px floor between two strobes, the missile-3-cycles-after-player trick that abuts a 4 px tail to an 8 px head with NO HMOVE, when a GRP write is too late (effective at x = 3w-64), and the fact that a strobe cancels only an object's FIRST copy | foundation | [sprite-placement.md](sprite-placement.md) | `roms/litmus/litmus_sprite_place.asm` | ✅ 11 bands, negative-controlled, CI-locked |
-| 36 | RESPx RE-STROBING — how many shaped slots fit on ONE scanline, and **how many depends on the SPACING between strobes**. At 6, 7 or 8 cycles a player in a copy mode draws 3 + k with k mid-line strobes, so one player reaches **eight** and two players reach **sixteen** (measured on its own band, not doubled). At **3 and 5 cycles the ladder is FLAT** — every strobe after the first buys nothing — and at 12 it climbs faster than 3 + k. Where a copy lands moves with the spacing too: off the multiple-of-three grid at 8, **on** it at 6. The mechanism behind the spacing dependence is measured but NOT explained. Slots are not the binding limit though — BYTES are, at six cycles a write | advanced | [restrobe-copies.md](restrobe-copies.md) | `roms/litmus/litmus_restrobe.asm` | ✅ 8 spacings x k=1..5 plus a two-player band, 36 bands, CI-locked; source solidcorp AtariAge 180632 |
+| # | Technique | Level | Doc | Demo ROM | Status | ★TIA revision |
+|---|---|---|---|---|---|---|
+| 1 | Sprite multiplexing (vertical zones) — many players past the 2-per-line limit | intermediate | [zone-multiplexing.md](zone-multiplexing.md) | `roms/techniques/zone_multiplex.asm` | ✅ 12 moving sprites, CI-locked | **LostMOTCK** |
+| 2 | Sprite animation — GRP frame cycling + free REFP flip | easy | [sprite-animation.md](sprite-animation.md) | `roms/techniques/sprite_anim.asm` | ✅ 4-phase walker, pos(v)=v calibrated, CI-locked | — |
+| 3 | Vertical positioning — any-Y placement, per-line compare | intermediate | [vertical-positioning.md](vertical-positioning.md) | `roms/techniques/vertical_pos.asm` | ✅ bouncing ball, art verified bit-for-bit, CI-locked | — |
+| 4 | 2-line kernel — art rows over 2 scanlines = CPU headroom | intermediate | [two-line-kernel.md](two-line-kernel.md) | `roms/techniques/two_line_kernel.asm` | ✅ 2 sprites + gradient, shared HMOVE, CI-locked | **LateColor** |
+| 8 | Playfield modes — score mode & PF priority | intermediate | [pf-modes.md](pf-modes.md) | `roms/techniques/pf_modes.asm` | ✅ both modes pixel-verified, CI-locked | — |
+| 10 | Flicker multiplexing — N objects through 2 players | advanced | [flicker-multiplexing.md](flicker-multiplexing.md) | `roms/techniques/flicker_multiplex.asm` | ✅ 4 balls @30Hz, alternation CI-asserted | — |
+| 12 | Venetian Blinds — 2 figures through 1 player, zero flicker | intermediate | [venetian-blinds.md](venetian-blinds.md) | `roms/techniques/venetian.asm` | ✅ alternating rows pixel-verified, CI-locked | — |
+| 10b | Dynamic multi-sprite kernel — Y-sort + 2-of-N + mid-screen reposition | advanced | [dynamic-multisprite.md](dynamic-multisprite.md) | `roms/techniques/dyn_multisprite.asm` | ✅ 5 crossing objects, zero budget spills, CI-locked | — |
+| M | Instrument-envelope music driver — per-frame volume envelopes + per-note instrument (TIATracker-derived) | advanced | [music-driver.md](music-driver.md) | `roms/techniques/music_driver.asm` | ✅ envelopes/sustain/pluck-gate/loop CI-locked, audio golden | — |
+| 13 | Text on screen — 12 characters flicker-free, 24 with column flicker, and **the width ladder above them**: 12 (flicker-free) → 24 (column flicker) → 26 (supercat) → 28 (Jentzsch) → 32 (solidcorp 2011, interleaved RESP re-strobing) → 36 / 576 / 1008 (omegamatrix). **Read this row before starting a text kernel**: every rung above 24 is a re-strobe route, and the re-strobe itself is measured in #36 — a kernel designed without it will conclude that 12 or 24 is the ceiling | intermediate | [text12.md](text12.md) · [text24.md](text24.md) | `roms/techniques/text12.asm`, `roms/techniques/text24.asm` | ✅ both CI-locked (`scenarios/text12.json` / `text24.json`). The ladder ABOVE 24 is what the AtariAge 32-character-display thread records and is **not measured here**; #36 is the measured part | — |
+| 15 | Constant divide (÷3/7/10/15) — corrected reciprocal-multiply, exact 0..255 + remainder | intermediate | [divtable.md](divtable.md) | `roms/techniques/divtable.asm` | ✅ Go-model exhaustive (0 errors), 13 RAM asserts, CI-locked | — |
+| 16 | Multicolor 48-px — 3×NUSIZ+VDEL 48px with per-row COLUPx (~73/76 cy) | advanced | [multicolor48.md](multicolor48.md) | `roms/techniques/multicolor48.asm` | ✅ per-row color verified, CI-locked, golden | — |
+| 18 | RTS-stack dispatch — data-driven zone chaining via push(addr-1)+RTS, ~6cy/zone | advanced | [rts-dispatch.md](rts-dispatch.md) | `roms/techniques/rts_dispatch.asm` | ✅ 4 zones, RAM-list driven, 262 held, CI-locked | **LateColor** |
+| 19 | Procedural maze PF — LFSR bits doubled to 2px cells, scrolled, reflected | intermediate | [maze.md](maze.md) | `roms/techniques/maze.asm` | ✅ deterministic seed, symmetric maze, CI-locked | — |
+| 21 | TIA PCM — digitized sample via AUDV (AUDC=0), 1-bit ADPCM, pseudo-5bit DAC | advanced | [tia-pcm.md](tia-pcm.md) | `roms/techniques/tia_pcm.asm` | ✅ AUDV envelope + audio golden, CI-locked | **LateColor** |
+| 22 | Shared SetXPos — position all 5 objects via one indexed RESPx,x/HMPx,x loop | intermediate | [shared-setxpos.md](shared-setxpos.md) | `roms/techniques/shared_setxpos.asm` | ✅ 5 objects at distinct X (hmoved_pixel), CI-locked | — |
+| 23 | Pseudo-3D road — M0/M1 shoulders + BL dashed centre, widening per band | advanced | [road.md](road.md) | `roms/techniques/road.asm` | ✅ widening wedge verified, steerable, CI-locked | — |
+| 27 | HMOVE two-step — reach screen edges past the ÷15 budget wall (clamp input + 2nd HMOVE drift) | intermediate | [hmove-two-step.md](hmove-two-step.md) | (in-game: sandbox PONG `pf2_02_flyoff-right`) | 🔶 in-game verified (read_row edge pixels + budget); standalone demo/CI TODO | — |
+| 28 | Asymmetric-PF two-digit score — mid-line PF1/PF2 rewrite = 4 independent digit fields | advanced | [asymmetric-pf-score.md](asymmetric-pf-score.md) | (in-game: sandbox PONG `pf2_score-2digit-playfield`+) | 🔶 in-game verified (all digits read_row); standalone demo/CI TODO | — |
+| 29 | Sub-pixel velocity (DDA accumulator) — fractional speed while the POSITION stays a 1-byte integer | intermediate | [subpixel-velocity.md](subpixel-velocity.md) | (in-game: sandbox PONG `pf2_06_feel-rally-ai-serve`) | 🔶 in-game verified (per-tier px/frame measured exact); standalone demo/CI TODO | — |
+| 30 | Audio-envelope idioms (Combat) — free envelopes from gameplay counters: counter-IS-register, self-clearing SFX counter, per-player detune, gear-shift pitch curve | idiom | [audio-envelope-idioms.md](audio-envelope-idioms.md) | (reference — `Combat.asm`) | 📖 studied from Combat disassembly (harvest 2026-07-23); reimplement + CI = TODO | — |
+| 31 | Kernel micro-idioms (Combat) — HMP low-nibble 2nd axis, `$FF`/`$00` AND-mask blank, −4 pointer bias, PF mirror via counter-EOR, compare-via-EOR A=0 | idiom | [kernel-micro-idioms.md](kernel-micro-idioms.md) | (reference — `Combat.asm`) | 📖 studied from Combat disassembly (harvest 2026-07-23); reimplement + CI = TODO | — |
+| 32 | Per-scanline NUSIZ+HMOVE shaping — one player into an irregular silhouette wider than 8px (G9a) | advanced | [nusiz-shaping.md](nusiz-shaping.md) | `roms/litmus/litmus_nusiz_shape.asm` | ✅ intended outline matched on 40/40 scanlines + 120/120 control rows, two-axis decomposition, CI-locked | — |
+| 33 | Fractional-HMOVE slope — arbitrary-angle 1px line on a missile/ball via an error accumulator (G9b) | advanced | [hmove-slope.md](hmove-slope.md) | `roms/litmus/litmus_hmove_slope.asm` | ✅ max error 0 px vs the line equation over 160 scanlines × 2 slopes, static control 160/160, CI-locked | — |
+| 34 | Pitch dither — play a note the TIA has NO register for by alternating two adjacent AUDF values every TWO frames, so the mean PERIOD lands on the target (E1: -26.9 c -> +8.8 c). Swapping every FRAME is worse than not doing it. | idiom | [pitch-dither.md](pitch-dither.md) | `litmus_pitchdither` | ✅ measured on the machine (5 tests incl. the failing case + a roughness figure); not yet used in a piece | — |
+| 35 | Sprite placement physics — where RESP/RESM land an object (player x = 3c-60, missile x = 3c-61, clamped at x=3), the 9 px floor between two strobes, the missile-3-cycles-after-player trick that abuts a 4 px tail to an 8 px head with NO HMOVE, when a GRP write is too late (effective at x = 3w-64), and the fact that a strobe cancels only an object's FIRST copy | foundation | [sprite-placement.md](sprite-placement.md) | `roms/litmus/litmus_sprite_place.asm` | ✅ 11 bands, negative-controlled, CI-locked | — |
+| 36 | RESPx RE-STROBING — how many shaped slots fit on ONE scanline, and **how many depends on the SPACING between strobes**. At 6, 7 or 8 cycles a player in a copy mode draws 3 + k with k mid-line strobes, so one player reaches **eight** and two players reach **sixteen** (measured on its own band, not doubled). At **3 and 5 cycles the ladder is FLAT** — every strobe after the first buys nothing — and at 12 it climbs faster than 3 + k. Where a copy lands moves with the spacing too: off the multiple-of-three grid at 8, **on** it at 6. The mechanism behind the spacing dependence is measured but NOT explained. Slots are not the binding limit though — BYTES are, at six cycles a write | advanced | [restrobe-copies.md](restrobe-copies.md) | `roms/litmus/litmus_restrobe.asm` | ✅ 8 spacings x k=1..5 plus a two-player band, 36 bands, CI-locked; source solidcorp AtariAge 180632 | — |
+
+### ★The `TIA revision` column — measured, not inferred (2026-09-05)
+
+The engine models **eight TIA-revision behaviours** and **all eight default to false** (see the
+`known-traps.md` row beginning *"Ten litmus ROMs measure a TIA that has no revision bugs"*). Real
+consoles have some of them, and `bugs.go` names shipped cartridges that depend on each. So every
+technique here is verified on **a TIA without those bugs**, and this table never said which
+techniques that mattered for.
+
+It now does, and the entries are **measured**: each demo ROM was rendered twice per flag — clean and
+with that one flag on — and its whole 262-line output hashed. **Seven of the thirty-one demo ROMs in
+`roms/techniques/` move; a dash is a measurement, not an absence of one.**
+
+	zone_multiplex   LostMOTCK          rts_dispatch  LateColor
+	two_line_kernel  LateColor          tia_pcm       LateColor
+	two_line_vdel    LateColor          rpgmap        LatePFx
+	bitmap48         LateVDELGRP0, LateVDELGRP1
+
+**What an entry means for a builder:** the technique works here, and on a console whose TIA has that
+bug the demo draws something different. It does not say the technique is broken there — it says the
+verification does not cover there.
+
+★★**Three of those seven are not in the table above**, because the table lists **18 of the 31 demo
+ROMs**: `two_line_vdel`, `rpgmap` (which has its own `rpgmap.md`) and `bitmap48` have demos and no
+row. So the column is as complete as the table is, and the table is not complete.
+`scripts/check_wiring.py` now counts the gap so it cannot grow quietly.
+
+★★★What this column does NOT cover: anything outside the eight flags. Console-to-console variation
+the engine does not model — components removed on cost-reduced boards, the 7800's 2600 mode, one-chip
+Jr revisions — is invisible here by construction. Origin: helper-2's distillation of `2600 jr
+incompatibilities` (200302), where the list's own conclusion was *"we should isolate certain
+techniques that may fail on some systems and enforce the usage of lowest-common-denominator
+standards"*. The isolating is this column; the enforcing is not attempted.
 
 ## Not a technique, but looked for here: game STATE
 

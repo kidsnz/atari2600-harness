@@ -123,6 +123,28 @@ def coverage_doc_roms():
     return sorted(set(out))
 
 
+# ★2026-09-05: the technique catalogue's table lists FEWER demo ROMs than roms/techniques/ holds.
+#   Measured when the TIA-revision column went in: **18 rows against 31 ROMs**, and three of the
+#   seven ROMs that turned out to be revision-dependent (`two_line_vdel`, `rpgmap`, `bitmap48`)
+#   were among the thirteen with no row — so the new column was incomplete because the TABLE was.
+#   ★★A doc that is silently less complete than the directory it describes is the shape this whole
+#   script exists to catch, and it had a blind spot for it. The ceiling is the measured gap, so it
+#   cannot grow without someone deciding to raise it.
+TECHNIQUE_TABLE_GAP_CEILING = 13
+
+
+def technique_table_gap():
+    """Demo ROMs in roms/techniques/ that the catalogue table does not name."""
+    readme = os.path.join(HARNESS, "docs", "techniques", "README.md")
+    if not os.path.isfile(readme):
+        return []
+    text = open(readme, encoding="utf-8").read()
+    listed = set(re.findall(r"roms/techniques/([a-z0-9_]+)\.asm", text))
+    on_disk = {os.path.basename(p)[:-4]
+               for p in glob.glob(os.path.join(HARNESS, "roms", "techniques", "*.asm"))}
+    return sorted(on_disk - listed)
+
+
 def gate_wiring():
     """Check every scripts/check_*.py against its row in docs/gate-ledger.md.
 
@@ -279,6 +301,20 @@ def main():
         print("\nWire each into CLAUDE.md's routing table (or link from docs/authoring-protocol.md) so the")
         print("knowledge actually fires at authoring time. (rule: knowledge-activation-architecture)")
         sys.exit(1)
+
+    gap = technique_table_gap()
+    if len(gap) > TECHNIQUE_TABLE_GAP_CEILING:
+        print(f"TECHNIQUE TABLE GAP — {len(gap)} demo ROMs have no row in docs/techniques/README.md, "
+              f"over the ceiling of {TECHNIQUE_TABLE_GAP_CEILING}:")
+        for g in gap:
+            print("  ✗ roms/techniques/" + g + ".asm")
+        print("\nA ROM nobody can find in the catalogue is a technique nobody will use, and any")
+        print("column added to that table (hardware scope, status) is incomplete by exactly this")
+        print("much. Add a row, or lower the ceiling if you removed one.")
+        sys.exit(1)
+    if len(gap) < TECHNIQUE_TABLE_GAP_CEILING:
+        print(f"note: the technique-table gap is down to {len(gap)} (ceiling {TECHNIQUE_TABLE_GAP_CEILING}) "
+              f"— lower the ceiling so it cannot drift back up")
     lit, total, via_scenario, via_code = litmus_orphans()
     if lit:
         print("LITMUS ORPHANS — these verification ROMs are run by nothing (no scenario, no test, no tool):")
