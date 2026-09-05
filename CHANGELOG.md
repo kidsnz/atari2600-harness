@@ -235,7 +235,7 @@ checked. Counted here by rendering all 128 even values and collecting distinct r
 
 | | distinct colours |
 |---|---|
-| NTSC | **126** of 128 |
+| NTSC | **126 or 127** of 128 (the last bit of the palette is computed in floating point and rounds differently on arm64 and x86-64) |
 | PAL | **104** |
 | SECAM | **8** |
 

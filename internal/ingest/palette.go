@@ -73,8 +73,10 @@ func (q *Quantizer) RGB(code uint8) color.RGBA {
 // collapsed. A caller that wants to warn has to ask this first.
 //
 // **The count belongs to this table, and measurement says so sharply.** Run the same two functions
-// over the engine's own palette (`NewNTSCQuantizer`) and the answer is **126 distinct colours with 2
-// alias groups** — against Stella's 91 and 28. The collapse is therefore overwhelmingly a property
+// over the engine's own palette (`NewNTSCQuantizer`) and the answer is **126-127 distinct colours with
+// 1-2 alias groups** — the exact figure depends on the host, because the palette is generated in
+// floating point and its last bit rounds differently on arm64 (two colliding pairs) than on x86-64
+// (one). The gap to Stella's 91 is not host-dependent, and that gap is the finding — against Stella's 91 and 28. The collapse is therefore overwhelmingly a property
 // of the *measured Stella table*, not of the TIA's colour generation, and the person who measured
 // that palette said as much in 2001: the colours in Stella "seem to be idealized a bit". Three
 // layers exist — the colour code, an emulator's RGB, and a real television — and this measures the

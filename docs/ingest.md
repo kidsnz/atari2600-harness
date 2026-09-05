@@ -20,8 +20,8 @@ but only **91 distinct colours** — 28 groups collide, 37 codes are unreachable
 most: a luminance ramp that looks smooth on the canvas has steps in it that do not exist. `Nearest`
 cannot warn about this — by the time it runs, the two swatches have already collapsed — so ask
 `Quantizer.Aliases()` first if you want to check a palette before drawing with it.
-**This is the measured Stella table's shape, not the TIA's**: the engine's own palette gives 126
-distinct colours in 2 groups. Which of the two a real television resembles is not established here.
+**This is the measured Stella table's shape, not the TIA's**: the engine's own palette gives 126–127
+distinct colours in 1–2 groups (the count is host-dependent; the gap to Stella's 91 is not). Which of the two a real television resembles is not established here.
 
 **And the palette is per TV standard, with one point checked against hardware.** The same byte is a
 different colour on PAL — `$36` orange becomes green, `$C6` green becomes violet — so a picture
@@ -33,9 +33,8 @@ It does not give a conversion table — one point is one point, and the 1997 sou
 necessarily a corresponding hue"* — but it does mean **a PAL release is a re-choice of colours, not a
 re-mapping of them.**
 
-**And the budget is different, counted 2026-09-04:** rendering all 128 even values gives **NTSC 126
-distinct colours, PAL 104, SECAM 8**. A 1997 post claiming PAL has *"half the colours"* was hedged
-with *"I vaguely remember"*, and the hedge was the accurate part — 104 is 83% of 126, not 50%.
+**And the budget is different, counted 2026-09-04:** rendering all 128 even values gives **NTSC 126–127 distinct colours (host-dependent), PAL 104, SECAM 8**. A 1997 post claiming PAL has *"half the colours"* was hedged
+with *"I vaguely remember"*, and the hedge was the accurate part — 104 is about 83% of NTSC's, not 50%.
 **SECAM is the one to know about**: eight colours, because the standard carries luminance only and
 assigns each level a fixed hue. A picture designed here does not degrade on SECAM, **it is replaced**.
 Pinned in `internal/emu/palspec_test.go`, so if any of the three numbers moves, the work designed

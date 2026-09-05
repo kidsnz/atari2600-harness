@@ -85,11 +85,23 @@ func TestPaletteAliases(t *testing.T) {
 	// own palette must stay far less collapsed than the measured one. If these ever converge, the
 	// aliasing has become a statement about the TIA rather than about Stella's table, and every doc
 	// comment here needs re-reading.
+	//
+	// ★The engine's exact count is NOT asserted, and that is a correction: it was, and it broke CI.
+	// The palette is generated in floating point and the last bit is architecture-dependent — this
+	// machine (arm64) finds **two** colliding pairs, `$5E`/`$6E` (#FF87FF) and `$0C`/`$0E` (#FFFFFE),
+	// and CI (x86-64) finds **one**, so 126 here and 127 there. Asserting 126 was measuring one CPU
+	// and calling it a fact, which is the error `check_instruments` exists to catch, committed in a
+	// test whose whole subject is counting colours. What the claim actually needs is that the
+	// engine's palette collapses FAR LESS than the measured Stella table; that is true on both.
 	e := NewNTSCQuantizer()
-	if e.DistinctColours() != 126 || len(e.Aliases()) != 2 {
-		t.Errorf("the engine's palette gives %d distinct colours in %d alias groups, want 126 and 2 "+
-			"— this is the control that separates 'the table collapses' from 'the TIA collapses'",
-			e.DistinctColours(), len(e.Aliases()))
+	if e.DistinctColours() < 120 {
+		t.Errorf("the engine's palette gives only %d distinct colours; it should be near 128 (this "+
+			"machine sees 126, x86-64 sees 127 — floating-point rounding differs), and if it has "+
+			"collapsed to Stella-table levels the control below means nothing", e.DistinctColours())
+	}
+	if len(e.Aliases()) > 4 {
+		t.Errorf("the engine's palette has %d alias groups; a handful is expected from rounding, but "+
+			"this many means it is collapsing like the measured table", len(e.Aliases()))
 	}
 	if e.DistinctColours() <= q.DistinctColours() {
 		t.Errorf("the engine's palette (%d colours) is no more distinct than the measured Stella "+

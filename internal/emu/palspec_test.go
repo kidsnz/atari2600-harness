@@ -140,19 +140,31 @@ func TestSameColourByteIsADifferentColourOnPAL(t *testing.T) {
 		}
 		return len(seen)
 	}
-	for _, tc := range []struct {
-		spec string
-		want int
-	}{{"NTSC", 126}, {"PAL", 104}, {"SECAM", 8}} {
-		if got := count(tc.spec); got != tc.want {
-			if got < 0 {
-				t.Logf("%s unavailable", tc.spec)
-				continue
-			}
-			t.Errorf("%s renders %d distinct colours from 128 values, want %d — the palette budget "+
-				"for that standard has changed and anything designed against the old number needs "+
-				"re-checking", tc.spec, got, tc.want)
-		}
+	// ★NTSC's exact count is deliberately NOT asserted. It was, at 126, and it broke CI: the palette
+	// is generated in floating point and the last bit is architecture-dependent — arm64 finds two
+	// colliding pairs and x86-64 finds one, so 126 here and 127 there. **Asserting it was measuring
+	// one CPU and calling it a fact.** The claims that matter survive the difference and are the ones
+	// checked: PAL is materially smaller than NTSC, and SECAM is eight.
+	ntsc, pal, secam := count("NTSC"), count("PAL"), count("SECAM")
+	if ntsc < 0 || pal < 0 {
+		t.Skip("both specs required")
+	}
+	if ntsc < 120 {
+		t.Errorf("NTSC renders %d distinct colours from 128 values; it should be near 128 (126 or 127 "+
+			"depending on the host's rounding)", ntsc)
+	}
+	if pal != 104 {
+		t.Errorf("PAL renders %d distinct colours, want 104 — a 1997 post guessed 'half the colours' "+
+			"and hedged it; 104 is 83%% of NTSC's, and anything designed against that number needs "+
+			"re-checking if it moved", pal)
+	}
+	if pal >= ntsc {
+		t.Errorf("PAL (%d) is not smaller than NTSC (%d); the palette-budget claim has inverted", pal, ntsc)
+	}
+	if secam >= 0 && secam != 8 {
+		t.Errorf("SECAM renders %d distinct colours, want 8 — the standard carries luminance only and "+
+			"assigns each level a fixed hue, so a picture designed here is REPLACED there, not "+
+			"degraded. If this is no longer 8 that sentence is wrong", secam)
 	}
 
 	// The control: a luminance-only value has no hue to get wrong, so it must NOT differ much.
