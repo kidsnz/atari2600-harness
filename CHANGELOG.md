@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — BIT sets three flags from two sources, and the docs named two (2026-09-05)
+
+`docs/resources.md` said of the collision registers: *"Test with `BIT CXxx` -> `BMI`(D7)/`BVS`(D6)."*
+True, and one flag short. Bill Heineman (200207/msg00281) lists all three, and the third is the
+useful one:
+
+    N <- the MEMORY's bit 7        (whatever the accumulator holds)
+    V <- the MEMORY's bit 6        (likewise)
+    Z <- (A AND memory) == 0       (a MASK TEST against the accumulator)
+    A  is not touched
+
+So `BIT` tests an arbitrary mask **without destroying the accumulator**, where `AND` would.
+`litmus_bit_flags` measures all four claims, including the case that proves N and Z read different
+things: with `A = $00` the AND is zero and Z sets, and **N still comes back set** from the memory's
+bit 7.
+
+★It lands directly on the register the previous commit separated: TIMINT's D7 is the timer flag and
+D6 is the PA7 flag, so **`BIT TIMINT / BMI expired / BVS pa7` reads both in one instruction**.
+
+★★The limit is recorded beside the capability: **`BIT` has no immediate mode**, so the mask must
+live in memory (Chris Wilkson, 199806/msg00118) — in a thread where Andrew Davie said otherwise and
+then corrected himself, *"my memory got mixed up with the 65816"*. Writing the limit next to the
+capability is the point: the correction exists because someone had to rediscover it.
+
+Found by the mailing-list distillation (helper-1), whose materials file carried the three verbatim
+sources machine-extracted rather than retyped.
+
 ### Added — the technique catalogue now says which techniques the verification does not cover (2026-09-05)
 
 The engine models eight TIA-revision behaviours and **all eight default to false**. Real consoles

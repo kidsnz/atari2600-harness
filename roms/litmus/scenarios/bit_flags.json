@@ -1,0 +1,17 @@
+{
+  "rom": "roms/litmus/litmus_bit_flags.asm",
+  "warmup_frames": 3,
+  "asserts": [
+    { "at_frame": 2, "field": "ram.0x80", "op": "==", "value": 1, "note": "N is the memory's bit 7" },
+    { "at_frame": 2, "field": "ram.0x81", "op": "==", "value": 0 },
+    { "at_frame": 2, "field": "ram.0x82", "op": "==", "value": 0 },
+    { "at_frame": 2, "field": "ram.0x83", "op": "==", "value": 1, "note": "V is the memory's bit 6" },
+    { "at_frame": 2, "field": "ram.0x84", "op": "==", "value": 1, "note": "Z is (A AND memory) == 0" },
+    { "at_frame": 2, "field": "ram.0x85", "op": "==", "value": 1, "note": "and clear when they share a bit" },
+    { "at_frame": 2, "field": "ram.0x86", "op": "==", "value": 15,
+      "note": "A survives: BIT is a non-destructive mask test where AND would clobber it" },
+    { "at_frame": 2, "field": "ram.0x87", "op": "==", "value": 1,
+      "note": "N comes from memory even when A=0 makes the AND zero — N and Z read different things" }
+  ],
+  "checks": { "ntsc_frame_lines": 262, "frame_lines_stable": { "frames": 40, "lines": 262 } }
+}

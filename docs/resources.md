@@ -110,6 +110,28 @@ $F0=right1 $E0=right2 $D0=right3 $C0=right4 $B0=right5 $A0=right6 $90=right7 $80
 ### Collision registers (CXxx)
 8 read-only registers, each with two latches in **D7/D6**, **sticky**. Test with `BIT CXxx` →
 `BMI`(D7)/`BVS`(D6).
+
+★**`BIT` sets THREE flags, from two different sources** — measured 2026-09-05,
+`internal/emu/bitflags_test.go`, `roms/litmus/litmus_bit_flags.asm`:
+
+	N <- the MEMORY's bit 7        (whatever the accumulator holds)
+	V <- the MEMORY's bit 6        (likewise)
+	Z <- (A AND memory) == 0       (a MASK TEST against the accumulator)
+	A  is not touched
+
+The line above names two of them. The third is the one this repository does not use: **it tests an
+arbitrary mask without destroying the accumulator**, where `AND` would. The case that separates the
+sources is measured too — with `A = $00` the AND is zero and Z sets, and **N still comes back set**
+from the memory's bit 7.
+
+★★It lands directly on TIMINT, whose two bits `litmus_timint_pa7` separated (D7 = timer expired,
+D6 = PA7): **`BIT TIMINT / BMI expired / BVS pa7` reads both in one instruction** rather than two.
+
+★★★And the limit belongs next to the capability: **`BIT` has no immediate mode**, so the mask must
+live in memory. Source: Bill Heineman, stella-list `200207/msg00281` for the three flags; Chris
+Wilkson, `199806/msg00118` for the missing immediate — in a thread where Andrew Davie said otherwise
+and then corrected himself (*"my memory got mixed up with the 65816"*). Found by the mailing-list
+distillation (helper-1).
 ```
 CXM0P : D7=M0-P1 D6=M0-P0    CXM1P : D7=M1-P0 D6=M1-P1
 CXP0FB: D7=P0-PF D6=P0-BL    CXP1FB: D7=P1-PF D6=P1-BL
