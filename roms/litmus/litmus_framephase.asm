@@ -1,92 +1,115 @@
-; litmus_framephase.asm — オラクル間の「Nフレーム後」の意味を数値で突き合わせる ROM（G6）。
+; litmus_framephase — WHERE in the frame you put non-kernel work, and what it costs you.
 ;
-; 目的: RAM ダンプ型オラクル（Gopher2600 / MAME / Stella）は「N フレーム走らせて RAM を読む」
-;   と言うが、**フレーム内のどこで読むか**は各エンジンの都合で決まる。Gopher は
-;   RunFrames(N) 後の境界、MAME は machine frame notifier の N 回目。毎フレーム変化する
-;   RAM を持つゲームでは、この位相差がそのまま「オラクルの不一致」に化ける——あるいは
-;   もっと悪いことに、位相が偶然そろっている間だけ一致して見える。
+; `prove_line_budget` proves the worst case over all paths WITHIN A SCANLINE. Nothing here says
+; anything about the frame: a 262-line NTSC frame has **37 VBLANK lines before the picture and 30
+; overscan lines after it** — 67 lines of non-kernel time — and which of the two you use has never
+; been written down as making any difference.
 ;
-; 手法: 1 フレームの中の**離れた 3 点**でそれぞれ別のカウンタを進める。
-;   $80 … VSYNC 直後（フレームの先頭）
-;   $81 … 可視領域の中央（192 ラインの 96 本目）
-;   $82 … Overscan の最後（次の VSYNC の直前）
-;   どの瞬間にダンプしても、この 3 つの関係が「どこで採ったか」を一意に指す:
-;     先頭で採れば $80 == $81+1 == $82+1、末尾で採れば $80 == $81 == $82。
-;   $83 は 3 点すべてを通過した完全なフレーム数（$82 と同値だが独立に数える＝計測器の自己検査）。
+; The list found that it does. Andrew Davie, 200103/msg00056, on a game losing vertical sync:
 ;
-; 出典: 自前の検証根拠（G6・capability-gap-audit.md）。smoke.asm の NTSC 骨格を流用。
-
+;	the amount of time required to move and draw all the cubes is > the available cycles that I
+;	can provide … Cubes are moved every 2nd frame, so they are also drawn every 2nd frame.
+;	**I moved the routine from the overscan to the vertical bl[ank]**
+;
+; Two different fixes in one report — *do the work half as often* (spend less) and *do the same work
+; somewhere else* (spend it elsewhere) — and only the first is a budget question.
+;
+; **What this ROM measures.** A player moves one pixel right per frame. The move is computed either
+; in VBLANK (before the picture) or in overscan (after it), selected by RAM $80, and the position
+; actually DRAWN is recorded. If the phase matters, the two differ by exactly one frame of motion:
+; overscan computes a value the beam has already passed, so it shows up on the NEXT frame.
+;
+; That is worth a fixture because the consequence is invisible in a still: both versions animate
+; smoothly, at the same speed, and one of them is a frame behind the input that caused it. On a
+; game that reads a stick and moves an object, that is the difference between a control that feels
+; attached and one that does not — and it costs nothing to fix, because the work is the same work.
         processor 6502
-
 VSYNC   = $00
 VBLANK  = $01
 WSYNC   = $02
 COLUBK  = $09
-CXCLR   = $2C
+COLUP0  = $06
+GRP0    = $1B
+RESP0   = $10
+HMP0    = $20
+HMOVE   = $2A
+HMCLR   = $2B
+phase    = $80      ; 0 = compute in VBLANK, 1 = compute in overscan (the test pokes this)
+xpos     = $81      ; the value the kernel will use
+drawn    = $82      ; the value the kernel actually used this frame
+frames   = $83
 
         org $F000
-
-Reset:
+Start:
         sei
         cld
         ldx #$FF
         txs
         lda #0
-ClearMem:
-        sta $00,x
+Clr:    sta $00,x
         dex
-        bne ClearMem
-        sta CXCLR
-
-MainLoop:
-; --- VSYNC: 3 lines ---
-        lda #2
-        sta VBLANK
-        sta VSYNC
-        sta WSYNC
-        sta WSYNC
-        sta WSYNC
+        bne Clr
+        lda #$0E
+        sta COLUP0
         lda #0
-        sta VSYNC
-        inc $80         ; ★POINT A: frame start (immediately after VSYNC)
-
-; --- VBLANK: 37 lines ---
-        ldx #37
-VBlankLoop:
-        sta WSYNC
-        dex
-        bne VBlankLoop
-
-        lda #0
-        sta VBLANK
-
-; --- Visible: 192 lines, with POINT B at the midpoint ---
-        lda #$1E
         sta COLUBK
-        ldx #192
-VisibleLoop:
-        sta WSYNC
-        cpx #96
-        bne NoMid
-        inc $81         ; ★POINT B: middle of the visible field
-NoMid:
-        dex
-        bne VisibleLoop
+        sta phase           ; default: VBLANK
 
-; --- Overscan: 30 lines ---
+NextFrame:
         lda #2
         sta VBLANK
-        ldx #30
-OverscanLoop:
+        sta VSYNC
         sta WSYNC
+        sta WSYNC
+        sta WSYNC
+        lda #0
+        sta VSYNC
+
+        ; ---- VBLANK phase ----
+        lda phase
+        bne VBSkip          ; phase=1 -> the work happens in overscan instead
+        inc xpos            ; the "work": advance the object
+VBSkip:
+        ; the kernel commits to whatever xpos holds RIGHT NOW
+        lda xpos
+        sta drawn
+
+        ldx #37
+VB:     sta WSYNC
         dex
-        bne OverscanLoop
+        bne VB
+        lda #0
+        sta VBLANK
 
-        inc $82         ; ★POINT C: last instruction before the next VSYNC
-        inc $83         ; a second, independent count of complete frames
+        ; ---- picture: draw one line of the object so the frame is not blank ----
+        ldx #192
+Vis:    sta WSYNC
+        cpx #100
+        bne NoDraw
+        lda #$FF
+        sta GRP0
+        jmp VisNext
+NoDraw: lda #0
+        sta GRP0
+VisNext:
+        dex
+        bne Vis
 
-        jmp MainLoop
+        lda #2
+        sta VBLANK
+
+        ; ---- overscan phase ----
+        lda phase
+        beq OSSkip          ; phase=0 -> the work already happened in VBLANK
+        inc xpos            ; same work, later in the frame
+OSSkip:
+        inc frames
+        ldx #30
+OS:     sta WSYNC
+        dex
+        bne OS
+        jmp NextFrame
 
         org $FFFC
-        .word Reset
-        .word Reset
+        .word Start
+        .word Start

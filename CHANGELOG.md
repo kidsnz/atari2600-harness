@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — where in the frame the work goes is capacity, not ordering (2026-09-04)
+
+`prove_line_budget` proves the worst case within a scanline. Nothing here said anything about the
+frame, whose 262 lines are 3 VSYNC + **37 VBLANK before the picture** + 192 visible + **30 overscan
+after it**. The archive treats moving between the two as a fix — Andrew Davie, 2001, *"**I moved the
+routine from the overscan to the vertical bl[ank]**"* to stop a game losing vertical sync; Dennis
+Debro, 2004, moved a console-switch check **the other way** for the same class of symptom.
+
+**The obvious explanation is ordering, and it is wrong.** VBLANK runs before the picture and overscan
+after it, so overscan work "should" reach the screen a frame late. `litmus_framephase` runs the
+identical work in each region: **the kernel uses the same value on the same frame either way**,
+because it reads the variable at a fixed moment and cannot tell when the write happened.
+
+**What differs is room: 37 lines against 30 — 7 lines, 532 cycles.** So *"move it to VBLANK"* is not
+a latency trick, it is *use the bigger of the two rooms*, with the corollary that a routine which
+does not fit in 37 will not fit in 30 either. Past that the remaining moves are the ones the same
+threads name: spread the work over frames, gate it on the timer, or blank a frame.
+
+Recorded because a plausible mechanism nobody tests becomes folklore. The hypothesis came from the
+distillation (helper-3) **marked as unmeasured**, which is why it could be tested rather than
+absorbed.
+
+### Fixed — pushed with a gate failing, and the gate was right (2026-09-04)
+
+`check_tests.py` failed on the commit before this one and the push went out anyway: the gate and the
+commit were in the same command, and the FAIL line scrolled past. It had caught a leftover probe —
+`zz_fp_test.go`, print-only, no assertions — which is precisely the family that file exists to
+refuse: *"a printed number is not a check."* Removed, and the measurement it was standing in for is
+now a real test with a control.
+
 ### Fixed — the `$30/$31` row cited a refutation as if it were the confirmation (2026-09-04)
 
 Landed this morning: *"patching the code to use the images at `$3x` makes it work on the

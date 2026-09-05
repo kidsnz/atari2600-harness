@@ -60,6 +60,21 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   value smaller than the interval** (`2^k ≤ INTIM at the start`).
   `→ roms/litmus/litmus_askdontwait.asm` / `internal/emu/askdontwait_test.go`, regression-locked
   `roms/litmus/scenarios/askdontwait.json`. Found by the mailing-list distillation (helper-1).
+  ✅ **And WHERE in the frame the work goes is about capacity, not ordering — a plausible mechanism
+  tested and rejected, 2026-09-04.** The archive treats the move as a fix: Andrew Davie, 2001,
+  *"**I moved the routine from the overscan to the vertical bl[ank]**"* to stop a game losing vertical
+  sync; Dennis Debro, 2004, moved a console-switch check **the other way** for the same class of
+  symptom. The obvious reading is ordering — VBLANK runs before the picture, overscan after it, so
+  overscan work "should" reach the screen a frame late. **It does not.** `litmus_framephase` runs the
+  identical work in each region and the kernel uses the same value on the same frame either way,
+  because it reads the variable at a fixed moment and cannot tell when the write happened. **What
+  actually differs is room: 37 lines against 30 — 7 lines, 532 cycles.** So "move it to VBLANK" is
+  not a latency trick, it is *use the bigger of the two rooms*, and the corollary is that a routine
+  which does not fit in 37 will not fit in 30 either. At that point the remaining moves are the ones
+  the same threads name: spread the work over frames, gate it on the timer (above), or blank a frame.
+  `→ roms/litmus/litmus_framephase.asm` / `internal/emu/framephase_test.go`, regression-locked
+  `roms/litmus/scenarios/framephase.json`. Hypothesis proposed — and marked as unmeasured — by the
+  mailing-list distillation (helper-3).
   ⬜ **Exact first-decrement offset.** The countdown band pins three successive reads at
   $3C/$35/$2E from TIM1T=$40 — that fixes the rate (−7 per `lda abs`+`sta zp` iteration) and the
   value 4 ticks after the write **for that instruction sequence**; it does not isolate how many
