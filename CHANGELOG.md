@@ -6,6 +6,42 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `cmd/timinglint` aimed at the works, and the author's own third fix for HMOVE double-application (2026-09-05)
+
+`cmd/timinglint` was in the same position `check_traps.py` had been: validated on the 31 technique
+ROMs — its own docs say *"zero false positives on the known-good technique corpus"* — and never
+pointed at anything else. It is called by neither CI nor the pre-push hook.
+
+Aimed at all three works (384 `.asm`): **one warning type, 9 ROMs, 0 false positives.**
+`hmxx-without-hmove` — `lda #$F0` staged into HMM0/HMM1/HMP0/HMP1 and `sta HMOVE` strobed nowhere
+in the ROM or anything it includes. The nine are variants over two generated bodies in which
+**every** strobe had been quieted (`sta HMOVE` = 0, `bit $80` = 11 and 10), so the staging block has
+no consumer at all. Dead rather than wrong — it sits in VBLANK padding — but the comment above it,
+*"the motion registers, at the value the frame wraps with"*, claims a purpose the ROM does not have.
+
+**And the reason those strobes were quieted is a fix worth having in the catalogue.** The generator
+records it (`roms/260816_transistor/tools/mk_transistor_ms.py:1023-1027`): a repeat pass that
+strobes again *"applies the nudge AGAIN: measured on --thick=2, pass 1 drew at x=19 and its repeat
+at x=20"* — this repository's own multiple-HMOVE trap, hit independently, measured, and fixed. The
+fix is the interesting part: in a generated kernel where every write is timed from the top of the
+line you cannot **remove** three cycles, so the strobe is **replaced** by `bit $80` — same three
+cycles, RAM instead of TIA. Added to the trap row as a third option, with the catch the generator's
+own comment does not state: `BIT` sets N and V from the memory byte and Z from `A AND m` (measured,
+`internal/emu/bitflags_test.go`), so it is only safe where the flags are dead, and there is no legal
+three-cycle filler that touches nothing at all (`PHP`/`PLP` is seven cycles, measured,
+`internal/emu/oddsleep_test.go`).
+
+**Two measurement errors were made and caught across sessions, in both directions, within the same
+two hours.** The first count of HMOVE strobes here used a zsh glob that matched nothing; the shell
+printed `no matches found` in the middle of the output and it was read past, so "grep found 0" was
+reported for files grep never opened. The distillation (helper-2) challenged it. Their counter-count
+was of a **different set** of ROMs — bodies matched by name rather than by which ROM includes them —
+and the rule is a whole-file predicate (`internal/cyclebound/timinglint.go:224`,
+`haveHmxxNonzero && !sawHMOVE`), so the ROMs they listed are exactly the ones that are never
+flagged. Re-measured properly by following each ROM's `include` chain: all nine have `sta HMOVE` = 0.
+Neither error was found by the person who made it, and both were found by the other one checking
+the mechanism rather than the conclusion.
+
 ### Fixed — the previous entry measured one ROM at one save position and generalised (2026-09-05)
 
 The entry below reported "34 of the first 1048 samples differ, contiguously from the first, then it
