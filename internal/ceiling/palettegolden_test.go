@@ -30,11 +30,25 @@ import "testing"
 // distinguishable and why — 91 distinct colours out of 128 against the Stella table, 126 against
 // this generator — which is the number an artist needs before picking swatches.
 //
-// ★★★★If this test fails, the renderer's colours have moved. Do not update the table to make it
-// pass without saying what moved them and why: every ceiling measurement, every pixel comparison
-// against the Stella oracle, and every piece of artwork ingested against these codes is quantised
-// against exactly these values. The precedent for pinning a measured table rather than a derived
-// one is `pkg/audio.MeasuredSpectra`.
+// ★★★★The comparison has a TOLERANCE, and the tolerance is not taste. The first version of this
+// test demanded exact equality and **went red on CI** — code `$0C` is `[255 255 254]` on the arm64
+// machine the table was taken on and `[255 255 255]` on CI's x86-64. One unit, in one channel, of
+// one entry: the generator's RGB→YIQ→RGB round trip with a gamma lands either side of a rounding
+// boundary depending on the platform's floating point. **This is the second time this repository
+// pinned a machine-specific float as if it were a constant** — the first was a palette COUNT (126
+// on arm64, 127 on x86-64) and it held CI red twelve times.
+//
+// So: at most **±1 per channel** on any entry (squared distance ≤ 3), and at most **8** in total
+// across all 128. That is a rounding boundary and nothing else. It costs no sensitivity worth
+// having: the probe above moves `$46` by a squared distance of **6,889**, three orders of
+// magnitude past the tolerance. If a change ever lands inside it, it is a change no viewer could
+// see and no measurement here quantises differently.
+//
+// ★★★★★If this test fails, the renderer's colours have moved. Do not widen the tolerance or
+// update the table to make it pass without saying what moved them and why: every ceiling
+// measurement, every pixel comparison against the Stella oracle, and every piece of artwork
+// ingested against these codes is quantised against exactly these values. The precedent for
+// pinning a measured table rather than a derived one is `pkg/audio.MeasuredSpectra`.
 var ntscGolden = [PaletteSize]struct {
 	Code    uint8
 	R, G, B int
@@ -88,7 +102,8 @@ func TestNTSCPaletteMatchesTheMeasuredGolden(t *testing.T) {
 		name string
 		p    Palette
 	}{{"derived (PaletteFor)", derived}, {"measured (HarvestPalette)", harvested}} {
-		bad, worst, worstAt := 0, 0, -1
+		const perEntry, total = 3, 8 // ±1 per channel; a handful of rounding boundaries in all
+		bad, worst, worstAt, sum := 0, 0, -1, 0
 		for i := 0; i < PaletteSize; i++ {
 			g := ntscGolden[i]
 			if uint8(i*2) != g.Code {
@@ -97,16 +112,24 @@ func TestNTSCPaletteMatchesTheMeasuredGolden(t *testing.T) {
 			}
 			got := side.p.Colors[i]
 			d := (got[0]-g.R)*(got[0]-g.R) + (got[1]-g.G)*(got[1]-g.G) + (got[2]-g.B)*(got[2]-g.B)
-			if d != 0 {
+			sum += d
+			if d > perEntry {
 				bad++
 				if d > worst {
 					worst, worstAt = d, i
 				}
 			}
 		}
+		if bad == 0 && sum > total {
+			t.Errorf("%s is within ±1 per channel everywhere, but %d rounding differences in total "+
+				"(budget %d). Individually invisible, collectively a signal: check whether "+
+				"colourgen's adjustment values have moved slightly rather than assuming a new "+
+				"platform", side.name, sum, total)
+		}
 		if bad != 0 {
 			g := ntscGolden[worstAt]
-			t.Errorf("%s disagrees with the measured golden on %d of %d codes; worst is $%02X "+
+			t.Errorf("%s disagrees with the measured golden by more than ±1 per channel on %d of "+
+				"%d codes; worst is $%02X "+
 				"(golden [%d %d %d], now %v, squared RGB distance %d). The renderer's colours have "+
 				"moved — most likely one of colourgen's six adjustment values, which nothing else "+
 				"here guards. Say what moved them and why before updating this table: the ceiling "+

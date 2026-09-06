@@ -6,6 +6,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the palette golden pinned a machine-specific float and turned CI red (2026-09-06)
+
+The golden added an hour earlier demanded exact equality and failed on CI: code `$0C` is
+`[255 255 254]` on the arm64 machine the table was taken on and `[255 255 255]` on CI's x86-64. One
+unit, in one channel, of one entry — the generator's RGB→YIQ→RGB round trip with a gamma lands
+either side of a rounding boundary depending on the platform's floating point.
+
+**This is the second time this repository has pinned a machine-specific float as if it were a
+constant.** The first was a palette *count* (126 on arm64, 127 on x86-64) and it held CI red twelve
+times. The lesson did not transfer because the first fix was written as "check the claim, not the
+number" and this looked like a different thing; it is the same thing.
+
+The comparison now allows **±1 per channel** on any entry (squared distance ≤ 3) and **8** in total
+across all 128 — a rounding boundary and nothing else, with the total budget catching a drift that
+is individually invisible but collectively real. It costs no sensitivity worth having, measured:
+the Saturation probe moves `$46` by a squared distance of **6,889**, and a **0.3%** change to
+Brightness (1.196 → 1.200) is still caught. Both probes were run against the tolerant version and
+both fail it; both were reverted.
+
 ### Fixed — a design rule with an implementation, a test, and no ROM that reaches it (2026-09-06)
 
 `design.ScrollScanlinesConstant` states the scrolling-background invariant: the total scanline count
