@@ -6,6 +6,34 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a technique page must state its PRICE, and the catalogue priced one resource out of four (2026-09-06)
+
+Measured over the 72 technique pages: **41 state a cycle count. Zero state a RAM cost in bytes.**
+One says *"Zero cycles, zero RAM"* in words, and it is the only sentence in the catalogue about
+what a technique costs in RAM — a boast with nothing to compare it against. Twenty-seven pages
+discuss RAM, and they discuss it as **a place to read a value from in order to prove something**,
+not as a budget something is spent from. The same word, two different objects.
+
+That matters because the archive says RAM is the resource that actually bends designs. Measured
+across 18,897 mailing-list messages by the distillation: **RAM 223 threads, cycles 115, ROM 107**.
+This catalogue prices cycles 41 times and RAM never, and the corpus talks about RAM roughly twice
+as often as cycles.
+
+`docs/techniques/README.md` now requires a page to state its price in every resource it spends —
+cycles per line, ROM bytes, RAM bytes, objects occupied — or to say explicitly that it spends none.
+Where the number depends on the author's data, give the formula. Not retro-fitted; new and edited
+pages carry it from here.
+
+**The structural finding behind it is the sharper one.** The two corpora differ in what their
+numbers are *about*: AtariAge reports **balances** ("12 free bytes of ROM space, and 30 bytes of
+RAM"), stella-list reports **prices** ("needs 12 bytes of RAM, but 3 of those can be temp
+storage"). A balance is a claim about one person's work-in-progress on one day and is false by the
+next commit; a price is a claim about a technique and stays checkable years later. That is the
+explanation for a ratio measured earlier and left unexplained — **97% of stella-list citations can
+be verified here against 1.8% of AtariAge ones**. It is not a difference in the quality of the two
+distillations. It is a difference in what kind of statement each corpus is full of. Found by the
+mailing-list distillation (helper-2); the page counts re-measured here.
+
 ### Added — `ram_budget`: the second rule with no caller, wired so it grades the ROM and not the claim (2026-09-06)
 
 `design.ScrollBackgroundFitsRAM` had **no non-test caller anywhere** — the second function found in

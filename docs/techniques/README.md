@@ -15,6 +15,36 @@ with confidence, from basics to advanced tricks.
    push; write up the technique here.
 6. **Promote (optional)** — a stable, reusable kernel/generator graduates to `pkg/` (like `pkg/playfield` / `pkg/sprite`).
 
+## Every page must state a PRICE, and until 2026-09-06 they only priced one resource
+
+Measured that day over the 72 pages here: **41 state a cycle count. Zero state a RAM cost in
+bytes.** One says *"Zero cycles, zero RAM"* in words (`two-line-kernel.md`), and it is the only
+sentence in the catalogue about what a technique costs in RAM — a boast with nothing to compare it
+against. Twenty-seven pages discuss RAM; they discuss it as a **place to read a value from in order
+to prove something**, not as a budget something is spent from.
+
+That is not a small omission, because the archive says RAM is the resource that actually bends
+designs. Measured across 18,897 mailing-list messages by the distillation: **RAM 223 threads,
+cycles 115, ROM 107** — RAM is talked about roughly twice as often as cycles, and this catalogue
+prices cycles 41 times and RAM never. Some of what that costs people:
+
+- *"that much RAM isn't worth sacrificing"* — a 6-digit score routine buying 13 spare cycles for a
+  net **45 bytes** 〔stella-list `199803/msg00196`–`00199`〕
+- *"I was that short of RAM, that I couldn't use a single block … So I could only use only every
+  2nd RAM space of that 12 bytes block … now you know why I sometimes got confused"* 〔`200108/msg00042`〕
+- *"not enough RAM to keep the bitmap around for more than one line of text at a time … I kept it
+  to 6 lines"* — a RAM limit becoming a number the player sees 〔`199709/msg00299`〕
+
+**So a technique page states its price in every resource it spends, or says explicitly that it
+spends none.** Cycles per line, ROM bytes, RAM bytes, and any object it occupies. Where the number
+depends on the author's data, give the formula: for a board or bitmap held in RAM it is
+`cells × bitsPerCell ÷ 8`, which the list confirms at bit widths 2, 3, 4 and 8 with "cell" meaning
+a board square, a well spot, a brick, a byte of a line and a sprite column in turn (see
+`pkg/design/pf.go`'s `ScrollBackgroundFitsRAM`, and `ram_budget` in a scenario, which checks a
+declared layout against what the program actually writes).
+
+The catalogue is not retro-fitted yet; new and edited pages carry the price from here on.
+
 ## Promoting out of a work (roms/) into here
 
 Written 2026-08-21, after doing it once and getting three of the five wrong on the way.
