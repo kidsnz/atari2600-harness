@@ -40,7 +40,7 @@ maintenance and the false confidence.
 | `check_tests.py` | a `TestXxx` with no failure path, or whose only failure path is its own setup | `ci` + `pre-push` | 0.10 s | **7** | 0 | 0 |
 | `check_provenance.py` | a technique/rule/`pkg/design` element with no source, or a citation that resolves nowhere | `ci` + `pre-push` | 0.12 s | **6** | 4 | 3 |
 | `check_memory.py` | a broken wiki-link, a missing/duplicate index line, an oversize file, a canonical rule file with no concrete evidence | `pre-push` only — reads ~/.claude/.../memory, which a CI checkout has not got | 0.07 s | **3** | many | 2 |
-| `check_traps.py` | emu-passes/hardware-fails patterns in kernels: unstable illegal opcodes, `NOP $00`, stack-zone variables, missing `CLD`, reads of write-only TIA registers, stores into ROM | `ci` + `pre-push` | 0.10 s | **0** | 3 | 0 |
+| `check_traps.py` | emu-passes/hardware-fails patterns in kernels: unstable illegal opcodes, `NOP $00`, stack-zone variables, missing `CLD`, reads of write-only TIA registers, stores into ROM | `ci` + `pre-push` | 0.10 s | **0 over 411 files** (was 0 over 31) | 3 | **113, all found and fixed 2026-09-05 the first time it was aimed at the works** |
 
 ### `check_instruments.py` — 10 catches, the highest yield per line here
 
@@ -129,7 +129,7 @@ source was one line in an archived STATUS file. Wired into the pre-push hook 202
 its correct home — CI has no `~/.claude` tree, so the gate skips there and would have proved
 nothing.
 
-### `check_traps.py` — 0 catches, kept anyway, and the reason is stated
+### `check_traps.py` — the zero was a statement about where it had been pointed
 
 Added `d7f1abc`, extended twice (`00f2280`, `15d8375`). **It has never failed on a defect.** Every
 measurement it has ever reported was a clean corpus: zero hits across 31 technique ROMs at
@@ -148,6 +148,49 @@ Kept, on three grounds, none of which is "it might catch something someday":
    value is unmeasured, not that it is proven.
 
 If it is ever cut, cut it on ground 3 being judged not worth 0.10 s, and say so.
+
+**2026-09-05 — the zero meant something else than it read.** Everything above is about 31 files.
+Called with no arguments — which is how CI (`ci.yml:79`) and the pre-push hook both call it — the
+gate globbed `roms/techniques/*.asm` and nothing else, so **the author's own works were checked by
+nothing**: 121 `.asm` in the first work, 2 in the second, 4 more works' worth beside them. The
+docstring said the quiet part out loud without anyone hearing it: *"Zero false positives is the top
+priority (the existing roms/techniques are all clean)"* — the gate was validated on the set it was
+pointed at, and never pointed anywhere else.
+
+**This is the second occurrence of one accident, and the first is written down.** `roms/allworks_test.go`
+opens with it: *"Until 2026-08-15 nothing ran the scenarios in this repo … Two directories named
+'roms' is the whole of it: the deliverables sat in the one nobody walked … Discovery is a WALK, not
+a list."* That fix has since carried 47 scenarios to 151 with no further edit. This gate had the
+same shape — `glob(os.path.join(HARNESS, "roms", "techniques", "*.asm"))` **is** the list — and
+takes the same cure.
+
+Aimed at the works, it produced **113 findings and every one was a false positive**, in three
+families, none of which could occur in `roms/techniques/`:
+
+| family | count | what it really was |
+|---|---|---|
+| the line was lower-cased before the register-name match | **112** | `lda pf1` — a RAM variable, `pf1 = MUSZP+7` in the music driver — read as `lda PF1` |
+| `NAME = $FC` read as a variable in the stack zone | ~16 | `COLM1 = $FC ; the gold electron` is a **colour**; a value is used as `#COLM1`, a variable as `sta COLM1` |
+| "no CLD" applied to a file that is not a program | 6, then 35 more once the walk reached `src/art/` | includes: data-only tail files carrying `org $FFFC` with zero instructions, and generated kernel bodies with instructions and no vector |
+
+All three are fixed, each with a counter-bait in `--selftest` that must stay silent, and the
+selftest now has both halves: eleven detectors that must fire on the bait, and four clean samples
+that must not. Six mutations — including reverting each fix and silencing rule 3 — are caught.
+**The gate now walks 411 `.asm` files and the tree is clean.** That is a different sentence from
+the one at the top of this entry: "0 catches" has become "0, and we looked".
+
+**Where the coverage actually lands.** Both call sites pass no arguments, so both get the walk, but
+they see different trees. CI clones only this repository, so `../roms` is absent there and the run
+covers the 31 technique ROMs and says so in a note — a CI green is still a statement about 31 files.
+The **pre-push hook is where the works are covered**: `core.hooksPath` is set in this repository
+(measured), `scripts/git-hooks/pre-push:94` calls the gate bare, and the sibling `roms/` is on disk,
+so every push of `harness` now checks all 411. The `roms` repository has a `pre-commit` and no
+pre-push of its own, so a push there runs nothing — pushing the instrument is what checks the works,
+which is backwards but is the coverage that exists.
+
+Found by the mailing-list distillation (helper-2), who aimed the gate at the works, opened all 113
+findings, found the 2026-08-15 precedent, and measured the repair order. Re-measured here before
+each change.
 
 ## Reading this table
 

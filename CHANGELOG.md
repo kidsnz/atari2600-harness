@@ -6,6 +6,55 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the trap gate had never been pointed at the works; it checked 31 files, now 411 (2026-09-05)
+
+`check_traps.py` globbed `roms/techniques/*.asm` when called with no arguments, which is how both
+CI and the pre-push hook call it. The author's own works — 121 `.asm` in the first, 2 in the second,
+more beside them — were checked by **nothing**. `docs/gate-ledger.md` recorded the gate as "0
+catches, kept anyway"; the zero was a statement about where it had been pointed, and the docstring
+said so without anyone hearing it: *"Zero false positives is the top priority (the existing
+roms/techniques are all clean)."*
+
+**Second occurrence of one accident, and the first is written down.** `roms/allworks_test.go`:
+*"Until 2026-08-15 nothing ran the scenarios in this repo … Two directories named 'roms' is the
+whole of it … Discovery is a WALK, not a list."* That fix carried 47 scenarios to 151 with no
+further edit. Same shape, same cure: discovery is now a walk, tolerant of the sibling repository
+being absent (CI clones only this one, and says so) and refusing to pass when it finds nothing at
+all — a gate that looks at nothing prints the same OK as a gate that looks at everything.
+
+Aimed at the works it produced **113 findings, all false positives**, in three families that
+`roms/techniques/` structurally cannot contain:
+
+- **112**: the line was lower-cased before the register-name match, so `lda pf1` — a RAM variable,
+  `pf1 = MUSZP+7` in the music driver — read as `lda PF1`. Measured before fixing: in this whole
+  tree register names are written upper case (WSYNC 15438, GRP0 10261, PF1 1399) and the only
+  lower-case register-shaped names are that one work's `pf0`/`pf1`/`pf2`.
+- **~16**: `NAME = $FC` read as a variable in the stack-collision zone. `COLM1 = $FC ; the gold
+  electron` is a **colour**. A value is used as `#COLM1`, a variable as `sta COLM1`; the rule now
+  looks at how the symbol is used.
+- **6, then 35 more once the walk reached `src/art/`**: "no CLD" applied to files that are not
+  programs. Both halves of the correct test were measured and each alone was wrong — data-only
+  tail includes carry `org $FFFC` with zero instructions, and generated kernel bodies have
+  instructions and no vector. The rule now needs both, which is what "this file is a whole
+  program" means; 266 files define the vector, 262 have CLD, and the four that do not are exactly
+  the vector-only includes.
+
+**The selftest gained its missing half.** It had eleven detectors that must fire on bait and
+nothing that must stay silent — validation against a curated corpus proves a lint does not miss,
+never that it does not shout. Four clean samples now must produce nothing, and six mutations are
+caught, including silencing a rule rather than breaking it.
+
+One guard was added and removed the same day. `pushes` gated the stack-zone rule on the file
+containing a JSR/PHA/PHP; mutation-testing showed it was the one guard with **no** counter-bait,
+and it is unsound anyway — these works are built from includes, so the file that declares a
+variable and the file that pushes are routinely different. The usage test alone takes the tree to
+zero, so the unsound guard was not carrying its weight.
+
+The tree is clean: **411 `.asm` files, zero findings.** That is a different sentence from "0
+catches" — it is "0, and we looked". Found by the mailing-list distillation (helper-2), who aimed
+the gate at the works, opened all 113 findings and found the 2026-08-15 precedent; every count
+re-measured here.
+
 ### Added — "The configuration surface": the population of engine defaults, closed and named (2026-09-05)
 
 Fourteen rows in `known-traps.md` for the family the repository kept finding one member at a time:
