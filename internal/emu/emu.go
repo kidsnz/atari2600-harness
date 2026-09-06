@@ -2240,6 +2240,39 @@ func (e *Emu) LastMemWrite() (addr uint16, ok bool) {
 	return e.effectiveAddr()
 }
 
+// LastMemRead は直前の命令がメモリを**読んだ**なら、その実効アドレスを返す。
+//
+// ★LastMemWrite の鏡。★★静的な may-READ 集合を実測と突き合わせるための観測点で、
+// 2026-09-06 まで存在しなかった——`cyclebound.DefUse` が読みを報告していなかったので、
+// 突き合わせる相手も要らなかった。★★★読みの側を報告に出した以上、その健全性も
+// 書き側と同じ形で掃引できなければ「報告しているだけ」になる。
+//
+// RMW（INC/DEC/シフトのメモリ形）は読みでも書きでもあるので、双方が真を返す。
+func (e *Emu) LastMemRead() (addr uint16, ok bool) {
+	lr := e.VCS.CPU.LastResult
+	d := lr.Defn
+	if d == nil {
+		return 0, false
+	}
+	reads := d.Effect == instructions.Read
+	if !reads {
+		switch d.Operator {
+		case instructions.INC, instructions.DEC, instructions.ASL, instructions.LSR,
+			instructions.ROL, instructions.ROR:
+			reads = d.AddressingMode != instructions.Implied
+		}
+	}
+	if !reads {
+		return 0, false
+	}
+	// ★即値と相対はメモリを触らない。★★Implied も（push は書きであって読みではない）。
+	switch d.AddressingMode {
+	case instructions.Immediate, instructions.Relative, instructions.Implied:
+		return 0, false
+	}
+	return e.effectiveAddr()
+}
+
 // ObjectX は object の現在の水平位置（HmovedPixel・可視 0..159）を返す。obj は
 // "P0"/"P1"/"M0"/"M1"/"BL"。HMOVE 適用後の実描画位置（HMOVE 未使用なら ResetPixel と同値）。
 func (e *Emu) ObjectX(obj string) (int, bool) {

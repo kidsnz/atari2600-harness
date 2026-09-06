@@ -40,6 +40,82 @@ func addrFacts(r *DefUseReport, addr string) []AddrFacts {
 // it. The check is only meaningful when nothing was left unbounded, since an
 // unbounded writer trivially covers everything; the report says so, and so does
 // this test.
+// TestDefUseMayReadContainsObservedReads is the read half of the soundness claim, added the day
+// the read side of the report was.
+//
+// ★A report that names addresses is a claim, and a claim with no way to be wrong is decoration.
+// `MayWrite` has had this sweep since it existed; `MayRead` was exposed on 2026-09-06 and would
+// otherwise have shipped as an unfalsifiable list. Same shape, same fixtures, same per-instruction
+// sharpness: the address THIS instruction actually read has to be in the set THIS instruction was
+// predicted to reach.
+//
+// ★★What it does NOT establish, stated because the next person will want it: this proves the read
+// SET is sound, not that reads and writes are correctly ORDERED. "These two variables may share a
+// byte" — the overlay condition the list names — needs the second, and this report does not answer
+// it. See the comment on `MayRead`.
+func TestDefUseMayReadContainsObservedReads(t *testing.T) {
+	// ★The fixtures must READ memory. litmus_indexed_tia is a write-only ROM — indexed TIA
+	// STORES — and the premise guard below caught it on the first run: a sweep over a ROM that
+	// reads nothing passes while checking nothing, which is the failure this guard exists for.
+	for _, asm := range []string{
+		"../../roms/litmus/motion_glide.asm",
+		"../../roms/litmus/litmus_ramstrip.asm",
+		"../../roms/techniques/vertical_pos.asm",
+	} {
+		t.Run(shortName(asm), func(t *testing.T) {
+			r := defUseOf(t, asm)
+			if !r.Converged {
+				t.Fatalf("%s: the fixpoint did not converge, so the may-set is not a claim", asm)
+			}
+			observedByPC, err := observedReadsByPC(asm, 8)
+			if err != nil {
+				t.Skipf("could not run %s: %v", asm, err)
+			}
+			total := 0
+			for _, addrs := range observedByPC {
+				total += len(addrs)
+			}
+			if total == 0 {
+				t.Fatal("premise broken: the ROM read no memory in 8 frames, so this sweep " +
+					"would pass without checking anything")
+			}
+
+			sharp, sharpOK := 0, 0
+			for pc, addrs := range observedByPC {
+				acc, known := r.Reads[hexAddr(pc)]
+				if !known {
+					t.Errorf("PC $%04X read memory but was never decoded — the CFG did not reach "+
+						"it (bank switch or computed dispatch)", pc)
+					continue
+				}
+				if acc.Unbounded {
+					continue
+				}
+				in := map[uint16]bool{}
+				for _, x := range acc.Addrs {
+					in[x] = true
+				}
+				for a := range addrs {
+					sharp++
+					if in[a] {
+						sharpOK++
+						continue
+					}
+					t.Errorf("PC $%04X read $%04X, which is not in its predicted set %v — the "+
+						"may-read set is UNSOUND, and an unsound may-set is worse than none",
+						pc, a, acc.Addrs)
+				}
+			}
+			if sharp == 0 {
+				t.Error("every observed read came from an instruction with an unbounded target, " +
+					"so nothing sharp was graded and this sweep is vacuous on this ROM")
+			}
+			t.Logf("%d of %d observed (PC, address) read pairs were contained in their "+
+				"instruction's predicted set", sharpOK, sharp)
+		})
+	}
+}
+
 func TestDefUseMayWriteContainsObservedWrites(t *testing.T) {
 	realChecks := 0
 	for _, asm := range []string{
@@ -224,6 +300,37 @@ func shortName(p string) string {
 // graded against — the emulator's behaviour, not another analysis. Keeping the
 // PC is what makes the check sharp: without it the comparison collapses to
 // "the program wrote somewhere in memory", which nothing can fail.
+// observedReadsByPC is the mirror of observedWritesByPC, added 2026-09-06 with the read side of
+// the report. Without it, `MayRead` would be a claim with no way to be wrong.
+func observedReadsByPC(asmPath string, frames int) (map[uint16]map[uint16]bool, error) {
+	bin := build.BinPathFor(asmPath)
+	if out, err := build.Assemble(asmPath, bin); err != nil {
+		return nil, fmt.Errorf("assemble: %s", out)
+	}
+	e, err := emu.New("NTSC")
+	if err != nil {
+		return nil, err
+	}
+	if err := e.LoadROM(bin); err != nil {
+		return nil, err
+	}
+	out := map[uint16]map[uint16]bool{}
+	start := e.Coords().Frame
+	for i := 0; i < 4_000_000 && e.Coords().Frame-start < frames; i++ {
+		pc := e.VCS.CPU.PC.Value()
+		if err := e.StepInstruction(); err != nil {
+			return nil, err
+		}
+		if a, ok := e.LastMemRead(); ok {
+			if out[pc] == nil {
+				out[pc] = map[uint16]bool{}
+			}
+			out[pc][a] = true
+		}
+	}
+	return out, nil
+}
+
 func observedWritesByPC(asmPath string, frames int) (map[uint16]map[uint16]bool, error) {
 	bin := build.BinPathFor(asmPath)
 	if out, err := build.Assemble(asmPath, bin); err != nil {

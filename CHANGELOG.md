@@ -6,6 +6,41 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the read side of `DefUse`, and a comment that named a test nothing answers to (2026-09-06)
+
+The list has a name for sharing one RAM byte between two variables — an **overlay** — and a stated
+safety condition. Andrew Davie, 2001: *"The overlay system took variables from a severe problem in
+Qb to one of the lesser things I had to worry about"* 〔stella-list `200102/msg00107`〕; Thomas
+Jentzsch on what happens when RAM is tighter still: *"I was that short of RAM, that I couldn't use a
+single block … So I could only use only every 2nd RAM space of that 12 bytes block … I also had to
+share variables bitwise … now you know why I sometimes got confused"* 〔`200108/msg00042`〕. The
+condition is that two variables may share a byte only if they are never live at the same time —
+which this repository already states in `integration-density-playbook.md` and nothing checks.
+
+`DefUse` looked like the instrument for it and **reported only writes**. Measured: reads are already
+classified and their addresses already resolved by the same `accessOf` machinery (`UninitReads` is
+built from them), so exposing them costs nothing. `MayRead`, `Reads` and `UnboundedReaders` are now
+in the report, mirroring the write side.
+
+**That is a prerequisite and not the check, and the comment on `MayRead` says so.** Liveness is
+path-sensitive — "A's last read comes before B's first write, on every path" is a dataflow question
+over the CFG, and this report answers set questions. **A gate built on the sets alone would pass two
+variables that share a byte and clobber each other**, which is worse than no gate. Found by the
+mailing-list distillation (helper-3), whose own open question — does `DefUse` carry the read side? —
+is what got measured.
+
+Two things came out of doing it. `Emu.LastMemRead` had no counterpart to `LastMemWrite`, so the new
+report would have shipped as **an unfalsifiable list**; it exists now, and
+`TestDefUseMayReadContainsObservedReads` sweeps the same fixtures with the same per-instruction
+sharpness as the write side. Its premise guard earned its place on the first run: one of the
+inherited fixtures, `litmus_indexed_tia`, is a write-only ROM and reads no memory at all, so the
+sweep would have passed while checking nothing.
+
+**And `defuse.go`'s own soundness claim pointed at a test that has never existed.** It said *"See
+TestDefUseContainsObserved"*; the real name is `TestDefUseMayWriteContainsObservedWrites`. A comment
+that names a check by a name nothing answers to reads as a guarantee and resolves nowhere — the same
+failure as citing a file by line number. Corrected, and it now names both halves.
+
 ### Added — `flicker_area`: how much of the picture is not the same thing two frames running (2026-09-06)
 
 The archive judges flicker by **area**, and nothing here could measure area: *"an area as large as

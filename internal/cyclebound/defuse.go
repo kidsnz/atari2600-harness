@@ -33,8 +33,16 @@ import (
 //     exact. Being wrong here means claiming a cell is initialised when it might
 //     not be, which costs correctness — so must-write stays deliberately timid.
 //
-// The soundness claim is checkable and is checked: every write a real execution
-// performs has to appear in the static may-set. See TestDefUseContainsObserved.
+// The soundness claim is checkable and is checked, on both sides: every write a
+// real execution performs has to appear in the static may-write set, and every
+// read in the may-read set. See TestDefUseMayWriteContainsObservedWrites and
+// TestDefUseMayReadContainsObservedReads.
+//
+// ★The name in this comment was TestDefUseContainsObserved until 2026-09-06 and
+// no such test has ever existed — the real one is TestDefUseMayWriteContains-
+// ObservedWrites. A comment that names a check by a name nothing answers to is
+// the same failure as citing a file by line number: it reads as a guarantee and
+// resolves nowhere.
 
 // AccessKind is how an instruction touches memory.
 type AccessKind uint8
@@ -222,6 +230,35 @@ type DefUseReport struct {
 	// MayWrite is every address any reachable instruction might write, ascending.
 	// This is the set a real execution's writes must be contained in.
 	MayWrite []string `json:"may_write"`
+
+	// MayRead is every address any reachable instruction might read, ascending. It is the
+	// read-side twin of MayWrite and exists for a question this report could not answer:
+	// **may two RAM bytes share one address?** The list has a name for the technique — an
+	// "overlay" — and a stated safety condition: two variables may share a byte only if they
+	// are never live at the same time. Andrew Davie in 2001: *"The overlay system took
+	// variables from a severe problem in Qb to one of the lesser things I had to worry about"*
+	// 〔stella-list `200102/msg00107`〕; Thomas Jentzsch the same year on what happens when RAM
+	// is tighter still: *"I was that short of RAM, that I couldn't use a single block … So I
+	// could only use only every 2nd RAM space of that 12 bytes block … I also had to share
+	// variables bitwise … now you know why I sometimes got confused"* 〔`200108/msg00042`〕.
+	//
+	// ★Reporting the read set is a PREREQUISITE for checking that condition, and not the
+	// check. Liveness is path-sensitive — "A's last read comes before B's first write, on every
+	// path" is a dataflow question over the CFG, and this report answers set questions. Measured
+	// 2026-09-06: reads are already classified and their addresses already resolved by the same
+	// `accessOf` machinery that finds writes (`UninitReads` is built from them), so exposing them
+	// costs nothing; the ordering is the part that does not exist yet. A gate built on the sets
+	// alone would pass two variables that share a byte and clobber each other, which is worse
+	// than no gate. Found by the mailing-list distillation (helper-3).
+	MayRead []string `json:"may_read,omitempty"`
+
+	// Reads is every reachable read/modify access with its resolved target set, keyed by PC —
+	// the same shape as Writes.
+	Reads map[string]Access `json:"reads,omitempty"`
+
+	// UnboundedReaders are the PCs whose read target could not be pinned down. While any exist,
+	// MayRead is not complete, for the same reason UnboundedWriters spoils MayWrite.
+	UnboundedReaders []string `json:"unbounded_readers,omitempty"`
 
 	// UnboundedWriters are the PCs whose write target could not be pinned down.
 	// While any of these exist, MayWrite cannot be treated as complete, and the
@@ -605,6 +642,27 @@ func DefUse(asmPath string, budget int) (*DefUseReport, error) {
 	})
 	rep.MayWrite = hexAddrs(sortedAddrs(mayW))
 	rep.UnboundedWriters = hexAddrs(sortedAddrs(unbounded))
+
+	// The read side, collected the same way. See MayRead for why it is here and what it is not.
+	mayR := map[uint16]bool{}
+	unboundedR := map[uint16]bool{}
+	rep.Reads = map[string]Access{}
+	for a, in := range instrs {
+		acc, ok := accessOf(in, states[a])
+		if !ok || (acc.Kind != AccessRead && acc.Kind != AccessModify) {
+			continue
+		}
+		rep.Reads[hexAddr(a.addr)] = acc
+		if acc.Unbounded {
+			unboundedR[a.addr] = true
+			continue
+		}
+		for _, t := range acc.Addrs {
+			mayR[t] = true
+		}
+	}
+	rep.MayRead = hexAddrs(sortedAddrs(mayR))
+	rep.UnboundedReaders = hexAddrs(sortedAddrs(unboundedR))
 
 	// Whole-program must-write from the reset vector. Computed but not reported —
 	// see UninitReads for the measured reason.
