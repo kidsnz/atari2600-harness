@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — an elision hid the strongest evidence the row had (2026-09-06)
+
+`known-traps.md`'s row on emulators agreeing with each other and disagreeing with the machine quoted
+a 2002 post and cut it with `[…]` after three emulator names. The cut passage is the sharpest thing
+in the thread:
+
+> *"only z26 displays Kool-Aid Man correctly. However z26 cheats!! It's not actually doing the
+> emulation it's just detecting the presence of the Kool-Aid Man rom (presumably through checksum
+> because changing even 1 byte in Kool-Aid Man makes z26 display incorrectly as per the other emus)
+> and then compensates to the undocumented bahaviour."*
+> 〔`200211/msg00098`, Christopher Tumber, 2002-11-15〕
+
+**A fourth way for an emulator to be wrong**, and the one a majority vote handles worst: a right
+answer with no model behind it is indistinguishable from a right answer at the moment you take the
+vote, and it stops being right the moment your ROM differs by a byte. The author proved it by
+changing one byte. The `[…]` read as though the omitted words were more emulator names.
+
+Two other things fall out. The passage is **evidence for the row's own claim** rather than
+background — "agreement means a shared model, not a right one" is exactly what a ROM-recognising
+emulator demonstrates. And the same person fixed Kool-Aid Man's own trap-#67 violation **four
+messages later** 〔`200211/msg00102`〕: same author, same month, same ROM, two findings that this
+repository holds in two different places and had not connected.
+
+Recovered by the mailing-list distillation (helper-2), re-read from the archive here; the quotation
+is verbatim to the author's own spelling of *"bahaviour"*.
+
 ### Fixed — the Stella capture queue was full and blocking the push; drained all eight (2026-09-06)
 
 `CAPTURE_QUEUE` holds ROMs added mid-session that have no Stella cross-check yet, and the oracle
