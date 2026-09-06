@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — two design histories, and a scope our instrument cannot measure (2026-09-05)
+
+**The HMOVE comb is an oversight, not a specification**, and that is why the cycle-73/74 workaround
+is revision-dependent. Glenn Saunders in 1998: *"The reason the 2600 positions objects as it does is
+because **poly-counter logic is cheaper to implement than digital logic**. Believe me, they did
+weigh the alternatives … they developed a software conversion routine and were anticipating that
+this routine, albeit CPU-hungry, **would only be necessary once at the top of the frame for each
+sprite (hence not knowing about the HMOVE comb bug)**"* 〔stella-list `199804/msg00146`〕. A second
+voice in the same thread: *"Refreshing to see someone refer to the HMOVE effect as a **bug** instead
+of a **feature**. My guess is that it was Activision who turned it into a feature. Too bad really,
+**it might have gotten fixed**."* 〔`199804/msg00151`, John Saeger〕. The repository already
+*measures* the consequence — `LostMOTCK` moves `litmus_hmove_mid` and `litmus_hmove_side` and
+nothing else in 145 litmus ROMs — and now records why that is a reason rather than a coincidence:
+the comb lives in behaviour nobody specified.
+
+**`restrobe-copies.md` gains a scope it did not have.** Its copy counts are measured and CI-locked,
+and the list ran the controlled experiment showing they are not universal — Eckhard Stolberg built
+`2or3.bin` for exactly this question in 1999 and reported *"When I try this on my classic VCS, I see
+three sprites … **When I try an Atari JR I see two sprites**"*, then found *"different results for
+both (d+3) positioning and (d-1) positioning between classic VCS and Atari JR"* 〔`199901/msg00099`〕.
+
+**And this one our instrument cannot show.** `internal/emu/tiarevision_test.go` already renders all
+145 litmus ROMs under each of the eight TIA-revision flags and finds exactly ten that move;
+`litmus_restrobe` is not among them. So the classic-versus-JR split is not a flag left unset — it is
+a difference this engine does not model, kind **B** in the configuration surface. The technique page
+now says to read its numbers as "this many copies on the TIA Gopher2600 implements".
+
+Both recovered verbatim from the raw archive by the mailing-list distillation (helper-2 and
+helper-1); the ten-of-145 measurement is this repository's own and predates them.
+
 ### Fixed — "the four undriven addresses return bus residue" was wrong; two pins are driven on every TIA read (2026-09-05)
 
 `check_traps.py`'s message for a read of a write-only TIA register said the four addresses nothing
