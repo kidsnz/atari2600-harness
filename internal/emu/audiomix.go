@@ -41,6 +41,37 @@ type mixDigest struct {
 	buf []byte
 }
 
+// ★`mix.Mono` has a SILENT failure mode, and this note is here because someone will read the
+// engine's comment and take it at face value. Past a channel sum of `0x1e` the engine returns
+// **zero — silence, not clipping**:
+//
+//	// boundary check. in very rare instances, the sum will be more than 0x1e so we
+//	// check and return zero if it is
+//	// … it is acceptable to return zero and not worry about the root cause too much
+//	// update: this should no longer happen because the average channel volume is
+//	// now masked to a maximum of four bits (see audio.Step() function)
+//
+// ★★A guard was written here on 2026-09-06 and REMOVED the same hour, because it could not be
+// made to fire. Three probes, each applied to the vendored engine, measured and reverted:
+// widening `audio.Step()`'s `& 0x0f` to `& 0x1f`; widening the register write's
+// `Volume = data.Value & 0x0f` likewise; and both at once, with a ROM writing `AUDV = $1F` to
+// both channels. **The sum reaching this function stayed inside `0x1e` every time.** So there is
+// a third cap on the path between the register and the mixer that this session did not locate,
+// and the engine's comment credits a mask that is at best one of several.
+//
+// ★★★What that means for anyone extending this: the branch is real, its symptom is the sound
+// going AWAY, and a digest of silence is a perfectly stable digest — but no ROM available here
+// can reach it, so a guard would be a branch nothing walks. Find the third cap first; then the
+// guard has a witness and is worth having.
+//
+// Found by the mailing-list distillation (helper-2) while chasing a 2004 report of a two-voice
+// tune that was *"brilliant and crystal clear"* on an emulator and *"horribly distorted"* on real
+// hardware, curable by *"turning the volume down"* to 10 and 8 〔stella-list `200405/msg00275`,
+// cybergoth〕. That thread also settles its own question: the PAL-mono hypothesis was disproved
+// two days later — *"I did your test … on a PAL and a NTSC 2600 Jr. I got the same results on
+// both consoles"* 〔`msg00286`, Eckhard Stolberg〕 — and the word offered for the symptom was
+// *"clipping"* 〔`msg00281`, B. Watson〕.
+
 func (d *mixDigest) SetAudio(sig []signal.AudioSignalAttributes) error {
 	for _, s := range sig {
 		v := mix.Mono(s.AudioChannel0, s.AudioChannel1)

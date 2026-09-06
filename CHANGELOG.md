@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `mix.Mono` fails SILENTLY, and a guard for it was written and removed the same hour (2026-09-06)
+
+Past a channel sum of `0x1e` the engine's mixer returns **zero — silence, not clipping** — and its
+own comment says *"it is acceptable to return zero and not worry about the root cause too much …
+update: this should no longer happen because the average channel volume is now masked to a maximum
+of four bits (see audio.Step() function)."* Nothing checked that claim, and the symptom of it being
+wrong would be the sound going away, which no digest can distinguish from a quiet passage.
+
+A guard was added to `mixDigest.SetAudio` and **removed the same hour, because it could not be made
+to fire.** Three probes, each applied to the vendored engine, measured and reverted: widening
+`audio.Step()`'s `& 0x0f` to `& 0x1f`; widening the register write's `Volume = data.Value & 0x0f`
+likewise; and both at once, with a ROM writing `AUDV = $1F` to both channels. The sum reaching the
+mixer stayed inside `0x1e` every time. **So there is a third cap between the register and the mixer
+that this session did not find, and the engine's comment credits a mask that is at best one of
+several.**
+
+Landing a branch nothing can walk is the exact shape this repository spent the day removing, so what
+is left is a comment: the branch is real, its symptom is silence, no ROM available here reaches it,
+and the next person should find the third cap before writing the guard — then it has a witness.
+
+The thread that sent someone to read the mixer settles its own question, and that is recorded too: a
+2004 report of a two-voice tune *"brilliant and crystal clear"* on an emulator and *"horribly
+distorted"* on hardware, curable by turning the volume down to 10 and 8 〔`200405/msg00275`〕; the
+PAL-mono hypothesis disproved two days later — *"I did your test … on a PAL and a NTSC 2600 Jr. I got
+the same results on both consoles"* 〔`msg00286`〕; and the word for the symptom supplied as
+*"clipping"* 〔`msg00281`〕. Recovered by the mailing-list distillation (helper-2).
+
 ### Added — a delay table with single-cycle resolution, and a 1998 question measured (2026-09-06)
 
 Spending an ODD number of cycles is awkward here: `ds N,$EA` makes only even delays and DASM's
