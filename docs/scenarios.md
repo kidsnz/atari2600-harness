@@ -56,6 +56,15 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
   "checks": {                           // whole-run properties (measurements with side effects; evaluated after the timeline)
     "ntsc_frame_lines": 262,            // StepFrame() == 262 (ONE frame)
     "frame_lines_stable": {"frames": 130, "lines": 262},  // every frame in the window has the SAME count (∀ sibling; `lines` optional)
+    "ram_budget": {"board": 15, "buffer": 60, "delta": 8, "stack": 6},
+                                        // the declared RAM layout fits in 128 bytes AND is no
+                                        // smaller than what the program actually writes (.asm only)
+    "max_flicker_area": 1500,           // pixels whose DRAWING OBJECT changes between two frames
+    "motion": {"object": "P0", "axis": "top", "frames": 40, "max_jerk_rms": 0.5},
+                                        // VV-4: how SMOOTH an object's motion is, over frames
+    "no_beam_race": {"object": "P0", "line_from": 40, "line_to": 90},
+                                        // AT-3: every pixel-data write for that object lands
+                                        // before the beam reaches it, on every line in the range
     "max_line_budget": 76,              // budget guard is never exceeded (equivalent to assert_line_budget)
     "golden_frame": true,              // D-3: compare the rendered frame-chain hash against <scenario>.golden
     "golden_audio": true,              // A-2: compare the audio-chain hash against <scenario>.audio.golden
@@ -102,6 +111,32 @@ reused as-is for regression). **Unknown fields are an error** (typos are not swa
 | `collisions.<pair>` (p0_p1, m0_p0, p0_pf, bl_pf …) | `ReadCollisions` |
 | `audio.ch0\|ch1.control\|freq\|volume` | `ReadAudio` |
 
+- **`motion`** = the smoothness of one object's movement, as `jerk_rms` over a window of frames
+  (`object` P0/P1/M0/M1/BL, `axis` `"top"` for the rendered vertical or `"x"`, plus `frames`,
+  `warmup` and a `y_top`/`y_bot` search window). A position that jumps rather than glides fails it.
+  Undocumented until 2026-09-06, when `check_wiring.py` started requiring every check in the schema
+  to be named here and found it.
+- **`no_beam_race`** = for one object over a range of scanlines, every write of its pixel data lands
+  **before the beam reaches it**, on every line. The author declares the object and the range
+  (`line_from`/`line_to`), which is what makes it sound: the tool checks a stated intention rather
+  than guessing one. Also found by that gate.
+- **`ram_budget`** = the declared RAM layout, checked twice. First the arithmetic
+  (`board + buffer + delta + stack ≤ 128`, via `design.ScrollBackgroundFitsRAM`), then the
+  declaration against **what the program actually writes** — `cyclebound.DefUse`'s static write set,
+  every address any reachable instruction might touch over all paths. Numbers an author writes into
+  a scenario are a claim about the program, and arithmetic on a claim grades the claim; the second
+  half is what makes it grade the ROM. Refuses to grade rather than under-report when a write target
+  cannot be pinned down, and says **SKIPPED** when `rom` is a `.bin` with no source. How to arrive at
+  `board`: cells × bits-per-cell ÷ 8 (see `pkg/design/pf.go`, which cites five worked examples from
+  the list at bit widths 2, 3, 4 and 8).
+- **`max_flicker_area`** = pixels whose **drawing object** (BG/PF/P0/P1/M0/M1/BL) differs between two
+  consecutive frames. Not a pixel diff: a colour register sweeping every frame contributes nothing,
+  and a static picture reads exactly **0**. Calibrated on the first work's 134 ROMs — the ten the
+  author named `*flick*` all read non-zero, 115 read zero, and the flickering variants sit between
+  2.6% and 8.0% of the picture. **It does not set a threshold**: the archive describes the limit in
+  words ("an area as large as an Arkanoid wall"), the quantity is a judgement about eyes, and this
+  check exists so the author can decide a ceiling once and have a machine keep it. It also does not
+  separate movement from blinking — a meter bar changing height reads as flicker.
 - **`frame_lines_stable`** = the ∀-over-frames sibling of `ntsc_frame_lines`. That check samples **one**
   frame and therefore certifies nothing about the next one; this one steps `frames` frames (continuing on the
   emulator the timeline drove) and requires every frame to report the same scanline count, optionally equal to

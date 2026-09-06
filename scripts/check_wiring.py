@@ -277,6 +277,47 @@ def tool_reachability():
     return out
 
 
+def scenario_check_docs():
+    """Every scenario check must be named in docs/scenarios.md.
+
+    ★2026-09-06. Two checks were added that day — `ram_budget` and `max_flicker_area` — and
+    NEITHER appeared in any document. Measured at the time: the checks that already existed were
+    named in four to eight places; the two new ones, in zero. An author reading `docs/scenarios.md`
+    to see what a scenario can assert would not have learned they existed.
+
+    This is a repeat. The 2026-08-15 sweep found six commands that built and ran and were not in
+    `CLAUDE.md` — "あるのに思いつかない", present but unthinkable — and added the rule below for
+    `cmd/`. The same failure came back one level down, in the scenario schema, because the rule was
+    written for commands rather than for the general shape: a capability nobody can find is a
+    capability nobody has. So this checks the schema too.
+
+    The source of truth is the `json:"..."` tags on the `Checks` struct, which is what a scenario
+    file is actually parsed against — not a hand-kept list that can drift from it.
+    """
+    src = os.path.join(HARNESS, "internal", "scenario", "scenario.go")
+    doc = os.path.join(HARNESS, "docs", "scenarios.md")
+    if not (os.path.isfile(src) and os.path.isfile(doc)):
+        return ["internal/scenario/scenario.go or docs/scenarios.md is missing, so the scenario "
+                "schema could not be checked against its documentation"]
+    with open(src, encoding="utf-8") as f:
+        text = f.read()
+    m = re.search(r"type Checks struct \{(.*?)\n\}", text, re.S)
+    if not m:
+        return ["could not find `type Checks struct` in internal/scenario/scenario.go — this gate "
+                "is looking at the wrong thing and would pass while checking nothing"]
+    names = re.findall(r'json:"([a-z0-9_]+)', m.group(1))
+    if not names:
+        return ["`type Checks struct` yielded no json tags, so nothing was checked"]
+    with open(doc, encoding="utf-8") as f:
+        docs = f.read()
+    missing = [n for n in names if n not in docs]
+    if missing:
+        return ["scenario check `%s` is in the schema and named nowhere in docs/scenarios.md — "
+                "an author reading the format reference cannot discover it" % n for n in missing]
+    print("scenario schema OK — all %d checks are named in docs/scenarios.md." % len(names))
+    return []
+
+
 def main():
     entry_text = ""
     for e in ENTRYPOINTS:
@@ -349,6 +390,15 @@ def main():
         sys.exit(1)
 
     gate_problems = gate_wiring()
+    sc_problems = scenario_check_docs()
+    if sc_problems:
+        print("SCENARIO SCHEMA — a check exists that no document names:")
+        for p in sc_problems:
+            print("  ✗", p)
+        print("\nThe 2026-08-15 sweep found six commands nobody could think of because CLAUDE.md")
+        print("did not list them. This is the same defect one level down, in the scenario schema.")
+        sys.exit(1)
+
     if gate_problems:
         print("GATE LEDGER — docs/gate-ledger.md does not match what actually runs:")
         for p in gate_problems:

@@ -36,7 +36,7 @@ maintenance and the false confidence.
 | Gate | Forbids | Runs in | Cost | Catches | Compliance | Self-inflicted |
 |---|---|---|---|---|---|---|
 | `check_instruments.py` | a sample→number function with no known-answer calibration; and, since 2026-08-13, one calibrated in a single state | `ci` + `pre-push` | 0.19 s | **10** | 0 | 0 |
-| `check_wiring.py` | an orphaned doc, a litmus ROM nothing runs, a `verified-coverage.md` row whose ROM is absent or unrun, a gate with no ledger row, **an internal package nothing imports, a command CLAUDE.md never names** | `ci` + `pre-push` | 1.57 s | **3** | many | 1 |
+| `check_wiring.py` | an orphaned doc, a litmus ROM nothing runs, ★a scenario check no document names, a `verified-coverage.md` row whose ROM is absent or unrun, a gate with no ledger row, **an internal package nothing imports, a command CLAUDE.md never names** | `ci` + `pre-push` | 1.57 s | **3** | many | 1 |
 | `check_tests.py` | a `TestXxx` with no failure path, or whose only failure path is its own setup | `ci` + `pre-push` | 0.10 s | **7** | 0 | 0 |
 | `check_provenance.py` | a technique/rule/`pkg/design` element with no source, or a citation that resolves nowhere | `ci` + `pre-push` | 0.12 s | **6** | 4 | 3 |
 | `check_memory.py` | a broken wiki-link, a missing/duplicate index line, an oversize file, a canonical rule file with no concrete evidence | `pre-push` only — reads ~/.claude/.../memory, which a CI checkout has not got | 0.07 s | **3** | many | 2 |

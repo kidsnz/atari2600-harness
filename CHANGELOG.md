@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a scenario check nobody can find is a check nobody has; `check_wiring.py` now says so (2026-09-06)
+
+Two checks were added today — `ram_budget` and `max_flicker_area` — and **neither appeared in any
+document**. Measured: the checks that already existed were named in four to eight places; those two,
+in zero. An author reading `docs/scenarios.md` to see what a scenario can assert would not have
+learned they existed.
+
+**This is a repeat, and the earlier one is in this repository's own history.** The 2026-08-15 sweep
+found six commands that built and ran and were not in `CLAUDE.md` — present but unthinkable — and
+added a rule for `cmd/`. The same failure came back one level down, in the scenario schema, because
+the rule was written for commands rather than for the shape: **a capability nobody can find is a
+capability nobody has.**
+
+`check_wiring.py` now requires every `json:"..."` tag on the `Checks` struct — which is what a
+scenario file is actually parsed against, not a hand-kept list that can drift — to be named in
+`docs/scenarios.md`. **It caught two more on its first run**, both older than today: `motion` (how
+smooth an object's movement is, as `jerk_rms`) and `no_beam_race` (every pixel-data write for one
+object lands before the beam reaches it, over a range the author declares). Both are now documented.
+Sixteen checks, all named. Negative control: adding a field to the struct turns the gate red.
+
 ### Added — the catalogue's first RAM prices, and the obvious way to measure them is useless (2026-09-06)
 
 The rule landed earlier today says a technique page states its price in every resource it spends.
