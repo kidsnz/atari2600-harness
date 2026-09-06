@@ -196,6 +196,32 @@ def scan_text(asm):
                 errors.append((n, f"stores to ${a:04X}, which is cartridge ROM — the write is discarded. "
                                   f"If it is a bank-switch hotspot or a SuperChip write port, say so with "
                                   f"`; @rom-write-ok` so the intent is declared rather than guessed"))
+        # 6b) The SAME cartridge page, reached by an address the author never wrote.
+        #     ★An indexed store performs a PHANTOM READ before the real write, and the engine's own
+        #     comment says when: `hardware/cpu/cpu.go`, "phantom read (always happens for Write and
+        #     Modify)", at **`(base & 0xFF00) | (effective & 0x00FF)`** — the base's page with the
+        #     effective address's low byte. So `sta $1F00,X` reads `$1F00 | (eff & $FF)`, and if the
+        #     index puts `$F8` there that read lands on **`$1FF8`, an F8 bank-switch hotspot**.
+        #     ★★The upper half of that address comes from the BASE, so this is decidable without
+        #     resolving the index: a base in cartridge space means the phantom read is in cartridge
+        #     space too, and some index value reaches every offset in the page. The rule is therefore
+        #     conservative — it says "can", not "does" — and rule 6 above already provides the way to
+        #     declare intent.
+        #     ★★★Rule 6 catches the write the author WROTE. This catches the read the author did
+        #     not. Found by the AtariAge cross-check (helper-2) against stella-list's own report of
+        #     the same mechanism from the other side (Eckhard Stolberg on indexed writes crossing a
+        #     page), which is the first place both corpora carried one fact.
+        m = re.search(r"\b(sta|stx|sty|inc|dec|asl|lsr|rol|ror)\s+\$([0-9a-f]{4})\s*,\s*[xy]\b", low)
+        if m and "@rom-write-ok" not in raw:
+            base = int(m.group(2), 16)
+            if 0x1000 <= base <= 0x1FFF or 0xF000 <= base <= 0xFFFF:
+                warns.append((n, f"`{m.group(1).upper()} ${base:04X},{'X' if ',x' in low else 'Y'}` — the "
+                                 f"indexed store's PHANTOM READ lands at ${base & 0xFF00:04X} plus the "
+                                 f"effective low byte, so some index value reaches every address in that "
+                                 f"cartridge page, hotspots included. The read happens on EVERY indexed "
+                                 f"store, not only on a page cross. Declare it with `; @rom-write-ok` if "
+                                 f"the page is known to hold none"))
+
         # 5) Reads of a write-only TIA register 〔known-traps / Gopher2600 cpubus.TIAReadRegisters=$00-$0D〕
         #    Zero false positives measured 2026-07-30: 0 hits across the 123 files then in
         #    roms/techniques + roms/litmus (the read-side opcodes themselves match 509 times, so the
