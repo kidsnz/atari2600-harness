@@ -43,6 +43,34 @@ a board square, a well spot, a brick, a byte of a line and a sprite column in tu
 `pkg/design/pf.go`'s `ScrollBackgroundFitsRAM`, and `ram_budget` in a scenario, which checks a
 declared layout against what the program actually writes).
 
+**And the RAM cost is measurable, so it does not have to be declared.** `cyclebound.RAMFootprintOf`
+takes a `.asm` and returns the RAM bytes a program precisely writes or reads — **a lower bound, not
+a price**. The first numbers this catalogue has ever had for the resource the archive says bends
+designs hardest:
+
+| technique | RAM bytes, at least |
+|---|---|
+| `tia_pcm` | 4 |
+| `two_line_kernel` | 5 |
+| `rpgmap` | 5 |
+| `maze` | 9 |
+| `sound_driver` | 9 |
+| `music_driver` | 10 |
+| `flicker_multiplex` | 14 |
+| `bitmap48` | 17 |
+| `score6` | 17 |
+| `text12` | 23 |
+
+Three things about that measure, all of which caught a wrong version of this table first. The
+obvious version — "which RAM does the may-write set contain" — is **128 for every ROM in the
+corpus**, because they all open by clearing RAM through an unknown index; the footprint counts only
+accesses that name their target. **Every figure above is a lower bound**, because that same clear
+loop makes `Imprecise` non-zero for all eleven ROMs measured — so it is the normal state and not a
+warning, and this table was nearly published as exact. And the measure **goes blind rather than
+wrong**: `zone_multiplex` reaches all of its RAM through unknown indices and reports **0 bytes with
+15 imprecise accesses** for a ROM that plainly uses RAM. `Bytes == 0` with `Imprecise > 0` is the
+case to act on.
+
 The catalogue is not retro-fitted yet; new and edited pages carry the price from here on.
 
 ## Promoting out of a work (roms/) into here

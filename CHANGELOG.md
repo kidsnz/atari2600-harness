@@ -6,6 +6,52 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the catalogue's first RAM prices, and the obvious way to measure them is useless (2026-09-06)
+
+The rule landed earlier today says a technique page states its price in every resource it spends.
+The catalogue could not state a RAM price because nothing measured one. `cyclebound.RAMFootprintOf`
+does now — and the first attempt at it is the part worth writing down.
+
+**`MayWrite ∩ RAM` is 128 for every ROM in the corpus.** Every 2600 program opens by clearing RAM
+through an unknown index (`ldx #$FF / sta $00,x`), and the may-set correctly reports that as
+touching all 128 bytes. True, and an answer to no question. The report already carried the fix:
+`Access.Wide` marks a set enumerated from an unknown index — *"sound, but it carries no information
+about WHICH cell"* — so counting only accesses that name their target leaves something meaningful.
+A byte that is only ever written carries no state either, so the footprint is the union of precisely
+written and precisely read RAM addresses.
+
+	tia_pcm 4 · two_line_kernel 5 · rpgmap 5 · maze 9 · sound_driver 9 · music_driver 10 ·
+	flicker_multiplex 14 · bitmap48 17 · score6 17 · text12 23
+
+★**They are LOWER BOUNDS and this entry first called them prices.** All eleven ROMs measured report
+imprecise accesses, because that same RAM-clear loop is itself one — so `Imprecise > 0` is the
+normal state, not a warning about the exceptions, and the table was a step away from being published
+as exact. The case that does discriminate is `Bytes == 0` with `Imprecise > 0`: nothing could be
+pinned at all.
+
+`music_driver` at 10 is worth a glance beside the archive: Paul Slocum's own figure for his song
+player in 2002 was *"12 bytes of RAM, but 3 of those can be temp storage"* 〔stella-list
+`200202/msg00020`〕 — nine dedicated, against our ten, arrived at independently.
+
+**The measure goes blind rather than wrong, and that is the only reason it is safe to publish.**
+`zone_multiplex` reaches all of its RAM through unknown indices, so nothing precise survives: it
+prices at **0 with 15 imprecise accesses**, for a ROM that plainly uses RAM. `Imprecise` is part of
+the result and the test asserts that this case reports it — a confident zero here would read as
+"this technique uses no RAM", which is false. Both the ten bounds and the blind spot are pinned as
+goldens.
+
+**And the gate caught debris I made while measuring.** A throwaway probe named
+`roms/techniques/score_kernel.asm`, which does not exist — the ROM is `score6.asm` — and `DefUse`'s
+assemble step left a **0-byte `score_kernel.bin`** in the fixture directory. The pre-push hook
+refused the push with *"fixture inventory (the gate would have tested an emptier world than CI)"*,
+because that file was in the checkout and absent from the clean worktree. Exactly what that gate is
+for, on a file created by guessing a name.
+
+Also fixed while measuring: the claim on `two-line-kernel.md` that the catalogue's only RAM figure
+was *"Zero cycles, zero RAM"* — read carefully, that sentence prices a particular FIX (re-cutting a
+sprite to an odd number of rows), not the technique. The page still had no technique price. It has
+one now: **5 bytes**.
+
 ### Added — the read side of `DefUse`, and a comment that named a test nothing answers to (2026-09-06)
 
 The list has a name for sharing one RAM byte between two variables — an **overlay** — and a stated
