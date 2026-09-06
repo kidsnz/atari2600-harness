@@ -6,6 +6,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the Stella capture queue was full and blocking the push; drained all eight (2026-09-06)
+
+`CAPTURE_QUEUE` holds ROMs added mid-session that have no Stella cross-check yet, and the oracle
+test fails once it passes `maxQueuedCaptures = 6`. Six were queued during the day's litmus work and
+two more arrived with `litmus_jmptable_delay` and `pal_odd_lines`, so the pre-push hook correctly
+refused: **eight is more than six**, and the queue is designed to get louder rather than quieter.
+
+Raising the ceiling would have been hiding my own additions behind a number meant to expose them,
+and `--no-verify` would have been bypassing the gate. Neither is a fix. The queue's own header says
+capturing takes the screen for about thirteen seconds per ROM and should not be done in the middle
+of someone's working session, so it was **asked and approved** before running.
+
+All eight captured. The oracle now grades **190 of 190** ROMs — 7,030 register readings, 37
+registers each — with 24 disagreements, every one of them already classified as sampling phase or
+undefined power-on state rather than divergence, and all 37 registers still taking more than one
+value across the corpus (nothing is constant, so nothing is being compared vacuously). Queue empty.
+
 ### Added — the witness for the PAL parity rule: a stable ODD frame, failing on parity alone (2026-09-06)
 
 `design.ScrollScanlinesConstant` was wired into `frame_lines_stable` earlier today, and its
