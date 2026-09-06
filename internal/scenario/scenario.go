@@ -111,6 +111,7 @@ type Checks struct {
 	NTSCFrameLines   *int                   `json:"ntsc_frame_lines,omitempty"`   // StepFrame() == この値（NTSC は 262）
 	FrameLinesStable *FrameLinesStableCheck `json:"frame_lines_stable,omitempty"` // every frame in a window has the SAME line count (the ∀-over-frames sibling of ntsc_frame_lines)
 	RAMBudget        *RAMBudgetCheck        `json:"ram_budget,omitempty"`         // the declared RAM layout fits in 128 bytes AND the program's static write set is no larger (rom must be .asm)
+	MaxFlickerArea   *int                   `json:"max_flicker_area,omitempty"`   // pixels whose DRAWING OBJECT changes between two frames must not exceed this. A colour sweep contributes nothing; a static picture reads exactly 0. The ceiling is the author's to set — the archive gives a phrase ("an area as large as an Arkanoid wall … positively headache-inducing") and no number
 	MaxLineBudget    *int                   `json:"max_line_budget,omitempty"`    // RunUntilBudget が超過しない（runtime・∃: ある1回の実行を観測。既定予算 76）
 	ProveLineBudget  *int                   `json:"prove_line_budget,omitempty"`  // VV-2: cyclebound が全パスの worst <= 予算を静的に証明（∀。rom が .asm のときのみ）
 	PFDeadlines      *bool                  `json:"pf_deadlines,omitempty"`       // every playfield write lands before the beam reaches the columns it governs, over all paths (.asm only). Fitting in 76 cycles does NOT imply this.
@@ -811,6 +812,29 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 					if !ok {
 						res.Pass = false
 					}
+				}
+			}
+		}
+		if s.Checks.MaxFlickerArea != nil {
+			e.EnableElementCapture()
+			if err := e.RunFrames(1); err != nil {
+				return nil, err
+			}
+			area, ferr := e.FlickerArea()
+			if ferr != nil {
+				res.Asserts = append(res.Asserts, AssertResult{
+					Desc: fmt.Sprintf("max_flicker_area: could not measure (%v)", ferr), Pass: false})
+				res.Pass = false
+			} else {
+				ok := area <= *s.Checks.MaxFlickerArea
+				d := fmt.Sprintf("max_flicker_area %d: %d pixels change drawing object between "+
+					"two frames", *s.Checks.MaxFlickerArea, area)
+				if !ok {
+					d += " — this counts ELEMENTS, not colours, so a colour sweep did not cause it"
+				}
+				res.Asserts = append(res.Asserts, AssertResult{Desc: d, Got: int64(area), Pass: ok})
+				if !ok {
+					res.Pass = false
 				}
 			}
 		}

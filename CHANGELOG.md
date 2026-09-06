@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `flicker_area`: how much of the picture is not the same thing two frames running (2026-09-06)
+
+The archive judges flicker by **area**, and nothing here could measure area: *"an area as large as
+an Arkanoid wall is going to be hard on the eyes even at 30 Hz flicker, and positively
+headache-inducing beyond that"* 〔stella-list `200108/msg00315`, Erik Mooney, 2001-08-20〕. Our
+technique pages describe flicker by object count and by which frames get which object.
+
+**The obvious instrument is the wrong one, and this repository already said so.** `cmd/still` has a
+pixel diff and its comment refuses the job: *"READ THIS AS COLOUR PLUS GEOMETRY, NEVER AS
+GEOMETRY … COLUPF follows the drum envelope in EVERY build, glitched or not, so the clean control
+still reports **6136** differing pixels between its two frames … a sanity check on the capture, not
+a measure of an effect"* — a fifth of the picture, from colour alone. The same comment names the
+right one: *"the per-element attribution in `emu.DecomposeRow` is what answers the first question"*.
+
+So `Emu.FlickerArea` compares the DRAWING OBJECT of every visible pixel — BG/PF/P0/P1/M0/M1/BL —
+between two consecutive frames. Measured: a static picture reads **exactly 0**, which the pixel diff
+cannot produce; `zone_multiplex` reads **126** of 30,720; the whole two-frame comparison costs about
+**4 ms**, which is why it can sit in a scenario assert. Exposed as `max_flicker_area`, with three
+witnesses: a static ROM passes a ceiling of zero, a multiplexed one does not, and it passes a
+ceiling above its measured area.
+
+**It does not set a threshold, and will not.** The sentence in the archive is a phrase, not a
+number, and the quantity is a judgement about eyes. What changes is that the author can now look
+once, decide their own ceiling, and have a machine keep it — which is the most that can be
+mechanised for a resource whose limit lives in a person. It also does not separate movement from
+blinking: a sprite that moves ten pixels changes the element at twenty columns. `read_motion` is the
+instrument for that axis.
+
+Designed by the mailing-list distillation (helper-3), who found the `diffPixels` trap and routed
+around it before proposing the measure; implemented, costed and controlled here.
+
 ### Added — the fifth route to more figures on a line, and its price is 7 cycles, not the 8 on the list (2026-09-06)
 
 `zone-multiplexing.md` lists the routes past two figures on a scanline and prices each in what it
