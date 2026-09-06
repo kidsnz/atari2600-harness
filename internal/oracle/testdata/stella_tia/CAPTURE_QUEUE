@@ -13,3 +13,4 @@
 #
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
+roms/litmus/litmus_ramstrip.bin  # 2026-09-06  added mid-session; capture takes the screen for ~13 s and the author is at the machine
