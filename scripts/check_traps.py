@@ -327,21 +327,42 @@ def scan_text(asm):
                 if 0x0E <= v <= 0x2C:
                     reg = next((k for k, a in TIA_WRITE_ONLY.items() if a == v), "$%02X" % v)
             if reg:
-                # The reason line was wrong until 2026-09-02: it said the read "returns bus
-                # residue". The TIA decodes reads on the low nibble only (the vendored engine
-                # masks with 0x000f, memorymap.go:96/147), so of the 31 addresses $0E-$2C that
-                # a program might read here, 27 land on a REAL read register and only four
-                # ($0E $0F $1E $1F) are undriven. `lda GRP0` ($1B) returns INPT3, not residue;
-                # `lda HMOVE` ($2A) returns INPT2; `lda CXCLR` ($2C) returns INPT4. That is
-                # worse than residue, not better: the value is reproducible, so the bug hides.
-                # Found by the Stella distillation (helper-3 computed it, reproduced here).
+                # This reason line has been wrong twice, in opposite directions.
+                #
+                # Until 2026-09-02 it said the read "returns bus residue" for everything. The TIA
+                # decodes reads on the low nibble only (the vendored engine masks with 0x000f,
+                # memorymap.go:96/147), so of the 31 addresses $0E-$2C a program might read here,
+                # 27 land on a REAL read register and four ($0E $0F $1E $1F) decode to nothing.
+                # `lda GRP0` ($1B) reaches INPT3; `lda HMOVE` ($2A) reaches INPT2; `lda CXCLR`
+                # ($2C) reaches INPT4. (helper-3 computed that, reproduced here.)
+                #
+                # ★From 2026-09-02 to 2026-09-05 it then said the four "return bus residue",
+                # which was the old error kept alive in a corner. The schematics say otherwise.
+                # Kevin Horton, who had them in front of him: "When reading, only D6 and D7 are
+                # used. period. The chip only has readback buffers for D6 and D7, and D0-D5 just
+                # hang in the breeze ... you must AND off the lower 6 bits; i.e. LDA tia_register
+                # AND #0C0h ... Both bits are output during a read to ANY TIA address... if
+                # nothing happens to be decoded, then 0's are returned." 〔stella-list
+                # 200109/msg00291, recovered by the distillation (helper-2) from the raw archive〕
+                #
+                # ★★So the split is not "27 driven, 4 undriven". It is: **two bits are driven on
+                # every TIA read** (zero when nothing decodes), and **six bits float on every TIA
+                # read**, decoded or not. Measured 2026-09-05, `internal/emu/tiadrivenpins_test.go`:
+                # reading $0E, $1F, INPT0 and CXM0P through `lda $hi..` returns $00/$01/$2A as hi
+                # varies — for the real registers exactly as for the undecoded ones — and the
+                # engine's own `vcs/tia.go` says why (`TIADrivenPins = 0b11000000`, the rest
+                # "left over from the address ... the most-significant byte").
                 mirror = MIRROR_READ.get(v & 0x0F)
-                because = (f"reads back {mirror} (the TIA decodes reads on the low nibble only), "
-                           f"so the value is REPRODUCIBLE and the bug hides"
+                because = (f"reaches {mirror} — the TIA decodes reads on the low nibble only, so "
+                           f"D6/D7 come back from THAT register and the value is REPRODUCIBLE, "
+                           f"which is worse than noise because the bug hides"
                            if mirror else
-                           "is one of the four undriven addresses ($0E $0F $1E $1F), so it "
-                           "returns bus residue")
-                errors.append((n, f"reads {reg}, a WRITE-ONLY TIA register — it {because}"))
+                           "is one of the four addresses nothing decodes ($0E $0F $1E $1F), so "
+                           "the two bits the TIA drives (D6, D7) come back as ZERO")
+                errors.append((n, f"reads {reg}, a WRITE-ONLY TIA register — it {because}. "
+                                  f"Whatever you do with the value, compare only D6 and D7 "
+                                  f"(`AND #$C0`): the low six bits are undriven on EVERY TIA "
+                                  f"read and carry the high byte of the address you used"))
     # 4) Reset initialisation (neither CLD nor CLEAN_START) 〔known-traps D / mined 261488,318346〕
     #    ★2026-09-05: only for a file that IS a whole program. "The decimal flag is undefined at
     #    power-up" is a claim about the RESET entry, so the rule belongs to the file that defines

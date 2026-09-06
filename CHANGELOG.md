@@ -6,6 +6,39 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — "the four undriven addresses return bus residue" was wrong; two pins are driven on every TIA read (2026-09-05)
+
+`check_traps.py`'s message for a read of a write-only TIA register said the four addresses nothing
+decodes — `$0E $0F $1E $1F` — "return bus residue". That was the older, wholly-wrong version of this
+message kept alive in a corner when the rest of it was corrected on 2026-09-02, and it stood in the
+repository for three days.
+
+The schematics say otherwise. Kevin Horton, who had the five sheets in front of him: *"When reading,
+only D6 and D7 are used. period. The chip only has readback buffers for D6 and D7, and D0-D5 just
+hang in the breeze. So, if you are going to do an absolute comparison ... you must AND off the lower
+6 bits; i.e. LDA tia_register AND #0C0h. Both bits are output during a read to ANY TIA address... if
+nothing happens to be decoded, then 0's are returned."* 〔stella-list `200109/msg00291`〕. The
+vendored engine agrees and explains itself: `hardware/memory/vcs/tia.go` defines
+`TIADrivenPins = 0b11000000` and says the undriven six bits are *"left over from the address ... the
+most-significant byte."*
+
+**So the split is not "27 driven, 4 undriven".** Two bits are driven on **every** TIA read (zero when
+nothing decodes) and six bits float on **every** TIA read, decoded or not.
+
+Measured, because a source and a comment are neither of them a measurement
+(`internal/emu/tiadrivenpins_test.go`): reading `$0E`, `$1F`, `INPT0` and `CXM0P` through
+`lda $hi..` returns `$00`, `$01`, `$2A` as `hi` varies — the same for the two real read registers as
+for the two nothing decodes. The test carries a witness that three different address bytes must
+produce three different results, because the first version of this probe used `$00/$40/$80/$C0`,
+every one of which has its low six bits zero, and could not have told the two models apart. A second
+version used `$12` and `$3F`, which fold to A12-set addresses and are cartridge reads rather than TIA
+reads at all; both mistakes are recorded next to the seeds.
+
+The gate's message now also carries Horton's practical rule: whatever you do with the value, compare
+only D6 and D7 (`AND #$C0`). Recovered from the raw archive by the mailing-list distillation
+(helper-2) — the same message independently confirmed the ball's position counter as a 6-bit LFSR
+with feedback from bits 4 and 5, so one primary source corrected one claim and confirmed another.
+
 ### Added — the 128 NTSC colours are pinned to a measured golden (2026-09-05)
 
 `TestHarvestedPaletteEqualsDerivedPalette` compares `PaletteFor` against `HarvestPalette` — one
