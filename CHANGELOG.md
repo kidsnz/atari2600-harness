@@ -717,10 +717,18 @@ to the original source and look it up again"*. It checked that cited **paths** r
 checked the thing most of the newer citations are made of: a stella-list message number.
 
 Swept: **41** unique `YYYYMM/msgNNNNN` references across **111** occurrences in `.md`, `.py`, `.go`
-and `.asm`. **Forty resolve. One is unresolved** — `199712/msg00194` (unresolved), cited from
-`CHANGELOG.md` and two rows of `docs/known-traps.md`, in a month that holds 102 messages ending at
-`msg00101`. Found by the
+and `.asm`. **Forty resolve. One did not** — a `199712` message number cited from `CHANGELOG.md` and two
+rows of `docs/known-traps.md`, in a month that holds 102 messages ending at `msg00101`. Found by the
 mailing-list distillation (helper-2); swept again here.
+
+**Resolved 2026-09-06.** The quotes are real and the thread is `199710`, not the `199712` first recorded:
+`199710/msg00043` (Greg Miller, 1997-10-03) carries *"prepping the carry bit before the SBC"* and
+*"You sure this is working with `bpl`?"*, and `199710/msg00045` (crackers@, same day) carries
+*"Ummm.... because I forgot"* and *"`AND $f0` instead of `AND #$f0`"* — all four verified against the
+raw archive. **The search that reported nothing had asked for one message carrying BOTH quotes, and
+they are in two.** The condition excluded the answer, and the result was reported as absence. Widened
+to either quote alone it takes a minute: `grep -l 'prepping the carry' */msg*.html`. Recovered by the
+mailing-list distillation (helper-1).
 
 The right number was searched for and not found, and the search is recorded rather than the result
 assumed: all **18,900** archived messages for a post carrying both the `BPL`/`BMI`-after-`CMP` trap
