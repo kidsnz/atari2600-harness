@@ -6,6 +6,44 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a 2004 report the list never resolved, measured: the mixer squashes one channel with the other (2026-09-06)
+
+A two-voice tune sounded *"brilliant and crystal clear"* under an emulator and *"horribly
+distorted"* on a Cuttle Cart, the voice line *"vibrating"*. The author analysed it for hours, found
+*"the driver did precisely what I wanted it to do"*, noticed that *"each channel playing on his own
+sounded fine"*, and cured it by **turning the volume down** 〔`200405/msg00275`〕. His recipe:
+ch0 `AUDC $C / AUDF $0E`, ch1 `AUDC $6 / AUDF $1A`, and *"when both channels are set to a lower
+volume like 8, channel 0 sounds independent from channel 1. But with a volume of $F, channel 1 seems
+to modulate channel 0"* 〔`msg00285`〕. Swapping the channels changed nothing 〔`msg00288`〕. His own
+guess — PAL mono downmixing — was disproved two days later on a PAL and an NTSC Jr with the same
+results 〔`msg00286`〕. **The thread then moved on without a mechanism.**
+
+The mechanism is the mixer's table. `mix.Mono` builds 31 entries as
+`0x7fff * vol/30 * (30+30)/(30+vol)` — compressive, lifting small sums and flat at the top — so what
+channel 0 contributes to the output depends on what channel 1 is doing. Measured
+(`internal/emu/mixnonlinear_test.go`):
+
+| both channels at | ch 0 alone | ch 0 with ch 1 sounding | squashed by |
+|---|---|---|---|
+| **8** | 6898 | 4499 | **34.8%** |
+| **15** | 10922 | 5461 | **50.0%** |
+
+Raising the volume from 8 to `$F` deepens the modulation from about a third to a half — exactly the
+difference the author heard, and exactly why turning it down helped. **And at volume 8 it is already
+35%**: *"sounds independent"* was the ear, not the signal. Superposition fails by **25%**
+(`Mono(15,0)+Mono(0,15)` = 21844 against `Mono(15,15)` = 16383).
+
+The test asserts the direction as a claim of its own — louder must squash harder — and carries a
+control that took two attempts. The first asked what the squash is when both channels are silent,
+which is 0/0 and returns NaN. The second compares against a LINEAR mixer, which must squash by
+nothing; the first version of that was off by exactly 1 from integer truncation, an arithmetic
+artefact wearing the face of a signal, so the control is now scale-free. Both mistakes are recorded
+beside it. Percentages are asserted to ±1 point because the table is built in `float32` and this
+repository has twice pinned a machine-specific float as a constant.
+
+Recovered by the mailing-list distillation (helper-2), who computed the same two figures from the
+formula before this was run and stated them as a prediction.
+
 ### Added — `mix.Mono` fails SILENTLY, and a guard for it was written and removed the same hour (2026-09-06)
 
 Past a channel sum of `0x1e` the engine's mixer returns **zero — silence, not clipping** — and its
