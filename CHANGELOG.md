@@ -6,6 +6,40 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — I gave the wrong cause for the 97% / 1.8% verification ratio, an hour after measuring it (2026-09-06)
+
+The entry below explains why 97% of this repository's stella-list citations can be checked against
+the archive and only 1.8% of its AtariAge ones can, and attributes it to **what the two corpora
+talk about** — balances versus prices. The observation about balances and prices is real and the
+entry keeps it. **The explanation is wrong.**
+
+The actual cause is a retention policy, written down in this repository twice:
+
+	reference/atariage/README.md, the pipeline comment:
+	  「③ 蒸留(notes.ja.md 作成)＋thread.md削除 のあと、台帳を再生成」
+	the same file's table of artefacts:
+	  | `thread.md` / `gaps.md` / `raw/` | 機械（取得の中間物） | 蒸留したら消す |
+
+Measured: **1,308 thread directories, 1,271 with a distilled note, 24 with the raw thread still
+present, 22 with both — so 1,249 threads had their source text fetched, distilled, and then
+deleted.** The raw AtariAge text was here. It was removed on purpose, by a documented step. The
+stella-list side keeps all 18,900 messages, which is the whole of why one side can be checked and
+the other cannot.
+
+So: not a property of the communities, not a property of the distillations, and not a property of
+what people write on each forum. **One pipeline keeps its sources and the other discards them.**
+The tooling records the cost of that in its own comment — `aa_manifest.py`'s *"取れた量をどこにも
+記録していなかった。thread.md は蒸留したら消すので、後から数えられない"*.
+
+Two consequences worth stating plainly. The measured 1.8% must never be quoted without this cause
+attached, or it reads as a judgement on AtariAge. And **re-fetching is a decision, not a repair**:
+1,249 threads of network traffic against a site this project already documents as awkward to fetch,
+and it is the author's call.
+
+Found by the mailing-list distillation (helper-2), who reached it after two wrong explanations of
+their own — "the preservation was biased" and "the fetches failed" — and got there by reading the
+tool instead of guessing again. Counts re-measured here.
+
 ### Added — a technique page must state its PRICE, and the catalogue priced one resource out of four (2026-09-06)
 
 Measured over the 72 technique pages: **41 state a cycle count. Zero state a RAM cost in bytes.**
@@ -30,8 +64,10 @@ RAM"), stella-list reports **prices** ("needs 12 bytes of RAM, but 3 of those ca
 storage"). A balance is a claim about one person's work-in-progress on one day and is false by the
 next commit; a price is a claim about a technique and stays checkable years later. That is the
 explanation for a ratio measured earlier and left unexplained — **97% of stella-list citations can
-be verified here against 1.8% of AtariAge ones**. It is not a difference in the quality of the two
-distillations. It is a difference in what kind of statement each corpus is full of. Found by the
+be verified here against 1.8% of AtariAge ones**. ★**That was wrong, and the correction is the entry above**: the cause is a documented
+retention policy that deleted 1,249 fetched AtariAge threads after distilling them, not anything
+about what either corpus contains. The balances-versus-prices observation stands on its own and is
+why a technique page needs a price; it is not why one corpus can be checked and the other cannot. Found by the
 mailing-list distillation (helper-2); the page counts re-measured here.
 
 ### Added — `ram_budget`: the second rule with no caller, wired so it grades the ROM and not the claim (2026-09-06)
