@@ -24,6 +24,7 @@ import (
 	"github.com/kidsnz/atari2600-harness/internal/emu"
 	"github.com/kidsnz/atari2600-harness/internal/motion"
 	"github.com/kidsnz/atari2600-harness/internal/ocr"
+	"github.com/kidsnz/atari2600-harness/pkg/design"
 )
 
 // Input はあるフレームで与えるジョイスティック操作（D-2: 入力タイムライン）。
@@ -680,6 +681,54 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			}
 			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: int64(len(counts)), Pass: ok})
 			if !ok {
+				res.Pass = false
+			}
+
+			// ★2026-09-06: hand the same frame lengths to the design rule, so the rule is
+			// reached by a running ROM instead of only by its own unit test.
+			//
+			// `design.ScrollScanlinesConstant` states the scrolling-background invariant —
+			// the total line count is the same every frame, and on PAL it must also be EVEN,
+			// because an odd count makes a PAL set drop colour entirely. Measured 2026-09-06:
+			// the function had **no non-test caller anywhere** (`rg ScrollScanlinesConstant`
+			// found its own definition, its own test, and two string tables in a generator),
+			// and `pal && n%2 != 0` was the only even/odd enforcement in the whole repository.
+			// A rule with an implementation and a test that nothing reaches is a rule the
+			// corpus cannot break — the shape this repository calls a missing witness.
+			//
+			// The primary source is older and sharper than the mined summary. Eckhard
+			// Stolberg wrote a purpose-made ROM for it in 1997 — *"The first one,
+			// PALLINES.BIN, is for the loss of colour problem … It seems that a program
+			// looses its colour signal only when it is doing an odd number of overall lines"*
+			// — and had retracted a wrong version of his own claim ten days earlier: *"The
+			// thing about PAL systems producing wrong colours … was a wrong theory by me.
+			// Actually they only loose the colour signal completely."* 〔stella-list
+			// 199703/msg00258 and 199703/msg00204; recovered by the mailing-list distillation
+			// (helper-3)〕. Note the word "overall": the count is the WHOLE frame, VBLANK and
+			// overscan included, and mistaking a visible-area count for it is a documented way
+			// to get the parity backwards 〔200001/msg00009〕.
+			//
+			// ★★What this witness does and does not cover, measured by mutation. Inverting the
+			// parity test (`n%2 == 0`) turns `pal.json` RED, so the PAL half is genuinely
+			// reached by a running ROM. Breaking the constancy test (`return true` on a
+			// mismatch) leaves it GREEN — that ROM holds 312 lines every frame, so the branch
+			// is never taken. The constancy half is already asserted right above by
+			// `frame_lines_stable`; what this call adds, and what the tree previously had no
+			// ROM for, is the PARITY.
+			lines := make([]int, 0, len(hist))
+			for n, times := range hist {
+				for i := 0; i < times; i++ {
+					lines = append(lines, n)
+				}
+			}
+			palOK := design.ScrollScanlinesConstant(lines, strings.EqualFold(spec, "PAL"))
+			palDesc := fmt.Sprintf("design.ScrollScanlinesConstant(%s): total lines constant",
+				strings.ToUpper(spec))
+			if strings.EqualFold(spec, "PAL") {
+				palDesc += " AND even — an odd PAL frame loses colour entirely"
+			}
+			res.Asserts = append(res.Asserts, AssertResult{Desc: palDesc, Got: b2i(palOK), Pass: palOK})
+			if !palOK {
 				res.Pass = false
 			}
 		}

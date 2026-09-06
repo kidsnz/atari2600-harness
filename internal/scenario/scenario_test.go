@@ -261,7 +261,17 @@ func TestFrameLinesStable(t *testing.T) {
 	if res.Pass {
 		t.Errorf("framelines_trap spends an extra line every 128th frame and must FAIL: %+v", res.Asserts)
 	}
-	if got := res.Asserts[len(res.Asserts)-1].Got; got != 2 {
+	// ★Find the assert by NAME, not by position. This read `Asserts[len-1]` until 2026-09-06,
+	// when `frame_lines_stable` gained a second assert (the design rule) and started returning
+	// that one's value instead — a positional index into a growing list is the same failure mode
+	// as citing a file by line number.
+	got := int64(-1)
+	for _, a := range res.Asserts {
+		if strings.HasPrefix(a.Desc, "frame_lines_stable") {
+			got = a.Got
+		}
+	}
+	if got != 2 {
 		t.Errorf("got = distinct line counts: want 2 (262 and 263), got %d", got)
 	}
 

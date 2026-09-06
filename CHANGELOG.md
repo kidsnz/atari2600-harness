@@ -6,6 +6,42 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — a design rule with an implementation, a test, and no ROM that reaches it (2026-09-06)
+
+`design.ScrollScanlinesConstant` states the scrolling-background invariant: the total scanline count
+is the same every frame, and **on PAL it must also be even**, because an odd count makes a PAL set
+lose colour entirely. Measured 2026-09-06: the function had **no non-test caller anywhere in the
+repository** (`rg ScrollScanlinesConstant` returns its own definition, its own unit test, and two
+string tables in a generator), and `pal && n%2 != 0` was the **only** even/odd enforcement in the
+whole tree. A rule with an implementation and a test that nothing reaches is a rule the corpus
+cannot break — a missing witness, the shape this repository has a name for.
+
+Wired into `frame_lines_stable`, which already collects every frame's line count, so the rule is now
+reached by a running ROM. `roms/litmus/scenarios/pal.json` — the tree's only PAL scenario — gained a
+`frame_lines_stable` block and is that witness.
+
+**Mutation-tested, and only half of it is covered.** Inverting the parity test (`n%2 == 0`) turns
+`pal.json` red, so the PAL half is genuinely reached. Breaking the constancy test (`return true` on a
+mismatch) leaves it green — that ROM holds 312 lines every frame, so the branch is never taken. The
+constancy half is already asserted immediately above by `frame_lines_stable` itself; what this call
+adds, and what the tree had no ROM for, is the **parity**. Recorded in the code rather than claimed.
+
+The primary source is older and sharper than the mined summary this rule cited. Eckhard Stolberg
+wrote a purpose-made ROM for it in 1997 — *"The first one, PALLINES.BIN, is for the loss of colour
+problem … It seems that a program looses its colour signal only when it is doing an odd number of
+overall lines"* — having retracted a wrong version of his own claim ten days earlier: *"The thing
+about PAL systems producing wrong colours … was a wrong theory by me. Actually they only loose the
+colour signal completely."* 〔stella-list `199703/msg00258`, `199703/msg00204`〕. Note "overall": the
+count is the whole frame, VBLANK and overscan included, and taking a visible-area count for it is a
+documented way to get the parity backwards 〔`200001/msg00009`〕. Recovered by the mailing-list
+distillation (helper-3), who also found that the claim "harness has nothing on PAL colour loss" was
+their own false negative — the rule was here, unreached.
+
+**And one test was reading an assert by position.** `TestFrameLinesStable` checked
+`res.Asserts[len(res.Asserts)-1]`, so the moment `frame_lines_stable` gained a second assert it
+started reading the wrong one. It now finds the assert by name. A positional index into a growing
+list is the same failure mode as citing a file by line number.
+
 ### Added — `check_provenance.py` now checks that a cited message EXISTS (2026-09-06)
 
 This gate's stated purpose is that *"when something misbehaves during real authoring you can go back
@@ -13,8 +49,9 @@ to the original source and look it up again"*. It checked that cited **paths** r
 checked the thing most of the newer citations are made of: a stella-list message number.
 
 Swept: **41** unique `YYYYMM/msgNNNNN` references across **111** occurrences in `.md`, `.py`, `.go`
-and `.asm`. **Forty resolve. One does not** — `199712/msg00194`, cited from `CHANGELOG.md` and two
-rows of `docs/known-traps.md`, in a month that holds 102 messages ending at `msg00101`. Found by the
+and `.asm`. **Forty resolve. One is unresolved** — `199712/msg00194` (unresolved), cited from
+`CHANGELOG.md` and two rows of `docs/known-traps.md`, in a month that holds 102 messages ending at
+`msg00101`. Found by the
 mailing-list distillation (helper-2); swept again here.
 
 The right number was searched for and not found, and the search is recorded rather than the result
