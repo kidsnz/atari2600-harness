@@ -151,11 +151,37 @@ Each metric is measurable *with the harness*, and compared to a reference ROM (e
 | **Generation ratio** | bytes of rendered content (screens · mazes · objects) ÷ bytes of stored generator + seed | count outputs × output-size / gen bytes | maximise (Pitfall: 255 screens / ~50 B) |
 | **Data-share ratio** | table bytes consumed by **≥ 2** users ÷ total table bytes | trace table readers | maximise (shared envelope/glyph tables) |
 | **Dead-weight** | bytes/cycles that buy **no** viable option (complexity without depth) | design audit | → 0 |
+| **RAM footprint** | RAM bytes a program precisely writes or reads — **a lower bound, not a price** | `cyclebound.RAMFootprintOf` (added 2026-09-06) | as low as the design allows |
+| **Flicker area** | pixels whose **drawing object** (BG/PF/P0/P1/M0/M1/BL) differs between adjacent frames | `max_flicker_area` in a scenario, or `emu.FlickerArea` (added 2026-09-06) | author-set, once, having looked |
+| **Frame-parity duty** | how many *meanings* the one frame-parity bit is asked to carry | **not computable** — the bit's value says nothing; only the author knows what it means | exactly 1 |
+| **Sustained-viewing cost** | whether the picture is still comfortable after minutes | **no instrument exists here and none can** — the longest scenario in this repository runs 1200 frames (20 s) | — |
 
 > **Anti-gaming caveat (open question).** The axes interlock — you can *trade* one for another (spend cycles to
 > save bytes, overlay RAM at the cost of a branch). So the scorecard is a **vector, not a single score**:
 > progress = moving one axis toward target **without regressing** the others. Collapsing them into one index
 > that can't be gamed by a resource trade is unsolved (§G).
+
+**Four rows added 2026-09-06, and two of them are honest about having no instrument.** The
+distillation of the stella-list archive produced a classification of the resources a 2600 design
+spends, and it does not fit the shape the rest of this table assumes. Some resources a tool can
+prove over all paths (cycles, via `prove_line_budget`); some it can only check against a number the
+author declares (RAM, via `ram_budget`); some are statically countable but nothing counted them
+(ROM bytes); **one has no observable at all** — the frame-parity bit's *value* says nothing, because
+the resource is which MEANING the author assigned to it, and that is a declaration, not a state;
+**and one cannot be measured even by asking a person.** The last is the sharpest thing the archive
+gave us. Manuel Polik put the flicker budget of Gunfight 2600 to a public vote in 2001, was
+*"talked everybody into giving me 9 bullets"*, built it, *"watch[ed] it for two minutes"*, got a
+headache, and shipped **six** 〔stella-list `200103/msg00099`〕 — killing the three-way shot in the
+process. Thomas Jentzsch, independently: static coarseness stops bothering you the longer you play,
+while *"any flicker … gives you some headache to soon"* 〔`200102/msg00271`〕. **A green 20-second
+scenario is not "comfortable after two minutes", and no arrangement of this repository's tools makes
+it one.** That row exists so nobody looks for the check.
+
+The flicker-area row is the counter-example that makes the other two bearable: the archive judges
+flicker by area — *"an area as large as an Arkanoid wall is going to be hard on the eyes even at
+30 Hz flicker"* 〔`200108/msg00315`〕 — and area IS measurable. The threshold still is not, so the
+check asks the author for a ceiling once and keeps it thereafter. Found by the mailing-list
+distillation (helper-3); the two instruments built and calibrated here.
 
 The scorecard is a *criterion-referenced* instrument (per the deliberate-practice measurement
 literature), not a vanity number: each row is an objective, reproducible target, and progress =

@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — four rows to the density scorecard, two of which say no instrument exists (2026-09-06)
+
+The scorecard in `integration-density-playbook.md` §D assumes every metric is measurable with the
+harness — its own opening sentence says so. The archive's resources do not all fit that shape, and
+the four rows added today make the shape explicit: cycles can be **proven over all paths**
+(`prove_line_budget`); RAM can be **checked against a declaration** (`ram_budget`, added today);
+flicker area can be **measured** (`max_flicker_area`, added today); and two cannot be instrumented at
+all.
+
+**The frame-parity bit has no observable.** Reading its value tells you nothing, because the resource
+is not the bit but *which meaning the author assigned to it* — which object to draw, which colour
+plane, which direction — and only one meaning fits. That is a declaration, not a state, and the row
+says so rather than proposing a check.
+
+**And sustained viewing cannot be measured even by asking a person**, which is the sharpest thing
+this archive gave us. Manuel Polik put the flicker budget of Gunfight 2600 to a public vote in 2001,
+was *"talked everybody into giving me 9 bullets"*, built it, *"watch[ed] it for two minutes"*, got a
+headache, and shipped **six** 〔stella-list `200103/msg00099`〕 — the three-way shot died with the
+other three bullets. Thomas Jentzsch, independently and three months earlier: static coarseness
+stops bothering you the longer you play, while *"any flicker … gives you some headache to soon"*
+〔`200102/msg00271`〕. The longest scenario in this repository runs 1200 frames — **20 seconds**,
+one sixth of the interval that changed Polik's mind. A green scenario is not "comfortable after two
+minutes", and the row exists so nobody goes looking for the check.
+
+Found by the mailing-list distillation (helper-3), who built the classification; the two instruments
+that do exist were built and calibrated here today.
+
 ### Added — the same rule again, one level over: a design rule nobody can find (2026-09-06)
 
 Having wired two `pkg/design` functions that had no caller, the obvious next question was how many
