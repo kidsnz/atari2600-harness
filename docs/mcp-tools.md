@@ -167,6 +167,16 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
   read_tia/read_row are video-only; this fills the missing verification path for audio.
 - Out: `emu.AudioState` (`channel0`/`channel1`, each `control`(AUDC) / `freq`(AUDF) / `volume`(AUDV)) + `Coords`.
 - Verification: exact match on `litmus_audio.bin` (ch0=$0C/$14/$0A, ch1=$04/$1F/$08). `internal/emu/emu_audio_test.go`.
+- ★**This reads the REGISTER, and the register is not what is heard.** The TIA sums the volume every
+  CPU cycle and takes the AVERAGE at two fixed points on a free-running 228 counter (`clock228` 36 and
+  150, 38 CPU cycles apart), so **a second write inside one window does not replace the first — it
+  dilutes it**. Measured 2026-09-05 (`internal/emu/audvtwice_test.go`, AUDC=0 so there is no waveform
+  to confound the average, v1=$0F then v2=$00 after a swept gap): the played sample climbs
+  monotonically with the gap — **1, 3, 5, 8, 11, 15** — while `read_audio` reports **0 at every one
+  of them**. Two distinct non-zero values appear per line because there are two windows and one
+  catches each write. Negative control: writing the same value twice produces no intermediate at any
+  gap. **Use `AudioSamples()` when the question is what was heard; use this when the question is what
+  was written.** The same caveat applies to `read_audio_trace`.
 
 ### 5c. `read_collisions`  ★ CXxx structured (P1, v0.14.0)
 - In: `struct{}`

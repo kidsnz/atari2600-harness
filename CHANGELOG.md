@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `read_audio` reports a volume the machine never plays (2026-09-05)
+
+`read_audio` and `read_audio_trace` read `PeekChannels`, which is the register, and the register is
+the last value written. The TIA sums `(pulseCounter & 1) * Volume` every CPU cycle and takes the
+**average** at two fixed points on a free-running 228 counter — `clock228` **36** and **150**, 114
+colour clocks = **38 CPU cycles** apart, twice a scanline. So two writes inside one window are not
+"first then second"; the second **dilutes** the first in proportion to how long each was held.
+
+Measured with a ROM built for it (`internal/emu/audvtwice_test.go`): AUDC=0 so the output is
+constant and there is no waveform to confound the average, `$0F` written at the top of the line and
+`$00` after a swept gap. The played value climbs monotonically with the gap — **1, 3, 5, 8, 11,
+15** — while `read_audio` reports **0 at every single gap**. Two distinct non-zero values appear per
+line, because there are two windows and one of them catches each write.
+
+Two controls. **Monotonicity**: holding the first value 30 cycles longer must make the played sample
+louder (3 → 11), so the result is a time-weighted average and not merely "some other number".
+**Same-value**: writing `$0F` twice produces no intermediate at any gap, so the intermediates come
+from the second VALUE and not from the second WRITE.
+
+Designed by the mailing-list distillation (helper-2) from the engine source, with the prediction
+written down before it was run — an intermediate for gaps inside a window, and `read_audio`
+disagreeing for at least one gap. Both landed, and the disagreement is at every gap tested. The
+design compares two runs of the same instruction stream rather than an absolute position in a line,
+because the audio clock is free-running; an absolute-position design would not have been valid.
+
+Recorded on the `read_audio` entry in `mcp-tools.md` and on its line in `CLAUDE.md`.
+
 ### Added — `cmd/timinglint` aimed at the works, and the author's own third fix for HMOVE double-application (2026-09-05)
 
 `cmd/timinglint` was in the same position `check_traps.py` had been: validated on the 31 technique

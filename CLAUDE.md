@@ -100,7 +100,7 @@ pass is permanently closed.)
   **`read_collisions`** (v0.14.0, structures CXxx into named boolean pairs) /
   **`step_scanline`** (v0.15.0, advance until scanline +1) / **`step_instruction`** (v0.15.0, one instruction at a time) /
   **`assemble_and_load`** (v0.16.0, dasm→load in one shot; on failure returns structured dasm output) /
-  **`read_audio`** (v0.17.0, reads TIA audio AUDC/AUDF/AUDV numerically = verify sound with numbers too) /
+  **`read_audio`** (v0.17.0, reads TIA audio AUDC/AUDF/AUDV numerically = verify sound with numbers too. ★It reads the REGISTER: the TIA averages volume over 38-cycle windows, so two writes in one window are AVERAGED while this reports only the second — measured, `internal/emu/audvtwice_test.go`) /
   **`read_audio_trace`** (v1.104.0, the read_motion of sound: traces AUDC/AUDF/AUDV per-frame over N frames = a whole sound envelope in one call instead of hand-stepping read_audio) /
   **`read_ram_trace`** (v1.105.0, the read_motion of arbitrary game state: traces up to 16 RAM addresses ($80-$FF) per-frame over N frames = measure how a tank's X/Y, an AI mode/timer, or a score evolves as numbers — frames-to-escape, decay curves, stuck oscillation — in one call instead of a manual step_frame+peek loop) /
   **`read_bank`** (v0.43.0, current cartridge bank at PC + is_ram; **F8/F6/F4 verified** (litmus_bank, _f6, _f4), scenario fields `bank.number`/`bank.is_ram`) /
