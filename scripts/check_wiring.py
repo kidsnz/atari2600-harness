@@ -315,6 +315,51 @@ def scenario_check_docs():
         return ["scenario check `%s` is in the schema and named nowhere in docs/scenarios.md — "
                 "an author reading the format reference cannot discover it" % n for n in missing]
     print("scenario schema OK — all %d checks are named in docs/scenarios.md." % len(names))
+    return design_rule_docs()
+
+
+def design_rule_docs():
+    """Every exported `pkg/design` rule must be named in a document.
+
+    ★`pkg/design` is deliberately NOT called by the pipeline. `budget.go` says what it is for:
+    「本関数は『作る前』の静的見積り」 — a static estimate BEFORE building, consulted at design
+    time rather than run at test time. Measured 2026-09-06: 23 of its 26 exported functions have no
+    non-test caller, and that is the intended shape, not a defect. (Two of the three that DO have
+    callers were wired the same day, because they had runtime counterparts; the rest do not.)
+
+    ★★Which makes findability the entire question. A design-time rule nobody can find is worse off
+    than an unreached runtime rule: nothing will ever fail to remind you it exists. Measured the same
+    day: 22 of the 26 were named in a document and **four were not** — `AsymPFLineFits`,
+    `AsymPFReachableX`, `HMoveReachable`, `FitsText`. The convention in `design-principles.md` is a
+    trailing `→ design.Fn` pointer on the principle the function computes; the four now have one.
+
+    ★★★This is the same rule as the scenario-schema check above and as the `cmd/` check below,
+    which is the point: the 2026-08-15 sweep wrote that rule for commands, and it came back twice in
+    one day at other levels. **A capability nobody can find is a capability nobody has**, wherever it
+    lives.
+    """
+    pkg = os.path.join(HARNESS, "pkg", "design")
+    if not os.path.isdir(pkg):
+        return ["pkg/design is missing, so the design rules could not be checked against docs"]
+    names = []
+    for fn in sorted(os.listdir(pkg)):
+        if not fn.endswith(".go") or fn.endswith("_test.go"):
+            continue
+        with open(os.path.join(pkg, fn), encoding="utf-8") as f:
+            names += re.findall(r"^func ([A-Z]\w*)\(", f.read(), re.M)
+    if not names:
+        return ["pkg/design yielded no exported functions, so nothing was checked"]
+    corpus = ""
+    for d in sorted(glob.glob(os.path.join(HARNESS, "docs", "*.md"))) + [os.path.join(HARNESS, "CLAUDE.md")]:
+        if os.path.isfile(d):
+            with open(d, encoding="utf-8") as f:
+                corpus += f.read()
+    missing = [n for n in names if n not in corpus]
+    if missing:
+        return ["design rule `design.%s` is exported and named in no document — pkg/design is a "
+                "DESIGN-TIME library, so nothing will ever fail to remind an author it exists" % n
+                for n in missing]
+    print("design rules OK — all %d exported pkg/design functions are named in a document." % len(names))
     return []
 
 

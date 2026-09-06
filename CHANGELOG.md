@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the same rule again, one level over: a design rule nobody can find (2026-09-06)
+
+Having wired two `pkg/design` functions that had no caller, the obvious next question was how many
+more there are. **Twenty-three of twenty-six.** That looked like a large defect and was not one:
+`budget.go` states the package's purpose in its second sentence — 「本関数は『作る前』の静的見積り」,
+a static estimate BEFORE building, consulted at design time rather than run at test time. Being
+uncalled is its intended shape. (The two wired that day had runtime counterparts; the rest do not.)
+Reading the intent deflated the alarm, which is this repository's own rule about a check reporting a
+mass failure.
+
+**Which makes findability the entire question, and there the measurement stood up.** A design-time
+rule nobody can find is worse off than an unreached runtime rule, because nothing will ever fail to
+remind you it exists. Twenty-two of the twenty-six were named in a document; **four were not** —
+`AsymPFLineFits`, `AsymPFReachableX`, `HMoveReachable`, `FitsText`. They now carry the convention's
+trailing `→ design.Fn` pointer on the principle each computes.
+
+`check_wiring.py` gained the corresponding rule, and it is now the third copy of one idea: `cmd/`
+must be named in `CLAUDE.md` (2026-08-15, after six commands nobody could think of), scenario checks
+must be named in `docs/scenarios.md` (earlier today, after two of mine), and exported design rules
+must be named somewhere. The 2026-08-15 rule was written for commands rather than for the shape, so
+it came back twice in one day at other levels. **A capability nobody can find is a capability nobody
+has, wherever it lives.** Negative control: adding an exported function to `pkg/design` turns the
+gate red.
+
 ### Added — a scenario check nobody can find is a check nobody has; `check_wiring.py` now says so (2026-09-06)
 
 Two checks were added today — `ram_budget` and `max_flicker_area` — and **neither appeared in any
