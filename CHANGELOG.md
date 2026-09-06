@@ -6,6 +6,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the re-strobe scope note credited one person for two people's work (2026-09-05)
+
+The entry below said *"Eckhard Stolberg built `2or3.bin` … and reported 'When I try this on my
+classic VCS, I see three sprites … When I try an Atari JR I see two sprites'"*. Two people, one
+afternoon: **Stolberg** built the ROM and asked the list to run it (`199901/msg00089`, 1999-01-14
+16:17 +0100); **John Saeger** answered the same day with the three configurations
+(`199901/msg00099`, 19:13 -0800).
+
+Worth recording how the mistake nearly survived the check. `msg00099`'s body contains the line
+`-----Original Message----- From: Eckhard Stolberg`, because it quotes the message it replies to —
+so a search for "From:" in that file finds **Stolberg**, and the reply's own header is further up.
+The header block resolves it: `From : "John Saeger" <john@…>`. The archive also carries an
+obfuscated `From-R13:` field that is *not* plain ROT13 (it decodes "Kevin Horton" correctly but
+turns "Stolberg" into "Rtolberg"), so it is not usable for attribution either.
+
+Caught by the mailing-list distillation (helper-1), who had made the opposite error first and
+corrected it; settled here by reading both messages' header blocks.
+
 ### Added — two design histories, and a scope our instrument cannot measure (2026-09-05)
 
 **The HMOVE comb is an oversight, not a specification**, and that is why the cycle-73/74 workaround

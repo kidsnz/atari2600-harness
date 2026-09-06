@@ -9,12 +9,14 @@ first. That is the floor under any dense-text kernel (`text12.md`, `text24.md`, 
 `scripts/gen_litmus_restrobe.py`); grading `internal/emu/restrobe_test.go`.
 
 **★Scope, added 2026-09-05: the counts below are for ONE TIA, and the list ran the experiment that
-shows they are not universal.** Eckhard Stolberg in 1999 built a purpose-made ROM, `2or3.bin`, for
-exactly this question and tried three configurations: *"When I try this on my classic VCS, I see
+shows they are not universal.** It took two people and one afternoon in January 1999.
+Eckhard Stolberg built a purpose-made ROM for exactly this question and asked the list to run it —
+*"Can all of you please try out the enclosed `2or3.bin` on a real VCS and tell us if you see 2 or 3
+sprites and which VCS modell you are using?"* 〔stella-list `199901/msg00089`, 1999-01-14〕. **John
+Saeger** answered the same day with three configurations: *"When I try this on my classic VCS, I see
 three sprites. I also tried a different TIA chip from a Rev-16 VCS and I also see three sprites.
-**When I try an Atari JR I see two sprites.**"* — and went on to find *"different results for both
-(d+3) positioning and (d-1) positioning between classic VCS and Atari JR"*, then asked the list to
-run it on their own machines 〔stella-list `199901/msg00099`〕.
+**When I try an Atari JR I see two sprites.**"* 〔`199901/msg00099`〕, and the thread went on to find
+different results for both `(d+3)` and `(d-1)` positioning between the classic VCS and the JR.
 
 **★★And our instrument cannot show that difference.** Gopher2600 models eight TIA-revision
 behaviours, all off by default; `internal/emu/tiarevision_test.go` renders all **145** litmus ROMs
