@@ -9,7 +9,7 @@ graded by `internal/emu/flickerattrib_test.go`, settles what the latches do acro
 This page adds what that fixture does not carry: **why the problem exists, what it costs a
 shipped game, and the two idioms the list converged on.** Both idioms are ⬜ unverified here.
 
-**Source:** Stella mailing list, three messages eight years apart.
+**Source:** Stella mailing list, three messages from **2000-05 to 2004-12** (`200005/msg00038` Mark De Smet, `200007/msg00140` Thomas Jentzsch, `200412/msg00026` Nick Bensema). ★This line said *"eight years apart"* until 2026-09-06; the dates are in the archive and the span is **4.6 years**. A number that the document's own citations can settle should not be written out — write the endpoints and let the reader subtract.
 `200005/msg00038` (Mark De Smet, 2000-05-04) states the mechanism; `200007/msg00140`
 (Thomas Jentzsch, 2000-07-31) is the symptom in a finished game; `200412/msg00026`
 (Nick Bensema quoting Lee Fastenau, 2004-12-02) is the temporal idiom.

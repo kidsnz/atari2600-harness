@@ -6,6 +6,50 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a delay table with single-cycle resolution, and a 1998 question measured (2026-09-06)
+
+Spending an ODD number of cycles is awkward here: `ds N,$EA` makes only even delays and DASM's
+`SLEEP <odd>` reaches for `nop $00` or `bit $00`, both of which READ $00 — measured in
+`oddsleep_test.go`. The archive has a third answer that this repository did not have.
+
+Jim Nitchals, 1998-03-18, subject *"[stella] Variable cycle delays"*: a jump table with *"single
+cycle resolution without the use of the carry flag (which adds overhead in the setup and at the
+end)"*, built out of opcodes that eat the byte after them — `$C9` (CMP immediate) swallows the next
+byte, `$C5` (CMP zero-page) swallows the following `nop` as its ADDRESS, and the `nop` alone is two
+cycles 〔`199803/msg00160`〕. Erik Mooney replied the same day — *"That's... incredibly wizardly.
+But isn't something backwards? … won't a larger value in the accumulator cause it to jump farther
+into the table, skipping more instructions and delaying fewer cycles?"* 〔`msg00161`〕 — and Chris
+Wilkson confirmed it within the hour: *"Yeah, but mine was like that too...the delay equaled the max
+count minus the accum[ulator]"* 〔`msg00164`〕. Two people had built it independently before it was
+posted.
+
+**Measured** (`roms/litmus/litmus_jmptable_delay.asm`, `internal/emu/jmptabledelay_test.go`).
+Entering the table at five successive offsets and subtracting both the empty interval and the 10
+cycles of scaffolding every entry pays (`jmp (indjmp)` 5 + the table's closing `jmp (RetVec)` 5):
+**6, 5, 4, 3, 2**. Both claims hold exactly — successive entries differ by **one cycle**, and the
+deeper the entry the SHORTER the delay. The test asserts the two properties as properties, not just
+the five numbers, so a change that keeps the numbers and breaks the behaviour is still caught.
+
+Writing it cost one bug worth recording: the first table was three bytes deep, so the shallowest
+entry fell below the page boundary while `indjmp+1` still named the table's page — the jump went one
+page high, the ROM ran off into unwritten bytes, and every measurement read zero. **A page-aligned
+table whose entry points reach back past its own start is not page-aligned for those entries.** The
+table is now sixteen deep and the reason is in the source.
+
+Why it matters beyond the archive: the works' generated kernels time every write from the top of the
+line, which is why a repeat pass **replaces** `sta HMOVE` with `bit $80` rather than dropping it. A
+delay dialable to a single cycle, with no flag side effect and no address touched, is the tool that
+situation keeps asking for. Recovered by the mailing-list distillation (helper-2).
+
+### Fixed — "three messages eight years apart" was 4.6 years, and the document said so itself (2026-09-06)
+
+`flicker-collision-attribution.md` dated its own sources as *"three messages eight years apart"*.
+The three are `200005/msg00038` (2000-05-04), `200007/msg00140` (2000-07-31) and `200412/msg00026`
+(2004-12-02) — **1,673 days, 4.6 years** — and all three dates are readable from the citations the
+same line carries. The line now gives the endpoints and lets the reader subtract, which is the
+general form: a number the document's own citations can settle should not be written out. Found by
+the mailing-list distillation (helper-2); dates re-read here from the archive.
+
 ### Added — the other half of the known-answer rule: real data for coverage of shapes (2026-09-06)
 
 `check_instruments.py` forbids a sample→number function that has never been fed an input whose
