@@ -143,6 +143,89 @@ def umbrella_present():
     return any(os.path.isdir(os.path.join(UMBRELLA, r.rstrip("/"))) for r in UMBRELLA_ROOTS)
 
 
+# ★2026-09-06: a citation that resolves nowhere is not provenance.
+#
+# This gate's own stated purpose is that "when something misbehaves during real authoring you can
+# go back to the original source and look it up again". It checked that cited PATHS resolve and
+# never checked the one thing most of the newer citations are made of: a stella-list message
+# number. Measured when the check was written — 41 unique `YYYYMM/msgNNNNN` references across 111
+# occurrences, of which **40 resolve and one does not**: `199712/msg00194`, cited from
+# `CHANGELOG.md` and `docs/known-traps.md`, in a month that holds 102 messages ending at
+# `msg00101`. Found by the mailing-list distillation (helper-2); the sweep re-run here.
+#
+# The archive lives in the umbrella (`reference/`), so a CI checkout of this repository alone
+# cannot resolve anything — in that case the check SAYS it skipped rather than passing silently.
+MSGREF_RE = re.compile(r"\b((?:19|20)\d{4})/msg(\d{5})\b")
+
+
+def check_message_references():
+    """Every stella-list message number cited anywhere must name a file that exists."""
+    archive = os.path.join(UMBRELLA, "reference", "stella-list")
+    # `umbrella_present()` is how the rest of this gate simulates a CI checkout
+    # (`HARNESS_NO_UMBRELLA=1`); honour it here too, or the skip path is untestable.
+    if not umbrella_present() or not os.path.isdir(archive):
+        print("message references: SKIPPED — %s is not present, so no citation could be "
+              "resolved. This is expected in CI, which clones only this repository; it is not "
+              "a pass." % archive)
+        return []
+
+    seen = {}
+    excused = set()
+    for root, dirs, files in os.walk(HARNESS):
+        dirs[:] = [d for d in dirs if d not in ("Gopher2600", ".git", "build", "bin")]
+        for f in files:
+            if not f.endswith((".md", ".py", ".go", ".asm", ".txt")):
+                continue
+            path = os.path.join(root, f)
+            # This file quotes the broken reference as its own worked example; a gate naming
+            # its own test case is not making a citation.
+            if os.path.abspath(path) == os.path.abspath(__file__):
+                continue
+            try:
+                with open(path, encoding="utf-8", errors="ignore") as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            for m in MSGREF_RE.finditer(text):
+                # ★A reference may be named in order to say it is WRONG — the tree carries one
+                # such, and explaining it requires printing it. The escape is the word
+                # "unresolved" on the same line, and the count of escapes is printed below so
+                # they cannot quietly accumulate.
+                line = text[text.rfind("\n", 0, m.start()) + 1:
+                            (text.find("\n", m.end()) + 1 or len(text)) - 1]
+                if "unresolved" in line.lower():
+                    excused.add(m.group(0))
+                    continue
+                seen.setdefault(m.group(0), set()).add(os.path.relpath(path, HARNESS))
+
+    bad = []
+    for ref, where in sorted(seen.items()):
+        ym, num = ref.split("/msg")
+        if os.path.isfile(os.path.join(archive, ym, "msg%s.html" % num)):
+            continue
+        month = os.path.join(archive, ym)
+        if os.path.isdir(month):
+            nums = sorted(int(n[3:8]) for n in os.listdir(month)
+                          if n.startswith("msg") and n.endswith(".html"))
+            hint = ("that month holds %d messages, the last is msg%05d"
+                    % (len(nums), nums[-1])) if nums else "that month is empty"
+        else:
+            hint = "there is no %s directory in the archive" % ym
+        bad.append("%s cites stella-list `%s`, which does not exist — %s. A citation that "
+                   "resolves nowhere is not provenance: this gate exists so a claim can be "
+                   "looked up again. Find the right number, or say in the text that the "
+                   "reference is unresolved and what was searched"
+                   % (", ".join(sorted(where)), ref, hint))
+    if not bad:
+        note = ""
+        if excused:
+            note = (" (+%d marked unresolved: %s)"
+                    % (len(excused), ", ".join(sorted(excused))))
+        print("message references: %d cited stella-list messages, all resolve%s"
+              % (len(seen), note))
+    return bad
+
+
 def _resolves(path):
     """True if `path` exists under the harness OR under the umbrella above it.
 
@@ -326,6 +409,7 @@ def main():
         missing.append("%s cites `%s`, which exists under neither the harness nor the "
                        "umbrella above it" % (doc, path))
     missing.extend(check_arcade_pong_banners())
+    missing.extend(check_message_references())
     for path in stale:
         missing.append("KNOWN_ABSENT lists `%s`, but it now resolves — delete the entry "
                        "so the list keeps meaning something" % path)

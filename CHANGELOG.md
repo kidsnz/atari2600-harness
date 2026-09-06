@@ -6,6 +6,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `check_provenance.py` now checks that a cited message EXISTS (2026-09-06)
+
+This gate's stated purpose is that *"when something misbehaves during real authoring you can go back
+to the original source and look it up again"*. It checked that cited **paths** resolve, and never
+checked the thing most of the newer citations are made of: a stella-list message number.
+
+Swept: **41** unique `YYYYMM/msgNNNNN` references across **111** occurrences in `.md`, `.py`, `.go`
+and `.asm`. **Forty resolve. One does not** — `199712/msg00194`, cited from `CHANGELOG.md` and two
+rows of `docs/known-traps.md`, in a month that holds 102 messages ending at `msg00101`. Found by the
+mailing-list distillation (helper-2); swept again here.
+
+The right number was searched for and not found, and the search is recorded rather than the result
+assumed: all **18,900** archived messages for a post carrying both the `BPL`/`BMI`-after-`CMP` trap
+and the forgotten-`#` trap (3 candidates, none of them it), and all **102** of `199712/` for one
+carrying `BPL`/`BMI` together with `CMP` (**zero**). So the number is wrong in both month and index.
+The two claims are 6502 fundamentals and stand without it; the rows now say the citation is
+unresolved and what was searched.
+
+The check skips when `reference/` is absent — a checkout of this repository alone cannot resolve
+anything — and **says it skipped**, because a gate that looks at nothing prints the same OK as a
+gate that looks at everything. Three controls, all run: a fake reference turns it red; the same fake
+reference with the word "unresolved" on its line is excused and **counted in the output**, so
+excuses cannot quietly accumulate; and `HARNESS_NO_UMBRELLA=1` produces the SKIPPED line rather than
+a pass. The first version of the skip did not honour that variable and so could not be tested — the
+control found it.
+
 ### Fixed — the re-strobe scope note credited one person for two people's work (2026-09-05)
 
 The entry below said *"Eckhard Stolberg built `2or3.bin` … and reported 'When I try this on my
@@ -1569,7 +1595,7 @@ in the umbrella `CLAUDE.md` that names those exact entry points.
 
 ### Added — two 1997 assembly traps, one of which we could already detect (2026-09-04)
 
-Greg Miller found both in one reading of someone else's code on the list (`199712/msg00194`), which
+Greg Miller found both in one reading of someone else's code on the list (stella-list; the message number recorded here was wrong — see 2026-09-06), which
 is the interesting part: no tool was involved.
 
 **`BPL`/`BMI` after `CMP` is a signed test on an unsigned compare.** `CMP` sets *carry*; `BPL`/`BMI`
