@@ -6,6 +6,43 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — "The configuration surface": the population of engine defaults, closed and named (2026-09-05)
+
+Fourteen rows in `known-traps.md` for the family the repository kept finding one member at a time:
+`RandomState`, the random boot bank, the `VSYNCscanlines` threshold, SuperChip SARA,
+`VSYNCsyncedOnStart`. Each had been written up in a different section and read as a one-off. They
+are one population and it is now closed: `SetDefaults` exists in **12** functions, all twelve
+opened; four are hardware and hold **17** values (2+2+5+8, all named in the table), `colourgen`
+holds **14** more that every pixel passes through.
+
+The table sorts them into three kinds that need different answers — **A** a switch that is off
+(flip it and measure the difference), **B** no model at all (a litmus can only measure our own
+settings), **C** something outside the repository. Two rows reach outside the machine and neither
+had been named anywhere: **PlusROM** POSTs to a URL carried in the ROM with no preference to
+disable it (the gate is a byte-fingerprint over the whole image; measured — **0 of 1157 `.bin`
+files** here carry `8d f1 1f`, and a match would still have to pass `NewPlusROM`'s URL check), and
+**`FestivalEnabled` defaults true**, which can launch an external binary, and is not measured.
+
+Found by the mailing-list distillation (helper-2), who closed the `SetDefaults` population and then
+followed `AttachCartridge` and `fingerprint.go` out of it. Every count re-measured here before
+publishing, which changed three of them.
+
+### Fixed — the setup-database guard was looking at four directories out of 38 (2026-09-05)
+
+`TestNoSetupDatabaseIsSilentlyPatchingOurROMs` asserted that Gopher2600's SHA-1-keyed setup
+database — which can toggle the panel, **patch the cartridge bytes**, or change the TV spec — is
+absent. It listed four roots (the umbrella, `harness/`, `roms/`, `sandbox/`) and its comment said
+"four `.gopher2600` directories exist".
+
+There are **38**. In a dev build the resource path is relative and `resources.JoinPath` creates the
+folder just for being asked, so `go test` — which runs each package with the package directory as
+its working directory — has minted one per package: **32** of the 38. The comment was reporting the
+number the test looked for, not the number that exists.
+
+The test now **walks** instead of listing, and carries a witness that fails if the walk ever finds
+no directories at all, because a version of this test that finds nothing passes for the wrong
+reason. All 38 are empty; `~/.gopher2600` does not exist.
+
 ### Fixed — "HW-stable" did not say which hardware, in four places (2026-09-05)
 
 The two distillations — stella-list (3,324 notes) and AtariAge (1,764) — had never been checked

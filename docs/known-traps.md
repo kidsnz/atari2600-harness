@@ -76,8 +76,9 @@ now sweeps all six points and pins the witness list at each. ★★They also pre
 differ; it does not, at any point.
 
 ★★★Family: this is the fifth entry of *"TRUE OF HARDWARE, AND NOT OF WHAT WE MEASURE WITH"* —
-after `RandomState`, the random boot bank, the VSYNC threshold and SuperChip SARA. helper-2 proposes
-the four be gathered into one table with a name; that is not done here and is worth doing.
+after `RandomState`, the random boot bank, the VSYNC threshold and SuperChip SARA. **All of them,
+and nine more, are now gathered in "The configuration surface" below**, which is where to look
+first; the prose entries keep the per-trap advice, the table keeps the roster.
 
 **The 3F hotspot is a 74LS173, and that explains two things the condition alone does not, 2026-09-05.**
 The engine states the condition (`addr&0x10c0 == 0x0000`, quoting alex_79) but not the circuit. Adam
@@ -187,6 +188,58 @@ Measured: 10 multi-bank ROMs, all pass (9 select in every bank, `litmus_superchi
 controls: the too-strict rule fails `litmus_superchip` by name; blinding the hotspot scan fails all 10.
 
 > Provenance: every row cites the mined thread(s) it came from. Raw notes in `reference/atariage/<id>-*/notes.ja.md`.
+
+## The configuration surface — what our answer depends on besides the ROM
+
+Every row here is TRUE OF HARDWARE AND NOT OF WHAT WE MEASURE WITH, or the reverse. They are not
+bugs in Gopher2600; they are choices, and the choice is ours because nothing in this repository
+sets any of them. This table exists because the family kept being discovered one member at a time
+— `RandomState`, the random boot bank, the VSYNC threshold, SuperChip SARA, `VSYNCsyncedOnStart` —
+each in a different section, each read as a one-off. **They are one population, and it is closed.**
+
+Counted 2026-09-05 (`rg 'func .*SetDefaults' Gopher2600 --include='*.go' | rg -v _test`): `SetDefaults`
+exists in **12** functions and all twelve have been opened. Four are hardware (`preferences.go`,
+`cartridge_preferences.go`, `television.go`, `revision_preferences.go`) and hold **17** values; a
+fifth file, `television/colourgen/colourgen.go`, holds **14** more that every pixel passes through
+— **31** in all. The 17 are accounted for exactly: 2 + 2 + 5 + 8, and rows 1–7 and 9 below name all
+of them. Of the remaining seven `SetDefaults`, **two reach outside this machine** and are rows 13–14;
+the other five are the ARM coprocessor, the disassembly listing, rewind granularity, and two for the
+GUI, which a headless run does not build.
+
+**Three kinds, and they need different answers:**
+
+| kind | what it is | what to do |
+|---|---|---|
+| **A — a switch that is off** | the engine models the behaviour and is not asked to | flip it and MEASURE the difference; the size of the difference is the finding |
+| **B — no model at all** | the engine cannot show it however it is configured | document it; a litmus here can only measure our own settings |
+| **C — something outside the repository** | a file, or a network, changes the answer | assert its absence, or read it and record what it said |
+
+| # | Setting / mechanism | Default | Kind | Measured? |
+|---|---|---|---|---|
+| 1 | `RandomState` — INTIM and all 128 bytes of RAM | **false** (read in 18 places) | A | partly — the consequence is recorded (§C), the difference is not |
+| 2 | F8/F6/F4 boot bank (`Random.Intn`, gated by 1) | fixed `Loader.Bank` | A | no — a litmus would measure our setting |
+| 3 | `VSYNCscanlines` — the "frame is synced" threshold | **2** | A | no |
+| 4 | `EmulateSARA` — SuperChip phantom reads | **false** | A | no |
+| 5 | `VSYNCsyncedOnStart` — hides vertical drift before `stabilityThreshold` (**6**) frames | **true** | A | **yes, 2026-09-05** — 192 ROMs × 6 read points: at most **1** differs at any point, and by frame 8 all agree. Transient and self-correcting. 42% of our measurement points sit inside the window: exposure, not damage |
+| 6 | `RandomPins` — floating-bus model | **false** | A | yes — used as a negative control in `internal/emu/floatbits_test.go` |
+| 7 | The eight TIA-revision flags | **all false** | A | **yes** — 7 of 31 technique ROMs change under them; the catalogue table listed only 18 of the 31, now gated by `check_wiring.py` |
+| 8 | `colourgen`: `LegacyEnabled` **true** plus 13 adjustment values (Brightness 1.196, Saturation 0.963, NTSCPhase 0.0; the non-legacy set differs on all three) | legacy generator | A | **no — and the existing guard cannot catch it**: `PaletteFor` and `HarvestPalette` BOTH go through `Spec.GetColor`, so a generator change moves both twins and `TestHarvestedPaletteEqualsDerivedPalette` stays green. So does C1==0 on the five playfield-only ROMs. Pin the 128 RGB triples as a golden — the precedent is `pkg/audio.MeasuredSpectra` |
+| 9 | `VSYNCimmedateSync` / `HaltChangedVBLANK` / `HaltChangedVSYNC` / `UnwrapACE` | false/false/false/true | A | **no — not named anywhere in this repository before this table** |
+| 10 | **PAL colour-loss** (odd scanline count → the set goes black and white) | — | **B** | Gopher2600 has **no implementation at all** — not a preference that is off, absent. Stella has the setting; it was off by default in 2011 and its maintainer said a developer should always have it on. Our own trap row for this warns the author about something our instrument cannot show 〔atariage 190917〕 |
+| 11 | The composite waveform — sync separation, DC reference. **A missing layer, not a setting** | — | **B** | our television takes a digital sync flag, so no VBLANK-interferes-with-sync effect can appear here 〔stella-list "262 scanline kernel is rolling"; atariage 113732, 126450, 254640, 189414〕 |
+| 12 | `setupDB` + `patches/` — a SHA-1-keyed database that can toggle the panel, PATCH THE CARTRIDGE BYTES, or change the TV spec | absent here | **C** | `setup.AttachCartridge` consults it on every load and the engine's own comment says it will "silently ignore absence of setup database". In a dev build the path is **relative**, so which database is consulted depends on the directory the command ran from. Measured 2026-09-05: **38** `.gopher2600` directories exist under the umbrella, **all empty** — 32 of them in Go package directories, because `go test` runs each package with the package directory as its working directory and `resources.JoinPath` mints the folder just for being asked the path. Asserted by `internal/emu/setupdb_test.go`, which **walks** rather than listing: an earlier version listed four roots and reported "four" |
+| 13 | **PlusROM outbound HTTP** | no off switch | **C** | `plusrom/network.go` POSTs to a URL carried in the ROM itself (`http.NewRequest("POST", …)`), and no preference disables it — the gate is a **fingerprint**. `cartridge/fingerprint.go`'s `fingerprintPlusROM` searches the WHOLE cartridge image for the bytes of `STA $1FF1` (`8d f1 1f`); the comment says an earlier version searched only the first 1024 bytes and missed a real PlusROM after it. A false positive is caught one step later — `NewPlusROM()` validates the URL — so the byte match alone does not transmit. Measured 2026-09-05: **0 of 1157 `.bin` files** under the umbrella carry the sequence, so the second check is never even reached. Re-run the three-byte scan if the corpus grows |
+| 14 | `FestivalEnabled` (AtariVox speech) — can launch an **external binary** | **true** | **C** | **not measured.** Same family as 13: an engine default that reaches outside the process. Whether any path in our headless use ever reaches it is unknown |
+
+**The general rule.** An emulator implements the specification; what is not in the specification
+cannot be modelled, only lost. **Kind A is not that** — kind A is in the specification and switched
+off, so it is measurable today and the measurement is cheap. Do not write "hardware does X" from a
+run that never asked the engine to model X.
+
+**Provenance.** Rows 1–4 and 10–12 were found by the mailing-list distillation (helper-2), who
+closed the population of `SetDefaults` and then followed `AttachCartridge` and `fingerprint.go` out
+of it; rows 5, 7 and the counts in 12 and 13 were measured here. Rows 13 and 14 are the two that
+leave the machine, and only 13 has been counted.
 
 ## A. Timing / sync (the Pong killers)
 
