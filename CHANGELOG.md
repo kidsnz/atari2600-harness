@@ -6,6 +6,56 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — `save_state` is bit-exact for the picture and not for the sound (2026-09-05)
+
+`save_state`/`restore_state` is documented as a "whole-machine snapshot ... CPU/RAM/TIA/RIOT/cart/TV
+plus the rendered framebuffer and the cycle counters". Measured with `tia_pcm.bin` and a 20-frame
+detour between save and restore: **34 of the first 1048 samples differ**, contiguously from the
+first, then it re-converges — about 17 scanlines of wrong audio after every restore.
+
+Probing each candidate in the vendored engine decomposes it completely:
+
+| | differing samples |
+|---|---|
+| as shipped | 34 |
+| `Audio.sampleSum` deep-copied | 33 |
+| `Television.audioSignals` cleared on `Plumb` | 1 |
+| both | **0** |
+
+Two causes, additive, and together the whole of it. **`Television.audioSignals` (33)** is the TV's
+per-scanline batch buffer, flushed to the mixers at `TotalScanlines` — it is a field of
+`Television` and **not of `television.State`**, so a snapshot never sees it and the detour's residue
+is emitted after the restore. **`Audio.sampleSum` (1)** is the volume averager's running total;
+`Audio.Snapshot()` is `n := *au`, so snapshot and live machine share one backing array. Twenty of
+the ninety-two `Snapshot` functions under `hardware/` call `copy()` — deep-copying is this engine's
+convention and Audio is the exception. Its blast radius is one averaging window (36→150 on the
+free-running 228 clock, 38 CPU cycles), hence exactly one sample.
+
+The engine is vendored and **has never been modified here** (`git log -- Gopher2600/` is empty),
+which is what lets "our engine does X" mean "upstream does X". Both probes were applied, measured
+and reverted. `internal/emu/audiosnapshot_test.go` therefore **asserts the defect**: it fails if
+either cause is fixed, with instructions to re-measure rather than delete, and separately fails if
+the divergence ever stops being a transient — because "discard the head" is only an adequate
+answer while it heals.
+
+Recorded in three places that made the claim: `known-traps.md` §E, `mcp-tools.md`'s snapshot-slot
+entry, and the `save_state` line in `CLAUDE.md`.
+
+### Added — the audio clock is free-running, and it is not a picture coordinate (2026-09-05)
+
+`hardware/tia/audio/audio.go` keeps its own `clock228`, advances it by 3 per `Step()` and wraps at
+228. Measured: the identifier appears **nowhere else in the engine**, the `Audio` type has no
+`Reset` and no HSYNC hook, and nothing outside that file ever writes it. It lines up with the
+scanline only because a line is also 228 colour clocks, so anything that changes a line's length —
+`RSYNC`, a desynced frame — shifts the audio phase against the picture permanently. Two events per
+line each: the waveform advances at clock228 **9** and **81**, the volume average closes at **36**
+and **150** (114 colour clocks = 38 CPU cycles apart).
+
+The consequence is for how an audio measurement is written: compare **two runs of the same
+instruction stream**, never an absolute position within a line. Same family as "a frame index is not
+a machine quantity" — a quantity that looks synchronised to the picture and is not. Found by the
+mailing-list distillation (helper-2); verified here.
+
 ### Fixed — the trap gate had never been pointed at the works; it checked 31 files, now 411 (2026-09-05)
 
 `check_traps.py` globbed `roms/techniques/*.asm` when called with no arguments, which is how both
