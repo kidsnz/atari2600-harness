@@ -131,6 +131,18 @@ instrument for that axis.
 Designed by the mailing-list distillation (helper-3), who found the `diffPixels` trap and routed
 around it before proposing the measure; implemented, costed and controlled here.
 
+**Calibrated against the author's own judgement, 2026-09-06.** Run over the 134 built ROMs of the
+first work: ten have *"flick"* in the filename because that is what they are, and **all ten read
+non-zero** — no false negatives against a call made by the person who wrote them. 115 read exactly
+zero. The flickering variants land between **2.6% and 8.0%** of the visible picture, which is the
+first real range this project has for the quantity the archive only describes in words.
+
+**And nine ROMs read non-zero without "flick" in the name** — `meterv-noise`, `meterv-peak` and
+seven `probe*` ROMs. Those are not false positives so much as the documented limitation appearing in
+real work: a meter bar that changes height changes the element at those pixels, and movement and
+blinking are the same measurement here. The boundary of the number is now demonstrated rather than
+asserted.
+
 ### Added — the fifth route to more figures on a line, and its price is 7 cycles, not the 8 on the list (2026-09-06)
 
 `zone-multiplexing.md` lists the routes past two figures on a scanline and prices each in what it

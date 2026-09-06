@@ -28,6 +28,18 @@ import "fmt"
 // ★★★What it does NOT distinguish: movement from blinking. A sprite that moves ten pixels left
 // changes the element at twenty columns and reads as flicker. `read_motion` is the instrument for
 // that axis. This one answers "how much of the picture is not the same thing two frames running".
+//
+// ★★★★CALIBRATED against the author's own naming, on 134 built ROMs of the first work. Ten of
+// them have "flick" in the filename because that is what they are, and **all ten read non-zero** —
+// no false negatives against a judgement made by the person who wrote them. 115 read exactly zero.
+// The flickering variants land between **2.6% and 8.0%** of the visible picture
+// (`transistor-flick12` 808 px, `full-flick12s` 1234, `full-flick` 1414, `full-flick12` 2468, of
+// 30,720).
+//
+// ★★★★★Nine ROMs read non-zero without "flick" in the name, and they are the limitation above
+// showing up in real work rather than being argued: `meterv-noise` and `meterv-peak` are meters
+// whose bars change height, and seven `probe*` ROMs change something deliberately every frame.
+// Movement and blinking are the same measurement here. That is the number's boundary, demonstrated.
 func (e *Emu) FlickerArea() (int, error) {
 	if e.elemBuf == nil {
 		e.EnableElementCapture()
