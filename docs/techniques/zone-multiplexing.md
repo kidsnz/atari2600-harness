@@ -25,6 +25,21 @@ DaveC's `landscape.asm` (AtariAge; `reference/files-dave/`) and the 8bitworkshop
   in frames. **And a fourth: use a missile as a CHARACTER** — vary its width (`NUSIZ` bits 4-5) and
   its colour every line and `HMOVE` it every line, and it draws a shape rather than a dot 〔stella
   1997, Erik Mooney, with a tank sketched in ASCII〕. Added 2026-09-03; neither is measured here.
+  **★And a fifth, added 2026-09-06 and this one IS measured: pay in RAM.** Reserve a strip of RAM
+  per player, draw the shape into it at the right vertical offset, and the kernel line becomes
+  `lda P0strip,y / sta GRP0` — *"No skipdraw trickery, and to have multiple players vertically, you
+  just draw multiple players in the RAM strip. YOu can have as many as you want, and they can
+  overlap fine, and they won't flicker when vertically overlapping"* 〔stella-list `200305/msg00000`,
+  Andrew Davie, 2003-05-01, in a thread titled "What would you do with more RAM?"〕.
+  **Price: 7 cycles a line per player, not the 8 the list says** — `sta GRP0` is a store to $1B and
+  the TIA is in the zero page, so it is `sta zp` at three, not four (measured,
+  `internal/emu/ramstrip_test.go`: load 4 + store 3). **8 is reachable and at exactly the proposed
+  size**: a 256-byte strip spans a page, so the indexed read crosses one whenever the index carries,
+  and those lines cost 8. Page-align the strip and you keep the cycle — a little over five scanlines
+  a frame for two players. **Price in RAM: 256 bytes per player**, against `design.RAM2600 = 128`,
+  so unlike the other four routes **this one needs a SuperChip**. The other side of that was priced
+  on the list too: *"Sure, it wastes RAM on lines the sprites don't appear in, but it's worth it …
+  all those RAM strips do add up"* 〔`200309/msg00071`, Glenn Saunders〕.
 - **Single-line vs 2-line kernel.** A *single-line* kernel updates the TIA every scanline (almost no spare
   CPU). A *2-line (double-line) kernel* repeats each sprite line over 2 scanlines, buying CPU time for logic —
   the more common choice for real games. Ours is effectively single-line.

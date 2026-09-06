@@ -6,6 +6,40 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the fifth route to more figures on a line, and its price is 7 cycles, not the 8 on the list (2026-09-06)
+
+`zone-multiplexing.md` lists the routes past two figures on a scanline and prices each in what it
+spends: flicker pays in frames, missile/ball/PF pays in objects, a wide `NUSIZ` interleave pays
+*"in width rather than in frames"*, a missile-as-character pays in the missile. **A fifth pays in
+RAM and the page did not have it** — Andrew Davie's RAM strip, 2003: reserve a strip per player,
+draw the shape into it at the right offset, and the kernel line is `lda P0strip,y / sta GRP0`,
+*"No skipdraw trickery … they can overlap fine, and they won't flicker when vertically
+overlapping"* 〔stella-list `200305/msg00000`〕. He priced it at *"8 cycles per player"*.
+
+**Measured: seven.** `sta GRP0` is a store to $1B and the TIA lives in the ZERO PAGE, so it is
+`sta zp` at three cycles, not four. Decomposed against an empty interval
+(`roms/litmus/litmus_ramstrip.asm`, `internal/emu/ramstrip_test.go`): load **4**, store **3**,
+pair **7**.
+
+**And eight is reachable at exactly the size he proposed.** A 256-byte strip spans a page by
+construction, so the indexed read crosses one whenever the index carries, and the pair costs **8**
+on those lines — measured as its own band. So the figure on the list is right about half the time
+for a reason it does not give, and the author's real choice is whether the strip can be
+page-aligned: one cycle per player per line, a little over five scanlines a frame for two players.
+
+The RAM price is what keeps the route off a stock machine — 256 bytes per player against
+`RAM2600 = 128`, so unlike the other four this one needs a SuperChip. The other side of that was
+priced on the list too: *"Sure, it wastes RAM on lines the sprites don't appear in, but it's worth
+it … all those RAM strips do add up"* 〔`200309/msg00071`〕. First entry written under the new rule
+that a technique page states its price in every resource it spends.
+
+**One process note, in the ROM's own header.** The first version of this litmus compared three
+spellings of the pair and measured 7 three times, because every one of them ends in the same
+zero-page store. The comparison looked like a comparison and was not; decomposing into load, store
+and pair is what made the seven readable and the eight explainable.
+
+Recovered by the mailing-list distillation (helper-2); the cycles measured here.
+
 ### Fixed — I gave the wrong cause for the 97% / 1.8% verification ratio, an hour after measuring it (2026-09-06)
 
 The entry below explains why 97% of this repository's stella-list citations can be checked against
