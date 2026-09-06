@@ -6,6 +6,41 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Changed — CI runs its packages in parallel; `-p 1` had outlived its reason (2026-09-06)
+
+`ci.yml` passed `-p 1` since 2026-06 under a comment saying several packages assemble and read the same
+shared ROM `.bin` fixtures, so a serial run avoids one process truncating a `.bin` mid-assemble while
+another loads it. **That race was fixed and the comment outlived it** — `internal/build`'s `scratchPath()`
+writes to a per-PID private name and `os.Rename`s it into place, so a half-written `.bin` cannot be
+observed — and `CLAUDE.md` had recorded the flag as kept "because it is what CI actually runs, and
+mirroring CI is the point", which makes the reason circular: the invocation justified itself.
+
+Measured before changing anything, in a worktree **outside** the repository (`docs/system-weight.md`'s
+rule), by a different session than the one proposing the change:
+
+| | EXIT | seconds | FAIL | packages |
+|---|---|---|---|---|
+| parallel | 0 | **272 / 265 / 265** | 0 | 42 |
+| serial (`-p 1`) | 0 | **538 / 541** | 0 | 42 |
+
+Three parallel runs green, identical package set to the serial runs, 0 skips, no data race, no panic.
+Parallel's slowest (272 s) is under serial's fastest (538 s), which was the condition set before the
+numbers were taken. **2.04x here; the ratio does not carry** — this machine has 8 cores and `ubuntu-latest`
+has 4. What carries is the greenness. The real figure will come from `gh run list` after this lands, so
+there is nothing to estimate.
+
+★**A fourth run was thrown away, and it is the most useful of the five.** The first attempt ran against a
+worktree with no `.bin` files at all — they are gitignored, and `ci.yml` assembles them in a separate step
+before the tests — and 39 packages failed, every one of the 62 errors reading "no such file or directory".
+So the failure mode that `-p 1` was masking is not concurrent writes; it is **files that are missing**, and
+the guard against it is the Assemble step's ORDER, not the test flag. That is now written where the flag
+used to be: do not reorder those two steps.
+
+Changed in the same commit, because a correction that reaches one side only is how this repo got here:
+`ci.yml`, `scripts/git-hooks/pre-push`, `CLAUDE.md` (three places) and `docs/system-weight.md` (three).
+Measured by helper-2 at the author's direction; the separation was deliberate, since the session proposing
+the removal should not be the one grading it.
+
 ### Added — PAL is a smaller box of colours, and three rows that were already related (2026-09-06)
 
 More from reading the 353 threads a keyword net had discarded. Four items, two of which repair

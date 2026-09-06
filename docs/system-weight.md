@@ -17,7 +17,7 @@ Measured from the GitHub Actions API, per step, on the runs at `3f148ad` (2026-0
 | Step | 2026-08-07 | 2026-08-13 |
 |---|---|---|
 | setup (checkout, Go, DASM, clone engine, assemble) | 38 s | 38 s |
-| **`go build` + `go vet` + `go test -p 1 ./...`** | **342 s** | **512 s** |
+| **`go build` + `go vet` + `go test ./...`** | **342 s** | **512 s** |
 | regression scenarios | 55 s | 64 s |
 | CPU conformance (Klaus + Tom-Harte) | 3 s | 4 s |
 | the five gates | 3 s | 1 s |
@@ -101,8 +101,10 @@ job limit is six hours and is irrelevant here.
 
 **When a run exceeds 20 minutes, the next commit must do one of three things and say which.**
 **Do NOT start by guessing the cause — the cause is already measured and recorded**: 84% of the
-wall clock is the single `go test -p 1 ./...` step, `-p 1` is there because packages share `.bin`
-fixtures (`ci.yml:48`), and the entry point to fixing that is `t.TempDir()` (§ below). Start there:
+wall clock is the single `go test ./...` step. **`-p 1` was removed 2026-09-06** — the shared-`.bin` race
+it named had been fixed and the flag had outlived its reason. Three parallel runs measured green, 42
+packages each, 265 s against 539 s on 8 cores; the ratio does not carry to CI's 4-core runner, the
+greenness does. The `t.TempDir()` note below still reads true but no longer gates the invocation. Start there:
 
 1. **Make the heavy thing faster.** First resort, because it costs no coverage. A test that is slow
    because it is serial is not a test that is slow.
@@ -118,7 +120,7 @@ Sampling a sweep re-creates the defect it was built to find.
 ### The first attempt at (1), measured and NOT shipped
 
 The pitch sweep is 330 independent emulator runs, and `buildAudioROM` writes into its own
-`t.TempDir()` without invoking dasm, so none of the shared-`.bin` races that keep CI on `-p 1`
+`t.TempDir()` without invoking dasm, so none of the shared-`.bin` races that once kept CI on `-p 1`
 apply. Taken concurrently it ran **41.8 s → 9.7 s, measuring the same 330 pairs with the same
 result** — the serial and concurrent runs agree pair for pair.
 

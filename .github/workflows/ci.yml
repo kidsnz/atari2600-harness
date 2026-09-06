@@ -45,12 +45,24 @@ jobs:
         run: |
           go build ./...
           go vet ./...
-          # -p 1: several packages assemble/read the SAME shared ROM .bin fixtures
-          # (roms/litmus, roms/techniques) during their tests, so running package test
-          # binaries serially avoids a flaky on-disk file race (one process truncating a
-          # .bin mid-assemble while another loads it). The engine is single-emu in
-          # production, so this is a test-isolation concern only, not a runtime bug.
-          go test -p 1 ./...
+          # Packages run in PARALLEL. `-p 1` was here from 2026-06 with a comment saying
+          # several packages assemble/read the same shared ROM .bin fixtures and a serial
+          # run avoids one process truncating a .bin mid-assemble while another loads it.
+          # **That race was fixed and the comment outlived it**: `internal/build`'s
+          # `scratchPath()` writes to a per-PID private name and `os.Rename`s it into place,
+          # so a half-written .bin cannot be observed. Measured 2026-09-06 in a worktree
+          # outside the repo: three parallel runs green, 42 packages each, 0 failures,
+          # 0 skips, identical package set to the serial runs; no data race, no panic.
+          # 265s parallel against 539s serial on an 8-core machine -- the RATIO does not
+          # carry to this 4-core runner, but the greenness does.
+          #
+          # What the parallel run DOES depend on is the step above: every .bin must already
+          # exist when the tests start. Assembling them there is not an optimisation, it is
+          # the ordering this line now relies on. A parallel run against a tree with no
+          # .bin files fails 39 packages, every error "no such file or directory" -- that
+          # is the real failure mode, and it is about files that are MISSING, not files
+          # being written concurrently. Do not reorder these two steps.
+          go test ./...
 
       - name: Regression scenarios (litmus + techniques)
         env:

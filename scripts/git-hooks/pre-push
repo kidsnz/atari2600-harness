@@ -19,7 +19,7 @@
 # a .bin. Measured: 137 t.Skip sites, only 80 of which say "unavailable", so grepping the skip
 # message would have missed 41% of them.
 #
-# WHAT IT COSTS, measured 2026-08-23: 5m41s, of which almost all is `go test -p 1 ./...`. The
+# WHAT IT COSTS, measured 2026-08-23: 5m41s with `-p 1`; packages run in parallel since 2026-09-06 (see ci.yml), which halved it on an 8-core machine. The
 # version before this one claimed "~1 minute" while running the same suite, and an over-promising
 # gate is what makes a surprise feel like an excuse to reach for --no-verify. If that is too slow
 # to live with, the honest cut is to move the test sweep to CI and keep the cheap certain failures
@@ -87,7 +87,7 @@ fi
 cd "$W" || fail "cd worktree"
 export GOWORK=off CGO_ENABLED=0
 go vet ./...                              || fail "go vet"
-go test -p 1 ./...                        || fail "go test -p 1"
+go test ./...                            || fail "go test"
 python3 scripts/check_wiring.py           || fail "check_wiring"
 python3 scripts/check_provenance.py       || fail "check_provenance"
 python3 scripts/check_traps.py --selftest || fail "check_traps --selftest"
