@@ -36,11 +36,14 @@ server.Run(context.Background(), &mcp.StdioTransport{})
   `load_rom`/`assemble_and_load` clear the map (`resetSlots()`) — a state must never be plumbed into a
   different machine. `emu.State` deliberately includes the capture framebuffer, because Gopher2600's
   `television.Plumb()` leaves the PixelRenderers alone and would otherwise show the diverged frame.
-  ★**The sound is not restored exactly** — measured 2026-09-05, 34 of the first 1048 samples after a
-  restore are wrong and it then re-converges (~17 scanlines). `Television.audioSignals`, the TV's
-  per-scanline batch buffer, is a field of `Television` rather than of `television.State`, so it is
-  never snapshotted (33 of the 34); `Audio.Snapshot` shares `sampleSum`'s backing array (the other 1).
-  Reset the audio capture **after** the restore and discard the head. Pinned by
+  ★**The sound is not restored exactly, and how badly depends on where you saved.** Measured
+  2026-09-05 over 3 ROMs × 4 save positions: saving **at a frame boundary** costs a short head (6,
+  19 or 34 samples) that then heals; saving **one scanline later** spreads the damage to the end of
+  the capture — worst measured **530 of 786 samples**. Two causes: `Television.audioSignals`, the
+  TV's per-scanline batch buffer, is a field of `Television` rather than of `television.State` and so
+  is never snapshotted; and `Audio.Snapshot` shares `sampleSum`'s backing array, worth exactly one
+  sample. **Save at a frame boundary, reset the audio capture after the restore, and discard the
+  head** — or do not restore at all when measuring sound. Pinned by
   `internal/emu/audiosnapshot_test.go`, and see `docs/known-traps.md` §E.
 
 ## Shared return component

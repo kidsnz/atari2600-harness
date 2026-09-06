@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the previous entry measured one ROM at one save position and generalised (2026-09-05)
+
+The entry below reported "34 of the first 1048 samples differ, contiguously from the first, then it
+re-converges" and told the reader to discard the head. Swept over three ROMs and four save
+positions, **both halves of that are position- and ROM-specific**:
+
+|  | frame boundary | +1 line | +5 lines | +40 lines |
+|---|---|---|---|---|
+| `tia_pcm` | 34/1048, last 33 | 38, last 1015 | 54, last 1015 | 114/786, last 491 |
+| `sound_driver` | 19/1048, last 19 | 87, last 1020 | 366, last 1047 | **530/786, last 780** |
+| `music_driver` | 6/1048, last 5 | 76, last 1034 | 266/786, last 785 | 526/786, last 785 |
+
+**At a frame boundary the damage is a short head and heals — 6, 19 or 34 samples depending on the
+ROM. One scanline later it is not a head at all** and runs to the last sample of the capture. So
+"discard the first N" is a workaround for a boundary save only, and "34" was this ROM's number, not
+the machine's.
+
+The prediction that prompted the sweep was that the head length would be a function of the save
+position (mailing-list distillation, helper-2, reasoning from the flush at `TotalScanlines`). It is
+not: the contiguous prefix measured **34 at all eleven save positions tried** for `tia_pcm`. What
+varies is the scattered remainder, and that is what breaks the "it heals" claim.
+
+`internal/emu/audiosnapshot_test.go` now sweeps the grid and carries three assertions: the defect
+exists everywhere in it, a boundary save stays a head (so the advice keeps earning its place), and a
+mid-frame save does not (so the stronger warning stays earned). `known-traps.md`, `mcp-tools.md` and
+`CLAUDE.md` corrected in the same turn.
+
 ### Fixed — `save_state` is bit-exact for the picture and not for the sound (2026-09-05)
 
 `save_state`/`restore_state` is documented as a "whole-machine snapshot ... CPU/RAM/TIA/RIOT/cart/TV
