@@ -6,6 +6,38 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — two facts the archive had and this repo did not (2026-09-06)
+
+Both came out of reading the threads a keyword net had discarded — 353 of them were recorded as
+"screened" when what had actually happened is that three regular expressions found nothing in them.
+
+**An object drawn only as SCENERY still sets its collision latch.** The TIA compares geometry and has
+no notion of what a program means by an object, so a missile borrowed for an explosion keeps colliding
+at its first job. This repository teaches the borrowing — *"Multi-kernel = reuse one object per
+region"* — and did not teach the bill. The bug report is from the author of the game it happened in:
+Piero Cavina on INV, *"This must happen because the program is checking missile/invaders collisions
+even when the missile is used for the explosion"* 〔`199801/msg00197`〕; shooting one of two adjacent
+invaders exploded both. Measured in `litmus_decor_collides`: a missile inside a quad-width player
+reads `CXM1P` = **$81, D7 set**, and **$01, D7 clear** with `ENAM1` alone changed.
+
+★**The fixture is the second lesson.** Its first version strobed `RESP0` and `RESM1` three cycles
+apart and read no collision — indistinguishable from the trap not existing. `DecomposeRow` put the
+objects at clocks 3..10 and 25..32, twenty-two apart. **A negative result from a fixture that never
+posed the question is not a negative result**, and the test now asserts the overlap before it asserts
+anything about the latch. Restoring the normal-width player is one of its negative controls.
+
+**The RIOT data registers decode A0 and A1 and ignore A3 and A4.** `$0288`, `$0290` and `$0298` all
+read SWCHA; `$028A` reads SWCHB. So an address inside the RIOT window that looks like an undocumented
+register is a mirror of one of the four. This matches the only hardware measurement of it the list
+produced — Eckhard Stolberg reporting `$288` reading back as the port on a 7800 in 2600 mode, after
+the person asking said an emulator would not settle it. **Measured in four input states**, because
+the first version read the ports once at reset and reported `$FF` everywhere, which is what a working
+mirror and a dead decoder both look like from one sample; the test now fails if SWCHA takes fewer
+than three distinct values. Its control is that **A1 still discriminates** (SWCHA `$FF`/`$BF`/`$DF`/
+`$F7` against SWCHB `$3F`).
+
+Found by the mailing-list distillation (helper-1). Gates 6/6; both ROMs queued for Stella capture.
+
 ### Added — the 1998 delay table, measured, and the row wrong since then (2026-09-06)
 
 "The shortest code that wastes exactly N cycles" is a daily 2600 tool. The table everyone quotes

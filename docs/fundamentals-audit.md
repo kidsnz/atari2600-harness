@@ -310,6 +310,20 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   (reset/select/color/p0pro/p1pro) + scenario panel inputs.
 - ✅ INPT4/5 fire: D7, 0=pressed; **VBLANK D6=1 latch mode** — verified `litmus_input` (v0.42.0).
   Test with N flag, never Z (bus noise in low bits).
+- ✅ **The RIOT data registers decode A0 and A1 and ignore A3 and A4** — verified
+  `litmus_riot_mirror` (`internal/emu/riotmirror_test.go`, 2026-09-06). `$0288`, `$0290` and
+  `$0298` all read SWCHA, and `$028A` reads SWCHB, in every input state. So an address inside
+  the RIOT window that looks like a register nobody documents is a **mirror of one of the four**,
+  not a discovery. This matches the only hardware measurement of it the list produced: Eckhard
+  Stolberg reported `$288` reading back as the port on a 7800 in 2600 mode, after the person
+  asking said an emulator would not settle it — found by the mailing-list distillation.
+  **Measured in four input states, and the reason is in the ROM's header:** the first version read
+  the ports once at reset, before any input was applied, and reported `$FF` at every address —
+  which is what a working mirror and a dead decoder both look like from one sample. The test's
+  control is that **A1 still discriminates** (SWCHA `$FF`/`$BF`/`$DF`/`$F7` against SWCHB `$3F`),
+  so the agreement is a fact about A3 and A4 rather than about a decoder that stopped answering.
+  Negative controls: pointing one mirror at a real other register (`$0284` INTIM) fails it, and
+  making SWCHA constant by turning SWACNT to outputs trips the distinct-values guard.
 - ✅ Paddles INPT0–3 dump/charge — verified `litmus_paddle` (v0.54.0; transfer curve measured).
 - 📖 **SWACNT/SWBCNT DDRs** — documented only. **"Rarely game-relevant" was withdrawn 2026-09-03:**
   it was true of *our* ROMs and not of the games. `docs/casebook.md:98` reads a commercial title
