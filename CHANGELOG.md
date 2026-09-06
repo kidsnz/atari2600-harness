@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — how full a cartridge is, after three wrong answers (2026-09-06)
+
+The price rule asks each technique for its ROM cost and nothing measured one. Four attempts:
+
+ 1. **Count the bytes DASM's listing displays.** It truncates any line over four bytes with a `*`,
+    so a sixteen-byte table counts as four. Short on every ROM with data in it.
+ 2. **Take the address delta to the next emitted line.** Exact until a directive is the last thing
+    before an `org`. Calibrated against a ROM of known size — 7 bytes of code, a 100-byte table,
+    4 vector bytes = **111** — the tool said **11**: the `ds 100` collapsed to one byte.
+ 3. **Bracket it**, non-`$FF` as the floor and capacity-minus-trailing-fill as the ceiling. The
+    floor is sound; **the ceiling is not a ceiling.** A ROM whose data ENDS in `$FF` has it
+    swallowed by the trailing run: 3 bytes of code, 200 deliberate `$FF`, 4 vectors = 207, and the
+    bracket came out **7..9** — the answer outside it. A bound that excludes the answer is worse
+    than none.
+ 4. **The floor alone**, with the trailing fill reported beside it rather than as its partner.
+
+All three failures looked right and every one was caught by a known answer — the second by a
+purpose-built fixture, the third by a second fixture written to defeat the first. Both are in the
+test.
+
+**And the archive says exactly where this measure earns its keep.** ROM does not behave like cycles:
+*"96 bytes of ROM isn't a heck of a lot **unless it's the difference between a 4K ROM and a 2K
+ROM**"* 〔stella-list `200401/msg00073`, Eric Ball, 2004〕. Cycles are continuous — a cycle saved is
+a cycle spent elsewhere. **ROM is quantised at the 2K/4K/8K boundaries**: inside one, ninety-six
+bytes buy nothing; at one, a single byte decides the work. Measured here the same day: twelve of
+`260809_technojacket`'s cover ROMs have **10 bytes** of trailing fill out of 4096 — the boundary
+Ball is describing — while most of the other 153 built work ROMs are comfortably inside one, where
+trimming buys nothing at all. That is a criterion for **which** ROM to work on, which the project did
+not have. Recovered by the mailing-list distillation (helper-2).
+
 ### Added — `cmd/palette`: the drawing side had no palette of its own (2026-09-06)
 
 Asked where the Photoshop palette comes from, the author's answer was *"something found somewhere
