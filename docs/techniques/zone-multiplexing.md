@@ -36,9 +36,18 @@ DaveC's `landscape.asm` (AtariAge; `reference/files-dave/`) and the 8bitworkshop
   `internal/emu/ramstrip_test.go`: load 4 + store 3). **8 is reachable and at exactly the proposed
   size**: a 256-byte strip spans a page, so the indexed read crosses one whenever the index carries,
   and those lines cost 8. Page-align the strip and you keep the cycle — a little over five scanlines
-  a frame for two players. **Price in RAM: 256 bytes per player**, against `design.RAM2600 = 128`,
-  so unlike the other four routes **this one needs a SuperChip**. The other side of that was priced
-  on the list too: *"Sure, it wastes RAM on lines the sprites don't appear in, but it's worth it …
+  a frame for two players. **Price in RAM: one byte per KERNEL LINE per player — not the 256 the
+  proposal names.** The list had said so a year before the proposal was made: *"Even with your
+  current code, the full 256 bytes make no sense, because the values for Y are not ranging from
+  0..255 when drawing the ball.  You initialize Y with 156, so that's the maximum of bytes you
+  should have to waste"* 〔`200207/msg00025`, Thomas Jentzsch, 2002-07-03〕. 256 is the ceiling of
+  the index, not the requirement. **That correction cuts both ways and the second way is the useful
+  one:** at 156 the strip fits INSIDE a page with 100 bytes of slack, so the page-alignment above
+  costs nothing to arrange, where a 256-byte strip has to be exactly page-aligned or it spans two by
+  construction. Against `design.RAM2600 = 128` a 156-line strip still needs a SuperChip — but the
+  figure that decides that is now the kernel's height, so **a short enough zone fits in the stock
+  128 and this route stops being SuperChip-only**, which was not visible while the price read 256.
+  The other side of that was priced on the list too: *"Sure, it wastes RAM on lines the sprites don't appear in, but it's worth it …
   all those RAM strips do add up"* 〔`200309/msg00071`, Glenn Saunders〕.
 - **Single-line vs 2-line kernel.** A *single-line* kernel updates the TIA every scanline (almost no spare
   CPU). A *2-line (double-line) kernel* repeats each sprite line over 2 scanlines, buying CPU time for logic —

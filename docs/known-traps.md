@@ -321,6 +321,78 @@ leave the machine, and only 13 has been counted.
 
 | **`ROL`/`ROR` rotate THROUGH the carry, so two of them are not two of one** | `ROL` shifts bit 7 into C and C into bit 0. Do it once and the carry you started with lands in bit 0; do it twice and the *first* rotation's bit 7 comes back round. A 2004 report reads like a hardware fault and is not: *"1 time gives a good result. **2 times makes a total mess.** First line only → good. Second line only → good. **Both lines and it's a total mess!**"* — answered on the spot, *"is the carry bit messing you up? **The rotate instructions rotate data through the carry bit.**"* The symptom points away from the cause: each half works, so the pair looks like a timing or alignment problem. | `CLC` (or `SEC`) before the first rotate when you want a defined bit in, and remember the second rotate inherits the first's output. If you want a plain shift, `ASL`/`LSR` do not involve C on the way in. | **Do not make this a static check.** The chain is used deliberately here — `maze.md` turns four source bits into eight output bits precisely by rotating twice through carry — so a rule would fire on correct code. "Suspicious, read it" is the right strength. Third of a family this file already has: `cmp` clobbering Z between a load and a zero test, and an immediate `ld_` clobbering N/Z. | stella-list `200404/msg00370`; found by the mailing-list distillation (helper-2) |
 
+### The delay table, measured — and the row that has been wrong since 1998
+
+"The shortest code that wastes exactly N cycles" is a daily 2600 tool, and the table everyone
+quotes has a defect its own authors flagged and never fixed.
+
+Andrew Davie posted it 〔`199805/msg00090`, 1998-05-09 11:07:03〕 under the constraint that makes it
+useful — *"these delays are designed to be NON-destructive of memory. Ie: they have no effect other
+than delay or the accumulator and/or flags"* — and corrected one row **eight minutes later**
+〔`199805/msg00091`, 11:15:37〕: *"That should be 5@3. I can't figure a 2 byte non-destructive 5
+cycle delay :("*. He fixed the row he was looking at. **`11@4` contains the same `STA $8000,X` and
+was not fixed.** Paul Slocum carried the table into the 2600 Cookbook six years later
+〔`200404/msg00246`〕 still reading `11@4`, under a heading that says so out loud:
+
+    WASTING CYCLES
+    Christopher Tumbler, Chris Wilkson, Andrew Davie
+     Todo: Verify Andrew's
+
+That Todo is discharged here. All 21 rows measured 2026-09-06 against the engine, cycles from the
+CPU counter and bytes from DASM's own symbol table (`roms/litmus/litmus_delaytable.asm`,
+`internal/emu/delaytable_test.go`). **Twenty rows match. One does not:**
+
+| cycles | bytes | code | |
+|---|---|---|---|
+| 2 | 1 | `nop` | |
+| 3 | 2 | `lda $80` | |
+| 3 | 1 | `pha` | 2004 |
+| 3 | 2 | `dop $80` | 2004, **ILLEGAL opcode** |
+| 4 | 1 | `pla` | 2004 |
+| 4 | 2 | `nop / nop` | |
+| 4 | 2 | `lda $80,x` | 2004 — **+1 cycle for ZERO extra bytes** over `lda $80` |
+| 4 | 3 | `lda.w $80` | 2004 |
+| 5 | 2 | `dec $2D` | 2004 — ★see the hazard below |
+| 5 | 3 | `sta $8000,x` | Davie's own 8-minute correction |
+| 6 | 2 | `lda ($80,x)` | |
+| 7 | 2 | `pha / pla` | |
+| 7 | 3 | `rol $8000,x` | |
+| 8 | 3 | `lda ($80,x) / nop` | |
+| 9 | 3 | `pha / pla / nop` | |
+| 9 | 4 | `lda ($80,x) / lda $80` | |
+| 10 | 4 | `rol $80 / ror $80` | |
+| 10 | 4 | `dec $2D / dec $2D` | 2004 |
+| **11** | **5** | `sta $8000,x / lda ($80,x)` | ★**published as `11@4` for 26 years. It is 5.** |
+| 12 | 3 | `jsr` + shared `rts` | 3 = the caller's bytes |
+| 12 | 4 | `lda ($80,x) / lda ($80,x)` | |
+
+**The correction is stronger than "the byte count is off by one."** Shortening that row to four bytes
+means using `sta $80,x` instead of `sta $8000,x`, which also drops it to **ten** cycles — measured as
+a negative control. There is no eleven-cycle four-byte form; the published row names something that
+does not exist.
+
+**And `STA $8000,X` is not a write to ROM.** Davie closed the post asking *"Any comments on the
+danger of 'writing' to ROM?"* and the thread never answered. There is no ROM at `$8000` on a 2600:
+the address bus is 13 bits and A12 selects the cartridge, so `$8000` folds to `$0000` — the TIA. The
+litmus makes that visible rather than arguing it: with `x = $09` the "harmless" write sets **COLUBK**
+and the background changes colour. Which register it hits is whatever `X` happens to hold, so this
+idiom is non-destructive only by luck. `x = $02` folds to **WSYNC** and halts the CPU to the end of
+the line — a delay of a completely different length, from an instruction whose whole purpose was to
+have a known one.
+
+**`dec $2D` is the 2004 answer to Davie's 1998 lament, and it carries the hazard in the row above.**
+The trick is not a cleverer instruction but a better address: *"locations $2D-$3F do nothin and
+aren't decoded"* 〔`200404/msg00246`〕 — the instruction is destructive, and there is nothing there to
+destroy. Verified here for **writes** (a separate axis from the read-side folding): writing `$FF` to
+seven addresses in that range moves no write-only TIA register, with a write to `$09` as the negative
+control. But `$2D` sits inside `$00`-`$3F`, so on a **3F/X07 cart it is a bankswitch hotspot** by the
+row above — and `scripts/check_traps.py` matches only `nop`/`bit`, so it will not flag `dec $2D`.
+The same paragraph in the Cookbook says as much (*"The only case where this might be a problem is if
+you're using an unusual bankswitching setup"*), and the engine's own mapper agrees from the other
+side: *"tigervision cartridges use mirror addresses to write to the TIA"*
+(`Gopher2600/hardware/memory/cartridge/mapper_tigervision.go`).
+
+
 ## E. TIA read / audio / emulator-fidelity
 
 | trap | note | source |

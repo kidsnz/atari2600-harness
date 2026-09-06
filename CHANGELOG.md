@@ -6,6 +6,52 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the 1998 delay table, measured, and the row wrong since then (2026-09-06)
+
+"The shortest code that wastes exactly N cycles" is a daily 2600 tool. The table everyone quotes
+carries a defect its own authors flagged and never closed, so it is now measured rather than
+remembered — `roms/litmus/litmus_delaytable.asm`, `internal/emu/delaytable_test.go`, 21 rows, cycles
+from the CPU counter and bytes from DASM's own symbol table.
+
+Andrew Davie posted it 〔`199805/msg00090`〕 and corrected one row **eight minutes later**
+〔`199805/msg00091`〕: *"That should be 5@3. I can't figure a 2 byte non-destructive 5 cycle delay
+:("*. He fixed the row he was looking at and missed the other one containing the same instruction.
+Paul Slocum carried the table into the 2600 Cookbook six years later 〔`200404/msg00246`〕 still
+reading `11@4`, under a heading that says *"Todo: Verify Andrew's"*. That Todo is discharged here.
+
+- **Twenty rows match. `11@4` does not — it is 11 cycles in 5 bytes.** And the correction is
+  stronger than an off-by-one: shortening it to four bytes means `sta $80,x` instead of
+  `sta $8000,x`, which **also drops it to ten cycles** (measured as a negative control). No
+  eleven-cycle four-byte form exists; the published row names something that cannot be built.
+- **`STA $8000,X` is not a write to ROM, and Davie's closing question — *"Any comments on the
+  danger of 'writing' to ROM?"* — was never answered on the list.** There is no ROM at `$8000`
+  on a 2600: 13 address lines, A12 selects the cartridge, so `$8000` folds to `$0000` — the TIA.
+  The litmus shows it instead of arguing it: with `x = $09` the harmless write sets **COLUBK** and
+  the background changes colour. Which register it hits is whatever `X` holds, so the idiom is
+  non-destructive only by luck, and `x = $02` folds to **WSYNC** and halts the CPU to end of line.
+- **The 2004 answer to the 1998 lament is an ADDRESS, not an instruction.** `dec $2D` is destructive
+  and there is nothing at `$2D` to destroy — *"locations $2D-$3F do nothin and aren't decoded"*.
+  Verified here for **writes**, a different axis from the read-side folding measured on 2026-09-02:
+  `$FF` into seven of those addresses moves no write-only TIA register, with a write to `$09` as the
+  negative control. But `$2D` is inside `$00`-`$3F`, so on a **3F/X07 cart it is a bankswitch
+  hotspot**, and `check_traps.py` matches only `nop`/`bit` — it will not flag `dec $2D`. Recorded in
+  `docs/known-traps.md` next to the row that states the condition.
+
+Three negative controls, all firing. Gates 6/6.
+
+### Fixed — `zone-multiplexing.md` priced a RAM strip at its ceiling (2026-09-06)
+
+The page read **"Price in RAM: 256 bytes per player"**. 256 is the range of the index, not the
+requirement: *"the full 256 bytes make no sense, because the values for Y are not ranging from
+0..255 when drawing the ball. You initialize Y with 156, so that's the maximum of bytes you should
+have to waste"* 〔`200207/msg00025`, Thomas Jentzsch, 2002-07-03 — a year BEFORE the proposal the
+page quotes〕. The price is one byte per kernel line per player. Correcting it sharpens the page's
+own conclusion in two directions: a 156-byte strip **fits inside one page** with slack, which is
+what makes the page-alignment the same paragraph recommends cheap to arrange, and the SuperChip
+verdict now depends on the kernel's height rather than being unconditional — **a short enough zone
+fits in the stock 128 bytes**, which was invisible while the price read 256. Found by the
+mailing-list distillation (helper-2) auditing landed pages against the corpus.
+
 ### Added — how full a cartridge is, after three wrong answers (2026-09-06)
 
 The price rule asks each technique for its ROM cost and nothing measured one. Four attempts:
