@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the witness for the PAL parity rule: a stable ODD frame, failing on parity alone (2026-09-06)
+
+`design.ScrollScanlinesConstant` was wired into `frame_lines_stable` earlier today, and its
+reachability had been shown only by MUTATION — inverting the parity test turned `pal.json` red.
+**A branch demonstrated only by breaking it is not demonstrated**, and the distillation (helper-3)
+said so rather than accepting the mutation as proof.
+
+`roms/litmus/pal_odd_lines.asm` is a PAL frame of **311** lines (VSYNC 3 + VBLANK 45 + picture 228 +
+overscan 35), identical every frame. Run through the scenario runner it produces exactly the split
+the rule needs:
+
+	ok    frame_lines_stable over 20 frames: 311x20
+	FAIL  design.ScrollScanlinesConstant(PAL): total lines constant AND even
+
+**The stability half passes and only the parity half fails**, so the fixture is a witness for one
+assertion rather than for two — the stability check on its own is perfectly happy with a ROM a PAL
+television would render in black and white. The scenario declares only `frames`, not `lines`, which
+also demonstrates the second half of the gap: `FrameLinesStableCheck.Lines` is `omitempty`, every
+scenario in the tree happens to set it, and every value happens to be even, so the parity rule had
+never had anything to catch.
+
+Our television takes a digital sync flag and cannot show the colour loss, which is the reason to
+check the count instead: the rule is enforceable where the symptom is not observable.
+
 ### Added — a 2004 report the list never resolved, measured: the mixer squashes one channel with the other (2026-09-06)
 
 A two-voice tune sounded *"brilliant and crystal clear"* under an emulator and *"horribly
