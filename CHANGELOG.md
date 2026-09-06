@@ -6,6 +6,44 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `ram_budget`: the second rule with no caller, wired so it grades the ROM and not the claim (2026-09-06)
+
+`design.ScrollBackgroundFitsRAM` had **no non-test caller anywhere** — the second function found in
+that state in one day, after `ScrollScanlinesConstant`. Found by the mailing-list distillation
+(helper-3).
+
+Wiring it up alone would have been worth little. Its four numbers are things an **author** writes
+into a scenario, so arithmetic on them grades the claim, not the ROM. The check therefore has two
+halves: the arithmetic, and the declaration compared against `cyclebound.DefUse`'s static write set
+— **every address any reachable instruction might write, over all paths**, which is the set a real
+execution's writes must be contained in. If the program touches more RAM than the layout declares,
+the layout is fiction and the arithmetic was decoration. It refuses to grade rather than
+under-report when `DefUse` cannot pin a write target down, and it **says it skipped** when the ROM
+is a `.bin` with no source. Four paths, four witnesses in
+`internal/scenario/rambudget_test.go`.
+
+**And `boardBytes` now says how to count it.** The function added four numbers without one line on
+where they come from; the list has the formula, and the striking thing is that "cell" means
+something different every time and the arithmetic still holds:
+
+	 60 board squares × 2 bits       =  15 bytes  〔200304/msg00033〕
+	104 well spots   × 4 bits        =  52 bytes  〔199905/msg00090〕
+	128 bricks       × 4 bits        =  64 bytes  〔200108/msg00315〕
+	  7 bytes/line   × 8 lines       =  56 bytes  〔199906/msg00102〕
+	  5 sprites wide × 20 lines deep = 100 bytes  〔200209/msg00045〕
+
+Re-checked here at bit widths 2, 3, 4 and 8. **The proof that it is a formula rather than
+remembered numbers is the one that does not divide**: 78 spots at 3 bits is 29.25, and its author
+wrote *"<30 bytes"* instead of a round figure. The bit width itself is decided by what a cell must
+remember — one bit per brick is enough for a simple game, but Arkanoid needs *"its color, how many
+hits it has taken (for silvers), and whether or not it hides a capsule"*.
+
+`false` also stopped meaning one thing. The list treats it as a three-way fork: buy the cartridge
+RAM — which one correspondent called cheating, *"The challenge is to make it run with 128 Bytes
+anyway"* 〔200104/msg00092〕 — pack harder, or **change the game so it needs less**, the option no
+tool can suggest: *"making the levels not have more than two silver bricks per row"*
+〔200108/msg00315〕. Recovered by helper-2 and helper-3.
+
 ### Fixed — an elision hid the strongest evidence the row had (2026-09-06)
 
 `known-traps.md`'s row on emulators agreeing with each other and disagreeing with the machine quoted

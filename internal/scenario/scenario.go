@@ -110,6 +110,7 @@ type Temporal struct {
 type Checks struct {
 	NTSCFrameLines   *int                   `json:"ntsc_frame_lines,omitempty"`   // StepFrame() == この値（NTSC は 262）
 	FrameLinesStable *FrameLinesStableCheck `json:"frame_lines_stable,omitempty"` // every frame in a window has the SAME line count (the ∀-over-frames sibling of ntsc_frame_lines)
+	RAMBudget        *RAMBudgetCheck        `json:"ram_budget,omitempty"`         // the declared RAM layout fits in 128 bytes AND the program's static write set is no larger (rom must be .asm)
 	MaxLineBudget    *int                   `json:"max_line_budget,omitempty"`    // RunUntilBudget が超過しない（runtime・∃: ある1回の実行を観測。既定予算 76）
 	ProveLineBudget  *int                   `json:"prove_line_budget,omitempty"`  // VV-2: cyclebound が全パスの worst <= 予算を静的に証明（∀。rom が .asm のときのみ）
 	PFDeadlines      *bool                  `json:"pf_deadlines,omitempty"`       // every playfield write lands before the beam reaches the columns it governs, over all paths (.asm only). Fitting in 76 cycles does NOT imply this.
@@ -143,6 +144,32 @@ type Checks struct {
 // banked_game recurs every 120 frames, so a 60-frame window passes it. Size Frames past
 // the ROM's slowest periodic event; the window is printed in the verdict either way, so
 // a scenario that has been gating a window too short to contain the event shows it.
+// RAMBudgetCheck is a declared RAM layout, checked twice: the arithmetic, and the declaration
+// itself against what the program actually writes.
+//
+// ★Why the second half exists. `design.ScrollBackgroundFitsRAM` adds four numbers and compares
+// them to 128. Numbers an author writes into a scenario are a claim about the program, and a
+// gate that only does arithmetic on a claim grades the claim, not the ROM — the shape this
+// repository calls a self-declared budget. The static write set from `cyclebound.DefUse` is the
+// other side: **every address any reachable instruction might write**, over all paths, which is
+// the set a real execution's writes must be contained in. If the program touches more RAM than
+// the layout declares, the layout is fiction and the arithmetic was decoration.
+//
+// ★★The corpus is unusually specific about how these numbers are arrived at. `boardBytes` is
+// cells × bits-per-cell ÷ 8, confirmed at two bit widths with "cell" meaning something different
+// each time: 60 board squares × 2 bits = 15 bytes 〔stella-list `200304/msg00033`〕; 7 bytes per
+// line × 8 lines = 56 〔`199906/msg00102`〕; 5 sprites wide × 20 lines deep = 100
+// 〔`200209/msg00045`〕. The three-buffer shape the function adds up is one message's own
+// architecture — a packed board, "a big 60 byte buffer … in an intermediate state, with a 1:1
+// byte to game square correlation", and a small buffer the kernel unpacks into on the fly
+// 〔`200304/msg00033`〕. Recovered by the mailing-list distillation (helper-2 and helper-3).
+type RAMBudgetCheck struct {
+	Board  int `json:"board"`            // the packed world/board
+	Buffer int `json:"buffer,omitempty"` // the 1:1 intermediate the kernel reads
+	Delta  int `json:"delta,omitempty"`  // whatever is recomputed per frame
+	Stack  int `json:"stack,omitempty"`  // 2 bytes per level of JSR depth; there are no interrupts here
+}
+
 type FrameLinesStableCheck struct {
 	Frames int `json:"frames,omitempty"` // frames to measure (default 120 = two seconds of NTSC)
 	Lines  int `json:"lines,omitempty"`  // if non-zero, additionally require that shared count to equal this
@@ -730,6 +757,61 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			res.Asserts = append(res.Asserts, AssertResult{Desc: palDesc, Got: b2i(palOK), Pass: palOK})
 			if !palOK {
 				res.Pass = false
+			}
+		}
+		if rb := s.Checks.RAMBudget; rb != nil {
+			declared := rb.Board + rb.Buffer + rb.Delta + rb.Stack
+			fits := design.ScrollBackgroundFitsRAM(rb.Board, rb.Buffer, rb.Delta, rb.Stack)
+			res.Asserts = append(res.Asserts, AssertResult{
+				Desc: fmt.Sprintf("ram_budget: %d+%d+%d+%d = %d of %d bytes",
+					rb.Board, rb.Buffer, rb.Delta, rb.Stack, declared, design.RAM2600),
+				Got: int64(declared), Pass: fits})
+			if !fits {
+				res.Pass = false
+			}
+
+			// ★And the half that makes it more than arithmetic: does the program agree?
+			if !strings.EqualFold(filepath.Ext(s.Rom), ".asm") {
+				res.Asserts = append(res.Asserts, AssertResult{
+					Desc: "ram_budget vs the program's write set: SKIPPED — rom is not .asm, so " +
+						"the static write set cannot be computed and only the arithmetic above ran",
+					Got: 0, Pass: true})
+			} else {
+				rep, err := cyclebound.DefUse(s.Rom, 0)
+				switch {
+				case err != nil:
+					res.Asserts = append(res.Asserts, AssertResult{
+						Desc: fmt.Sprintf("ram_budget vs the program's write set: could not analyse (%v)", err),
+						Got:  0, Pass: false})
+					res.Pass = false
+				case len(rep.UnboundedWriters) > 0:
+					res.Asserts = append(res.Asserts, AssertResult{
+						Desc: fmt.Sprintf("ram_budget vs the program's write set: REFUSED — %d write "+
+							"target(s) could not be pinned down, so the write set is not complete and "+
+							"comparing against it would understate what the ROM touches",
+							len(rep.UnboundedWriters)),
+						Got: int64(len(rep.UnboundedWriters)), Pass: false})
+					res.Pass = false
+				default:
+					used := 0
+					for _, a := range rep.MayWrite {
+						var v int
+						if _, err := fmt.Sscanf(a, "$%x", &v); err == nil && v >= 0x80 && v <= 0xFF {
+							used++
+						}
+					}
+					ok := used <= declared
+					d := fmt.Sprintf("ram_budget vs the program's write set: %d RAM bytes may be "+
+						"written, %d declared", used, declared)
+					if !ok {
+						d += " — the declaration is smaller than the program, so the arithmetic above " +
+							"was grading a claim rather than the ROM"
+					}
+					res.Asserts = append(res.Asserts, AssertResult{Desc: d, Got: int64(used), Pass: ok})
+					if !ok {
+						res.Pass = false
+					}
+				}
 			}
 		}
 		if s.Checks.MaxLineBudget != nil {

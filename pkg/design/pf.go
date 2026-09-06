@@ -37,7 +37,33 @@ const RAM2600 = 128
 // を誰も検査していなかった。
 //
 // stackBytes は呼び出しの深さぶん（1段 2 バイト）＋割り込みは無いので純粋に JSR の深さ。
-// ★false のときは SuperChip/CBS RAM が要る、というのがこの関数の言っていること。
+//
+// ★boardBytes は cells × bitsPerCell ÷ 8。★★2026-09-06 まで、この関数は四つの数を足すだけで
+// 「どう数えるのか」を一行も書いていなかった。★★★リストは書いている——しかも「cell」の意味が
+// 毎回違うのに同じ式で通る:
+//
+//	 60 board squares × 2 bits      =  15 bytes  〔stella-list 200304/msg00033, C. Tumber, 2003〕
+//	104 well spots   × 4 bits       =  52 bytes  〔199905/msg00090, R. Perry Jr, 1999〕
+//	128 bricks       × 4 bits       =  64 bytes  〔200108/msg00315, E. Mooney, 2001〕
+//	  7 bytes/line   × 8 lines      =  56 bytes  〔199906/msg00102, K. Woloch, 1999〕
+//	  5 sprites wide × 20 lines deep = 100 bytes 〔200209/msg00045, A. Davie, 2002〕
+//
+// ★★★★Perry's is the one that proves it is a FORMULA and not remembered numbers: 78 spots at
+// 3 bits is 29.25, which does not divide, and he wrote "<30 bytes" rather than a round figure.
+//
+// ★★And the bit width is not free — it is decided by what each cell has to remember. Mooney:
+// one bit per brick is enough for a simple game, but Arkanoid needs "its color, how many hits it
+// has taken (for silvers), and whether or not it hides a capsule", so four.
+//
+// ★false のときは SuperChip/CBS RAM が要る、というのがこの関数の言っていること——★★ただし
+// リストはその判断を三択として扱っている。★★★(1) buy the cartridge RAM, which one correspondent
+// called cheating: "it is cheating to simply shift a game to the Supercharger that'd normally need
+// 500 Bytes of RAM … The challenge is to make it run with 128 Bytes anyway" 〔200104/msg00092〕;
+// (2) pack harder — the bit widths above; (3) ★change the GAME so it needs less, which is the
+// option a tool cannot suggest: "This can be handled, maybe through constraints, something like
+// making the levels not have more than two silver bricks per row" 〔200108/msg00315〕.
+// Recovered by the mailing-list distillation (helper-2, helper-3); the arithmetic re-checked here
+// on all five, and it holds at bit widths 2, 3, 4 and 8.
 func ScrollBackgroundFitsRAM(boardBytes, bufferBytes, deltaBytes, stackBytes int) bool {
 	if boardBytes < 0 || bufferBytes < 0 || deltaBytes < 0 || stackBytes < 0 {
 		return false
