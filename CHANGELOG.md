@@ -6,6 +6,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the 128 NTSC colours are pinned to a measured golden (2026-09-05)
+
+`TestHarvestedPaletteEqualsDerivedPalette` compares `PaletteFor` against `HarvestPalette` — one
+derived from the spec, one measured by rendering `litmus_palette.bin`. It is a good test of the
+harvest path and it **cannot see a change to the colour generator**, because both sides go through
+`Spec.GetColor` and a generator change moves them together.
+
+Measured by probing the vendored engine: setting `colourgen.SetDefaults`'s
+`LegacyAdjust.Saturation` from **0.963 to 0.500** moves code `$46` from `[236 51 51]` to
+`[157 69 69]` — a red turning to brick, plainly visible — and **the twin test still reported `ok`**.
+Negative control on the new golden: the same probe fails it. The probe was reverted; the vendored
+engine is unmodified.
+
+The table is the **measured** one (`HarvestPalette`, checked equal to the derived one when it was
+taken), 128 even codes with the RGB the renderer paints, and both paths are now checked against it
+rather than against each other. It carries a witness of its own: if the table ever holds fewer than
+64 distinct colours it is not a palette and the comparison would pass for the wrong reason (it holds
+**126**, which is the engine-side number `internal/ingest/aliases_test.go` measures, so the two
+agree).
+
+What the numbers depend on is why they are worth pinning: `colourgen/legacy.go` starts from 128 RGB
+literals *"taken from Stella 7.0 file common/PaletteHandler.cxx"*, converts to YIQ, applies
+`LegacyEnabled` true, Brightness 1.196, Contrast 1.000, Saturation 0.963, Hue 0.0, NTSCPhase 0.0 and
+a gamma, and converts back. Upstream knows the source table moves — `colourgen/legacy_test.go`'s
+`TestStellaComparisons` holds five Stella palettes and asserts where one of them changed. **Upstream
+guards the input; this guards the output.** Row 8 of the configuration surface in `known-traps.md`
+named this as the one engine default with no guard; it now has one. Found by the mailing-list
+distillation (helper-2).
+
 ### Added — `read_audio` reports a volume the machine never plays (2026-09-05)
 
 `read_audio` and `read_audio_trace` read `PeekChannels`, which is the register, and the register is
