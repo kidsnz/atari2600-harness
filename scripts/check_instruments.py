@@ -31,6 +31,27 @@ WHAT COUNTS AS CALIBRATION: a test that calls it with an input the test itself C
 instrument the machine's own output and checking it agrees with the machine is not
 calibration; it is the loop that hid MeasurePeriod for a year.
 
+AND THE OTHER HALF, learned 2026-09-06 and recorded here because this file is where someone
+goes looking for the reasoning. A constructed known-answer case proves the instrument is
+RIGHT on the shapes its author thought of. It cannot prove the author thought of every
+shape. Only real data does that, and the two are not substitutes.
+
+The worked example is small enough to hold in one hand. A tool that reads a sender's name
+out of a mail archive had a unit test on `'<stella@example>'` and passed it; the archive's
+actual bytes are `'< stella@example >'`, with spaces, and the tool returned "unknown" for
+every message of that shape. Then three sessions independently estimated how many messages
+had no name at all and produced 8%, 12% and 20% -- all three wrong, all three for the same
+reason: each had written a pattern for what it EXPECTED a From field to look like, and none
+had counted what the field actually contains. It contains five shapes, one of which
+(`addr (Name)`) hides the name in parentheses where nobody's regex was looking. The
+disagreement resolved the moment someone classified the real field and looked at an example
+of each shape.
+
+So: a known answer for CORRECTNESS, real data for COVERAGE OF SHAPES. This gate can only
+mechanise the first. When you add an instrument, run it over the whole corpus once and look
+at what it returns -- not to check the numbers, but to find the inputs whose shape you did
+not imagine. Count the shapes before counting the things.
+
 SECOND AXIS -- THE STATE. One calibration point is not a calibration, and this project
 has now paid for that lesson in three separate places in one session: a Video Olympics
 reading taken only in the attract screen, a frame measurement taken only at frame 1, and

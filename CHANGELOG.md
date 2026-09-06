@@ -6,6 +6,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the other half of the known-answer rule: real data for coverage of shapes (2026-09-06)
+
+`check_instruments.py` forbids a sample→number function that has never been fed an input whose
+answer is known independently. Its docstring now records the complement, because the file is where
+someone goes looking for the reasoning: **a constructed known-answer case proves the instrument is
+right on the shapes its author thought of, and cannot prove the author thought of every shape.**
+
+The worked example, measured today. A tool that reads a sender's name out of the mailing-list
+archive had a unit test on `'<stella@example>'` and passed it; the archive's actual bytes are
+`'< stella@example >'`, with spaces, so the tool returned "unknown" for every message of that shape.
+Then three sessions independently estimated how many messages have no name at all and produced
+**8%, 12% and 20%** — all three wrong, all three because each had written a pattern for what it
+EXPECTED a `From` field to look like and none had counted what the field actually contains. It
+contains five shapes, one of which — `addr (Name)` — hides the name in parentheses where nobody's
+regex was looking. The disagreement resolved the moment someone classified the real field and looked
+at an example of each shape.
+
+A known answer for correctness, real data for coverage of shapes. This gate can only mechanise the
+first; the docstring now says so, and says to run a new instrument over the whole corpus once and
+look at what it returns — not to check the numbers, but to find the inputs whose shape you did not
+imagine. Found during the distillation (helper-1), whose own tool was the example.
+
 ### Fixed — the palette golden pinned a machine-specific float and turned CI red (2026-09-06)
 
 The golden added an hour earlier demanded exact equality and failed on CI: code `$0C` is
