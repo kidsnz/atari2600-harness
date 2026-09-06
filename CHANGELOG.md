@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `cmd/palette`: the drawing side had no palette of its own (2026-09-06)
+
+Asked where the Photoshop palette comes from, the author's answer was *"something found somewhere
+on the web"*. That is the exact hazard the mailing list recorded in 2001. Jake Patterson built a
+Photoshop palette from *"sixteen screenshots of the colors.bin running in Mac Stella"*, published
+it, and it carried **odd luminances the machine cannot make** — he had already shipped a demo using
+them: *"I actually used a couple of the non-spec ones in my little demo thing, it was necesssary to
+get the colors to look right"* 〔stella-list `200109/msg00148`〕. The correction came the next day —
+*"On a real VCS there are only 8 luminance levels. The lowest bit isn't used … If you are seeing
+more than that, then it must be a bug in the emulator"* 〔`200109/msg00159`, Eckhard Stolberg〕 —
+and he republished it *"with the odd numbered colors … removed"* 〔`200109/msg00278`〕. A complete
+accident and its repair, twenty-five years early.
+
+**This project's ingest side was already safe** — `internal/ingest` uses the 128 EVEN codes and
+`pkg/design/color_test.go` machine-locks D0 as invalid — and the drawing side had nothing at all.
+
+`cmd/palette -out DIR` writes `.aco` Photoshop swatches **named with the TIA code** (`$1E`), plus
+`.act`, a `.txt` and a labelled chart. The palette is **measured, not transcribed**:
+`ceiling.HarvestPalette` runs `litmus_palette.bin` and reads back the colour of the pixels the
+renderer painted. The command **refuses to write** if that disagrees with the spec-derived table —
+if the two paths disagree, neither is fit to hand an artist. Here they agree on all 128.
+
+The names are the point. An artist picking a colour in Photoshop sees the number to write to
+`COLUPF`, so *"what number is this colour"* stops being a question anyone has to ask.
+
+Generated into `library/palette/` with provenance. **They are a copy**: `library/README.md` promises
+that nothing lives there and nowhere else — *"The moment (2) stops being true … this repository
+needs a remote"* — so the original is this command, and `works.json` carries the one line that
+re-creates all four. Found by the mailing-list distillation (helper-2), who located the 2001 thread
+and noticed the asymmetry between the two sides.
+
 ### Added — four rows to the density scorecard, two of which say no instrument exists (2026-09-06)
 
 The scorecard in `integration-density-playbook.md` §D assumes every metric is measurable with the
