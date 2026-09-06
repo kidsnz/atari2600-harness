@@ -83,6 +83,38 @@ the suite red instead.
 warning saying the numbers are wrong on purpose. It is there so the failure mode can be seen rather than
 described.
 
+**And PAL is not NTSC with different timing — it is a smaller box of colours.** Measured 2026-09-06
+(`internal/ceiling/palpalette_test.go`), with the NTSC table as the control in every comparison:
+
+| | grey hues | reddest entry |
+|---|---|---|
+| NTSC | **1** of 16 (hue 0) | `$46` → RGB(236, 51, 51) — a red |
+| PAL | **4** of 16 (hues 0, 1, 14, 15, all RGB(154,154,154)) | `$46` → RGB(215, 106, 38) — an **orange** |
+
+And the count that falls out of it — **the table is 128 entries on every spec; what differs is how
+many of them are the same colour twice**:
+
+| spec | distinct colours from 128 entries |
+|---|---|
+| NTSC | 126 |
+| PAL | **104** (12 hues × 8 + one grey column) |
+| SECAM | **8** |
+
+★The test asserts this as an **order**, not as three pinned numbers: the NTSC count came out 126 here
+and 127 on another machine earlier in this project — a rounding difference in the renderer's
+conversion, not a fact about the hardware — and pinning it turned CI red. `NTSC > PAL > SECAM` is the
+claim that survives the arithmetic.
+
+So a PAL kernel picks from **twelve** hues rather than fifteen, and **the same TIA code that paints a
+red on NTSC paints an orange on PAL** — a picture whose subject IS red does not port, and no other
+entry rescues it, because `$46` is already the reddest thing in the table. Both facts were reported on
+the list in 1997 by someone who burned an EPROM to check them on a real machine rather than an
+emulator: *"the first and last two colours are the same grey. What is surprising is that the TIA has
+many nice colours but there isn't a bright, intense RED - at least in PAL"* 〔`199704/msg00150`,
+1997-04-17〕. **There should be 16 hues on both systems, but there is not necessarily a corresponding
+hue for each hue in the other system** — the same post, and the reason a spec conversion cannot be a
+table lookup. Found by the mailing-list distillation (helper-2).
+
 ## Verification
 
 Run `go test ./internal/ceiling/`. Denominators are stated in every test's log line.

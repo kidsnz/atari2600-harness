@@ -153,7 +153,33 @@ being present, and the two mirrors are identical on a bare console. **So the rul
 evidence for it does not include a working repair.** What is actually established: a shipped game
 reads through `$0x`, and it is one of three in 135 that a Supercharger breaks. Why remains open —
 the 2000 reporter says "maybe", the 2003 reporter could not reproduce the cure, and nobody has
-checked whether ROM revision, cartridge individual or modification accounts for the difference. **This is the false-green
+checked whether ROM revision, cartridge individual or modification accounts for the difference.
+★**A 1998 post answers the "why", and it is the bus-residue row further up this same file.**
+Bradford Mott — Stella's author — diagnosing Haunted House three years before either row was written:
+*"it seems to be because Haunted House is reading and using the values from undefined locations in the
+TIA. The values read from these locations change depending on 'something' … So when Haunted House is
+loaded into a SC the values the cartridge reads isn't the same as if it was a real cartridge and thus
+you get the strange behavior. Something similar happens with **Warlords** I believe"* 〔`199801/msg00272`,
+1998-01〕. Two consequences. **Warlords is a seventh name**, not among the six the 2003 survey lists.
+And **the mechanism is not specific to the Supercharger** — it is that the undriven bits are an
+electrical property of whatever hardware is answering, so ANY substitute cartridge can differ.
+★**That is also why an emulator cannot see it.** All three residue models below are DETERMINISTIC
+given the ROM; real bus capacitance is not. The false green is structural, not a missing feature.
+★★**Not yet separated here:** a probe reading `$00`/`$0100`/`$0200`/`$0D00` returns `$00`/`$01`/`$02`/
+`$0D`, which fits the ADDRESS model and the LAST-BUS-BYTE model equally, because in absolute addressing
+the last byte fetched IS the address's high byte. Telling the two apart needs a read whose preceding
+bus byte is not part of its own address. Found by the mailing-list distillation (helper-1).
+**One of those three now has a name.** The "modification" is not hypothetical: *"Bob's hardware
+modification disables all bankswitches. It is meant to be used only with ROM dumps of actual carts.
+Some of those accidently access the address which triggers the bankswitching and therefore crash. It
+is limited to 2k and 4k games"* 〔`199706/msg00047`, Eckhard Stolberg, 1997-06 — the same post gives
+the control byte at `$FFF8`, write-only, and the read-then-compare idiom that drives it〕. So a
+Supercharger in the field can be running with bankswitching disabled, and a 2K or 4K ROM that brushes
+the hotspot behaves differently on two machines that are both "a Supercharger".
+★**This is a variable, not an explanation.** Air-Sea Battle's symptom is a collision read through
+`$00`/`$01`, not a `$FFF8` access, so the modification is not shown to be its cause — what changes is
+that "modification" is no longer a word standing in for something nobody has looked at. Found by the
+mailing-list distillation (helper-1). **This is the false-green
 direction** — the emulator passes it and a real configuration does not — the same side as the F8
 hotspot decoding elsewhere in this file. Found by the mailing-list distillation (helper-2).
 

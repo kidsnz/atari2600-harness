@@ -6,6 +6,47 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — PAL is a smaller box of colours, and three rows that were already related (2026-09-06)
+
+More from reading the 353 threads a keyword net had discarded. Four items, two of which repair
+existing rows rather than add new ones.
+
+**PAL spends four hues on grey and cannot draw a red.** Measured with the NTSC table as the control in
+every comparison (`internal/ceiling/palpalette_test.go`): PAL's hues 0, 1, 14 and 15 are all the same
+grey, so a PAL kernel picks from **twelve** hues rather than fifteen; and the reddest entry PAL can
+make is `$46` → RGB(215, 106, 38), an **orange**, where the same code on NTSC is RGB(236, 51, 51). A
+picture whose subject IS red does not port, and nothing else in the table rescues it. Reported in 1997
+by someone who burned an EPROM to check it on a real machine: *"the first and last two colours are the
+same grey … there isn't a bright, intense RED - at least in PAL"* 〔`199704/msg00150`〕, along with the
+reason a spec conversion cannot be a table lookup — *"there is not nessessarily a corresponding hue for
+each hue in the other system"*. In `docs/visual-ceiling.md`.
+
+**`RepositionCostScanlines = 1` has a visible form, and it is the one that lands when you are drawing.**
+Piero Cavina shipping a build of *Look Mom No Flicker*: *"now the 4 objects are repositioned before
+each floor (here's why the floors are thicker)"* 〔`199808/msg00051`〕. The constant and "the floors are
+thicker" are the same fact; a band that hosts a repositioning cannot also be the thinnest band in the
+picture. In `docs/design-principles.md`, next to the number.
+
+**The Supercharger row's "modification" is no longer a bare word.** *"Bob's hardware modification
+disables all bankswitches … Some of those accidently access the address which triggers the
+bankswitching and therefore crash. It is limited to 2k and 4k games"* 〔`199706/msg00047`, Eckhard
+Stolberg〕. This is a variable, not an explanation — Air-Sea Battle's symptom is a collision read
+through `$00`/`$01`, not a `$FFF8` access — but the candidate now has content.
+
+**The Supercharger row and the bus-residue row are the same phenomenon, and a 1998 post says so.**
+Bradford Mott, Stella's author, on Haunted House: *"it seems to be because Haunted House is reading and
+using the values from undefined locations in the TIA … when Haunted House is loaded into a SC the
+values the cartridge reads isn't the same as if it was a real cartridge … Something similar happens
+with **Warlords**"* 〔`199801/msg00272`〕 — three years before either row was written. **Warlords is a
+seventh name**, not among the six the 2003 survey lists, and the mechanism is not Supercharger-specific:
+the undriven bits are an electrical property of whatever hardware answers. ★**Which is also why no
+emulator can see it** — all three residue models are deterministic given the ROM, and bus capacitance
+is not. ★★**Stated honestly:** a probe reading `$00`/`$0100`/`$0200`/`$0D00` returns `$00`/`$01`/`$02`/
+`$0D`, which fits the ADDRESS model and the LAST-BUS-BYTE model **equally** — in absolute addressing
+the last byte fetched IS the address's high byte — so it separates nothing, and the row says so.
+
+Found by the mailing-list distillation (helper-1, helper-2).
+
 ### Added — two facts the archive had and this repo did not (2026-09-06)
 
 Both came out of reading the threads a keyword net had discarded — 353 of them were recorded as

@@ -95,6 +95,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   collisions **only for a sprite that MOVED this frame**, since most sprites are stationary; the cost is that
   an overlap present the moment a screen appears goes unnoticed until something moves. 〔blogs 8429 SpiceWare/Frantic〕 `→ design.HardwareCollisionUsable`
 - Beyond 2 objects, multiplex by Y band; a horizontal repositioning costs one scanline; **an empty Y lane is mandatory**; the price is 30Hz flicker. 〔Bumbershoot〕 `→ design.NeedsFlicker/NeedsEmptyYLane/RepositionCostScanlines`
+  **What that scanline looks like.** The same constraint was stated on the list in the form the
+  person drawing the screen actually sees it — Piero Cavina, shipping a new build of *Look Mom No
+  Flicker*: *"I've found an use for the ball :) Most of the changes aren't visible, but very
+  important — now the 4 objects are repositioned before each floor (here's why the floors are
+  thicker)"* 〔`199808/msg00051`, 1998-08-14〕. **The floors got thicker because each one now has to
+  pay for a repositioning.** `RepositionCostScanlines = 1` and "the floors are thicker" are the same
+  fact, and when the layout is being drawn rather than budgeted, the second one is the one that
+  lands: a band that hosts a repositioning cannot also be the thinnest band in the picture.
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
 - **Multi-kernel = reuse one object per region**: switch `REFP` / position / picture per Y band and reuse a single player for different purposes (Stay Frosty). Match a "never overlap on the same line" placement constraint with an AI that "never enters an occupied column" and flicker is zero. 〔mining 303364, 318140, 164247〕
 - **★Everything measured here is measured BEFORE the television.** `internal/emu` imports
