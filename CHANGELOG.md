@@ -40,6 +40,19 @@ the result and the test asserts that this case reports it — a confident zero h
 "this technique uses no RAM", which is false. Both the ten bounds and the blind spot are pinned as
 goldens.
 
+**Calibrated against a known answer**, which is what separates a trustworthy bound from a merely
+conservative one. `roms/260816_transistor/src/rom/meterv-dual.asm` states its own RAM map in source
+— `MUSZP = $80`, `LVL = $8A` (ten bytes), `TMP = $94`, `BAR = $96` with the comment "$96..$F9",
+`BARD = $C8` — which is $80–$F9, **122 of the 128 bytes**. The tool reports **119**: three short of
+the author's own map, on a real work with a hundred-byte array in it. A bound that lands three under
+a known 122 is worth quoting; one that landed at 5 would not be.
+
+That measurement also says something about the work itself, and it is a bigger gap than expected.
+The picture ROMs — `transistor-all`, `transistor-even`, `transistor-sp4x` — use **1 to 5 bytes**.
+The meter ROMs, which replace the letters with ten bars driven from RAM, use **at least 119**. The
+two directions the work can take differ in RAM by two orders of magnitude, and one of them has about
+six bytes left.
+
 **And the gate caught debris I made while measuring.** A throwaway probe named
 `roms/techniques/score_kernel.asm`, which does not exist — the ROM is `score6.asm` — and `DefUse`'s
 assemble step left a **0-byte `score_kernel.bin`** in the fixture directory. The pre-push hook
