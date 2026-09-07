@@ -244,6 +244,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **Minimum-byte initialisation + hotspot placement**: in a tight 2K/4K, Omegamatrix's 8-byte self-modifying init (`bne .loop+1` jumps between operator and operand → `#$0A` executes as an ASL) yields A=0 / X=0 / SP=$FF / carry clear. Put bank hotspots **at the highest addresses (near the already-used interrupt vectors)** and the free chunk is maximised (a ZP hotspot = Tigervision 3F saves 1 ROM byte + 1cy per switch). 〔mining blog 12061, 11811〕
 - **★The "lodging" pattern for physics lines (sharing a WSYNC line between mutually exclusive paths)**: splitting the Overscan physics into "one concern = one WSYNC line" runs out of lines, but **paths that are mutually exclusive within the same frame (normal / hit / miss / frozen …) may use the same line for different purposes** —— each path strobes line N's WSYNC itself and only the contents of the line are swapped (e.g. line 3 = paddle input normally / english computation on a hit / serve handling on a miss). Work that gets skipped (a frame's worth of paddle input not being applied, say) merely means "drawn with a value one frame old" = an invisible compromise. Keep **the total line count identical on every path** (offset the variable part with the number of filler lines). When a feature addition inflates the budget, first ask "which path is it exclusive with", and consider lodging before adding a dedicated line. Housekeeping that must run every frame (LFSR / counters / note length / switch polling) is safest gathered on **a dedicated line where all paths converge**. 〔in-house: PONG pf2 physics-line architecture 2026-07-02–03 (serve lodging → generalised to hit/miss → new line 5)〕
 
+- **★The lodging pattern has an OBJECT version, and the choice it forces is about feel, not bytes.**
+  The same reasoning that shares one WSYNC line between mutually exclusive code paths shares **one
+  object slot** between mutually exclusive events. Piero Cavina, 1997, on a game with a single
+  explosion object: *"when something is hit, you remove it and add an \"explosion-object\"; since
+  there can be **only one of these on the screen at once**, if you hit something else while the
+  explosion is still around, it is **immediately replaced** by the new explosion"* 〔`199712/msg00039`〕.
+  ★★He then names all three policies and rejects the one he shipped: *"I don't like this very much, I
+  think it would be better to **always let the explosion finish**, and what is hit before the end of the
+  explosion just disappears. Alternatively, you could handle an **array of explosions** - but this can
+  be a real waste of RAM since you've to store all the information (position, status…) for **each**"*.
+  ★★★So the slot is not a limitation to route around — it is a **design decision with three answers**:
+  **newest wins** (the hit you just made always shows), **oldest wins** (an animation is never cut
+  short), or **an array** (correct, and paid for in RAM per instance). The first two cost nothing and
+  feel different; only the third costs bytes. Decide it deliberately rather than inheriting whichever
+  one the obvious code produces.
 - **★Placing a row of shapes and WRITING them are different limits, and the writes bind first.** A line's
   placement capacity is a search over strobe cycles (`plan_sprite_placement`); its write capacity is the
   graphics stores that must fit in the same 76 cycles (`prove_line_budget`). They are not the same number and
