@@ -114,6 +114,28 @@ right on a machine with both, and turned GitHub Actions **red three times** on a
 has one. The rule now counts and prints what it could not check, so a run that verified
 everything and one that skipped a third of it do not print the same thing.
 
+★**What it deliberately does not ask: what KIND of source it is.** The gate answers *"is there a
+citation"* and *"does the cited path resolve"*. It never asks whether the thing cited is machine
+output, literature, or **someone else's annotated source** — and that third category is the one the
+clean-room line is about. A comment in the script says as much: the path check *"answers the question
+provenance exists for — when this breaks, can I get back to the original? — instead of the question
+the marker check answers, which is does this file contain the word `Source:`"*.
+
+★★**A gate is the wrong tool for it, and the reason is worth stating.** The type is not in the
+citation text; it is a property of the thing cited. A cited `.asm` under the disassemblies tree could
+be DiStella output or a hand-annotated listing, and the citation string is identical either way.
+★★★★And this note proved it while being written: the first draft used an invented example path, the
+gate resolved it, found nothing, and failed — **a hypothetical path in backticks is indistinguishable
+from a citation**, which is the same lesson `check_wiring` learned as *"a reference is not a link"*. So it was counted by hand instead,
+once, and the count recorded: **58 rows of machine output against 1 annotated source** in
+`mining-digest.md`, with that one routed through `cmd/dissect` 〔`a320d55`〕. ★★★A number that has to
+be re-derived by reading is worth having anyway — the rule *"decode it yourself, do not take someone
+else's interpretation"* is easy to state and easy to erode one convenient row at a time, and until
+that count nobody had asked the digest whether it still held. Raised by the mailing-list distillation
+(helper-1), from Jim Nitchals' account of EA's two-team clean-room process 〔`199709/msg00220`〕 —
+where the point was that the people who read the disassembly and the people who wrote the code were
+**different people**, which is the one control this project cannot copy.
+
 ### `check_memory.py` — 3 catches, and it was wired to nothing
 
 Added `34fedb4`. Four findings on its first run, **two of which were the checker itself** (raw
