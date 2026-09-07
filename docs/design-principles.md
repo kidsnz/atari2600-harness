@@ -244,6 +244,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **Minimum-byte initialisation + hotspot placement**: in a tight 2K/4K, Omegamatrix's 8-byte self-modifying init (`bne .loop+1` jumps between operator and operand → `#$0A` executes as an ASL) yields A=0 / X=0 / SP=$FF / carry clear. Put bank hotspots **at the highest addresses (near the already-used interrupt vectors)** and the free chunk is maximised (a ZP hotspot = Tigervision 3F saves 1 ROM byte + 1cy per switch). 〔mining blog 12061, 11811〕
 - **★The "lodging" pattern for physics lines (sharing a WSYNC line between mutually exclusive paths)**: splitting the Overscan physics into "one concern = one WSYNC line" runs out of lines, but **paths that are mutually exclusive within the same frame (normal / hit / miss / frozen …) may use the same line for different purposes** —— each path strobes line N's WSYNC itself and only the contents of the line are swapped (e.g. line 3 = paddle input normally / english computation on a hit / serve handling on a miss). Work that gets skipped (a frame's worth of paddle input not being applied, say) merely means "drawn with a value one frame old" = an invisible compromise. Keep **the total line count identical on every path** (offset the variable part with the number of filler lines). When a feature addition inflates the budget, first ask "which path is it exclusive with", and consider lodging before adding a dedicated line. Housekeeping that must run every frame (LFSR / counters / note length / switch polling) is safest gathered on **a dedicated line where all paths converge**. 〔in-house: PONG pf2 physics-line architecture 2026-07-02–03 (serve lodging → generalised to hit/miss → new line 5)〕
 
+- **★The simplicity of the RULES says nothing about the cost of the KERNEL, and the escape is to
+  split by EVENT rather than by space.** Two messages from a 2002 thread on putting Battleship on the
+  machine. Mark De Smet, on why a trivial game is not a trivial kernel: *"Don't forget that this means
+  you have to draw a **10x10 grid with mulitple arbitrary objects/placement**. Not impossible (see
+  video chess), but **more involved than it may appear given the simplicity of the game**"*
+  〔`200203/msg00066`, `mulitple` is his spelling〕. ★★Glenn Saunders answered with the way out:
+  *"I would **only draw the pegs, not the ships**. So that's **playfield only**. When a ship gets sunk
+  I could **temporarily drop the playfield out to display just that ship**"* 〔`200203/msg00067`〕.
+  ★★★**Two configurations, chosen by what is happening rather than by where on the screen you are.**
+  The steady state draws the one thing the playfield is naturally good at — a coarse grid — and the
+  rare event borrows the entire screen for a single object. `zone-multiplexing.md` divides a frame by
+  **space**; this divides it by **time**, and the budget it buys is the whole line rather than a band
+  of it. The price is that the two configurations must not both be needed at once, which is a rule
+  about the game, decidable before any code exists.
 - **★The lodging pattern has an OBJECT version, and the choice it forces is about feel, not bytes.**
   The same reasoning that shares one WSYNC line between mutually exclusive code paths shares **one
   object slot** between mutually exclusive events. Piero Cavina, 1997, on a game with a single
