@@ -35,6 +35,24 @@ counter and no way to read a write-only register.**
 Found by the mailing-list distillation (helper-1 for the unanswered questions, helper-2 for the citation
 shapes, counted after their own tool was fooled by five of them).
 
+### Added — `check_traps` warns on an odd immediate into a colour register (2026-09-06)
+
+D0 of a TIA colour register does nothing — hue is D7..D4, luminance D3..D1 — so **`#$45` is the same
+colour as `#$44`, and `#$46` is the next one up.** Measured before writing the check, against the
+palette this repository derives from the renderer: `$44` and `$45` both give RGB(204, 33, 33); `$46`
+gives (236, 51, 51). **An odd literal rounds DOWN**, never towards the colour the author was reaching
+for, and it never crashes — which is why nothing caught it. It is a sign that someone believes in a
+colour that is not there: **the machine has 128, not 256**, which is also why `cmd/palette` names its
+swatches with the even code and why a 256-entry palette file shows 128 colours the TIA cannot make.
+
+Positive and negative controls both run, and **the rule fires zero times across the tree's 411 files** —
+a guard against new code rather than a backlog to work off.
+
+★Found the way the useful ones keep being found today: a distillation item asked whether harness warns
+about odd colour values and **checked before asking** — `rg -ni 'odd colour|odd color' docs/
+pkg/design/` returned nothing. The repository already knew D0 was unused (`pkg/design/color.go:48`
+says so). **What it did not have was anything that acts on knowing.**
+
 ### Fixed — `cmd/jingle` was the one path that assembled without the guard (2026-09-06)
 
 `internal/build.Assemble` has done two things for a while that a bare `exec.Command("dasm", …)` does

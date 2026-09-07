@@ -382,6 +382,36 @@ def scan_text(asm):
         pass
     elif not (has_cld or has_cleanstart):
         errors.append((0, "no CLD and no CLEAN_START — decimal flag / SP / RAM are undefined at power-up (BCD garbage, rolls)"))
+
+    # An ODD immediate loaded into a colour register. D0 of a TIA colour register does
+    # nothing — hue is D7..D4, luminance D3..D1 — so `#$45` and `#$44` are the SAME colour
+    # and `#$46` is the next one up. Measured 2026-09-06 against the palette this repository
+    # derives from the renderer: $44 and $45 both give RGB(204,33,33); $46 gives (236,51,51).
+    #
+    # Writing an odd value is not a crash, which is why nothing caught it — it is a sign the
+    # author believes in a colour that is not there. The machine has 128 colours, not 256, and
+    # an odd literal silently rounds DOWN to the even one below it, never to the one the author
+    # was probably reaching for. `cmd/palette` names its swatches with the even code for the
+    # same reason. Found by the mailing-list distillation (helper-3), who checked and found
+    # `rg -ni 'odd colour|odd color' docs/ pkg/design/` returned nothing.
+    colour_regs = ("COLUP0", "COLUP1", "COLUPF", "COLUBK")
+    pending = None  # (line, value) of the most recent `lda #$xx`
+    for n, raw in enumerate(asm.split("\n"), 1):
+        low = raw.split(";")[0].strip().lower()
+        m = re.match(r"(?:\w+:\s*)?lda\s+#\$([0-9a-f]{1,2})\b", low)
+        if m:
+            pending = (n, int(m.group(1), 16))
+            continue
+        m = re.match(r"(?:\w+:\s*)?sta\s+(\w+)\b", low)
+        if m and pending and m.group(1).upper() in colour_regs:
+            ln, v = pending
+            if v & 1:
+                warns.append((ln, "`lda #$%02X` into %s — D0 of a colour register is unused, so this "
+                                  "is the same colour as `#$%02X`, not a step towards `#$%02X`. The TIA "
+                                  "has 128 colours; an odd literal rounds DOWN"
+                                  % (v, m.group(1).upper(), v & 0xFE, (v + 1) & 0xFE)))
+        pending = None
+
     return errors, warns
 
 
