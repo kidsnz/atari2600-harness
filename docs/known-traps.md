@@ -86,6 +86,14 @@ Wozniak posted the wiring in 200506 — *"`/G1`→A7, `/G1`→A6, `CLK`→enable
 low, followed by a high transition on A12, the 74LS173 loads its flip-flops."* Two consequences follow
 that the address condition does not state on its own:
 
+- **On a 3F cartridge the TIA has to be addressed at `$40`-`$7F`, not `$00`-`$3F`.** The same
+  sentence says so directly — *"This means we can't access the TIA at 00-3F, **we must use 40-7F**"* —
+  and it is a stronger statement than the trap rows above. Those say *do not accidentally touch
+  `$00`-`$3F`*; this says the whole low mirror is **gone** on such a cartridge, so every TIA access in
+  the program has to use the higher one. `STA WSYNC` at `$02` is a bank switch; at `$42` it is a
+  WSYNC. ★A ROM written for any other mapper and then rebuilt as 3F does not fail at the one clever
+  line — it fails at **every** line, which is a different and much louder kind of broken, and worth
+  knowing before choosing the mapper rather than after.
 - **You cannot bankswitch from code running in RAM.** The load needs a LOW-to-HIGH transition on A12,
   and code executing out of RAM never drives A12 high. *"This also means we can't switch banks from
   code running in RAM."* — which is the constraint behind the separate `running-code-in-ram` idea of
