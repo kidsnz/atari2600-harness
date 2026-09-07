@@ -64,6 +64,9 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 		os.Remove(tmpBin)
 		os.Remove(lstPath)
 		os.Remove(symPath)
+		if hint := mnemonicStormHint(string(out)); hint != "" {
+			return string(out) + hint, "", "", err
+		}
 		return string(out), "", "", err
 	}
 	lb, _ := os.ReadFile(lstPath)
@@ -102,4 +105,47 @@ func diagnosedFailure(out string) error {
 		}
 	}
 	return nil
+}
+
+// mnemonicStormHint names the cause when DASM rejects the whole instruction set at once.
+//
+// A source with no working `processor` directive assembles nothing, and DASM reports it by calling
+// every instruction it meets an unknown mnemonic:
+//
+//	x.asm (4): error: Unknown Mnemonic 'lda'.
+//	x.asm (5): error: Unknown Mnemonic 'sta'.
+//	x.asm (6): error: Unknown Mnemonic 'jmp'.
+//
+// **Nothing in that output names the cause**, which is one character on line 1. Measured on DASM
+// 2.20.14.1, both ways of losing the directive produce the same storm:
+//
+//	`processor` in COLUMN 1   -> 4 unknown mnemonics, exit 5. DASM reads `processor` as a LABEL and
+//	                             `6502` as the mnemonic, so line 1 appears as `Unknown Mnemonic '6502'`
+//	                             -- a clue that names the argument rather than the mistake.
+//	`processor` line MISSING  -> 3 unknown mnemonics, exit 5, and **no mention of line 1 at all**.
+//
+// The exit status is non-zero either way, so nothing silently succeeds; what is lost is time. The
+// symptom points at the instruction set and the cause is the first line, and the two look nothing
+// alike. Manuel Polik diagnosed it on the list in 2001 for someone who had pasted a source into an
+// email: *"You need to TAB both lines for DASM. Now it's assuming 'processor' as label and '6502' as
+// mnemonic"* 〔stella-list `200102/msg00253`〕. The mailing-list distillation (helper-1) lost an
+// afternoon to the second form on 2026-09-07 -- eighteen illegal-opcode probes failed, and so did the
+// `lda #$01` negative control, which is what finally gave it away.
+//
+// The threshold is three because a real source can have one or two genuine typos; a run of three
+// unrecognised mnemonics is not a typo, it is a missing processor.
+func mnemonicStormHint(out string) string {
+	var n int
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, "Unknown Mnemonic") {
+			n++
+		}
+	}
+	if n < 3 {
+		return ""
+	}
+	return fmt.Sprintf("\n\nhint: %d instructions were rejected as unknown mnemonics. That is not a "+
+		"typo -- it is a source with no active `processor 6502` directive. Check line 1: the "+
+		"directive must be PRESENT and must be INDENTED. In column 1 DASM reads it as a label and "+
+		"the CPU is never selected. 〔stella-list 200102/msg00253〕", n)
 }

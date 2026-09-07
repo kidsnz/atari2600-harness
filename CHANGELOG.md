@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — when DASM rejects every instruction, the cause is line 1 (2026-09-07)
+
+A source with no working `processor` directive assembles nothing, and DASM reports it by calling every
+instruction it meets an unknown mnemonic. **Nothing in that output names the cause.** Measured on DASM
+2.20.14.1, both ways of losing the directive produce the same storm and both exit 5:
+
+| | unknown mnemonics | mentions line 1 |
+|---|---|---|
+| `processor` in **column 1** (read as a label, `6502` as the mnemonic) | 4 | once, as `Unknown Mnemonic '6502'` |
+| `processor` line **missing** | 3 | **never** |
+
+Nothing succeeds silently; what is lost is time, because the symptom points at the instruction set and
+the cause is the first line. Manuel Polik diagnosed the first form on the list in 2001 — *"You need to
+TAB both lines for DASM. Now it's assuming 'processor' as label and '6502' as mnemonic"*
+〔`200102/msg00253`〕 — and the distillation (helper-1) lost an afternoon to the second on 2026-09-07,
+when eighteen illegal-opcode probes failed and so did the `lda #$01` negative control, which is what
+finally gave it away. `internal/build` now appends the cause to DASM's own output. The threshold is
+three, because one or two unrecognised mnemonics is a typo and three is a missing CPU; a source with
+two deliberate typos is part of the test.
+
 ### Added — PAL60 declares one line rate and uses another (2026-09-07)
 
 `specifications.go` builds each television spec as a literal and then overwrites `RefreshRate` with a
