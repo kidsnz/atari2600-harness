@@ -97,6 +97,23 @@ that the address condition does not state on its own:
 Found by the mailing-list distillation (helper-1). ★Not measured here: this repository has no 3F
 fixture to run it against, so the circuit is recorded as the source's, not as ours.
 
+★★**And that last sentence has a casualty, 2026-09-07.** If the ROM's size tells you nothing, then a
+bank number the cartridge cannot honour is not a compile error, not a link error, and not an emulator
+failure — it is a crash on the machine and nowhere else. Eckhard Stolberg diagnosing a 2003 release on
+a Cuttle Cart: *"The new version starts with `lda #$1e/sta $3f`. This would switch the CC to the 31st
+(30th when counting from 0) 2K bank. But **in your 32K binary there are only 16 2K banks**. Since the
+CC can address 64K in this mode, your game is **jumping into an empty bank and therefore crashes**.
+After patching the `#$1e` to `#$0e` in the binary the game came up fine"* 〔`200301/msg00250`〕.
+★★★**One byte, and only real hardware could say which byte.** An emulator sized to the image wraps the
+high bits and survives; the cartridge, which addresses more than the image fills, does not.
+
+★★★★**Why this is a note and not a `check_traps` rule.** The check would be "is the value written to
+`$3F` within the cartridge's bank count", and **the `.asm` does not carry the cartridge's bank count** —
+only the image's, which is precisely the number the source above says is meaningless. A detector built
+on the image size would pass Stolberg's crash. Found by the mailing-list distillation (helper-2), who
+cited `200301/msg00256`; that is Andrew Davie quoting it back, and the words are Stolberg's six
+messages earlier.
+
 **"Bus residue" names three different models, and this engine picks one, 2026-09-05.** The row above
 says a read of a write-only register "returns bus residue", which is true and does not say *what*. The
 engine's own source names two candidates and B. Watson's 200508 post names the third:
