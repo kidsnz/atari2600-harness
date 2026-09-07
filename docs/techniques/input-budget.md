@@ -66,6 +66,21 @@ region that has no slack. The joystick spends 0.2%, in the region that does.
   to read. Play Star Raiders and FEEL the delay between a keypress and a response."*
   〔Stella list, `controllers`, 1997-09, Glenn Saunders〕
 
+  ★**And the 2000 answer to that delay is not a faster read — it is a design that needs fewer keys.**
+  Manuel Polik laid out multi-tap text entry in one message: a 4×4 grid where each key carries four
+  letters, and *"with repeated pressings you cycle through A>>B>>C>>D>>A>>B and so on. You just need a
+  **simple counter and 'AND #03'** it in your code, when having 4 values on each key… If another key
+  is pressed, just **reset the counter**. If it's the same, increase i[t]"* 〔`200011/msg00012`〕.
+  ★★Erasing is the same mechanism with a blank in the cycle — *"it would cycle from
+  BLANK>>X>>Y>>Z>>BLANK>>X"* — and the cursor is *"just **EOR #$FF** the graphics data that paints the
+  char where the cursor is located"*, so neither costs a code path of its own. ★★★He even puts the
+  letter frequencies in: *"you can rearange the above layout a bit, for example **starting the fifth
+  key with 'S' as it is statistically more often used** than P,Q&R"*.
+  ★★★★**Why it belongs on a page about budgets:** the expensive part of a keypad is finding *which*
+  of sixteen keys is down, and multi-tap needs only *one key at a time plus whether it changed*. The
+  design does not make the read cheaper — it makes the answer smaller. That is the shape to look for
+  whenever a device's cost is in resolution: **spend the resolution on time instead of on the read.**
+
 ## Reading the shape, not the value
 
 `docs/techniques/game-states.md` fixes the discipline that makes any of these affordable:
