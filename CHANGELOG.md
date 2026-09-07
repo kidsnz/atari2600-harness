@@ -6,6 +6,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — PAL60 declares one line rate and uses another (2026-09-07)
+
+`specifications.go` builds each television spec as a literal and then overwrites `RefreshRate` with a
+division. Four of the five divide their own fields. PAL60 divides **NTSC's**, so
+`SpecPAL60.HorizontalScanRate` says 15625.00 while the rate its own `RefreshRate` implies is 15734.26
+— a gap of **0.4170 Hz, 0.70%**. The arithmetic is right and the literal is wrong: PAL60 is PAL colour
+on 60 Hz timing, and PAL-M, the same 262-line geometry, declares 15734.26. Both cannot be correct.
+
+It costs this repository nothing, and the reason is worth writing down: `HorizontalScanRate` and
+`RefreshRate` are read **nowhere** in `internal/`, `pkg/` or `cmd/` — timing here comes from scanline
+counts, not hertz — and `internal/ceiling/palette.go` resolves `SpecPAL60` only to reach its colour
+generator. That insulation is an accident rather than a decision, so `internal/emu/pal60rate_test.go`
+pins the four self-consistent specs, the exception, the size of the gap, and PAL-M as the witness that
+15625.00 is the wrong half. Each assertion was mutation-checked. Raised by the mailing-list
+distillation (helper-2) as a decision for the author; measured here, where it turns out not to need one.
+
 ### Added — no claim here is taken on one phase, and the probe that said 62 were (2026-09-07)
 
 **`scripts/phase_probe.py`.** A scenario that asserts `field == v` at a single frame cannot tell a

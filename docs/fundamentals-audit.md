@@ -105,6 +105,16 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   passing test. Found by the mailing-list distillation (helper-2); the three claims were re-measured here
   (the comment read verbatim, the 37 counted from the array rather than from the prose that describes it).
 - ⬜ SECAM; real-game variable line counts (we already treat 262 as a range).
+  ⚠ **And one engine field is wrong in a way nothing here notices.** `SpecPAL60.HorizontalScanRate`
+  is **15625.00**, but the engine computes that spec's `RefreshRate` from **NTSC's 15734.26** — the
+  only one of the five specs that does not divide its own fields. The arithmetic is right and the
+  literal is wrong: PAL60 is PAL colour on 60 Hz timing, and **PAL-M, the same 262-line geometry,
+  declares 15734.26**. The gap is **0.4170 Hz (0.70%)**. It costs nothing here only because
+  `HorizontalScanRate` and `RefreshRate` are read **nowhere** in `internal/`, `pkg/` or `cmd/`;
+  timing in this harness comes from scanline counts, not hertz. `internal/ceiling/palette.go`
+  resolves `SpecPAL60`, but only to reach its colour generator. That insulation is an accident, not
+  a decision, so `internal/emu/pal60rate_test.go` pins both halves and says what to do if either
+  moves.
 
 ## 2. Horizontal positioning & HMOVE
 - ✅ X(N)=3N−55 (missile/ball), player +1px; slope 3 px/cycle; divide-by-15 coarse; **no leftmost-X constant** (retracted 2026-07-30; it is kernel-specific) /
