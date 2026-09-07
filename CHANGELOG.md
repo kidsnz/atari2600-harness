@@ -6,6 +6,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — no claim here is taken on one phase, and the probe that said 62 were (2026-09-07)
+
+**`scripts/phase_probe.py`.** A scenario that asserts `field == v` at a single frame cannot tell a
+constant from a value that alternates every frame; if it alternates, the other phase is unmeasured.
+511 of the corpus's 651 asserted fields are pinned at exactly one frame, so the question was worth
+asking. Answer: **0 of 129 readable scenarios**. The zero is guarded — `text24` asserts
+`tia.player0.hmoved_pixel` at frames 10 and 11 (39 and 87, a real two-phase kernel); removing either
+makes the probe fire, keeping both makes it silent, and `--selftest` runs both directions. This is a
+tool, not a gate: it emulates 129 ROMs, and CI's four cores already cannot afford `internal/emu` in
+parallel.
+
+**The first version of that probe reported 62 alternating fields and every one was false.** It paired
+the runner's output lines to plan entries by position, having built the plan field-major while the
+runner emits frame-major. What exposed it was not the count but one value: `bank.number` alternating
+`0/177`, when bank numbers on that cartridge are 0..3. The field name was printed on every output line
+the whole time and the pairing threw it away. Recorded in `docs/gate-ledger.md`.
+
+**A second sweep shifted every scenario's frame indices by one**: 75 unaffected, 23 shifted, and each
+of the 23 for a visible reason — a per-frame counter advancing (`ram.0x80` 17→18) or a two-phase
+kernel's positions trading places. None was accidentally pinned to an arbitrary frame.
+
 ### Added — a trap that assembles cleanly, and a family this harness cannot reach (2026-09-07)
 
 **`check_traps.py` now catches a loop that counts the wrong register.** Aaron Bergstrom posted a

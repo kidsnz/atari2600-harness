@@ -290,3 +290,41 @@ an environment you did not run in** — and this time the gate that caught it wa
 fails it, a bare mention in prose does not. Found by the mailing-list distillation (helper-3), who
 arrived at it by misreporting a broken link, chasing their own mistake, and noticing the gate could not
 have caught the false one or the real one.
+
+## A probe that reported 62 defects and had none (2026-09-07)
+
+`scripts/phase_probe.py` asks whether any scenario claim is taken on **one phase of an
+alternation** — a `field == v` at a single frame cannot tell a constant from a value that
+flips every frame, and the corpus has 511 such single-frame assertions.
+
+**Catch: zero. And the zero is the smaller half of what this cost.**
+
+The first version reported **62** alternating fields across 84 scenarios. Every one was
+false. It read the runner's output and paired each `(got …)` line to a plan entry **by
+position**, having built the plan field-major while the runner emits **frame-major**. The
+readings it printed were real numbers belonging to the wrong fields.
+
+★**What exposed it was not the count.** It was one value: `bank.number` reported as
+alternating `[0, 177, 0, 177, 0]`. Bank numbers on this cartridge are 0..3, so 177 came from
+somewhere else. Reading that one field alone, with nothing to interleave with, gave `0` at
+every frame.
+
+★★**The field name was printed on every output line the entire time.** The probe had the
+information that would have made misalignment impossible and discarded it in favour of
+position. The corrected version reads the name from the line and encodes the phase in the
+sentinel value, so the two cannot come apart.
+
+★★★**And the honest zero needed a control.** 129 scenarios, 0 hits — which is worth nothing
+unless the probe can fire. `text24` asserts `tia.player0.hmoved_pixel` at frames 10 **and**
+11 (39 and 87: a genuine two-phase kernel). Delete one of the two and the probe fires;
+leave both and it stays silent. Both directions run under `--selftest`.
+
+★★★★**Why this is not a gate.** It emulates 129 ROMs and takes minutes. `internal/emu`
+already blows Go's per-package timeout on CI's four cores — that is the whole reason `-p 1`
+came back the same day it was removed (above). A correct measurement that cannot afford to
+run every commit belongs in `scripts/` with its numbers dated, not in CI.
+
+**Measured 2026-09-07**, alongside a second sweep that shifted every scenario's frame indices
+by one and re-ran it: **75 unaffected, 23 shifted**, and each of the 23 shifted for a visible
+reason — a per-frame counter advancing by one (`ram.0x80` 17→18), or a two-phase kernel's
+positions swapping (`text24`'s 39 and 87 trading places). None was accidentally phase-locked.
