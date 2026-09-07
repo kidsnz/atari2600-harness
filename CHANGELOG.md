@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the text ladder counts characters; the width never changes (2026-09-07)
+
+`text12.md` calls 12 → 24 → 28 → 32 a **width ladder**. Those are numbers of characters, and how wide
+one character is appeared nowhere — which is the number someone drawing letters actually needs.
+
+Measured by reading the picture rather than the source: `text12` puts its twelve characters in **clock
+87..134 = 48 px**, and `text24` puts the *same* 48-px block at **two** X positions — 39..86 and
+87..134 — on alternate frames. 48 px is one 6-store sprite block, every rung uses the same 4×5 font,
+so **4 px per character at every rung**. Climbing the ladder does not narrow the letters; it adds
+another block at another X and pays in flicker.
+
+**A glyph wider than 4 px is therefore not a character in any of these kernels.** A 10-px letter needs
+the 48-px block used as a picture, where it is one of about four shapes on the line rather than one of
+twelve — a different technique with a different budget, not a wider setting of this one.
+
+★Sampling one frame hides half of it: one frame of `text24` shows one band and makes 24 characters
+look like 2 px each. Both phases have to be read. Raised by the mailing-list distillation (helper-2)
+from a 2003 thread where three people took apart David Crane's routine and disagreed over whether
+letters could be 7 or 8 px wide 〔`200309/msg00212`, `msg00216`, `msg00218`〕.
+
 ### Fixed — a TIM64T wait is 36 scanlines, not 37 (2026-09-07)
 
 `capability-gap-audit.md` said a `TIM64T` of 43 runs for `43 * 64` = ~2752 cycles. It does not. The

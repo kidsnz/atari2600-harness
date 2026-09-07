@@ -17,6 +17,25 @@ width ladder is 12 (flicker-free) → 24 (column flicker) → 28 (Jentzsch) → 
 RESP re-strobing, solidcorp 2011). 12 is the sweet spot: zero flicker, no re-strobe timing
 hazards, reuses the score kernel verbatim.
 
+★**That ladder counts CHARACTERS, not width — the character width never changes.** Measured
+2026-09-07 by reading the picture (`internal/emu/textwidth_test.go`): `text12` puts its twelve
+characters in **clock 87..134 = 48 px**, and `text24` puts the *same* 48-px block at **two** X
+positions — 39..86 and 87..134 — on alternate frames. **48 px is one 6-store sprite block, every rung
+uses the same 4×5 font, and 48 / 12 = 4 px per character at every rung.** Climbing the ladder does not
+narrow the letters; it adds another block at another X and pays in flicker. What a rung buys is how
+much of the 160-px line carries text; what it costs is how often each block is drawn.
+
+★★**So a glyph wider than 4 px is not a character in any of these kernels.** A 10-px letter needs the
+48-px block used as a *picture* (`bitmap48.md`), where it is one of about four shapes on the line
+rather than one of twelve. That is a different technique with a different cycle budget, not a wider
+setting of this one.
+
+★★★**Sampling one frame hides half of this.** One frame of `text24` shows one 48-px band and invites
+the conclusion that 24 characters are squeezed into the same span at 2 px each. Both phases have to be
+read — the same trap `scripts/phase_probe.py` exists for. Raised by the mailing-list distillation
+(helper-2) from a 2003 thread where three people took apart David Crane's routine and disagreed over
+whether letters could be 7 px or 8 px wide 〔`200309/msg00212`, `msg00216`, `msg00218`〕.
+
 **Before designing anything wider, read [`restrobe-copies.md`](restrobe-copies.md) (technique #36).**
 The rungs above 24 all use the mechanism named in the line above — a mid-line `RESP` re-strobe — and
 #36 is where this harness measured it: a player in a copy mode draws **3 + k** slots with k mid-line
