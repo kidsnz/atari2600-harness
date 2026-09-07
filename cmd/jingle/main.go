@@ -13,6 +13,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/kidsnz/atari2600-harness/internal/build"
 	"os"
 	"os/exec"
 	"strconv"
@@ -208,8 +209,16 @@ func run(notes, notes2, out string, vol, vol2, forceType, forceType2 int) error 
 	}
 	bin := strings.TrimSuffix(out, ".asm") + ".bin"
 	if _, err := exec.LookPath("dasm"); err == nil {
-		if err := exec.Command("dasm", out, "-f3", "-o"+bin).Run(); err != nil {
-			return fmt.Errorf("dasm: %w", err)
+		// Go through internal/build rather than calling dasm here. It is the same
+		// invocation plus two guards this had neither of: it writes to a per-PID
+		// scratch name and renames, so a concurrent reader never sees a half-written
+		// .bin; and `diagnosedFailure` fails an assembly that DASM *described* as an
+		// error while still exiting zero. Calling dasm directly and checking only the
+		// exit status printed "assembled" over a broken ROM — found 2026-09-06 while
+		// checking a distillation item that claimed the guard did not exist anywhere.
+		// It existed; this was the one path that did not use it.
+		if diag, err := build.Assemble(out, bin); err != nil {
+			return fmt.Errorf("dasm: %w\n%s", err, diag)
 		}
 		fmt.Println("assembled", bin)
 	}

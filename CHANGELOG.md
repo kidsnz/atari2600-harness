@@ -35,6 +35,20 @@ counter and no way to read a write-only register.**
 Found by the mailing-list distillation (helper-1 for the unanswered questions, helper-2 for the citation
 shapes, counted after their own tool was fooled by five of them).
 
+### Fixed — `cmd/jingle` was the one path that assembled without the guard (2026-09-06)
+
+`internal/build.Assemble` has done two things for a while that a bare `exec.Command("dasm", …)` does
+not: it writes to a per-PID scratch name and renames, so a concurrent reader never sees a half-written
+`.bin`; and `diagnosedFailure` fails an assembly that **DASM described as an error while still exiting
+zero**. `cmd/jingle` did not import it. It ran dasm directly, checked only the exit status, and printed
+`assembled <file>` over a ROM DASM had just complained about. Now routed through `build.Assemble`.
+
+★**How it was found is the point.** A distillation item claimed the exit-0 guard did not exist and
+proposed adding it — "the fix is one line". Checking that claim showed the guard has existed all along
+at `internal/build/build.go:98`, so the item was misfiled. **But looking for it turned up the one call
+site that bypassed it.** The wrong claim was worth more than a right one would have been, and this is
+the third time in a day that checking a false report found a true defect behind it.
+
 ### Added — the five ways a quotation lies (2026-09-06)
 
 `docs/provenance.md` grew a rule a day, each one found by a sweep that the previous sweep had declared
