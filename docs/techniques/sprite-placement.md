@@ -333,3 +333,32 @@ showing 60, the three-pixel leak at write cycle 43 and none at 42 or 41, the cla
 22 and 25 obeying 3c − 60 above it, and the mid-line strobe leaving 56 and 88 with 24 gone.
 Both new assertions were negative-controlled: changing the expected leak from 3 to 2, and adding
 the cancelled copy back to band 10, each make the test fail.
+
+
+## Where a shape cannot go at all — the left edge is a comb (measured 2026-09-07)
+
+`internal/place.Solve` has always been able to say *this x is impossible*, one x at a time. **Nobody
+had asked it across the screen**, so the answer arrived as a surprise per position rather than as a
+map. Swept over every x in 0..159 for a single 8-clock shape
+(`internal/place/deadzone_test.go`):
+
+| range | unplaceable | shape |
+|---|---|---|
+| `x = 0..32` | **20 of 33** | 2-pixel holes at a 3-pixel pitch — a comb |
+| `x = 33..150` | **0 of 118** | free |
+| `x = 151..159` | 4 | single-pixel holes |
+
+**The middle of the screen is not the problem.** A row of glyphs laid out between 33 and 150 can sit
+anywhere; one that starts at 20 cannot. The cause is the grid this page already documents — `RESPx`
+lands on a 3-colour-clock grid and the strobe cannot occur before `ClampFirst` — so near the left edge
+the reachable positions are quantised and the gaps show. Far enough right, every residue is reachable.
+
+★**With two shapes 8 px apart the unplaceable starting positions jump from 24 to 66**, because both
+must satisfy the grid and there is a 3-cycle floor between strobes. A pair is not twice as free as a
+single; it is markedly less free, and the loss is concentrated where the comb already is.
+
+★★This is a statement about **the solver**, not the TIA: it is the set of x this package can currently
+produce a plan for. The test's controls hold that meaning — the free middle must stay free, the left
+comb must stay a comb of 1s and 2s, and if either changes the numbers move and it says so. Found by the
+mailing-list distillation (helper-2), whose note said it plainly: *"作品1（TRANSISTOR DUB）に直に効く
+——文字の x が穴に落ちるかどうか"*.
