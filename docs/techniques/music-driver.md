@@ -60,3 +60,36 @@ compatible designs; a real game would merge them (envelope volume + SFX channel-
   format here (instrument table + flat `Env` + Notes/Inst/Durs) is intentionally simple to emit.
 - For the full canonical envelope byte layout, see the TIATracker manual's "For the coder" section
   and the GitHub player source (recorded in the mining notes).
+
+## How well a tune fits is about HOW MANY pitches, not WHICH (2026-09-07)
+
+Manuel Polik had SID-to-TIA conversion working in 2003 — *"No. manual. tweaking."* — and stated its
+limit himself: *"Basically it does any SID tune. They will just sound **more or less horrible** ;-)
+**Hubbard doesn't do to well**"* 〔`200308/msg00134`〕. The workflow was convert, listen, judge.
+
+`cmd/keyfit` answers it **before** any conversion. Give it the figure as semitones above a tonic
+(`-degrees 0,4,7`) and it reports, per tonic, how far each degree lands from where it should. Measured
+over three octaves from 55 Hz, best tonic, worst degree in cents
+(`internal/keyfit/pitchcount_test.go`):
+
+| distinct pitches | figure | best tonic | worst |
+|---|---|---|---|
+| 3 | `0,4,7` | F2 | **2.7c** |
+| 3 | `0,1,2` | A2 | 4.7c |
+| 3 | `0,6,11` | B2 | 4.7c |
+| 5 | `0,2,4,7,9` | C#2 | 13.9c |
+| 5 | `0,1,6,7,11` | F2 | 13.4c |
+| 7 | `0,2,4,5,7,9,11` | C#2 | 13.9c |
+| 12 | `0…11` | E3 | **19.3c** |
+
+★**Within a size the intervals barely matter; across sizes they matter a lot.** Three pitches land
+within 2.7–4.7 cents whatever they are; five land at 13.4–13.9 whatever they are. **The count of
+distinct pitches predicts the fit; the choice of pitches does not.**
+
+★★That is a testable explanation for a subjective remark made twenty-three years ago: **Hubbard's
+tunes use more distinct pitches**, so they land worse — nothing about the style, just the size of the
+set. And it is answerable from a score.
+
+★★★**For the rule that a cover version may not be out of tune — transpose if you have to — this is
+the number that decides.** A three-note figure is free to sit almost anywhere; a chromatic one is 19
+cents out at its best tonic, and no key rescues it. Found by the mailing-list distillation (helper-1).
