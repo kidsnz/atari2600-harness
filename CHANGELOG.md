@@ -6,6 +6,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a trap that assembles cleanly, and a family this harness cannot reach (2026-09-07)
+
+**`check_traps.py` now catches a loop that counts the wrong register.** Aaron Bergstrom posted a
+vertical-scroll kernel in 2003 (`200302/msg00012`) whose clear-memory loop reads `STA 0,X / DEY / BNE`.
+X never moves, so every pass stores to the same address, and Y is undefined after reset, so the trip
+count is undefined too. The author later changed something else entirely, reported the problem solved,
+and shipped with the trap still in it — the symptom went and the cause stayed. Nothing objects to this
+code: it is syntactically valid, and both dasm and the emulator run it happily. The new rule is
+deliberately narrow (a backward branch, a body of at most twelve lines, indexed on one register while
+only the other is modified) and fires on **nothing** in this tree's 411 `.asm` files. It carries its own
+fixture pair, and both were checked by mutation: disabling the rule fails the self-test, and widening it
+to ignore which register moves fails on a legitimate stretch loop that deliberately holds X still while
+a RAM counter counts. Found by the mailing-list distillation (helper-1).
+
+**The emulator is a harsher judge than a television** (`docs/known-traps.md`). Every trap row in that
+file has one shape — passes here, breaks on hardware — and that is the file's title. The opposite shape
+had one line anywhere in the repository. B. Watson, 1997: flicker looks worse on an emulator than it
+does on a television. Being wrong on the lenient side ships something broken and it eventually gets
+reported; being wrong on the strict side means an author throws away a design that would have been fine,
+and nothing ever tells them. `max_flicker_area`, `FlickerArea` and every pixel-exact comparison here
+inherit it. There is no gate for this and none should pretend to be.
+
+**And a number that was a modelling choice wearing a measurement's clothes** (`docs/fundamentals-audit.md`).
+The audit pinned "write 20 to `TIM64T`, read INTIM next instruction, get 19" under an open box about the
+first-decrement offset. That 19 comes from `Timer.Update` ending in `tmr.ticksRemaining = 0`, above the
+engine author's own note that they are *not sure which value is correct* and that *matching Stella
+requires 2*. The Stella oracle cannot arbitrate: `TIARegNames` has 37 entries, counted from the array,
+and every one is TIA — INTIM is not among them. So the box is not one a litmus ROM can close, and it now
+says so, pointing at `timerdiv_test.go` for the shape a question like this should take.
+
 ### Added — how this repo cites, and the questions the archive asked and nobody answered (2026-09-06)
 
 Two things the distillation surfaced that had no home here.

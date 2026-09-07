@@ -412,6 +412,60 @@ def scan_text(asm):
                                   % (v, m.group(1).upper(), v & 0xFE, (v + 1) & 0xFE)))
         pending = None
 
+    # A loop that writes through one index register while counting a DIFFERENT one
+    # writes the SAME address every pass, and the count is whatever the untouched
+    # register happened to hold. Source: `200302/msg00012` (Aaron Bergstrom, 2003),
+    # a real posted kernel:
+    #
+    #     LDX #$FF / TXS / LDA #0
+    #   ClearMem
+    #     STA 0,X       <- selects the address with X
+    #     DEY           <- counts with Y
+    #     BNE ClearMem
+    #
+    # X never changes, so every pass stores to $00FF; Y is undefined after reset, so
+    # the trip count is undefined too. The author later "fixed" the symptom somewhere
+    # else entirely and reported it solved -- the symptom went and the trap stayed.
+    # This is the shape known-traps.md's CLEAN_START row warns about, arriving as
+    # SYNTACTICALLY VALID CODE, which is why no assembler and no emulator objects.
+    #
+    # The rule is deliberately narrow: it fires only when a backward branch closes a
+    # body that both indexes on a register AND modifies only the other one. A loop
+    # that hammers one address on purpose uses absolute addressing (`STA WSYNC`), not
+    # an index, so it cannot reach here. Found by the mailing-list distillation
+    # (helper-1); measured to fire on nothing in this tree before it was added.
+    lines = [l.split(";")[0] for l in asm.split("\n")]
+    labels = {}
+    for n, raw in enumerate(lines, 1):
+        m = re.match(r"^([A-Za-z_.][\w.]*)\b", raw)
+        if m and not re.match(r"^\s", raw):
+            labels.setdefault(m.group(1).lower(), n)
+    for n, raw in enumerate(lines, 1):
+        m = re.search(r"\b(bne|beq|bpl|bmi|bcc|bcs)\s+([A-Za-z_.][\w.]*)", raw.lower())
+        if not m:
+            continue
+        top = labels.get(m.group(2))
+        if not top or not (0 < n - top <= 12):
+            continue
+        body = " \n ".join(lines[top - 1:n]).lower()
+        indexed = set(re.findall(r"\b(?:sta|lda|stx|sty|ldx|ldy|inc|dec|asl|lsr|rol|ror)\s+[^\s,;]+\s*,\s*([xy])\b", body))
+        touched = set()
+        for reg in ("x", "y"):
+            if re.search(r"\b(?:in%s|de%s|ld%s|ta%s|ts%s)\b" % (reg, reg, reg, reg, "x" if reg == "x" else "y"), body):
+                touched.add(reg)
+        if re.search(r"\btax\b|\btsx\b", body):
+            touched.add("x")
+        if re.search(r"\btay\b", body):
+            touched.add("y")
+        for reg in indexed:
+            other = "y" if reg == "x" else "x"
+            if reg not in touched and other in touched:
+                warns.append((n, "loop back to `%s` indexes on %s but only %s changes inside it — "
+                                 "%s never moves, so every pass hits the SAME address and the trip "
+                                 "count is whatever %s happened to hold (undefined after reset "
+                                 "without CLEAN_START). Real instance: `200302/msg00012`, 2003"
+                              % (m.group(2), reg.upper(), other.upper(), reg.upper(), other.upper())))
+
     return errors, warns
 
 
@@ -462,6 +516,44 @@ Start
         SLEEP 4           ; even SLEEP is plain NOPs
         rts
 Sub     rts
+"""
+
+# The index-mismatch loop, kept out of BAIT because it needs a label and a backward branch
+# and would perturb the other detectors' line accounting. Verbatim shape from `200302/msg00012`.
+LOOP_MUST_FIRE = """
+        processor 6502
+        ldx #$ff
+        txs
+        lda #0
+ClearMem
+        sta 0,x
+        dey
+        bne ClearMem
+"""
+
+# And its counter-bait: the SAME loop, correct. A rule that cannot tell these two apart is
+# not reading the code, it is reacting to the word `sta`.
+LOOP_MUST_BE_SILENT = """
+        processor 6502
+        ldx #$ff
+        txs
+        lda #0
+ClearMem
+        sta 0,x
+        dex
+        bne ClearMem
+Copy
+        lda src,x
+        sta dst,y
+        dex
+        dey
+        bne Copy
+Stretch
+        lda sprite,x
+        sta GRP0
+        sta WSYNC
+        dec lines
+        bne Stretch
 """
 
 # A third clean sample, the counter-bait the removed `pushes` guard never had: an EQU in the
@@ -515,13 +607,19 @@ def selftest():
         sys.exit(1)
     print("selftest OK — all %d trap detectors fire on the bait" % len(want))
 
+    # The index-mismatch loop has its own fixture pair (see LOOP_MUST_FIRE above).
+    _, wl = scan_text(LOOP_MUST_FIRE)
+    if not any("indexes on X but only Y changes" in m for _, m in wl):
+        print("SELFTEST FAIL — the index-mismatch rule went silent on `200302/msg00012` itself")
+        sys.exit(1)
+
     # ★2026-09-05: and the other half of the control, which this gate did not have. A detector
     # that fires on everything is not a detector; the three false-positive families found when
     # the gate was first aimed at the author's works are each represented here and must stay
     # silent. Aiming a lint at a curated corpus proves it does not miss; only a clean sample
     # proves it does not shout.
     errors, warns = scan_text(QUIET)
-    for sample in (QUIET_TABLE, QUIET_CODE_INCLUDE, QUIET_VECTOR_INCLUDE):
+    for sample in (QUIET_TABLE, QUIET_CODE_INCLUDE, QUIET_VECTOR_INCLUDE, LOOP_MUST_BE_SILENT):
         e2, w2 = scan_text(sample)
         errors += e2
         warns += w2
