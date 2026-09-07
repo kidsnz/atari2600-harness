@@ -35,6 +35,33 @@ counter and no way to read a write-only register.**
 Found by the mailing-list distillation (helper-1 for the unanswered questions, helper-2 for the citation
 shapes, counted after their own tool was fooled by five of them).
 
+### Reverted — parallel packages time out `internal/emu` on CI's runner (2026-09-06, same day)
+
+The change below was wrong and CI said so on the first run:
+
+```
+panic: test timed out after 10m0s
+FAIL github.com/kidsnz/atari2600-harness/internal/emu   600.013s
+```
+
+**Parallel packages do not each run faster; they share the cores.** `internal/emu` is the heavy one.
+With `-p 1` it gets the whole runner and finishes well inside Go's default per-package 10-minute
+timeout; in parallel it competes with 41 others and blows it. It passed three times on the 8-core
+machine it was measured on and failed the first time it met `ubuntu-latest`'s four.
+
+★**The caveat was written down and shipped past anyway.** The entry below says, in its own words, *"the
+ratio does not carry to CI's 4-core runner; the greenness does"* — and the greenness did not carry
+either. Knowing that a measurement was taken on the wrong machine is not the same as acting on it, and
+the gap between those two is what this revert cost. The measurement itself was sound and its conditions
+were stated; **what was missing was a run on the machine the change was for.**
+
+What the day still establishes, and what the comment in `ci.yml` now says instead of the stale one it
+replaced: the shared-`.bin` write race that originally justified `-p 1` **is not real** —
+`build.Assemble` writes to a per-PID scratch name and renames — and the flag's actual value here is that
+it gives the heavy package the whole runner. If this is revisited, the question is not the race; it is
+whether `internal/emu` fits a per-package timeout on four shared cores. Raise `-timeout`, split the
+package, or cap at `-p 2` — **and measure it on the runner**, which is the one thing not done.
+
 ### Changed — CI runs its packages in parallel; `-p 1` had outlived its reason (2026-09-06)
 
 `ci.yml` passed `-p 1` since 2026-06 under a comment saying several packages assemble and read the same

@@ -345,24 +345,26 @@ in the CHANGELOG's "Decisions" section. **When tagging, also bump `Harness` in `
 
 **Before pushing, mirror CI — don't trust a plain local build+test.** A local `go test` runs under the
 umbrella `go.work` and effectively serially, which HIDES what CI hits. Run CI's actual invocation:
-`GOWORK=off CGO_ENABLED=0 go vet ./... && go test ./...`, then the scenario + `check_*` steps.
-**Packages run in PARALLEL since 2026-09-06.** `-p 1` had been kept "because it is what CI runs" long
-after the race it named was fixed — `build.Assemble` writes to a per-PID private name and renames, so a
-half-written ROM cannot be observed — which made the reason circular. Measured before removing it, in a
-worktree outside the repo: three parallel runs green, 42 packages each, 0 failures, 0 skips, the same
-package set as the serial runs, and 265 s against 539 s on an 8-core machine. **The ratio does not carry
-to CI's 4-core runner; the greenness does.** What the parallel run depends on instead is ORDER: every
-`.bin` must exist before the tests start, which is what `ci.yml`'s Assemble step is for. A parallel run
-on a tree with no `.bin` fails 39 packages, every error "no such file or directory". **Lesson (2026-06-18):** a docs-only push
+`GOWORK=off CGO_ENABLED=0 go vet ./... && go test -p 1 ./...`, then the scenario + `check_*` steps.
+**`-p 1` is serial and the reason is measured, 2026-09-06.** It used to be justified by a shared-`.bin`
+write race that `build.Assemble`'s per-PID scratch name had already made impossible, and by the circular
+"it is what CI runs" — so it was removed. **CI failed on the first run**: `panic: test timed out after
+10m0s`, `internal/emu` at 600 s. Parallel packages do not each run faster, they SHARE the cores; with
+`-p 1` the heavy package gets the whole runner, and in parallel it competes and blows Go's default
+per-package timeout. It had passed three times on the 8-core machine it was measured on (265 s against
+539 s) and failed the first time it met `ubuntu-latest`'s four. **A measurement taken on the wrong
+machine predicted the wrong thing, and the caveat had been written down and shipped past anyway.** If
+revisited: the question is whether `internal/emu` fits a per-package timeout while sharing four cores —
+raise `-timeout`, split the package, or cap at `-p 2` — and measure it on the runner. **Lesson (2026-06-18):** a docs-only push
 went CI-red on a flaky parallel-test file race that local build+test never showed — CI is the gate, so verify
 against it, not a proxy, before every push. A tracked **pre-push hook** automates this: `scripts/git-hooks/pre-push`
-runs the mirror (vet + `test` + the fast `check_*`) and blocks a red push — enable once per clone with
+runs the mirror (vet + `test -p 1` + the fast `check_*`) and blocks a red push — enable once per clone with
 `git config core.hooksPath scripts/git-hooks` (emergency bypass: `git push --no-verify`).
 
 > **The hook is the ONLY gate on the authored ROMs, and that is by design.** `sandbox/` is local-only with no
 > remote, so GitHub Actions cannot see the 16 scenarios under `sandbox/practice/**` — `TestTheAuthoredROMsStillPass`
 > SKIPS there with the reason printed rather than passing silently. On this machine the tree IS present, the
-> hook's `go test ./...` runs it, and a red authored ROM blocks the push. That test also fails when a
+> hook's `go test -p 1 ./...` runs it, and a red authored ROM blocks the push. That test also fails when a
 > scenario listed in its `knownFailing` map starts PASSING, so the list cannot rot into a permission slip.
 > Consequence to remember: `git push --no-verify`, or a push from a clone without the umbrella, ships those
 > 16 ungated. Nothing else covers them.

@@ -17,7 +17,7 @@ Measured from the GitHub Actions API, per step, on the runs at `3f148ad` (2026-0
 | Step | 2026-08-07 | 2026-08-13 |
 |---|---|---|
 | setup (checkout, Go, DASM, clone engine, assemble) | 38 s | 38 s |
-| **`go build` + `go vet` + `go test ./...`** | **342 s** | **512 s** |
+| **`go build` + `go vet` + `go test -p 1 ./...`** | **342 s** | **512 s** |
 | regression scenarios | 55 s | 64 s |
 | CPU conformance (Klaus + Tom-Harte) | 3 s | 4 s |
 | the five gates | 3 s | 1 s |
@@ -101,10 +101,12 @@ job limit is six hours and is irrelevant here.
 
 **When a run exceeds 20 minutes, the next commit must do one of three things and say which.**
 **Do NOT start by guessing the cause — the cause is already measured and recorded**: 84% of the
-wall clock is the single `go test ./...` step. **`-p 1` was removed 2026-09-06** — the shared-`.bin` race
-it named had been fixed and the flag had outlived its reason. Three parallel runs measured green, 42
-packages each, 265 s against 539 s on 8 cores; the ratio does not carry to CI's 4-core runner, the
-greenness does. The `t.TempDir()` note below still reads true but no longer gates the invocation. Start there:
+wall clock is the single `go test -p 1 ./...` step. **Removing `-p 1` was tried on 2026-09-06 and
+reverted the same day** — three green parallel runs on an 8-core machine (265 s against 539 s), then
+`panic: test timed out after 10m0s` on `internal/emu` the first time it ran on CI's 4-core runner.
+Parallel packages share cores rather than each going faster. The entry point below is still the right
+one, and it is now the entry point to a *different* question: not "is the shared-`.bin` race real"
+(it is not) but "does `internal/emu` fit a per-package timeout on four shared cores". Start there:
 
 1. **Make the heavy thing faster.** First resort, because it costs no coverage. A test that is slow
    because it is serial is not a test that is slow.

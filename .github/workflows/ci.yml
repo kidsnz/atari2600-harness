@@ -45,24 +45,26 @@ jobs:
         run: |
           go build ./...
           go vet ./...
-          # Packages run in PARALLEL. `-p 1` was here from 2026-06 with a comment saying
-          # several packages assemble/read the same shared ROM .bin fixtures and a serial
-          # run avoids one process truncating a .bin mid-assemble while another loads it.
-          # **That race was fixed and the comment outlived it**: `internal/build`'s
-          # `scratchPath()` writes to a per-PID private name and `os.Rename`s it into place,
-          # so a half-written .bin cannot be observed. Measured 2026-09-06 in a worktree
-          # outside the repo: three parallel runs green, 42 packages each, 0 failures,
-          # 0 skips, identical package set to the serial runs; no data race, no panic.
-          # 265s parallel against 539s serial on an 8-core machine -- the RATIO does not
-          # carry to this 4-core runner, but the greenness does.
+          # -p 1: SERIAL, and the reason is a MEASURED one as of 2026-09-06, not the
+          # stale comment that used to sit here. The old text blamed a shared-.bin write
+          # race that `internal/build`'s per-PID scratch name had already made impossible;
+          # removing the flag on that basis was tried on this runner and FAILED:
           #
-          # What the parallel run DOES depend on is the step above: every .bin must already
-          # exist when the tests start. Assembling them there is not an optimisation, it is
-          # the ordering this line now relies on. A parallel run against a tree with no
-          # .bin files fails 39 packages, every error "no such file or directory" -- that
-          # is the real failure mode, and it is about files that are MISSING, not files
-          # being written concurrently. Do not reorder these two steps.
-          go test ./...
+          #   panic: test timed out after 10m0s
+          #   FAIL github.com/kidsnz/atari2600-harness/internal/emu  600.013s
+          #
+          # Parallel packages do not each go faster, they SHARE the cores. `internal/emu`
+          # is the heavy one; with -p 1 it gets the whole runner and finishes, and in
+          # parallel it competes and blows Go's default per-package 10-minute timeout.
+          # It passed three times on the 8-core machine it was measured on (265 s against
+          # 539 s) and failed the first time it met this 4-core runner. **The ratio did
+          # not carry, and neither did the greenness.**
+          #
+          # If this is revisited: the question is not "is the race real" (it is not), it
+          # is "does internal/emu fit in a per-package timeout while sharing 4 cores".
+          # Raise -timeout, or split that package, or cap with -p 2 -- and measure it HERE,
+          # because a measurement taken on 8 cores did not predict this runner.
+          go test -p 1 ./...
 
       - name: Regression scenarios (litmus + techniques)
         env:
