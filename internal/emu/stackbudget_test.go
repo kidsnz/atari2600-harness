@@ -31,8 +31,9 @@ var deliberateStackROMs = map[string]bool{
 // and this repository had no design rule about the stack's cost at all — only the power-on trap
 // (`known-traps.md`, "post-reset SP / RAM / flags undefined").
 //
-// Measured 2026-09-07 over every `.bin` in this tree plus the works, 30 frames each after a
-// ten-frame warmup:
+// Measured 2026-09-07 over every `.bin` in this tree plus the works, after a ten-frame warmup (SP
+// is undefined until TXS runs). The window was 30 frames when first measured and is 8 here: a
+// kernel's stack use repeats every frame, and the package was over CI's ten-minute budget.
 //
 //	0 bytes    281 ROMs      <- most kernels never touch it
 //	1-8 bytes   89 ROMs      <- 4 is by far the commonest: two levels of JSR
@@ -55,7 +56,7 @@ var deliberateStackROMs = map[string]bool{
 func TestStackFitsInATinyCornerOfRAM(t *testing.T) {
 	const (
 		warmupFrames  = 10 // SP is undefined until TXS runs; see the note above
-		measureFrames = 30
+		measureFrames = 8
 		budget        = 16 // above rts_dispatch's 10, far below anything that would crowd game state
 	)
 
