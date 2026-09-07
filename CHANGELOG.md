@@ -6,6 +6,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — how far the HMOVE hazard lint can see (2026-09-07)
+
+The R3 rule looks for an HMxx/HMCLR write within 24 CPU cycles **after** an HMOVE strobe. A 2003
+technique writes them the other way round — HMCLR first, HMOVE at cycle 74 — and the question was
+whether the lint would flag it. Measured over three shapes:
+
+| kernel loop | hazard warnings |
+|---|---|
+| HMCLR, then a late HMOVE, WSYNC in the loop | **0** — no false positive |
+| HMOVE, then HMCLR on the next instruction | **1** — the rule works |
+| a loop with **no WSYNC**, HMCLR ~8 cycles after HMOVE via the back edge | **0** — ★not seen |
+
+**The answer is "no, it does not misfire", and the reason is worth more than the answer.** The scan
+stops at any branch, jump or WSYNC. Stopping at a WSYNC is sound — the wait clears the window.
+Stopping at a **branch** means the rule never follows a loop back to its own top, and a kernel loop is
+exactly where HMOVE lives; the third row is a real hazard the lint says nothing about.
+
+That is a bound on the rule rather than a bug in it — following back edges is the difference between a
+peephole and the abstract interpreter this package already runs for cycles. Recorded so that "the
+timing lint is quiet" is not read as "there is no HMOVE hazard here".
+`internal/cyclebound/hmovelintreach_test.go` builds all three shapes at run time, so no fixture ROM is
+committed for a case that exists only to be looked at.
+
 ### Added — a 1998 asymmetry that does not reproduce here, and why that is the honest answer (2026-09-07)
 
 Brad Mott, in one sentence never corroborated elsewhere in the archive: *"the meaning of HMP0 isn't
