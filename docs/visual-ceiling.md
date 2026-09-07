@@ -115,6 +115,23 @@ many nice colours but there isn't a bright, intense RED - at least in PAL"* 〔`
 hue for each hue in the other system** — the same post, and the reason a spec conversion cannot be a
 table lookup. Found by the mailing-list distillation (helper-2).
 
+★★★★★**And the strongest form of it: a code can be RED on one spec and GREEN on the other.**
+Reported from hardware in 2003 — *"the NTSC red you chose comes out as green on a PAL VCS"*
+〔`200302/msg00246`, Eckhard Stolberg〕 — and reproduced here
+(`internal/ceiling/palntsc_test.go`):
+
+| code | NTSC | PAL |
+|---|---|---|
+| `$34` | RGB(199, 61, 27) — red | RGB(40, 140, 8) — **green** |
+| `$38` | RGB(255, 119, 54) — red | RGB(124, 245, 44) — **green** |
+
+**Seven codes cross the whole way.** This is not a dimmer red or a shifted one — the picture changes
+subject. The test asserts that at least one code crosses, not which: the boundary of "red" is a
+threshold judgement, the existence of a code that flips is not. Its control checks that the two tables
+are neither identical nor a uniform shift, either of which would make this a calibration story instead
+of a hue one. ★**For a work that may ship on both**: pick from the codes whose meaning survives, or
+accept that the PAL cartridge is a different picture and choose its colours separately.
+
 ## Verification
 
 Run `go test ./internal/ceiling/`. Denominators are stated in every test's log line.
