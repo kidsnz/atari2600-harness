@@ -104,6 +104,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   fact, and when the layout is being drawn rather than budgeted, the second one is the one that
   lands: a band that hosts a repositioning cannot also be the thinnest band in the picture.
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
+- **An odd width is a power of two PLUS ONE, and the join is free.** A ball is 1, 2, 4 or 8 pixels
+  and nothing else, so a shape that must be an odd number of pixels wide has no ball that fits it.
+  Thomas Jentzsch, 2001: *"all cursors are **7 pixels wide** (has to be an **odd number** to make the
+  up/down arrows look nice) and so the 'hole' in the stop cursor is 5 pixels wide. That means, I can
+  **only use a 4 pixel wide ball**"* 〔`200102/msg00234`〕. Andrew Davie: *"Instead of 7-wide, make the
+  cursor **9 wide**. Use the **missile to give you the extra pixel** you need. (8 player + 1 missile)
+  Then it is a simple-matter to use an **8-wide ball**"* 〔`200102/msg00238`〕.
+  ★★**Measured** (`internal/emu/playermissile9_test.go`): player alone 8 px, player + missile **one
+  contiguous run of 9 px**, missile alone 1 px on the clock immediately after the player's last.
+  `RESM0` on the instruction after `RESP0` is three CPU cycles = nine colour clocks, and a player is
+  eight wide, so **no fine motion is needed at all** — one extra store, and the missile carries
+  `COLUP0` so the two read as one object. ★★★The lesson generalises past cursors: **when a size the
+  hardware offers is one short of the size the drawing needs, add a missile rather than change the
+  drawing.**
 - **Colour is a capacity tool, not only a look.** Two characters can share one set of graphics bytes
   and differ only in `COLUPx`. Andrew Davie, 2003, on a Mario demo: *"you will see **two Marios** -
   animating independently. The interesting thing here is that the Marios are **different colours - but
