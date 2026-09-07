@@ -167,3 +167,35 @@ attribution checkable; a name alone asserts something no reader can verify and n
 Found by the mailing-list distillation (helper-3), whose detector had a 73% false-positive rate on the
 eleven it flagged — six were work titles read as people — and whose **population** (26 quotations
 attributed by name with no id) is the number worth keeping.
+
+## The archive's attachments were never fetched, and nothing here depends on them (2026-09-07)
+
+Roughly 1,200 messages in the stella-list archive carry attachments — ROMs, sources, zips. **They
+were deliberately not fetched** (author's decision, 2026-09-04). This section is the measurement
+that makes that decision safe to leave standing rather than a hope.
+
+**104** stella-list message ids are cited across `docs/`, `internal/` and `CHANGELOG.md`. All 104
+bodies are present in the local archive. **19 of them carry an attachment.** Each of the 19 was
+opened and read:
+
+| What the attachment is | Count |
+|---|---|
+| A binary, zip, or `.asm` offered **beside** the argument (`Attachment: lmnf12.bin`, `push.asm`, `songplay.zip`) | 18 |
+| A body that **is** a uuencoded blob (`199702/msg00017`, *"section 1 of uuencode 5.25 of file say.bin"*) | 1 |
+
+**In none of the 19 does this repository quote the attachment.** The eighteen are quoted from body
+text — Stolberg's *"I need to revise my 5 pixel delay theory again"*, Mooney's *"different results
+for both (d+3) positioning and (d-1) positioning between classic VCS and Atari JR"*, Bergstrom's
+`ClearMem` loop, which he pasted inline. The nineteenth is cited only as evidence that a `wavconv`
+thread existed at that date, which its subject line establishes without the blob.
+
+★**The one that came closest** is `199901/msg00099`: *"I'm attaching ALL of my data (hits.txt)"*. The
+data is genuinely gone. What this repository quotes from that message is the sentence **summarising**
+the data, not a number out of it — so the citation stands and the missing file bounds what could ever
+be asked of it.
+
+★★**What this does not say.** It is not a claim that attachments hold nothing worth having; 1,200
+files were not examined. It says the 104 citations already made do not rest on any of them, so
+fetching is a question about future work, not a repair of existing work. Re-run it before assuming it
+still holds — the ids are extractable with
+`grep -rhoE "[0-9]{6}/msg[0-9]{5}" docs/ internal/ CHANGELOG.md | sort -u`.
