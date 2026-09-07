@@ -77,13 +77,11 @@ NotDown:
         lda #0
         sta held
 Done:
-        ; the colour makes the ROM watchable; nothing here is measured from the picture
-        lda cnt
-        asl
-        asl
-        asl
-        asl
-        sta COLUBK
+        ; ★No colour is driven from `cnt`. An earlier version set COLUBK to `cnt << 4` "to make the
+        ; ROM watchable", and the Stella oracle caught it: the background then depends on WHICH
+        ; FRAME is sampled, so harness read $50 where Stella read $40 and the two emulators were
+        ; being compared on a phase rather than on a behaviour. Nothing here was ever measured from
+        ; the picture, so the line bought nothing and cost the ROM its place as an oracle fixture.
 
         ldx #37
 VB:     sta WSYNC

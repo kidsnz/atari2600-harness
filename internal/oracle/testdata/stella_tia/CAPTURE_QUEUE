@@ -13,14 +13,3 @@
 #
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
-roms/litmus/litmus_vdel_bits.bin  # 2026-09-07 — VDELPx bit decode (bit 0 only; $FE behaves as $00)
-roms/litmus/litmus_tim64t_zero.bin  # 2026-09-07 — TIM64T countdown length (2692 cy, not 43*64)
-roms/litmus/litmus_pal_physics.bin  # 2026-09-07 — NTSC/PAL per-frame identity (physics scaling)
-roms/litmus/litmus_store7_overrun.bin  # 2026-09-07 — negative control: prover certifies, frame is 269 lines
-roms/litmus/litmus_bank_capacity.bin  # 2026-09-07 — stores per line at three bank-reach costs
-roms/litmus/litmus_hmp0_vs_hmp1.bin  # 2026-09-07 — HMP0/HMP1 symmetry across all 16 nibbles
-roms/litmus/litmus_player_missile_9px.bin  # 2026-09-07 — 8px player + 1px missile = one 9px shape
-roms/litmus/litmus_counter_entropy.bin  # 2026-09-07 — where a free-running counter's randomness comes from
-roms/litmus/litmus_swacnt_delay.bin  # 2026-09-07 — the 400us SWACNT delay is not modelled
-roms/litmus/litmus_autorepeat.bin  # 2026-09-07 — edge-only vs deliberate auto-repeat
-roms/litmus/litmus_paint_as_background.bin  # 2026-09-07 — painted-as-BG vs not drawn
