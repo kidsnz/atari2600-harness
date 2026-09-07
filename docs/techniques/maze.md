@@ -65,5 +65,16 @@ every cell exactly 2px wide:
   the LFSR per cell instead of per row for finer structure.
 - Carve guaranteed-solvable passages by forcing one open column per row (mask a passage bit before
   storing), the way Entombed guarantees a path.
+  ★**Not implemented — and measured 2026-09-07 to be unnecessary at this size.** The generator is an
+  8-bit Galois LFSR of period 255 stepped per row from a fixed seed, so the seed picks the whole maze
+  and there are exactly **255** of them. All 255 were generated and flood-filled
+  (`internal/emu/mazesolvable_test.go`): **every one is traversable from the top edge to the bottom by
+  an 8-pixel-wide sprite**, with 22–91 px of eight-wide opening at the top edge and 93 at the bottom.
+  ★★**The width is the part that nearly went missing**: a fill on single pixels asks whether a 1-px
+  path exists, which no player is, and requiring eight contiguous columns roughly halves the open
+  space. The answer survives it. ★★★**Exhaustion is not construction** — nothing in the ROM prevents a
+  blocked maze, it simply happens that no seed produces one, and that is a property of this
+  generator at this height with this step rate. Change any of the three and it is a question again;
+  the carve above is what would make it structural.
 - Combine with a player sprite (`dynamic-multisprite`) + collision (`CXPFB`) for wall collision to
   turn this skeleton into a playable maze game.
