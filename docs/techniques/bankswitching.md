@@ -101,3 +101,40 @@ between the loader and the boot-time `Clr` loop). Trampoline at $FF80 keeps a sa
 - Loader contents land exactly ($81,$42,… for level 0; $FF,$7E,… after the switch).
 - `bank.number == 0` at every frame boundary (the kernel never runs banked-in code).
 - F6/F4 generalize by adding stubs/vectors per bank and more hotspots (verified in litmus).
+
+## What crossing a bank costs, in stores per scanline (measured 2026-09-07)
+
+Andrew Davie's 2003 packing tool imposed a rule and never said what it bought:
+
+> a) For any frame, **ALL of its sprites must be in a single bank**
+> b) The matrix definition for the frame must be in the same bank as the [sprites]
+> 〔stella-list `200301/msg00229`〕
+
+This page had the mechanism and no price. Measured by growing the store count in a kernel row until
+every line of the band started taking two:
+
+| how the graphic is reached | stores per scanline |
+|---|---|
+| same bank | **9** |
+| one switch per line, fetches batched inside it | **8** |
+| a switch on each side of every fetch | **4** |
+
+★**That is the numeric reason for rule (a).** Reaching across banks per sprite costs **more than half**
+the line's drawing capacity; batching the switch to once per line costs **exactly one store**. So the
+rule is not conservatism — a frame whose sprites are split across banks either draws less than half as
+much per line, or has to sort its fetches so that one switch serves them all, which is the packing
+problem the tool existed to solve.
+
+★★**The hotspot access is stood in for.** A real F8 switch is `sta $1FF9`, a 4-cycle absolute store;
+`roms/litmus/litmus_bank_capacity.asm` is 4K and uses `lda $A0,x`, also 4 cycles and one memory
+access, with no effect on a zeroed page. What is measured is the **time** a switch costs, which is
+what the rule is about. The switching itself is covered by `litmus_bank`, `litmus_bank_f4` and
+`litmus_bank_f6`. Guarded by `internal/emu/bankcapacity_test.go`, which runs all three bands at their
+maxima (262 scanlines) and requires one more store to break it.
+
+★★★**Two readings had to be corrected on the way here, both of them mine.** At one store past the
+maximum the frame grows by exactly **one line**; only at two past does every line of the band take
+two. Reading the +1 as the boundary made every maximum come out one too low. And the first three runs
+of the sweep reported stale numbers, because the generated ROMs lived outside the module and `go test`
+served **cached results** across two regenerations — `-count=1` is not optional when the fixtures are
+somewhere the cache cannot see. Raised by the mailing-list distillation (helper-2).

@@ -6,6 +6,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — what crossing a bank costs, in stores per scanline (2026-09-07)
+
+Andrew Davie's 2003 packing tool imposed a rule and never said what it bought: *"For any frame, **ALL
+of its sprites must be in a single bank**"* 〔`200301/msg00229`〕. `bankswitching.md` had the mechanism
+and no price. Measured by growing the store count in a kernel row until every line of the band started
+taking two:
+
+| how the graphic is reached | stores per scanline |
+|---|---|
+| same bank | **9** |
+| one switch per line, fetches batched inside it | **8** |
+| a switch on each side of every fetch | **4** |
+
+**That is the numeric reason for the rule.** Reaching across banks per sprite costs more than half the
+line's drawing capacity; batching to one switch per line costs exactly one store. `litmus_bank_capacity.asm`
+runs all three at their maxima and comes to 262 scanlines; `internal/emu/bankcapacity_test.go` requires
+one more store to break it. The hotspot access is stood in for by a 4-cycle `lda $A0,x` — what is
+measured is the time a switch costs, not the switching, which `litmus_bank*` already covers.
+
+★**Two readings had to be corrected, both mine.** At one store past the maximum the frame grows by
+exactly one line; only at two past does every line of the band take two. Reading the +1 as the boundary
+made every maximum come out one too low. And the first three runs of the sweep reported stale numbers,
+because the generated ROMs lived outside the module and **`go test` served cached results across two
+regenerations** — `-count=1` is not optional when the fixtures are somewhere the cache cannot see.
+
 ### Added — the hole is real and nothing has fallen into it (2026-09-07)
 
 Having found that `prove_line_budget` certifies a kernel rendering 269 scanlines (below), the next
