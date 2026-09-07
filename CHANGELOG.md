@@ -6,6 +6,56 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — twenty measurements from the mailing-list distillation, in one line each (2026-09-07)
+
+The entries above cover the findings large enough to need their own. These are the rest of the day's
+measurements, each with its own test or litmus and each answering a question the archive asked:
+
+**Hardware and the engine**
+- `VDELPx` decodes **bit 0 only** — `$FE` behaves exactly as `$00`, so the `AND #1` before `STA VDELPx`
+  buys nothing: **2 cycles and 1 byte per object per frame** 〔`200204/msg00067`〕.
+- A `TIM64T` wait is **2692 cycles, not 2752** — the first decrement has already happened, so it is 42
+  intervals and not 43. Spent on WSYNC that is **36 lines, not 37** 〔`200301/msg00250`〕.
+- `HMP0` and `HMP1` move identically across all sixteen nibbles; a 1998 report of asymmetry **does not
+  reproduce here**, and neither cross-check could see it if it were real 〔`199804/msg00193`〕.
+- The **400 µs SWACNT delay is not modelled** — writing the direction register and reading SWCHA on the
+  next instruction gives the same value as 608 cycles later 〔`200111/msg00192`, `msg00194`〕.
+- Bus contention is a **wired-AND** and the engine models neither it nor its cost in heat
+  〔`199812/msg00015`〕.
+- On a **3F cartridge the whole low TIA mirror is gone**: `STA WSYNC` at `$02` is a bank switch, and
+  every TIA access must use `$40`–`$7F` 〔`200506/msg00014`〕.
+- PCM's silent carrier is **two values, 0 and 11** — byte-identical audio digests, with 1, 4 and 12 all
+  differing 〔`199902/msg00036`〕.
+
+**Instruments and their limits**
+- `FlickerArea` charges **motion more than flicker**: the law is 2·d·h, so 4 px a frame scores as a full
+  blink and 8 px scores double 〔`200208/msg00128`〕.
+- `max_flicker_area` **cannot see duty ratio** — a 2-of-3 design and a 1-of-2 design have the same worst
+  pair 〔`200309/msg00154`〕.
+- `check_provenance` does not type its sources, and a gate is the wrong tool for it; counted by hand
+  instead, **58 machine-output rows to 1 annotated source**.
+- The `SLEEP` opt-out is **not an exemption** — `NO_ILLEGAL_OPCODES` emits `bit $00`, which reads the
+  same address; the detector was right and the false positive was my belief 〔`200401/msg00242`〕.
+- Painting a sprite the background colour is **pixel-identical to not drawing it and element-different**;
+  only `DecomposeRow` can tell 〔`199801/msg00038`〕.
+
+**Design, with numbers**
+- Folding sprite placement into a `JSR` costs **12 cycles on the worst case** — about 1.7 graphics stores.
+- Packing PF0's nibbles costs **+3 cycles a line unrolled, +19 written the obvious way**
+  〔`200210/msg00045`〕.
+- A uniform random range costs **2 cycles and the top value** 〔`200505/msg00172`〕.
+- The stack costs **4 bytes** in practice, not the policy Tumber's rule implies 〔`200401/msg00013`〕.
+- An **odd width is a power of two plus one**: 8 px player + 1 px missile makes one 9 px shape, and the
+  join is free 〔`200102/msg00234`, `msg00238`〕.
+- A free-running counter **carries no entropy of its own** — synchronise the presses and the output is a
+  constant; and a flat histogram is not evidence 〔`199706/msg00005`〕.
+- Held input needs **deliberate repetition**, a third policy beside edge detection and throttling; DELAY
+  and REPEAT are the design 〔`199612/msg00012`〕.
+- Every one of the maze's **255 LFSR seeds is traversable** by an 8-px sprite — a guarantee by
+  exhaustion, not by construction 〔`200208/msg00283`〕.
+- How well a tune fits is about **how many distinct pitches, not which** — 3 land within 4 cents, 12
+  cannot beat 19 〔`200308/msg00134`〕.
+
 ### Added — how far the HMOVE hazard lint can see (2026-09-07)
 
 The R3 rule looks for an HMxx/HMCLR write within 24 CPU cycles **after** an HMOVE strobe. A 2003
