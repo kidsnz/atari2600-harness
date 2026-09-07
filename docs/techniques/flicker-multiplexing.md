@@ -6,6 +6,28 @@ players down the screen, but the hard wall remains: 2 players per line. Flicker 
 object with 2 subsets) that persistence of vision merges them. This is how Pac-Man's four ghosts
 share two player slots — the famous 2600 ghost flicker is this technique.
 
+★**A longer cycle can flicker LESS, and the number this repository gates on cannot see it.** Andrew
+Davie, 2003, proposing a three-frame Fuji over a two-frame one: *"**three frames**, first frame with
+the outer bars, second with the left two, third with the right two. It gives you an **11-pixel
+Fuji**… This one is **less 'flickery' in my opinion, because any of the bars is displayed two out of
+every 3 frames**"* 〔`200309/msg00154`〕. The period went **up** and the flicker went **down**, because
+what the eye tracks is the **duty ratio** — 2/3 rather than 1/2 — and the wider sprite came free.
+
+★★Measured on two ROMs identical but for their duty (`internal/emu/flickerduty_test.go`):
+
+| shown | max flicker area | mean | unchanged pairs |
+|---|---|---|---|
+| 1 frame of every 2 | 120 | 120.0 | 0 of 12 |
+| 2 frames of every 3 | **120** | **80.0** | 4 of 12 |
+
+★★★**The maxima are equal**, so a `max_flicker_area` ceiling ranks Davie's calmer design exactly level
+with the one it replaces. The difference is entirely in *how often* the worst pair happens, and the
+mean carries it — 80/120 is 2/3, the duty itself. This is not an argument for changing the gate: a
+ceiling on the worst pair is the right shape for *"no single transition may be too violent"*. It is
+an argument for knowing what the number cannot say — **a design that flickers less often, but just as
+hard when it does, is invisible to it.** Choose the duty by eye, then let the gate hold the worst
+case.
+
 ★**There is a second use, and this page had only the first: flicker makes COLOURS.** Manuel Polik,
 watching Star Ship in 2002: *"I mean the crosshair. It's done with both missiles. But the two enemy
 sprites have different colors. Now, **the flicker is used to give the crosshair a unique look!** The
