@@ -14,7 +14,7 @@ modulating to specific values across frames, plus golden frame + golden audio).
 
 ## How it works
 
-1. **Silence the tone generators.** `AUDC=0` on both channels → AUDV is the raw
+1. **Silence the tone generators.** `AUDC=0` **or `AUDC=11`** on both channels → AUDV is the raw
    amplitude, not a tone volume. This is the whole trick.
    **`AUDC=11` does the same job** — measured 2026-09-04, `litmus_audc_carrier` /
    `internal/emu/audccarrier_test.go`: of all sixteen settings, **exactly 0 and 11**
@@ -148,3 +148,31 @@ the low-nibble mask to `and #$07` gives `107/144 values exact, 144/144 still in 
 - ADPCM here is a compact didactic LUT (16 states, 0–30 levels). Tjoppen's
   production codec is a 62-byte table tuned by an encoder against a WAV; same
   shape (`next = ADPCMTable[(sample<<1)|bit]`), better fit.
+
+## The silent carrier is two values, not one (2026-09-07)
+
+Eckhard Stolberg, asked how to get one-bit sound out of the TIA: *"If you set the AUDCx register to
+**0 or 11**, the output will always be high. You can generate complex waves by quickly changing the
+AUDVx register for that voice"* 〔`199902/msg00036`〕. This page took the first half; `litmus_pcm.asm`
+says *"AUDC0 = 0 and AUDF0 = 0 for the whole run"*. **11 appeared nowhere.**
+
+Measured by rebuilding the litmus with five values of `AUDC0` and comparing the audio mix digest over
+ten frames (`internal/emu/pcmcarrier_test.go`):
+
+| AUDC | digest | |
+|---|---|---|
+| 0 | `d323059a…` | the reference |
+| 1 | `1e6efd69…` | different |
+| 4 | `d33c513f…` | different |
+| **11** | **`d323059a…`** | **byte-identical** |
+| 12 | `160c6c9a…` | different |
+
+★**Exactly 0 and 11, with both of their neighbours differing** — a pair of points, not a range. So the
+precondition is `AUDC ∈ {0, 11}` and a driver that already holds 11 there does not have to write
+anything.
+
+★★**The confound this nearly had**: the litmus feeds one `lda #0` to three stores — `AUDC0`, `AUDF0`
+and `AUDV0` — so replacing that literal would have moved the frequency and the volume too, and the
+digests would have differed for reasons unrelated to the tone generator. The test splits the load
+first, and fails loudly if the setup block ever changes shape. Found by the mailing-list distillation
+(helper-1).
