@@ -18,3 +18,4 @@ roms/litmus/litmus_tim64t_zero.bin  # 2026-09-07 — TIM64T countdown length (26
 roms/litmus/litmus_pal_physics.bin  # 2026-09-07 — NTSC/PAL per-frame identity (physics scaling)
 roms/litmus/litmus_store7_overrun.bin  # 2026-09-07 — negative control: prover certifies, frame is 269 lines
 roms/litmus/litmus_bank_capacity.bin  # 2026-09-07 — stores per line at three bank-reach costs
+roms/litmus/litmus_hmp0_vs_hmp1.bin  # 2026-09-07 — HMP0/HMP1 symmetry across all 16 nibbles

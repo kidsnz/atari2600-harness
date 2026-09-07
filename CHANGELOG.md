@@ -6,6 +6,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — a 1998 asymmetry that does not reproduce here, and why that is the honest answer (2026-09-07)
+
+Brad Mott, in one sentence never corroborated elsewhere in the archive: *"the meaning of HMP0 isn't
+quite the same as it is for HMP1. When the high nibble of HMP0 is **F** it moves P0 by **-8 instead of
+-7**"* 〔`199804/msg00193`〕. `known-traps.md` records that mid-line HMOVE differs by TIA **revision**;
+this would be a different axis — the same chip, the two players disagreeing.
+
+`roms/litmus/litmus_hmp0_vs_hmp1.asm` places both players on one line, writes the same nibble to both
+registers and strobes HMOVE inside HBLANK. Across all sixteen nibbles **P0 and P1 move identically**,
+on the standard signed table (`$0`..`$7` → 0..−7, `$8`..`$F` → +8..+1).
+
+★**That is a statement about the instrument, not a verdict on Mott.** The engine applies one motion
+table to both objects, so it could not show a difference whatever the hardware does — and the Stella
+oracle compares `HMP0`/`HMP1` as register *values*, equal by construction here, not as motion. Both
+cross-checks are blind in the same way. Recorded as "not reproducible here", in the shape
+`timerdiv_test.go` uses. ★★Note also that `$F` moves **+1** in this engine, not −8 or −7: Mott counts
+in the other direction, so hardware would have to settle the convention before it could settle the
+asymmetry.
+
 ### Added — flicker makes colours, and there are about 776 of them (2026-09-07)
 
 `flicker-multiplexing.md` opened with *"**Goal:** show more than two player objects"*. That is one use.
