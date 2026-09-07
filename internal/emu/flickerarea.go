@@ -25,7 +25,21 @@ import "fmt"
 // keep it. Designed by the mailing-list distillation (helper-3), who found the `diffPixels` trap
 // first and routed around it; cost and behaviour measured here.
 //
-// ★★★What it does NOT distinguish: movement from blinking. A sprite that moves ten pixels left
+// ★★★What it does NOT distinguish: movement from blinking — and, measured 2026-09-07, it charges
+// motion MORE. On one 8x15 player with everything else held still
+// (`internal/emu/flickermotion_test.go`):
+//
+//	still                      0
+//	blinking on/off          120   = 8 x 15, the whole object
+//	drifting 1 px a frame     30   = 2 x 1 x 15
+//	drifting 4 px a frame    120   = the same as a full blink
+//	drifting 8 px a frame    240   = TWICE a full blink
+//
+// The law is 2·d·h, saturating at 2·w·h once the object clears its own width: two edges move, each d
+// wide, on every line. So four pixels a frame — an ordinary speed — is indistinguishable from a
+// sprite switching on and off, and eight scores double. A ceiling chosen from a flicker budget will
+// fire on something that never flickers, and the number will be RIGHT; it is the name that misleads.
+// Compare like with like: across frames whose motion matches, or on a scene held still. A sprite that moves ten pixels left
 // changes the element at twenty columns and reads as flicker. `read_motion` is the instrument for
 // that axis. This one answers "how much of the picture is not the same thing two frames running".
 //
