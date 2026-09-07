@@ -105,6 +105,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   lands: a band that hosts a repositioning cannot also be the thinnest band in the picture.
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
 - **Multi-kernel = reuse one object per region**: switch `REFP` / position / picture per Y band and reuse a single player for different purposes (Stay Frosty). Match a "never overlap on the same line" placement constraint with an AI that "never enters an occupied column" and flicker is zero. 〔mining 303364, 318140, 164247〕
+- **The stack costs 4 bytes, not a policy.** Christopher Tumber, 2004: *"I pretty much try to avoid
+  using JSR completely, and only do so when absolutely needed … **RAM management is really one of the
+  keys**"* 〔`200401/msg00013`〕. Measured across every `.bin` in this tree and the works, 30 frames
+  after a warmup: **281 ROMs use zero stack bytes, 89 use 1-8 (4 is by far the commonest — two levels
+  of JSR), exactly one uses 9-16 (`rts_dispatch`, at 10), and nothing between 17 and 128.** The nine
+  above that are the ROMs whose subject *is* the stack. So the direction of Tumber's instinct is
+  right — every stack byte is a byte of the same 128 that holds game state — but the **size** is
+  single digits. Do not contort a design to avoid subroutines; do count them if a kernel starts
+  nesting. Guarded by `internal/emu/stackbudget_test.go` at 16 bytes.
 - **★Everything measured here is measured BEFORE the television.** `internal/emu` imports
   `hardware`, `cpu/instructions`, `cartridge/mapper` and `memorymap` — and nothing from the engine's
   GUI, where the CRT model lives (`gui/sdlimgui/gl32_crtseq_effects.go`, `preferences_crt.go`).

@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the stack costs four bytes, not a policy (2026-09-07)
+
+Christopher Tumber in 2004: *"I pretty much try to avoid using JSR completely … RAM management is
+really one of the keys"* 〔`200401/msg00013`〕 — a policy with no number, and this repository had no
+design rule about the stack's cost at all, only the power-on trap. Measured over every `.bin` here and
+in the works, 30 frames after a warmup:
+
+| stack bytes used | ROMs |
+|---|---|
+| 0 | 281 |
+| 1–8 (4 is by far the commonest — two levels of JSR) | 89 |
+| 9–16 (`rts_dispatch` alone, at 10) | 1 |
+| 17–128 | **0** |
+| 129+ | 9, all of them ROMs whose subject *is* the stack |
+
+The direction of the instinct is right — every stack byte is a byte of the same 128 that holds game
+state — but the size is single digits. `internal/emu/stackbudget_test.go` guards it at 16 and names
+the nine exclusions.
+
+★**The first version of this measurement reported 255 bytes for all 380 ROMs.** SP is undefined until
+`TXS` runs, so reading it before then measures the emulator's power-on state; the give-away was that
+nothing used zero. The warmup is now part of the test and so is that check — if no ROM reads zero, the
+test says so rather than passing.
+
 ### Added — when DASM rejects every instruction, the cause is line 1 (2026-09-07)
 
 A source with no working `processor` directive assembles nothing, and DASM reports it by calling every
