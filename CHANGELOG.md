@@ -6,6 +6,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the hole is real and nothing has fallen into it (2026-09-07)
+
+Having found that `prove_line_budget` certifies a kernel rendering 269 scanlines (below), the next
+question is whether anything in the catalogue is already sitting in that hole. Swept every technique
+ROM: **it is not.** Of 31, fifteen certify with a settled frame and every one of those renders exactly
+262 lines. The other sixteen do not certify, which is a separate matter.
+
+`internal/cyclebound/certifiedframe_test.go` keeps the sweep, with the deliberately broken
+`litmus_store7_overrun.asm` as its positive control — added to the sweep it must be found, and found
+alone. A clean sweep and a sweep that looks at nothing are otherwise indistinguishable.
+
+★A first pass over *all* ROMs reported **27 of 133** certified-but-not-262 and that number is
+meaningless: it counts `cb_*` prover fixtures, deliberately truncated litmus ROMs, and — my own error
+— `litmus_pal.asm` run under NTSC, where 312 lines is the correct answer. The population has to be
+ROMs for which 262 was ever the goal.
+
 ### Added — the prover certifies a kernel the frame rejects (2026-09-07)
 
 Asked where the six-store choreography sits inside the 76 cycles, and whether the remainder admits a
