@@ -97,6 +97,20 @@ the NTSC m to be ~80%"* and then, parenthetically and unsurely, *"can someone pr
 value? 83,4%?"*. **The confident figure was 3.4 points out and the hesitant one was right to two
 decimal places.**
 
+★**That factor is for CONSTANT VELOCITY. Anything that accelerates is off by the SQUARE of it.** With
+`vel += g` and `pos += vel` once per frame, distance goes as the square of the frame count, so the
+same code travels **1.4380×** further per second on NTSC than on PAL — not 1.1992×. A 2004 author felt
+it as gravity and shipped a second build rather than retune: *"THE GRAVITY IN THE NTSC VERSION IS
+EFFECTIVELY **1.4x GREATER**. IT'S THE ONE CONSTANT I COULDN'T CHANGE… So anyway, I'VE INCLUDED A
+PAL60 VERSION"* 〔`200409/msg00309`〕. So **a game ported by scaling every velocity constant by 83.39%
+will still fall wrong**, and the acceleration constant needs 69.54% (83.39% squared).
+
+★★**And the premise both numbers rest on is now measured, not assumed**
+(`internal/emu/palphysics_test.go`, `roms/litmus/litmus_pal_physics.asm`): the same ROM produces
+**byte-identical positions per frame** under NTSC and PAL at 50, 100 and 150 frames. PAL's extra fifty
+scanlines change how long a frame lasts and nothing about what happens inside one, so the whole
+difference is temporal — which is what lets a rate ratio stand in for the physics at all.
+
 ⬜ Untested here, from the same thread: that for speeds of 0-2 px/frame the **zero** flag can replace
 the carry, and for 0-4 px the **overflow** flag. No mechanism is given in the source and it has not
 been reproduced.

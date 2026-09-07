@@ -6,6 +6,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — porting to PAL, acceleration is off by the SQUARE of the rate ratio (2026-09-07)
+
+`subpixel-velocity.md` carries the conversion factor for constant velocity: a PAL increment must be
+**83.39%** of the NTSC one. Anything that accelerates needs that squared. With `vel += g` and
+`pos += vel` once per frame, distance goes as the square of the frame count, so the same code travels
+**1.4380×** further per second on NTSC — not 1.1992×. A 2004 author felt it as gravity and shipped a
+second build rather than retune: *"THE GRAVITY IN THE NTSC VERSION IS EFFECTIVELY 1.4x GREATER. IT'S
+THE ONE CONSTANT I COULDN'T CHANGE"* 〔`200409/msg00309`〕. **A game ported by scaling every velocity
+constant by 83.39% will still fall wrong**; the acceleration constant needs 69.54%.
+
+★**And the premise both numbers rest on is now measured rather than assumed.** The same ROM produces
+byte-identical positions per frame under NTSC and PAL at 50, 100 and 150 frames — PAL's extra fifty
+scanlines change how long a frame lasts and nothing about what happens inside one. That is what lets a
+rate ratio stand in for the physics at all, and it is the assertion that could have failed. The
+quadratic shape is measured too, with the constant-velocity object as its control: doubling the frames
+multiplies the accelerating distance by ~4 and the constant-velocity distance by ~2.
+
 ### Added — the text ladder counts characters; the width never changes (2026-09-07)
 
 `text12.md` calls 12 → 24 → 28 → 32 a **width ladder**. Those are numbers of characters, and how wide
