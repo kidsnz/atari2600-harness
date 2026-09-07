@@ -2482,6 +2482,19 @@ image was run through `Prove`: **0 of 33 got an answer.** DPC+ (7), F4SC (10), 3
 F6SC / FA / AR (1 each) — all refused, none certified on a machine the model does not describe. That is the
 soundness half of G1 and it had never been checked end to end.
 
+  ⚠ **The AR entry is thinner than "1 image, refused" suggests, and the thinness is worth naming.**
+  The Supercharger has **two** load paths in the engine and this repository reaches neither on a valid
+  image. `supercharger/soundload_pcm.go` is **126 lines** implementing tape audio loading — sample
+  rate, *"total time of recording in seconds"*, *"two bytes per sample per channel"* — and
+  `git grep -clnE 'soundload|SoundLoad' -- internal/ cmd/ pkg/` returns **0**, with **0** `.wav` files
+  anywhere in the tree. The other path, `fastload.go`, is reached only by the one real cartridge that
+  `roms/carts/README.md` records as living **out of repo** and being refused. ★★And that path is built
+  not to fail: `if fl.blocks[i].verifyChecksum() == false` logs *"checksums incorrect (will now
+  correct)"* and continues, so a corrupted image would load. **So AR is not "covered and refused" — it
+  is one refusal on an image nobody here can open, past a loader that would not have complained
+  anyway.** Found by the mailing-list distillation (helper-2); the four counts above were re-measured
+  before being written.
+
 **4. Three of the four new entries can never print, and that is structural.** `bankedUnits` refuses a
 cartridge that maps RAM into the window BEFORE it reaches the edge-semantics table, and FA, FA2 and E7 all
 carry cartridge RAM by construction (CBS RAM Plus, its NVRAM successor, M-Network's 1K+256B). Only **E0**
