@@ -65,7 +65,7 @@ The countermeasure for gap C is "distillation," not "collection." A concise, def
 
 ## Stream B results (domain constants + verification) 2026-06-09
 
-Settled values that can be dropped directly into CLAUDE.md / `docs/2600-constants.md` for distillation.
+Settled values that can be dropped directly into **`CLAUDE.md`'s "Constants you must never get wrong"** section, which is where they actually live. ★This line used to offer a second home, a `2600-constants.md` under `docs/`, that was never created — found 2026-09-07 by `check_wiring.py`'s new reverse pass, which asks whether a referenced document exists rather than only whether an existing one is referenced.
 
 ### ⭐ Horizontal position (the antidote to failure #1) = NEW, most critical
 - **Formula:** missile/ball `X = 3N − 55` (N = CPU cycles from the sync point to the RESPx strobe),

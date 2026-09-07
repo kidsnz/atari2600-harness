@@ -363,6 +363,83 @@ def design_rule_docs():
     return []
 
 
+
+def dangling_doc_references():
+    """(1)'s missing direction: does every referenced .md actually EXIST?
+
+    The orphan check above asks "has every doc got a reader". It never asked the
+    reverse — "has every reference got a target" — so a `.md` name that no file
+    answers to passes every gate here. Seven of them did, quietly, for months:
+    `2600-constants.md`, `improvement-roadmap.md`, `hardening-roadmap.md`,
+    `MEMORY.md`, `feedback_asm_architecture.md`, `project_pong_status.md`,
+    `feedback_dev_process.md`. Two of those are roadmaps whose content was folded
+    into `capability-gap-audit.md` and whose names were left pointing at nothing;
+    the reader following one learns the document is missing, not that it moved.
+
+    ★A gate that only looks one way is the same defect this repository spent a day
+    finding in a text differ — it reported deletions and had no path at all for
+    insertions, so it reported none. Direction is a property of an instrument, and
+    an instrument only answers the direction it was built to ask.
+
+    Found by the mailing-list distillation (helper-3), who arrived at it by
+    misreporting a broken link, chasing the mistake, and noticing the gate could
+    not have caught either the false one or the real ones.
+    """
+    # Search the umbrella, not just this repo: docs legitimately point at ../STATUS.md,
+    # ../OVERVIEW.md and the sibling repos. Counting those as missing was the first
+    # version's own error.
+    umbrella = os.path.dirname(HARNESS)
+    # ★Is the umbrella actually here? The pre-push hook runs the gates in a throwaway
+    # worktree OUTSIDE the repository, where the sibling repos do not exist — so a
+    # reference to `sandbox/EVALUATION.md` is unresolvable there and perfectly fine in a
+    # real checkout. Judging it either way from inside the worktree would be a guess.
+    #
+    # ★★This is the same mistake as the CI revert on 2026-09-06, one day later and one
+    # scale smaller: a check written where the environment happened to be complete, run
+    # where it is not. The gate now asks whether it can see the umbrella before it decides
+    # anything about the umbrella.
+    siblings_present = all(os.path.isdir(os.path.join(umbrella, d)) for d in ("roms", "sandbox"))
+    have = set()
+    for root, dirs, files in os.walk(umbrella):
+        dirs[:] = [d for d in dirs if d not in ("Gopher2600", ".git", "node_modules")]
+        for f in files:
+            if f.endswith(".md"):
+                have.add(f)
+
+    # Capture the WHOLE path, so `x.ja.md` yields `x.ja.md` and not the tail `ja.md`. The
+    # first version split on the last dot and reported fifteen references to a file called
+    # `ja.md`; the check was wrong, not the tree — this repository's most-repeated lesson,
+    # met again inside the check that came out of it.
+    # Only references a reader would FOLLOW: a path (`docs/x.md`, `../STATUS.md`) or a
+    # markdown link. A bare file name in prose is a mention, not a link.
+    #
+    # ★The first version took every `*.md` token and reported 23 problems where 7 exist and
+    # only ONE is a defect. Its false positives are worth naming, because each is a different
+    # way of being right: `x.ja.md` split at the last dot and became fifteen references to a
+    # file called `ja.md`; `~/.claude/plans/…` names a real file this gate cannot see; *"the
+    # FORMER improvement-roadmap.md"* is prose about a document that was deliberately folded
+    # away; and *"memory `feedback_dev_process.md`"* says where to look in the word before it.
+    # **A reference is not a link, and a gate that cannot tell them apart reports history and
+    # prose as rot.** Narrowed to paths and links, the tree has one.
+    ref = re.compile(r"(?:\]\(|`|\s)((?:\.\.?/|[\w-]+/)[\w./-]*\.md)")
+    problems = []
+    for src in sorted(glob.glob(os.path.join(HARNESS, "docs", "**", "*.md"), recursive=True)):
+        if os.path.basename(src).endswith(".ja.md"):
+            continue
+        for m in ref.finditer(open(src, encoding="utf-8", errors="ignore").read()):
+            path = m.group(1)
+            if path.startswith("~") or path.startswith("/") or path.endswith(".ja.md"):
+                continue
+            # A reference OUT of this repo can only be judged where the siblings exist.
+            if not siblings_present and (path.startswith("../") or path.split("/")[0] in
+                                         ("roms", "sandbox", "reference", "library")):
+                continue
+            if os.path.basename(path) not in have:
+                problems.append("%s references `%s`, which does not exist anywhere under the umbrella"
+                                % (os.path.relpath(src, HARNESS), path))
+    return sorted(set(problems))
+
+
 def main():
     entry_text = ""
     for e in ENTRYPOINTS:
@@ -442,6 +519,15 @@ def main():
             print("  ✗", p)
         print("\nThe 2026-08-15 sweep found six commands nobody could think of because CLAUDE.md")
         print("did not list them. This is the same defect one level down, in the scenario schema.")
+        sys.exit(1)
+
+    dangling = dangling_doc_references()
+    if dangling:
+        print("WIRING CHECK FAILED (dangling doc reference):")
+        for d in dangling:
+            print("  \u2717 " + d)
+        print("  A reference with no target teaches the reader the document is missing, not that it "
+              "moved. Point it at the file that absorbed it, or delete the sentence.")
         sys.exit(1)
 
     if gate_problems:

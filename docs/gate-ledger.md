@@ -247,3 +247,46 @@ standing in for *"is it enforced"*. Both substitutions leave a true statement be
 conclusion in front of it. Named by the mailing-list distillation (helper-3), on the day their own
 question — "does harness warn about odd colour values?" — turned out to have the answer *"it knows, and
 it does not warn"*.
+
+
+## `check_wiring` looked one way only (2026-09-07)
+
+**Catch:** one dangling reference, and — more usefully — **the shape of its own first three versions.**
+
+Check (1) has always asked *"has every `docs/*.md` got a reader?"* It never asked the reverse, *"has
+every reference got a target?"*, so a `.md` name that no file answers to passed every gate here. A
+reverse pass now runs beside it.
+
+★**The check was wrong three times before it was right, and each way is worth keeping:**
+
+1. **Every `*.md` token.** 23 problems where 7 names exist, because `x.ja.md` split at the last dot and
+   became fifteen references to a file called `ja.md`. The tree was fine; the regex was not.
+2. **Every name, paths included.** 7 problems, of which **six were not defects**: `~/.claude/plans/…`
+   names a real file this gate cannot see; *"the FORMER `improvement-roadmap.md`"* is prose about a
+   document deliberately folded into this file; *"memory `feedback_dev_process.md`"* says where to look
+   in the word before it. **A reference is not a link.** A gate that cannot tell them apart reports
+   history and prose as rot — and a gate that cries rot gets switched off.
+3. **Paths and markdown links only.** One problem, and it is real: `resources.md` offered a second home
+   for the settled constants that was never created. Fixed by pointing at `CLAUDE.md`, where they live.
+
+★★It then caught the sentence written to explain it, because that sentence quoted the missing path.
+**That is correct**, and the note was rephrased rather than the gate weakened.
+
+★★★**Why this class of hole exists at all:** direction is a property of an instrument, and an
+instrument answers only the direction it was built to ask. The same day, a text differ in the
+distillation reported deletions and **had no code path for insertions** — so it reported none, over nine
+hundred files, and a negative control fired 0 of 60. Both gates were built looking one way. **When
+adding a check, write down what its mirror image would be, and say why you are not building it.**
+
+★★★★**And it was wrong a fourth time, in the place that matters most.** It passed here and the
+pre-push hook rejected it — because the hook runs the gates in a throwaway worktree **outside** the
+repository, where `sandbox/` and `roms/` do not exist, so every reference out of this repo read as
+broken. **The same mistake as the CI revert the day before**, one day later and one scale smaller: a
+check written where the environment happened to be complete, run where it is not. It now asks whether
+it can see the siblings before deciding anything about them. ★**Local green still proves nothing about
+an environment you did not run in** — and this time the gate that caught it was one of ours.
+
+**Cost:** one pass over `docs/**/*.md` per run. Negative-controlled both ways: a broken markdown link
+fails it, a bare mention in prose does not. Found by the mailing-list distillation (helper-3), who
+arrived at it by misreporting a broken link, chasing their own mistake, and noticing the gate could not
+have caught the false one or the real one.
