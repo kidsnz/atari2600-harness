@@ -6,6 +6,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the frame-length check must reach every state the scenario drives (2026-09-07)
+
+A 2005 report, found by eye and by nothing else: *"The screen also **jumps during gameplay on some,
+but not all, of the screens**"* 〔`200505/msg00099`〕. `ntsc_frame_lines` looks at one frame and
+`frame_lines_stable` looks at a window; neither knows anything about **states**. A ROM that holds 262
+lines on its title screen and loses them in play passes both if the window stops before the game
+starts.
+
+The invariant that makes the window mean something is cheap: it must reach at least as far as the last
+frame the scenario itself talks about. Every input and every assert is the author saying *"the ROM is
+somewhere interesting at frame N"*; a line-length check that stopped before N never looked at that
+somewhere. **205 scenarios declare `frame_lines_stable` and 0 fall short** — the property held
+everywhere and nothing enforced it, which is the cheapest moment to add a rule.
+`internal/scenario/framewindow_test.go`, with a synthetic short-window scenario as its control.
+
+★The gap was reported as "there is no form for checking 262 in every screen". There is: `game_states`
+already watches 1200 frames across all three of its states. What was missing was not the form but
+anything requiring it to be used that way.
+
 ### Added — what crossing a bank costs, in stores per scanline (2026-09-07)
 
 Andrew Davie's 2003 packing tool imposed a rule and never said what it bought: *"For any frame, **ALL
