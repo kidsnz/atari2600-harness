@@ -35,6 +35,25 @@ counter and no way to read a write-only register.**
 Found by the mailing-list distillation (helper-1 for the unanswered questions, helper-2 for the citation
 shapes, counted after their own tool was fooled by five of them).
 
+### Added — the pre-push hook refuses a workflow change aimed at `main` (2026-09-06)
+
+The revert below should not have needed to happen, and the fix is not a rule anyone has to remember.
+
+**What no local gate can do:** everything in `pre-push` runs on this machine, so it can only catch what
+is machine-independent. **A change to how CI invokes the tests is, by definition, not that.** The hook
+passed the parallel change three times; CI failed it on the first run. The commit message even said the
+measurement was taken on the wrong machine — knowing that and acting on it turned out to be two
+different things, and the second one was left to a human standing in front of a green hook.
+
+**What it does now:** a push whose commits touch `.github/workflows/` and whose target ref is `main` is
+refused, with the recipe in the message — push a branch, read `gh run list`, then merge. Everything else
+is untouched, and `--no-verify` remains for a deliberate exception where the run has already been read.
+
+It compares against the **remote sha git hands the hook**, not a local `origin/main`, which may already
+have been fetched forward and would make the diff empty. Negative-controlled both ways: the
+workflow-touching commit to `main` is blocked, the same commit to a branch passes and runs the full
+mirror. Recorded in `docs/gate-ledger.md` with the incident that produced it.
+
 ### Reverted — parallel packages time out `internal/emu` on CI's runner (2026-09-06, same day)
 
 The change below was wrong and CI said so on the first run:

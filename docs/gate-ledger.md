@@ -203,3 +203,25 @@ after that the gate is mostly holding a line rather than discovering one.
 Which means the recurring question is not "is this gate still catching things" but "has this gate
 stopped being a line worth holding". Those have different evidence, and only the first is in the
 Catches column.
+
+
+## The pre-push workflow guard (2026-09-06)
+
+**Catch:** its own first day — the incident that created it. `-p 1` was removed from `ci.yml` after
+three green parallel runs measured on an 8-core machine (265 s against 539 s). `ubuntu-latest` has
+four. Parallel packages share cores rather than each running faster; `internal/emu` lost its exclusive
+access and the first CI run died on `panic: test timed out after 10m0s`. **The pre-push hook passed
+it**, because on eight cores it is green, and the commit message even carried the words *"the ratio
+does not carry to CI's 4-core runner"* — the caveat was known, written down, and pushed straight past.
+
+**What it does:** a push whose commits touch `.github/workflows/` and whose target ref is `main` is
+refused, with the branch-and-read-the-run recipe in the message. Anything else is untouched.
+
+**Why it is not a `check_*.py`:** the gates run in a worktree on this machine, and **a machine-dependent
+failure is exactly what no local gate can see**. This one does not try to predict CI; it removes the
+step where a human is asked to remember that local green means nothing here, while a green hook tells
+them to go ahead.
+
+**Cost:** one `git diff --quiet` per push. Negative-controlled both ways on the day it was written — a
+workflow-touching commit to `main` is blocked, the same commit to a branch passes and runs the full
+mirror.

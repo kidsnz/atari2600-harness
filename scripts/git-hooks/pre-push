@@ -32,10 +32,15 @@ set -uo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 SHA=""
 REFS=0
-while read -r _lref lsha _rref _rsha; do
+TO_MAIN=0
+while read -r _lref lsha rref rsha; do
   REFS=$((REFS+1))
   case "$lsha" in ""|0000000000000000000000000000000000000000) continue ;; esac
   SHA="$lsha"
+  # The REMOTE sha git hands us is the state being replaced. Comparing against it — rather than
+  # against a local `origin/main`, which may already have been fetched forward — is what makes the
+  # workflow guard below see the change the push actually carries.
+  case "$rref" in refs/heads/main|refs/heads/master) TO_MAIN=1; BASE="$rsha" ;; esac
 done
 # A DELETION HAS NOTHING TO TEST. `git push --delete branch` sends an all-zero local sha, which the
 # loop skips; SHA then stayed empty and the fallback below reached for HEAD — so deleting a branch
@@ -50,6 +55,41 @@ elif [ "$REFS" -gt 0 ]; then
   exit 0
 else
   SHA="$(git rev-parse HEAD)"
+fi
+
+# ---------------------------------------------------------------------------------------------
+# CI'S OWN CONFIGURATION CANNOT BE TESTED BY THIS HOOK. Everything below runs on THIS machine, so
+# it can only catch what is machine-independent. A change to how CI invokes the tests is, by
+# definition, not that.
+#
+# Measured 2026-09-06, which is why this block exists. `-p 1` was removed from ci.yml after three
+# green parallel runs on an 8-core machine (265 s against 539 s). CI has four. Parallel packages
+# share cores rather than each running faster, `internal/emu` lost its exclusive access, and the
+# first CI run died on `panic: test timed out after 10m0s`. This hook passed it, because on eight
+# cores it is green. The commit even carried the words "the ratio does not carry to CI's 4-core
+# runner" — the caveat was known, written down, and pushed straight past.
+#
+# So: a commit that touches ci.yml does not go to main from here. Push it to a branch, read the
+# run, then merge. That is the one step that was missing, and it is not something a human should
+# have to remember while a green hook is telling them to go ahead.
+BASE="${BASE:-}"
+case "$BASE" in ""|0000000000000000000000000000000000000000) BASE="" ;; esac
+if [ "$TO_MAIN" = "1" ] && [ -n "$BASE" ] \
+   && ! git -C "$REPO" diff --quiet "$BASE..$SHA" -- .github/workflows/ 2>/dev/null; then
+  cat >&2 <<'CIGUARD'
+
+✗ pre-push BLOCKED: this push changes .github/workflows/ and targets main.
+
+  Nothing on this machine can tell you whether CI will pass -- that is what CI is for, and a
+  workflow change is exactly the case where local greenness proved nothing (2026-09-06: three
+  green runs here, timeout on the first real one). Push a branch and read the run:
+
+      git push origin HEAD:ci-check          # then: gh run list -R kidsnz/atari2600-harness -L 1
+      # green? then merge it to main.
+
+  Deliberate exception, with the run already read: git push --no-verify
+CIGUARD
+  exit 1
 fi
 
 # A previous run killed outright (SIGKILL skips the trap) leaves its worktree registered; prune
