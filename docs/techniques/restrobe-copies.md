@@ -75,6 +75,27 @@ strobe at cycle 29. Copies drawn:
 | 10 | 4 | 5 | 6 | 7 | 6 |
 | 12 | 4 | 6 | 8 | 9 | — |
 
+★**Spacing 11 is missing, and it is the one a commercial game uses.** Erik Mooney, 1997-08-25:
+Galaxian re-strobes at **11 cycles**, and each `RESP0` shows the second and third of three copies.
+The sweep here has 10 and 12 and not the value between them — and by this page's own rule
+(*"Do not pick a strobe spacing without measuring that spacing"*) that gap cannot be filled by
+reading the table: **10 and 12 are the two rows that disagree most.** 10 climbs to 7 and then
+**falls back to 6**; 12 climbs *faster* than 3+k. Whatever 11 does, neither neighbour predicts it.
+
+★★**Attempted 2026-09-07 and abandoned, deliberately, with what it costs written down.** Adding
+`11` to `SPACINGS` in the generator is one character and it builds — but the fixture's bands stop
+being three lines each. The sweep goes from 35 bands to 40, the sentinel count from 41 to **43**, and
+the stride breaks from 3 to 4 partway through. `TestRestrobeAddsCopies` finds its anchor by requiring
+that *every* band's sentinel land on a fixed 3-line stride, so it fails outright, and reading the
+bands by ordinal instead misaligns — the check for that is `s10 k1`, which must be 4 copies and came
+back 6. **A number was available and could not be trusted, so none is recorded here.**
+
+★★★So this is not a one-line addition: **the fixture's uniform band stride and the test's anchor
+have to change together.** Whoever takes it should budget for that rather than discovering it, and
+should keep `s10 k1 == 4` as the alignment check — it is what caught the misread. Raised by the
+mailing-list distillation (helper-2), who also left a prediction worth scoring: that 11 behaves like
+10 (climbs, then falls) rather than like 12.
+
 (A dash is a schedule the machine cannot build: a gap of exactly one cycle has no filler, and a
 store ending past cycle 74 runs out of scanline.)
 
