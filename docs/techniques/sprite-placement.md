@@ -367,3 +367,25 @@ produce a plan for. The test's controls hold that meaning — the free middle mu
 comb must stay a comb of 1s and 2s, and if either changes the numbers move and it says so. Found by the
 mailing-list distillation (helper-2), whose note said it plainly: *"作品1（TRANSISTOR DUB）に直に効く
 ——文字の x が穴に落ちるかどうか"*.
+
+## Inline or behind a call: twelve cycles, charged unconditionally (2026-09-07)
+
+The steps this page describes have to live somewhere, and folding them into a subroutine is the
+obvious tidiness. It costs `JSR` 6 cycles plus `RTS` 6, and unlike most costs it lands on the **worst
+case** rather than the average — the call happens on every row whatever the data does.
+
+Measured with `prove_line_budget` on two kernels identical but for the fold
+(`internal/cyclebound/jsrplacement_test.go`):
+
+| positioning | Krow worst |
+|---|---|
+| inline | **28** of 76 |
+| behind a `JSR` | **40** of 76 |
+
+★**Twelve cycles is about 1.7 graphics stores**, at the seven a `lda (zp),y` + `sta GRPx` pair costs
+— one and a half sprites' worth of the line, given up for one call.
+
+★★**Both kernels certify.** The budget prover will not object to the fold in a row with room and will
+object in a row without, so **the number decides, not the gate**. In a row already near the ceiling —
+which is where placement work usually is — the fold is the difference between fitting and not.
+Predicted at exactly +12 by the mailing-list distillation (helper-2) before it was run.
