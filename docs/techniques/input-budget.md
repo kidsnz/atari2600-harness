@@ -10,6 +10,25 @@ CI: `scenarios/paddle_demo.json` (three paddle positions → exact line counts).
 Hardware basis: `litmus_paddle` (v0.54.0; INPT0 dump/charge transfer curve measured) ·
 `litmus_swchb` (SWCHB read side verified). **No litmus exists for the keypad or the trackball.**
 
+## The axis before all the others: how many axes the device has at all
+
+★**This page costs a controller in cycles. It does not cost it in DEGREES OF FREEDOM, and that is the
+first thing a design loses.** A paddle gives **one** analogue axis, a driving controller **one**
+relative axis, a joystick **two** discrete ones. Choosing the analogue smoothness of a paddle spends
+the second axis, and that is not a setting to revisit later — it is the shape of the game.
+
+Joe Grand, 2001, asked by Andrew Davie to *"allow some horizontal motion (perhaps with
+inertia/acceleration) to allow me to shift the head back/forward"* 〔`200105/msg00041`〕, answered:
+*"I will consider the horizontal motion of the drivehead.. I was thinking about that a bit, but **if I
+use a paddle or driving controller, that wouldn't be possible**.. :/"* 〔`200105/msg00044`〕. ★★The
+feature request was for movement; the reply is about the **connector**. Adding a direction was not a
+feature at all — it was a change of device, and it would have taken the analogue feel with it.
+
+★★★So read the sections below as *"what can be squeezed out of the device you chose"*, and read this
+one as *"which device, and what it forecloses"*. `paddle.md` describes the paddle's read cost in
+detail and this page describes the budget; **until now neither said that picking one costs an axis**.
+Found by the mailing-list distillation (helper-2).
+
 ## Where the cost lands
 
 | device | read shape | cost | where it lands |
