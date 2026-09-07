@@ -157,6 +157,26 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   `COLUP0` so the two read as one object. ★★★The lesson generalises past cursors: **when a size the
   hardware offers is one short of the size the drawing needs, add a missile rather than change the
   drawing.**
+- **Painting a sprite the background colour is not removing it, and only one instrument here can
+  tell.** Ruffin Bailey, 1998, on someone else's game: *"why can I see a **silhouetted tank** over on
+  the far right side of the ground in one player games?"* Piero Cavina, who wrote it: *"it might be
+  the second player's sprite, which is **always there, but painted in black** in 1-player games. But
+  **I don't see it here**.."* 〔`199801/msg00038`, `msg00045`〕. ★★**Measured**
+  (`internal/emu/paintasbackground_test.go`), three bands — a visible player, the same player in
+  `COLUBK`'s colour, and no player at all:
+
+  | band | pixels | elements |
+  |---|---|---|
+  | visible | BG ×129, WHITE ×8, BG ×23 | BG, P1, BG |
+  | painted as background | **BG ×160** | **BG, P1, BG** |
+  | not drawn | BG ×160 | BG |
+
+  ★★★**The last two are pixel-identical and element-different.** Every colour comparison here —
+  `vismatch`, a golden frame, `cmd/still`'s diff — reads "painted the background colour" as "not
+  drawn"; `DecomposeRow` does not, and that is what it is for. **So painting it out frees nothing**:
+  the object still costs its store, still holds a player slot, and still sets collision latches. ★And
+  the third party who *did* see the tank is outside what any of this reaches — a television is not a
+  pixel comparator, which is the frontier `known-traps.md` names.
 - **Colour is a capacity tool, not only a look.** Two characters can share one set of graphics bytes
   and differ only in `COLUPx`. Andrew Davie, 2003, on a Mario demo: *"you will see **two Marios** -
   animating independently. The interesting thing here is that the Marios are **different colours - but
