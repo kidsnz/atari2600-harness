@@ -35,6 +35,46 @@ counter and no way to read a write-only register.**
 Found by the mailing-list distillation (helper-1 for the unanswered questions, helper-2 for the citation
 shapes, counted after their own tool was fooled by five of them).
 
+### Added — the four ways a quotation lies (2026-09-06)
+
+`docs/provenance.md` grew a rule a day, each one found by a sweep that the previous sweep had declared
+finished. They turned out to be one rule seen from four sides:
+
+1. **Something goes in that the author did not write** — `[sic]`, a bracketed completion, a silently
+   corrected typo. Measured: `"the cable networks will tole[rate]"` was invisible to a verbatim matcher
+   **and the bracket hid the sentence that carried the finding**; three notes had quietly fixed
+   `kernal`, `positionining` and `yor`; two had fixed a REGISTER NAME (`INTTIM`, `COLUMBK`), erasing the
+   fact that the original spelled it that way.
+2. **Something comes out** — 45 unmarked deletions, five of them the author's own hedge (`(I think)`,
+   `perhaps`, `(apparently)`). **A quotation with its hedge cut reads as an assertion the person did not
+   make**, and unlike a typo it survives being read: the sentence is grammatical, plausible, and wrong
+   about exactly how sure its author was. One had dropped a term from a formula — `74-X+(5-Y)*12`
+   quoted as `74-X+12` — so the reader receives a different equation.
+3. **It stops one clause early** — 31 quotations ending where the original continues with a *but*.
+   *"…on the vintage ROMs were active high"* omits *"But they are active low on standard EPROMs"*:
+   **read the quotation alone and you learn the opposite of the fact.** Another quoted a problem as open
+   whose author reported solving it two lines later.
+4. **It is not a quotation at all** — a paraphrase wearing `>`. The root of the other three, and the one
+   case where a matcher's "does not appear in the source" is simply correct. The fix is not to restore
+   words; it is to drop the marker.
+
+★**(1) and (2) are the same rule pointed in opposite directions**, which is why extending a quotation to
+undo (3) does not conflict with the ban in (1): restoring more of what the author DID write is not
+adding. Three sessions treated these as three separate accidents for three days before the framing made
+them one.
+
+★★**None of this was found by the person who wrote the notes.** The detector behind the first sweep
+compared word against word and **had no path for reporting a deletion at all** — so it reported none,
+and "243 typos" was one class presented as the whole. Class (2) and class (3) were both named by
+*another session looking at the output from outside*. Measured across nine wrong results in one day: the
+tool's own shape was recovered once, and that once was when someone else named it. **A tool's outline is
+invisible to the person holding it** — which is the argument for the separation this project already
+practises between measuring and implementing, stated as a number rather than a preference.
+
+Found by the mailing-list distillation (helper-1 built and repeatedly rebuilt the detectors; helper-3
+named two classes from outside; helper-2 caught two self-inflicted defects by checking the LINE rather
+than the edit).
+
 ### Added — flicker is judged on its own axis, and what an archive is actually for (2026-09-06)
 
 **Coarse gets through; flickering does not.** Glenn Saunders, on why a 2600 credit-roll had to reach

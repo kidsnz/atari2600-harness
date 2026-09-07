@@ -80,5 +80,46 @@ and three notes had quietly fixed `kernal`, `positionining` and `yor`. **A corre
 the person did not say, and it is also a quote `rg -F` will never find again.** Put the clarification
 in the surrounding prose instead, where it belongs.
 
+★★**And nothing comes OUT of a quotation either — least of all a hedge.** Measured 2026-09-06, after
+the typo sweep above had been declared finished: a second pass looking for *omissions* rather than
+substitutions found **45 unmarked deletions**, and five of them had removed the author's own qualifier —
+`(I think)`, `perhaps`, `(apparently)`, `(or my own)`. **A quotation with its hedge cut reads as an
+assertion the person did not make**, and unlike a typo it cannot be caught by reading: the sentence is
+grammatical, plausible and wrong about exactly one thing, which is how sure its author was. This
+repository already treats claim strength as part of a fact — that is what the `📖` legend in
+`fundamentals-audit.md` is for, marking what is documented but unmeasured. **The same discipline has to
+survive the trip through a quotation.** Marked elision (`…`, `[...]`) is fine and 146 instances of it
+were correctly left alone; what is not fine is silence.
+
+★★★**A third way to make a quotation lie: stop it one clause early.** Found the same day, 31 cases
+where a quotation ends mid-sentence and the original continues with a *but*. Cutting a quote is a
+normal thing to do — what is not normal is cutting it where the next clause **reverses** it:
+
+> *"…on the vintage ROMs were active high"* — and the original goes on, *"**But they are active low on
+> standard EPROMs.**"* 〔`200207/msg00165`〕
+
+**Read the quotation alone and you learn the opposite of the fact.** Another ended at *"adding another
+table is impossible"* where the author's next line reports having found a working example — a solved
+problem quoted as an open one. **When the continuation reverses the claim, extend the quotation.** That
+is not in tension with the rule above: the rule forbids adding text the author did not write, and
+restoring more of what they DID write is the same rule pointed the other way. Where the continuation
+merely adds detail or social chat, leave it — and where it strengthens rather than reverses, a note
+outside the quotation is enough. **The whole of this class cannot be automated**: only the *but* case
+is detectable, and `tole[rate]`'s missing sentence — the strongest one in that thread — was not a
+reversal and would never have been flagged.
+
+★★★★**A fourth way, and the simplest: wear the marker without being one.** A paraphrase set in
+`>` or `*"…"*` claims to be verbatim, and nothing in it can be repaired by restoring words — the whole
+line is the writer's sentence. The fix is not to edit the quotation but to **stop it claiming to be
+one**: drop the marker and let it be prose. This is the failure the other three are variations of, and
+it is the only one where a matcher's "does not appear in the source" verdict is exactly right.
+
+★★★★★The way these classes were found is worth as much as the fixes. The first sweep's detector compared
+word against word and **had no path at all for reporting a deletion** — not an oversight but a shape:
+it could not see omissions, so it reported none, and "243 typos" was the count of one class presented as
+the count of all of them. It took another session pointing at it from outside. **A tool's outline is
+invisible to the person holding it** — measured across nine wrong results in one day, the tool's own
+shape was recovered exactly once, and that once was when someone else named it.
+
 Found by the mailing-list distillation (helper-2, who counted the shapes after their own tool was
 fooled by five of them).
