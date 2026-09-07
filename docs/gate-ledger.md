@@ -225,3 +225,25 @@ them to go ahead.
 **Cost:** one `git diff --quiet` per push. Negative-controlled both ways on the day it was written — a
 workflow-touching commit to `main` is blocked, the same commit to a branch passes and runs the full
 mirror.
+
+
+## Knowing a rule and enforcing it are different quantities (2026-09-06)
+
+The odd-colour trap added this day is the cleanest example in the ledger, and it is worth stating as a
+question to ask of every gate here.
+
+`pkg/design/color.go:48` has said for months that *"A TIA color register is D7..D4 = hue(0–15) /
+D3..D1 = luminance(0–7) / **D0 unused**"*. `gate-ledger.md` itself explained a stepping bug by that same
+masking. **The repository knew.** Nothing acted on knowing: `lda #$45 / sta COLUBK` passed every gate,
+and its author walked away believing in a colour that is not there.
+
+★So a documented fact and an enforced one are **not the same measurement**, and it is easy to check
+which you have: **write the mistake the fact forbids, and run the gates.** If nothing fires, what you
+have is a sentence. That test takes a minute and it is the one that separates `docs/` from `scripts/`.
+
+★★This is the mirror of the failure this project keeps recording in the other direction — using a
+quantity you can measure in place of the one you want. Here the quantity is *"is it written down"*
+standing in for *"is it enforced"*. Both substitutions leave a true statement behind and a false
+conclusion in front of it. Named by the mailing-list distillation (helper-3), on the day their own
+question — "does harness warn about odd colour values?" — turned out to have the answer *"it knows, and
+it does not warn"*.
