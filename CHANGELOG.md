@@ -6,21 +6,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
-### Added — VDELPx decodes bit 0 and ignores the other seven (2026-09-07)
+### Fixed — a TIM64T wait is 36 scanlines, not 37 (2026-09-07)
 
-Thomas Jentzsch's two-line kernel writes the parity straight into the register, with a comment that
-was never checked here: *"don't care for the bits 1..7, VDEL ignores them"* 〔`200204/msg00067`〕.
-`two-line-kernel.md` instead tells authors to write `VDELP0 = y & 1`.
+`capability-gap-audit.md` said a `TIM64T` of 43 runs for `43 * 64` = ~2752 cycles. It does not. The
+first decrement has already happened by the time the next instruction can look — **write 43, read
+INTIM, get 42** — so the countdown is 42 intervals. Erik Mooney measured `1 + 42*64 = 2689` on the
+list in 2004-05 and nothing here had checked it.
 
-`roms/litmus/litmus_vdel_bits.asm` parks OLD := `$00` and NEW := `$FF`, then writes six values and
-lets the picture answer — a lit band means the new graphic reached the screen (delay off), a dark band
-means the parked old one did. Measured: `$00` lit, `$01` dark, `$02` **lit**, `$03` dark, `$FE`
-**lit**, `$FF` dark. Seven set bits behave exactly like none. Jentzsch was right, and the mask can go:
-**2 cycles and 1 byte per object per frame**, in the part of the frame where cycles are scarcest.
+Measured with `roms/litmus/litmus_tim64t_zero.asm`, which parks markers either side and lets the
+emulator do the counting (a counting loop inside the ROM measures itself): **2692 cycles**, identical
+across three consecutive periods. The three-cycle gap from Mooney is the resolution of the reading —
+the spin is `LDA INTIM` + `BNE` = 7 cycles per poll, so the crossing lies in the preceding seven.
+2752 is nine polls away.
 
-`$00` and `$01` are in the litmus as controls, because without them a run of dark bands could mean the
-ROM never draws and a run of lit ones could mean VDEL never engages. Found by the mailing-list
-distillation (helper-2).
+**Spent on WSYNC that is 36 lines, not 37**: 2752/76 = 36.2 rounds up, 2692/76 = 35.4 does not. The
+test is two-sided — it fails if the measurement drifts more than one poll from Mooney's number, and it
+fails if it drifts back towards 2752 far enough that the two stop being distinguishable. Predicted as
+2689 by the mailing-list distillation (helper-2) before it was run.
 
 ### Added — VDELPx decodes bit 0 and ignores the other seven (2026-09-07)
 
