@@ -1958,10 +1958,18 @@ Cost: rewriting the analysis's central premise. Benefit: **2 of 12 loops**, wort
 coverage.
 
 **The weaker version is not worth building either.** Ignoring elapsed time (assume zero) is sound and would
-reach all twelve — but the bound it produces is the full timer period, so a `TIM64T` of 43 yields ~2752
-cycles and the verdict is "this region exceeds 76 cycles". That is true, useless, and already obvious from
+reach all twelve — but the bound it produces is the full timer period, so a `TIM64T` of 43 yields
+**2692 cycles** (measured 2026-09-07, `internal/emu/tim64tzero_test.go`) and the verdict is "this region exceeds 76 cycles". That is true, useless, and already obvious from
 the fact that it is a timer wait. It buys the coverage NUMBER without buying an answer anyone wants, which
 is the failure mode this audit exists to name.
+
+★**That number read `~2752` here until 2026-09-07, and it was wrong by a scanline.** `43 * 64` assumes
+the countdown starts at 43; it starts at **42**, because the first decrement has already happened by
+the time the next instruction can look — write 43, read INTIM, get 42. Erik Mooney measured
+`1 + 42*64 = 2689` on the list in 2004-05 and nothing here had checked it. The measured 2692 sits
+inside the 7-cycle resolution of the reading (`LDA INTIM` + `BNE` is one poll); 2752 sits nine polls
+outside it. **Spent on WSYNC that is 36 lines, not 37** — 2752/76 = 36.2 rounds up, 2692/76 = 35.4
+does not. Found by the mailing-list distillation (helper-2), who predicted 2689 before it was run.
 
 **What the timer length would actually be good for** is the frame-structure check (does the frame come to 262
 lines?), which is a different tool with a different interval — and which needs the same cross-region cycle
