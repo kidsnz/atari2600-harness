@@ -16,3 +16,4 @@
 roms/litmus/litmus_vdel_bits.bin  # 2026-09-07 — VDELPx bit decode (bit 0 only; $FE behaves as $00)
 roms/litmus/litmus_tim64t_zero.bin  # 2026-09-07 — TIM64T countdown length (2692 cy, not 43*64)
 roms/litmus/litmus_pal_physics.bin  # 2026-09-07 — NTSC/PAL per-frame identity (physics scaling)
+roms/litmus/litmus_store7_overrun.bin  # 2026-09-07 — negative control: prover certifies, frame is 269 lines

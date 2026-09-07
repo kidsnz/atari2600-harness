@@ -61,6 +61,27 @@ Krow:   sta WSYNC
         bpl Krow       ; 72  (< 76 — fits in one line)
 ```
 
+★**There are 4 cycles left and they cannot buy a seventh store — measured 2026-09-07.**
+`roms/litmus/litmus_store7_overrun.asm` is this kernel with one extra `lda (zp),y` + `sta GRPn`,
+eight cycles the line does not have. What happens is worth knowing in both directions:
+
+| | `prove_line_budget` | rendered frame | band width |
+|---|---|---|---|
+| six stores | Krow 93 / 152 — certified | 262 scanlines | 46 px |
+| seven stores | Krow 102 / 152 — **certified** | **269 scanlines** | 46 px |
+
+★★**The prover says yes and the machine says no.** The region begins with `sta WSYNC`, so it is given
+a two-line budget of 152, and an eight-cycle overrun of the *inner* line disappears into that
+allowance. That is not a bug in the budget — a two-line region is a real thing — but it means
+**`prove_line_budget` cannot be the only check on a loop whose region starts with a WSYNC**.
+`ntsc_frame_lines` / `frame_lines_stable` is what catches it. `internal/cyclebound/twolineregion_test.go`
+holds this as a standing negative control.
+
+★★★**And the seventh store buys nothing anyway: the band stays 46 px.** The "6" was never a cycle
+budget — it is two players × three NUSIZ copies, and there is no seventh place to put a seventh image.
+Question raised by the mailing-list distillation (helper-2), who asked where the six stores sit inside
+the 76 cycles and whether the remainder admits a seventh.
+
 **Position follows the store times.** The 4-burst completes at 55/58/61/64 cy = **+21 cy** vs
 litmus_48px6's 34/37/40/43, so the whole sprite block shifts **+63 px**: position P0=87, P1=95
 (prologue = litmus recipe + SLEEP 21). The gap relations between copies are preserved exactly

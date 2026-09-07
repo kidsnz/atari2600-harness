@@ -6,6 +6,30 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the prover certifies a kernel the frame rejects (2026-09-07)
+
+Asked where the six-store choreography sits inside the 76 cycles, and whether the remainder admits a
+seventh store. It does not, and finding that out turned up something larger.
+
+`roms/litmus/litmus_store7_overrun.asm` is `score6.asm` with one extra `lda (zp),y` + `sta GRPn`:
+
+| | `prove_line_budget` | rendered frame | band width |
+|---|---|---|---|
+| six stores | Krow 93 / 152 — certified | 262 scanlines | 46 px |
+| seven stores | Krow 102 / 152 — **certified** | **269 scanlines** | 46 px |
+
+**The prover says yes and the machine says no.** The region begins with `sta WSYNC`, so it gets a
+two-line budget of 152, and an eight-cycle overrun of the *inner* line disappears into that allowance.
+A two-line region is a real thing and 152 is the right budget for one — but the consequence is that
+`prove_line_budget` cannot be the only check on a loop whose region starts with a WSYNC.
+`ntsc_frame_lines` / `frame_lines_stable` is what catches this, so the two checks are not redundant.
+`internal/cyclebound/twolineregion_test.go` keeps it as a standing negative control, and fails loudly
+if the prover ever starts rejecting it — at which point the note describes a hole that is gone.
+
+And the seventh store buys nothing anyway: the band stays 46 px. The "6" was never a cycle budget —
+it is two players × three NUSIZ copies, and there is no seventh place to put a seventh image. Raised
+by the mailing-list distillation (helper-2).
+
 ### Added — porting to PAL, acceleration is off by the SQUARE of the rate ratio (2026-09-07)
 
 `subpixel-velocity.md` carries the conversion factor for constant velocity: a PAL increment must be
