@@ -32,6 +32,61 @@ func NeedsFlicker(sameYSprites int) bool {
 	return sameYSprites > DistinctPlayerSprites
 }
 
+// NTSCFrameRateHz is the engine's own NTSC refresh, measured rather than the nominal 60:
+// 15734.26 / 262. Kept here so the rate below and `subpixel-velocity.md`'s conversion factor
+// cannot drift apart.
+const NTSCFrameRateHz = 60.0544
+
+// FlickerRateHz reports how often each object is drawn when sameYSprites objects share the two
+// player slots, at 60 Hz frames.
+//
+// `NeedsFlicker` answers yes or no and says nothing about HOW MUCH — it returns the same answer for
+// three objects and for twenty. This is the missing half, and the archive gives both ends of it.
+//
+// Glenn Saunders, 1997, arguing flicker is a tool rather than a defect: *"Some of the most impressive
+// 2600 games have flicker (Solaris, Radar Lock, Stargate, Star Wars: The Arcade Game, even
+// Adventure). It frees up the 2600 to do more independently moving sprites, and have more of them.
+// **It's never really necessary to drop below 30hz** and still manage to fill the screen with
+// sprites"* 〔stella-list `199709/msg00139`〕.
+//
+// Piero Cavina answered five days later with the counter-example, and it is not a compliment:
+// *"**'Adventure' must be the king of flicker**… I remember that you could put all the objects (dot
+// included) in the same room and get an incredible amount of flicker"* 〔`199709/msg00218`〕.
+//
+// So the ladder is the frame rate over the number of subsets, and the two named points are:
+//
+//	 3-4 objects    2 subsets   30.03 Hz   the rate Saunders says is enough for a screen of sprites
+//	24   objects   12 subsets    5.00 Hz   Adventure's crowded room, named by the person who
+//	                                       watched it as excessive
+//
+// The second line is arithmetic meeting an eyewitness: twenty-four objects sharing two slots is
+// exactly the "5hZ, maybe?" Cavina guessed at, which is the sort of agreement worth writing down
+// because neither side was derived from the other.
+//
+// There is no hardware limit here to return — this is a judgement, and the number exists so the
+// judgement is made against one. `HardwareCollisionUsable` is the other half of the same decision:
+// past two subsets the TIA's collision latches stop being trustworthy, so the cost of a high N is
+// not only visual.
+func FlickerRateHz(sameYSprites int) float64 {
+	subsets := SubsetsFor(sameYSprites)
+	if subsets <= 0 {
+		return 0
+	}
+	return NTSCFrameRateHz / float64(subsets)
+}
+
+// SubsetsFor reports how many frames a cycle takes when sameYSprites objects share the player slots:
+// one when they all fit, otherwise the number of groups of DistinctPlayerSprites needed to hold them.
+func SubsetsFor(sameYSprites int) int {
+	if sameYSprites <= 0 {
+		return 0
+	}
+	if !NeedsFlicker(sameYSprites) {
+		return 1
+	}
+	return (sameYSprites + DistinctPlayerSprites - 1) / DistinctPlayerSprites
+}
+
 // RepositionCostScanlines は、可動オブジェクトを横へ再配置（RESPx ストロボ）するのに
 // 消費する走査線数。1 本の Y 帯境界で 1 走査線を使う＝帯間に空き Y レーンが要る理由。
 // 〔design-principles.md「横再配置は1走査線消費」/ Bumbershoot〕

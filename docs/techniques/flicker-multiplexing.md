@@ -6,6 +6,30 @@ players down the screen, but the hard wall remains: 2 players per line. Flicker 
 object with 2 subsets) that persistence of vision merges them. This is how Pac-Man's four ghosts
 share two player slots — the famous 2600 ghost flicker is this technique.
 
+★**How much flicker, not just whether: `design.FlickerRateHz`.** `NeedsFlicker` answers yes or no and
+returns the same answer for three objects and for twenty. The ladder is the frame rate over the number
+of subsets, and the archive names both of its ends. Glenn Saunders, 1997: *"Some of the most impressive
+2600 games have flicker (Solaris, Radar Lock, Stargate, Star Wars: The Arcade Game, even Adventure). It
+frees up the 2600 to do more independently moving sprites… **It's never really necessary to drop below
+30hz**"* 〔`199709/msg00139`〕. Piero Cavina, five days later and not as a compliment: *"**'Adventure'
+must be the king of flicker**… you could put all the objects (dot included) in the same room and get an
+incredible amount of flicker"* 〔`199709/msg00218`〕.
+
+`design.SubsetsFor` gives the first column's answer and `design.FlickerRateHz` the last:
+
+| objects sharing the two slots | subsets | each drawn at |
+|---|---|---|
+| 1–2 | 1 | 60.05 Hz — no flicker |
+| 3–4 | 2 | **30.03 Hz** — the rate Saunders calls sufficient |
+| 12 | 6 | 10.01 Hz |
+| 24 | 12 | **5.00 Hz** — Cavina's *"5hZ, maybe?"* |
+
+★★**The last row is arithmetic meeting an eyewitness.** Twenty-four objects sharing two slots comes to
+exactly the number he guessed at, and neither side was derived from the other. ★★★There is no hardware
+limit to return here — this is a judgement — but the number exists so the judgement is made against
+one, and `HardwareCollisionUsable` is the other half of it: past two subsets the TIA's collision
+latches stop being trustworthy, so a high N costs more than looks.
+
 ★**A longer cycle can flicker LESS, and the number this repository gates on cannot see it.** Andrew
 Davie, 2003, proposing a three-frame Fuji over a two-frame one: *"**three frames**, first frame with
 the outer bars, second with the left two, third with the right two. It gives you an **11-pixel
