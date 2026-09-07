@@ -35,7 +35,7 @@ counter and no way to read a write-only register.**
 Found by the mailing-list distillation (helper-1 for the unanswered questions, helper-2 for the citation
 shapes, counted after their own tool was fooled by five of them).
 
-### Added — the four ways a quotation lies (2026-09-06)
+### Added — the five ways a quotation lies (2026-09-06)
 
 `docs/provenance.md` grew a rule a day, each one found by a sweep that the previous sweep had declared
 finished. They turned out to be one rule seen from four sides:
@@ -57,6 +57,17 @@ finished. They turned out to be one rule seen from four sides:
 4. **It is not a quotation at all** — a paraphrase wearing `>`. The root of the other three, and the one
    case where a matcher's "does not appear in the source" is simply correct. The fix is not to restore
    words; it is to drop the marker.
+5. **It silently repairs the AUTHOR's own mistake** — not a transcription typo but a slip the person
+   actually made, tidied away: *"when **the the** ball"* quoted as *"when the ball"*, *"clear all
+   **collision collision** latches"*. The other four leave the sentence *stranger* than the original in
+   some way a careful reader might notice; **this one moves only toward plausibility**, so reading
+   harder never finds it — and it makes the source look more careful than they were, which matters when
+   the same archive is cited for how sure somebody was.
+
+★**One truncation deserves naming on its own**, because it is this repository's `📖`/`✅` distinction
+leaking through a quotation. A note quoted *"it's getting even worse when you're using PAL"* — a
+hardware observation, apparently. The original continues: *"**But I'm mostly playing with z26**"*
+〔`200102/msg00268`〕. **Cutting there promotes emulator evidence to hardware evidence.**
 
 ★**(1) and (2) are the same rule pointed in opposite directions**, which is why extending a quotation to
 undo (3) does not conflict with the ban in (1): restoring more of what the author DID write is not
@@ -67,7 +78,13 @@ them one.
 compared word against word and **had no path for reporting a deletion at all** — so it reported none,
 and "243 typos" was one class presented as the whole. Class (2) and class (3) were both named by
 *another session looking at the output from outside*. Measured across nine wrong results in one day: the
-tool's own shape was recovered once, and that once was when someone else named it. **A tool's outline is
+tool's own shape was recovered once, and that once was when someone else named it. ★★And the sharpest case
+came from a session that refused to grade itself with somebody else's instrument: told to fix nineteen
+listed omissions, it **wrote a second detector** instead of trusting the list, and the first run
+reported **zero** across nine hundred notes. Before reporting that, it fed the detector sixty artificial
+deletions — **none fired.** It had been reading its diff opcodes backwards. Corrected, the control
+fired 57 of 60 and the real scan found **twenty-one more** than the list. **A zero without a negative
+control is not a measurement.** **A tool's outline is
 invisible to the person holding it** — which is the argument for the separation this project already
 practises between measuring and implementing, stated as a number rather than a preference.
 

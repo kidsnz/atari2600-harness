@@ -121,5 +121,14 @@ the count of all of them. It took another session pointing at it from outside. *
 invisible to the person holding it** — measured across nine wrong results in one day, the tool's own
 shape was recovered exactly once, and that once was when someone else named it.
 
+★★★★★★★★And the sharpest demonstration came from a session that refused to grade itself with
+somebody else's instrument. Told to fix nineteen listed omissions, it **wrote a second detector** rather
+than trust the list, and the first run reported **zero** across nine hundred notes. Before reporting
+that, it fed the detector sixty artificial deletions: **none of them fired.** The comparison had been
+reading its diff opcodes backwards — counting text present in the note and absent from the source
+(fabrication) instead of the reverse (omission). Corrected, the same control fired 57 of 60, and the
+real scan found **twenty-one more** than the list it had been handed. **A zero without a negative
+control is not a measurement**, and that one was a sentence away from being reported with confidence.
+
 Found by the mailing-list distillation (helper-2, who counted the shapes after their own tool was
 fooled by five of them).
