@@ -6,6 +6,27 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — flicker makes colours, and there are about 776 of them (2026-09-07)
+
+`flicker-multiplexing.md` opened with *"**Goal:** show more than two player objects"*. That is one use.
+Manuel Polik, watching Star Ship in 2002, described the other: *"the flicker is used to give the
+crosshair a unique look! The missiles are just swapped constantly, so the **two colors melt into
+one**"* 〔`200201/msg00014`〕 — and the same ROM uses flicker for both purposes at once, the ball
+multiplexing a starfield while the missiles compose a colour.
+
+Measured over the engine's NTSC palette (128 codes): of all 8128 pairs, 6225 distinct midpoints sit
+more than 16 RGB units from every static colour; of the **960 same-luminance pairs**, **776**.
+
+**The same-luminance row is the usable one.** The TIA's luminance is D3..D1, so two codes sharing it
+differ only in hue — the eye tracks a constant brightness and the hues melt instead of flickering.
+That is the axis `design.SameLuminance` already names for multiplexing, used here for the opposite
+purpose. About 776 colours are reachable that no register can hold, for two `COLUPx` writes a frame.
+
+★**Not measured: whether the eye agrees.** The midpoint is an arithmetic model of temporal
+integration. What 30 Hz alternation looks like on a television is the frontier this repository named
+today as its harshest blind spot. The numbers say which colours are arithmetically out of reach, not
+which ones look right.
+
 ### Added — the frame-length check must reach every state the scenario drives (2026-09-07)
 
 A 2005 report, found by eye and by nothing else: *"The screen also **jumps during gameplay on some,

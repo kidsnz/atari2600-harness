@@ -6,6 +6,33 @@ players down the screen, but the hard wall remains: 2 players per line. Flicker 
 object with 2 subsets) that persistence of vision merges them. This is how Pac-Man's four ghosts
 share two player slots — the famous 2600 ghost flicker is this technique.
 
+★**There is a second use, and this page had only the first: flicker makes COLOURS.** Manuel Polik,
+watching Star Ship in 2002: *"I mean the crosshair. It's done with both missiles. But the two enemy
+sprites have different colors. Now, **the flicker is used to give the crosshair a unique look!** The
+missiles are just swapped constantly, so the **two colors \*melt\* into one**"* 〔`200201/msg00014`〕 —
+and the same ROM uses flicker for **both** purposes at once, the ball multiplexing a starfield while
+the missiles compose a colour.
+
+★★**Measured** (`internal/ceiling/flickercolour_test.go`, engine NTSC palette, 128 codes):
+
+| pairs alternated | distinct colours >16 RGB units from anything static |
+|---|---|
+| all 8128 pairs | 6225 |
+| **the 960 SAME-LUMINANCE pairs** | **776** |
+
+★★★**The same-luminance row is the usable one.** The TIA's luminance is D3..D1, so two codes sharing
+it differ only in hue: the eye tracks a constant brightness and the hues melt instead of flickering.
+That is the same axis `design.SameLuminance` names for multiplexing, used here for the opposite
+purpose — there it decides which objects can share a slot without the swap being seen; here it decides
+which pairs blend rather than blink. **So ~776 colours are reachable that no register can hold**, for
+two `COLUPx` writes a frame.
+
+★★★★**What is not measured: whether the eye agrees.** The midpoint is an arithmetic model of temporal
+integration. What 30 Hz alternation looks like on a television is the frontier `known-traps.md` names
+as this harness's harshest blind spot — the numbers above say which colours are *arithmetically* out
+of reach, not which ones look right. Pick the pair here; judge it on a screen. Found by the
+mailing-list distillation (helper-2).
+
 Learned from (clean-room): `multisprite2/3.asm` discussions (8bitworkshop), AtariAge flicker
 threads. Demo: `roms/techniques/flicker_multiplex.asm` — four bouncing color-coded balls, two
 drawn per frame by frame parity — locked in CI by `scenarios/flicker_multiplex.json`.
