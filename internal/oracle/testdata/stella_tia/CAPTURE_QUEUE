@@ -22,3 +22,4 @@ roms/litmus/litmus_hmp0_vs_hmp1.bin  # 2026-09-07 — HMP0/HMP1 symmetry across 
 roms/litmus/litmus_player_missile_9px.bin  # 2026-09-07 — 8px player + 1px missile = one 9px shape
 roms/litmus/litmus_counter_entropy.bin  # 2026-09-07 — where a free-running counter's randomness comes from
 roms/litmus/litmus_swacnt_delay.bin  # 2026-09-07 — the 400us SWACNT delay is not modelled
+roms/litmus/litmus_autorepeat.bin  # 2026-09-07 — edge-only vs deliberate auto-repeat

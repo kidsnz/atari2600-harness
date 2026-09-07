@@ -147,3 +147,37 @@ also why the joystick's 40–44 cycles is the *whole* cost and not a per-line on
 
 
 ---
+
+## The same machinery, three ways — and this page had two of them (2026-09-07)
+
+Edge detection, deliberate throttling and deliberate repetition are one counter with three policies.
+`game-states.md` records the first as *"hold-to-repeat bugs gone"* — a record of **removing**
+repetition — and `design-principles.md` records the second as a turn-rate governor. The third had no
+line anywhere, and a held direction needs exactly it.
+
+Glenn Saunders, 1996, on a Tetris in progress: *"When moving the joystick left and right, **when you
+HOLD the joystick, it should keep moving the piece. It should not require extra taps.** Perhaps some
+extra **'grace time' when a piece is lying flat** so you can 'slide' L-shaped pieces into place after
+they are on the ground"* 〔`199612/msg00012`〕.
+
+Measured (`internal/emu/autorepeat_test.go`, `roms/litmus/litmus_autorepeat.asm`), both policies
+running off the same button with `DELAY = 16` and `REPEAT = 8`:
+
+| held for | edge-only | auto-repeat |
+|---|---|---|
+| 1 frame | 1 | 1 |
+| 16 frames | 1 | 1 |
+| **17 frames** | 1 | **2** |
+| 25 frames | 1 | 3 |
+| 60 frames | 1 | 7 |
+
+★**Edge detection alone never repeats, however long the button is down** — correct for a menu, wrong
+for a direction, and the two policies differ by nine lines of kernel.
+
+★★**The two numbers are the design.** `DELAY` is how long a hold must last before the game decides it
+was deliberate; `REPEAT` is how fast it goes after that. They are in RAM so a scenario can assert them
+rather than a person judging them by feel.
+
+★★★**The grace window is the same counter with a different trigger** — a state change rather than a
+button edge — and it is *not* measured here, because this litmus has no landing to hang it on. Named
+so it is not mistaken for covered. Found by the mailing-list distillation (helper-1).
