@@ -182,6 +182,19 @@ def scan_text(asm):
         #        SLEEP 3 -> 04 00       nop $00   ILLEGAL opcode, and READS $00
         #        SLEEP 4 -> EA EA
         #        SLEEP 5 -> 04 00 EA
+        #     ★Measured 2026-09-07 by assembling both ways and reading the bytes, because the
+        #     claim below is about what the ESCAPE HATCH does and prose is not evidence:
+        #        SLEEP 3                        -> 04 00   nop $00   illegal, reads $00
+        #        SLEEP 3 + NO_ILLEGAL_OPCODES   -> 24 00   bit $00   LEGAL, reads $00
+        #     Both read $00. The constant buys a legal opcode and does NOT avoid the bankswitch,
+        #     so the warning is right to fire in both cases. ★This was checked because the
+        #     opposite was assumed first — the opt-out looked like an exemption and is not one.
+        #
+        #     ★★Known blind spot, measured the same day: the value has to be a LITERAL. `SLEEP DUR`
+        #     with `DUR = 7` elsewhere in the file is not seen, because this is a text scan and
+        #     resolving constants is a different kind of tool. No ROM in this tree does that
+        #     (`git grep -inE '^\\s*SLEEP\\s+[A-Za-z_]' -- roms/` returns nothing against 50 uses of
+        #     SLEEP), so the hole is recorded rather than filled.
         #     and with -DNO_ILLEGAL_OPCODES=1 the 04 becomes 24 (`bit $00`) — legal, SAME ADDRESS.
         #     ★★So the switch everyone recommends fixes the opcode and leaves the bankswitch trap.
         #     Even values are safe: they are plain `nop`s. This is the answer to Kirk Israel's

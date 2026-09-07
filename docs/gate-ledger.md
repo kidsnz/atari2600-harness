@@ -328,3 +328,33 @@ run every commit belongs in `scripts/` with its numbers dated, not in CI.
 by one and re-ran it: **75 unaffected, 23 shifted**, and each of the 23 shifted for a visible
 reason — a per-frame counter advancing by one (`ram.0x80` 17→18), or a two-phase kernel's
 positions swapping (`text24`'s 39 and 87 trading places). None was accidentally phase-locked.
+
+## The SLEEP opt-out is not an exemption, and the detector was right (2026-09-07)
+
+Dennis Debro warned in 2004 that the trap hides inside a macro: *"If you're using the **SLEEP macro**
+in macro.h and have not turned off illegal opcodes, then when your SLEEP value is **>= 3** you're
+using `nop 0`"* 〔`200401/msg00242`〕. `check_traps.py` catches the macro call textually, and the
+phrase *"have not turned off illegal opcodes"* reads like an exemption — a file that defines
+`NO_ILLEGAL_OPCODES` looked like one the warning should skip.
+
+**Measured by assembling both ways and reading the bytes:**
+
+| source | emitted | opcode |
+|---|---|---|
+| `SLEEP 3` | `04 00` | `nop $00` — illegal, reads `$00` |
+| `SLEEP 3` with `NO_ILLEGAL_OPCODES` | `24 00` | `bit $00` — **legal, reads `$00`** |
+
+★**Both read `$00`.** The constant buys a legal opcode and does not avoid the bankswitch on a 3F or
+X07 cartridge, which is what the row is about. So the detector is right to fire in both cases — and
+its own message already said so, in the sentence *"`bit $00` (legal, but CHANGES FLAGS and reads the
+SAME address)"*.
+
+★★**The catch here is not the gate's, it is mine**: I set out to remove a false positive and the
+false positive was the belief. The evidence was already written into the warning text, one line below
+where I was editing.
+
+★★★**A real blind spot, found on the way and left open**: the SLEEP value has to be a **literal**.
+`SLEEP DUR` with `DUR = 7` defined elsewhere in the file is not seen, because this is a text scan and
+resolving constants is a different kind of tool. `git grep -inE '^\s*SLEEP\s+[A-Za-z_]' -- roms/`
+returns nothing against 50 uses of SLEEP, so nothing has fallen into it — recorded rather than filled,
+and recorded rather than left for someone to discover from a green run.
