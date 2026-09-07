@@ -113,6 +113,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   fact, and when the layout is being drawn rather than budgeted, the second one is the one that
   lands: a band that hosts a repositioning cannot also be the thinnest band in the picture.
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
+- **A console switch can choose the TV standard, and the price is one switch.** A PAL frame needs
+  more scanlines than an NTSC one, and that is a number the ROM decides — so a single build can serve
+  both if the player tells it which television it is on. Piero Cavina listing what his 1997 demo does,
+  crediting Nick Bensema: *"**pal/ntsc option using the bw/color switch** (**limited to screen size,
+  not colors**)"* 〔`199703/msg00228`〕. ★★**The parenthesis is the whole caveat and it is in his own
+  sentence**: the switch buys the line count, not the palette. A colour chosen for NTSC is still a
+  different colour on a PAL console 〔see `internal/emu/palspec_test.go`〕, so this makes a ROM
+  *displayable* on both, not *right* on both. ★★★What it costs is a switch the game can no longer use
+  for anything else — and on this machine that is a real budget, since there are only three.
 - **Two different needs share the word "random", and only one of them is expensive.** A starfield or
   a terrain must be **reproducible** — Manuel Polik: *"Total randomness won't work, since you've to
   **REPEAT** what you're doing every frame"* — and that is what a fixed-seed LFSR is for
