@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -65,6 +66,9 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 		os.Remove(lstPath)
 		os.Remove(symPath)
 		if hint := mnemonicStormHint(string(out)); hint != "" {
+			return string(out) + hint, "", "", err
+		}
+		if hint := operandAsMnemonicHint(string(out)); hint != "" {
 			return string(out) + hint, "", "", err
 		}
 		return string(out), "", "", err
@@ -148,4 +152,35 @@ func mnemonicStormHint(out string) string {
 		"typo -- it is a source with no active `processor 6502` directive. Check line 1: the "+
 		"directive must be PRESENT and must be INDENTED. In column 1 DASM reads it as a label and "+
 		"the CPU is never selected. 〔stella-list 200102/msg00253〕", n)
+}
+
+// operandAsMnemonicHint names the cause when DASM rejects an OPERAND as if it were an instruction.
+//
+// A single instruction that lost its indentation produces one error and points at a token that is
+// not an instruction anywhere:
+//
+//	x.asm (5): error: Unknown Mnemonic '#0'.
+//
+// DASM reads the first field of a line as a label unless the line is indented. So `lda #0` in column
+// 1 becomes the label `lda` and the mnemonic `#0`. ★Measured 2026-09-07: this is a **different
+// signature** from a missing `processor` directive, which produces a storm of ordinary-looking
+// mnemonics — here there is exactly ONE error and the token it names begins with `#` or `$`.
+//
+// That leading character is what makes the rule safe: an immediate or an address can only reach the
+// mnemonic position if the field before it was eaten as a label, and a real program has no
+// instruction whose name starts with either. The hint therefore does not guess — the shape it matches
+// has one cause.
+//
+// The mailing list has the same diagnosis from 2001, for the `processor` line rather than an
+// instruction: *"You need to TAB both lines for DASM. Now it's assuming 'processor' as label and
+// '6502' as mnemonic"* 〔stella-list `200102/msg00253`, Manuel Polik〕. It is one mistake with two
+// error messages, and neither of them says "indentation".
+func operandAsMnemonicHint(out string) string {
+	re := regexp.MustCompile(`Unknown Mnemonic '([#$][^']*)'`)
+	m := re.FindStringSubmatch(out)
+	if m == nil {
+		return ""
+	}
+	return fmt.Sprintf("\n\nhint: `%s` is an OPERAND, not an instruction. DASM read the field before "+
+		"it as a LABEL, which happens when a line starts in column 1. Indent that line.", m[1])
 }

@@ -248,6 +248,28 @@ the nine exclusions.
 nothing used zero. The warmup is now part of the test and so is that check — if no ROM reads zero, the
 test says so rather than passing.
 
+### Added — one unindented instruction names its own cause too (2026-09-07)
+
+The companion to the entry below. A missing `processor` directive rejects **every** instruction at
+once; a **single** instruction that lost its indentation rejects one thing, and names something that
+is not an instruction anywhere:
+
+	x.asm (5): error: Unknown Mnemonic '#0'.
+
+DASM reads the first field of an unindented line as a label, so `lda #0` in column 1 becomes the label
+`lda` and the mnemonic `#0`. One error, and the token begins with `#`. **That leading character is the
+whole rule** — an immediate or an address can only reach the mnemonic position if the field before it
+was eaten as a label, and no real instruction is named `#0` or `$80`. So the hint does not guess: the
+shape it matches has one cause.
+
+Mutation-checked: dropping the `#`/`$` requirement makes an ordinary misspelling (`lxx #$00`) report
+itself as an indentation problem, and the test fails.
+
+★It is one mistake with two error messages and neither says "indentation" — which is why
+`check_traps.py` is *not* the place for this. Measured: the linter is silent on both shapes and does
+not need to be otherwise, because the assembler already refuses; what was missing was the assembler's
+output saying why.
+
 ### Added — when DASM rejects every instruction, the cause is line 1 (2026-09-07)
 
 A source with no working `processor` directive assembles nothing, and DASM reports it by calling every

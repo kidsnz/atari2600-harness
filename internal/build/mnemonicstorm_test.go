@@ -64,3 +64,52 @@ func TestMnemonicStormThreshold(t *testing.T) {
 			"only speak when that cause is the one DASM's output describes")
 	}
 }
+
+// TestOneUnindentedInstructionNamesItsOwnCause covers the other half of the same mistake.
+//
+// A missing `processor` directive rejects every instruction at once; a SINGLE instruction that lost
+// its indentation rejects one thing, and names something that is not an instruction anywhere:
+//
+//	x.asm (5): error: Unknown Mnemonic '#0'.
+//
+// DASM reads the first field of an unindented line as a label, so `lda #0` in column 1 becomes the
+// label `lda` and the mnemonic `#0`. Measured 2026-09-07: one error, and the token begins with `#`.
+// That leading character is the whole rule — an immediate or an address can only reach the mnemonic
+// position if the field before it was eaten as a label.
+func TestOneUnindentedInstructionNamesItsOwnCause(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want bool
+	}{
+		{"one instruction in column 1",
+			"\tprocessor 6502\n\torg $F000\nStart\n\tcld\nlda #0\n\tjmp Start\n" +
+				"\torg $FFFC\n\t.word Start\n\t.word Start\n", true},
+		{"correct source",
+			"\tprocessor 6502\n\torg $F000\nStart\n\tcld\n\tlda #0\n\tjmp Start\n" +
+				"\torg $FFFC\n\t.word Start\n\t.word Start\n", false},
+		// The counter-bait: an ordinary misspelling must NOT be read as an indentation problem,
+		// because the token it names does not start with `#` or `$`.
+		{"a plain typo",
+			"\tprocessor 6502\n\torg $F000\nStart\n\tcld\n\tlxx #$00\n\tjmp Start\n" +
+				"\torg $FFFC\n\t.word Start\n\t.word Start\n", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			asm := filepath.Join(dir, "t.asm")
+			if err := os.WriteFile(asm, []byte(c.src), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			out, _, _, err := AssembleWithListing(asm, filepath.Join(dir, "t.bin"))
+			if c.want && err == nil {
+				t.Fatalf("this source cannot assemble, but Assemble returned no error:\n%s", out)
+			}
+			got := strings.Contains(out, "is an OPERAND, not an instruction")
+			if got != c.want {
+				t.Errorf("hint present = %v, want %v. DASM said:\n%s", got, c.want, out)
+			}
+		})
+	}
+}
