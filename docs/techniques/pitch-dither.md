@@ -148,11 +148,34 @@ outside a fifth either side of the note:
 |---|---|
 | steady tone (E1) | 0.063 |
 | dithered (E1, every frame) | 0.064 |
-| two channels detuned (E1) | 0.175 |
+| two channels detuned (E1) | **not produced by this instrument — see below** |
 
 The working mechanism is indistinguishable from a steady tone. The detune — the other obvious
-idea — is 3.5× noisier **and** costs both channels for one note, which on a machine with two
-channels means the drums or the bass has to go.
+idea — costs both channels for one note, which on a machine with two channels means the drums or
+the bass has to go.
+
+★★**The third row used to read `0.175` and the sentence used to say "3.5× noisier". Neither
+survives checking, 2026-09-07.** The first two figures come out of
+`TestTheDitherAddsNoRoughness`, which runs `sidebandRatio` over a steady and a dithered tone. **The
+third figure is produced by nothing**: `grep -rn '0\.175' --include='*.go'` returns zero and the
+string appears exactly once in the whole repository — in this table. `TestDetuningTwoChannelsDoesNotFuse`
+exists but reports Hz and cents, never a sideband ratio. And the arithmetic did not hold either:
+0.175 / 0.063 is **2.8**, not 3.5.
+
+★★★Running the detuned pair through the *same* instrument as the rows above it gives **0.060** —
+below the steady tone, a ratio of 0.96. **That is not evidence the detune is quiet.** `sidebandRatio`
+measures energy outside a fifth either side of the note, and two tones a few cents apart both sit
+*inside* that window; the roughness a listener hears is beating between them, which this instrument
+cannot see. **So the honest state is: the claim was never measured, and the obvious instrument is the
+wrong one.** Measuring it needs an envelope or beat-rate measure, not a spectral-spread one.
+
+★★★★The reason this went unnoticed for so long is the row's company: two machine-produced figures
+and one hand-written one in the same three-row table, in the same format. **A number that nothing
+computes looks exactly like a number that something computes.** Found by the mailing-list distillation
+(helper-2), who arrived at it while checking an unrelated claim about detuning as a *thickening*
+effect — which is the other thing this page could say and does not: the list uses the detune
+deliberately, for the sound it makes, where this page evaluates it only as a rejected alternative to
+pitch dithering.
 
 ## Cost
 
