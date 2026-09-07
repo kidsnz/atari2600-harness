@@ -28,8 +28,13 @@ rule that gets measured again.
 
 **The TIA has no register that reports where an object currently is.** You can strobe `RESP0` and you
 can nudge with `HMP0`, but nothing reads back — there is no counterpart to `read_tia`'s
-`hmoved_pixel` on the console itself. Erik Mooney said it plainly on stella-list: *"you can't read
-the horizontal positions directly."* Every position a running game knows, it knows because it wrote
+`hmoved_pixel` on the console itself. **KirkIsrael asked** it on stella-list, and the question mark matters: *"since you can't read
+the Horizontal Positions directly, **right?**"* 〔`200207/msg00046`, 2002-07-04〕. ★This line used
+to read *"Erik Mooney said it plainly"* over a lower-cased, shortened version with the hedge cut —
+**a beginner's tentative question rewritten as an expert's flat assertion**, attributed to the
+wrong person. The name came from `200207/msg00047`, where Bob Colbert quotes the same sentence
+**without a `>` marker**, so anyone searching for the text lands on the reply. Corrected
+2026-09-07 by the mailing-list distillation (helper-3). Every position a running game knows, it knows because it wrote
 it down in RAM and kept the shadow copy honest.
 
 That is the reason this file, `plan_sprite_placement`, `cmd/place` and `internal/place` exist. A

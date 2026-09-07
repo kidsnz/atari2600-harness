@@ -132,3 +132,38 @@ control is not a measurement**, and that one was a sentence away from being repo
 
 Found by the mailing-list distillation (helper-2, who counted the shapes after their own tool was
 fooled by five of them).
+
+
+## Attribution without a message id is where misattribution lives (2026-09-07)
+
+Three quotations here named the wrong person. **All three attribute by NAME with no message id**, and
+of the 45 quotations that carry an id, **none is wrong**. That is the finding: the defect is not
+carelessness about who said things, it is the habit of writing a name without the number that would
+have checked it.
+
+| page | said | actually |
+|---|---|---|
+| `design-principles.md:283` | Eric Ball | **Glenn Saunders** 〔`200401/msg00063`〕 — Ball ANSWERED it in `msg00064`, and the reply quoted the question |
+| `design-principles.md:302` | Erik Mooney | **Billy Eno** 〔`200208/msg00131`〕 — whose post opens *"Erik, I searched the archives…"* |
+| `sprite-placement.md:31` | Erik Mooney | **KirkIsrael** 〔`200207/msg00046`〕 |
+
+★**Three different mechanisms, and none of them is inattention:**
+
+1. **A reply quotes the question.** Search the archive for the sentence and you land on `msg00064`,
+   whose byline is the replier's. The quoted text is `>`-marked in the source and the marker is lost
+   the moment the sentence is copied out.
+2. **A vocative read as a byline.** *"Erik, I searched the archives…"* is Billy Eno writing TO Erik.
+   The name nearest the quotation was the addressee.
+3. **A quotation without a `>`.** Bob Colbert repeats KirkIsrael's sentence unmarked in `msg00047`, so
+   a matcher — and a reader — takes it for his own words.
+
+★★The third one also lost the claim's shape. The original is a beginner asking *"since you can't read
+the **Horizontal Positions** directly, **right?**"*; this file had it as *"Erik Mooney said it plainly …
+you can't read the horizontal positions directly."* **A tentative question became a flat assertion by
+an expert** — the hedge-cutting failure recorded above, this time carrying a name with it.
+
+★★★**The rule, and it is cheap:** name a person and give the message id. The id is what makes the
+attribution checkable; a name alone asserts something no reader can verify and no gate can catch.
+Found by the mailing-list distillation (helper-3), whose detector had a 73% false-positive rate on the
+eleven it flagged — six were work titles read as people — and whose **population** (26 quotations
+attributed by name with no id) is the number worth keeping.

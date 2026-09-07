@@ -280,9 +280,9 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     20:11 to three places. Every source is the same physics; each picked a different line count, and
     PAL picks a different one again.
     **The consequence is not only shape, it is angle.** A line drawn at 45° on a square-pixel canvas
-    reads as `atan(1/aspect)`: **32° at 1.60, 31° at 1.67, 27° at 2.00**. Eric Ball arrived from
+    reads as `atan(1/aspect)`: **32° at 1.60, 31° at 1.67, 27° at 2.00**. **Glenn Saunders** arrived from
     exactly that symptom — *"when I try doing 16 degrees of movement assuming 1 pixel per frame
-    up/down and 1 pixel per frame left/right, **the 45° diagonals don't seem quite right**."*
+    up/down and 1 pixel per frame left/right, **the 45' diagonals don't seem quite right**."*
     **Do not confuse this with the diagonal correction already in this file.** Combat's frame gating
     (`MPace & $03`, move on 3 of 4 frames) corrects **√2 — the distance travelled diagonally** — and
     is needed on any display. The aspect correction is about **the angle the eye sees**, and is
@@ -299,8 +299,8 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     thread went is the sharper illustration: the method was described on the list in **2000**; two
     other people built a working version in **2002** having *searched the archive first and missed
     it*; and the original author had to point them at his own post afterwards. Billy Eno, who built
-    it, replying to Erik Mooney, who described it: *"I searched the archives while I was doing this
-    and **never saw your post**. Perhaps if the title had had something to do with interlacing :)"*
+    it, **Billy Eno**, replying to Erik Mooney: *"I searched the archives while I was doing this
+    and **never saw your post**. Perhaps if the title had had something to do with interlacing :)"* 〔`200208/msg00131`, 2002-08-20〕
     **A subject line records where a conversation started, not what it produced** — which is also why
     the search above returns fourteen hits and none of them is this. Recorded 2026-09-04 by the mailing-list distillation
     (helper-2), who read all 96 hits across five layers before saying so; so "how many visible lines" asks about a signal with no interlaced partner to average against. Neither number lives anywhere else in this tree (227.5: five layers, zero hits; every 228 here is cycle budget, a different quantity). **So no single Stella measurement settles it either** — it settles what
