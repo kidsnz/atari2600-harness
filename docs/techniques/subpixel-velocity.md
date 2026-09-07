@@ -114,3 +114,30 @@ difference is temporal — which is what lets a rate ratio stand in for the phys
 ⬜ Untested here, from the same thread: that for speeds of 0-2 px/frame the **zero** flag can replace
 the carry, and for 0-4 px the **overflow** flag. No mechanism is given in the source and it has not
 been reproduced.
+
+## What a region conversion actually costs, in bytes (2026-09-07)
+
+The sections above say what has to change when a game moves between 50 Hz and 60 Hz. This is what it
+came to in practice, measured on two conversions that ship all three builds at 16,384 bytes each:
+
+| | NTSC vs PAL | NTSC vs PAL60 | **PAL vs PAL60** |
+|---|---|---|---|
+| Double Dragon 2b | 1333 | 1324 | **9** |
+| Montezuma's Revenge 2B | 188 | 180 | **8** |
+
+★**The time conversion is eight or nine bytes. Everything else is colour and data.** PAL→PAL60 changes
+only the frame's length; NTSC→PAL changes that *and* the palette, and the difference between the two
+columns is what the palette costs — **179 bytes in one game and 1324 in the other**, so it is not a
+fixed price, it is however much of the ROM happens to be colour.
+
+★★**And those eight bytes are three constants, patched once per bank.** In Montezuma the same three
+values recur: `$1B→$19` (−2) three times, `$32→$15` (−29) three times, `$38→$1B` (−29) twice — an F6
+cartridge holds a copy of the frame code in several banks and each copy needs the same edit. Double
+Dragon has two such constants (`$41→$21`, `$52→$36`) plus a seven-byte run of `$FF`/`$00` flips at
+`$0C0A`–`$0C15`. **The values are all line-count sized.** So the conversion is cheap to *make* and easy
+to get *partly* right: miss one bank and the game runs at two different speeds depending where it is.
+
+★★★**What this is NOT.** These are conversions from `reference/disassemblies`' hacks collection —
+somebody's port, not Atari's shipped PAL release. What was measured is **what a converter changed**,
+which is a different question from **how two official versions differ**. Byte counts only; no
+disassembly was read. Found by the mailing-list distillation (helper-2) and re-measured here.
