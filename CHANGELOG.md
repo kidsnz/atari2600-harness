@@ -6,6 +6,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — how this repo cites, and the questions the archive asked and nobody answered (2026-09-06)
+
+Two things the distillation surfaced that had no home here.
+
+**Six citation shapes are in use, and that is five too many** (`docs/provenance.md`). A checker built to
+verify that quoted text really appears in the message it names reported thirteen wrong sources; a human
+opened all thirteen and **every one was correct here**. The tool was not weak — it was reading prose
+that cites six different ways, and three of them mislead a reader looking for the nearest
+`YYYYMM/msgNNNNN`: a bare continuation `〔msg00286〕`, a month named with a thread but no number, and a
+quotation from SOURCE CODE sitting beside a message number. `check_provenance.py` never had this problem
+because it only asks whether a cited message exists; the problem appears the moment anyone asks the
+stronger and more useful question, *does this quote appear in that message*. New prose cites in one
+shape. ★**And nothing goes inside the quotation marks that the author did not write** — measured the
+same day, a note reading *"the cable networks will tole[rate]"* was missed by a verbatim matcher, and
+three notes had quietly fixed `kernal`, `positionining` and `yor`. A corrected quote is a quote the
+person did not say, and one `rg -F` will never find again.
+
+**A measurement backlog of questions the list asked and nobody answered** (`docs/capability-gap-audit.md`).
+Two were closed the day the section was written, which is why it exists: Davie's *"Any comments on the
+danger of 'writing' to ROM?"* 〔`199805/msg00090`〕 — there is no ROM at `$8000`, it folds to the TIA —
+and a lost message's report that at high volume *"channel 1 seems to modulate channel 0"*, which measures
+out at 67% of channel 0's swing at volume 8 and 50% at 15. Six more are tabled with **what would answer
+each**, three of them one litmus ROM apiece. ★The pattern is the point: **a question that went unanswered
+for twenty-five years is usually not hard — it is a question whose asker had no emulator, no cycle
+counter and no way to read a write-only register.**
+
+Found by the mailing-list distillation (helper-1 for the unanswered questions, helper-2 for the citation
+shapes, counted after their own tool was fooled by five of them).
+
 ### Changed — CI runs its packages in parallel; `-p 1` had outlived its reason (2026-09-06)
 
 `ci.yml` passed `-p 1` since 2026-06 under a comment saying several packages assemble and read the same

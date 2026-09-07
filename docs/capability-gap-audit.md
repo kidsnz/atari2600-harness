@@ -4244,3 +4244,38 @@ prover had been run.
 **Status: not scheduled.** The technique is understood and costed; it buys voices we have
 nowhere to spend while the deliverables are picture-led. Revisit if a piece wants sound
 over image.
+
+
+## Questions the list asked and nobody answered — a measurement backlog (2026-09-06)
+
+A category that had no home here until now. The mailing list is full of questions that were posed
+carefully, went unanswered, and **stayed unanswered because nobody in 1998 had an instrument**. This
+repository is that instrument. Two were closed the day this section was written, which is why it exists:
+
+- *"Any comments on the danger of 'writing' to ROM?"* 〔`199805/msg00090`, Andrew Davie〕 — asked at the
+  end of a delay table whose rows write to `$8000`. The thread never replied. **Answered by measurement
+  2026-09-06: there is no ROM at `$8000` on a 2600.** Thirteen address lines, A12 selects the cartridge,
+  so `$8000` folds to `$0000` — the TIA. With `x = $09` the "harmless" write sets COLUBK; with `x = $02`
+  it hits WSYNC and halts the CPU to end of line. `roms/litmus/litmus_delaytable.asm`.
+- *"channel 1 seems to modulate channel 0"* at high volume 〔a message LOST from the archive, recovered
+  from the quotation in its reply〕 — Eckhard Stolberg asked whether NTSC machines do the same and whether
+  every PAL machine does; **no answer followed**. Measured 2026-09-06: the mixer sums both channels and
+  reads a compressive table, so channel 0's swing falls to **67% at channel 1 volume 8 and 50% at 15**.
+  The 2004 observation was made by ear, on one PAL machine, and it was right.
+
+**Still open, found in one day of reading and not yet measured.** Each is a question the archive asked:
+
+| question | where | what would answer it |
+|---|---|---|
+| Is it safe for a shipped ROM to point its reset vector at `$0000` and use BRK for the real entry? | `200507/msg00101`, Dennis Debro on Stargunner | Needs the ROM; a corpus sweep found no `.bin` whose reset vector is below `$1000` that was not 32K padding |
+| Can the ball be made taller, not just wider? | thread `109` | `litmus` — the ball's size control is documented as width only, which is a testable negative |
+| Kernel height 192 against a Y counter of 191 — which is off by one? | thread `milquetoast` | `read_row` over a full frame |
+| Why does Asteroids need 8K when Adventure fits in 4K? | `200302/msg00045`, Clay Halliwell, **no replies** | `cmd/dissect` + `internal/build.ROMBytesUsed` on both — this is the functionality-per-byte question the playbook asks and nothing here measures |
+| Do `SWBCNT` writes have any use? | see `fundamentals-audit.md` | `litmus_swchb` extension |
+| Does Pitfall II's sound chip change the cycle budget? | thread `pitfall 2 sound` | out of scope until a DPC ROM is in the corpus |
+
+★**The pattern is the point, not the list.** A question that went unanswered for twenty-five years is
+usually not hard — it is a question whose asker had no emulator, no cycle counter and no way to read a
+write-only register. Three of the six above are one litmus ROM each. **When reading the archive, record
+the unanswered questions separately from the answers**; they are the cheapest measurement work in this
+repository, and they come with their own provenance. Found by the mailing-list distillation (helper-1).

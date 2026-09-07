@@ -46,3 +46,39 @@ Recording is the strict part (CI-enforced); this list is just the consolidated l
 - **`pkg/design` functions** → source comment in each `pkg/design/*.go`.
 - **Mined AtariAge threads** → `docs/mining-digest.md` (topic_id + URL → what it feeds).
 - **Raw per-thread notes** → `reference/atariage/<id>-*/notes.ja.md` (provenance, not committed).
+
+
+## How this repository cites the mailing list — and why a checker cannot follow it
+
+**Six shapes are in use. That is five too many, and it is a harness problem, not a tool problem.**
+Measured 2026-09-06, when a checker built to verify that quoted text really appears in the message it
+names reported thirteen wrong sources; a human opened all thirteen and **every one was correct here**.
+The tool was not weak — it was reading prose that cites in six different ways:
+
+| # | shape | example |
+|---|---|---|
+| 1 | full | `〔200405/msg00275〕` |
+| 2 | **continuation** — the year-month carries over from earlier in the sentence | `〔msg00286〕` |
+| 3 | **month + thread name, no number at all** | ``stella-list `200011` (`more-keyboard-nonsense`)`` |
+| 4 | range | `〔199803/msg00196–00199〕` |
+| 5 | comma list | `〔199703/msg00258, 199703/msg00204〕` |
+| 6 | **a quote from source, not from the list**, sitting beside a message number | ``hardware/memory/vcs/tia.go … *"left over from the address"*`` |
+
+Shapes 2, 3 and 6 are the ones that mislead: a checker looking for the nearest `YYYYMM/msgNNNNN`
+attaches the quote to a number that belongs to a different claim. **`check_provenance.py` does not have
+this problem** — it only asks whether a cited message EXISTS, which shape 1 and 4 and 5 all satisfy
+and 2, 3 and 6 simply do not trigger. The problem appears the moment anyone asks the stronger question,
+*does this quote appear in that message*, which is the question worth asking.
+
+**The rule for new prose:** cite in shape 1, `〔YYYYMM/msgNNNNN〕`, immediately after the closing quote.
+A range or comma list is fine when the claim genuinely spans messages. **Do not use a bare continuation,
+do not cite a thread by name without a number, and do not put a source-code quotation next to a message
+number.** ★And nothing goes inside the quotation marks that the author did not write — no `[sic]`, no
+bracketed completions, no silently corrected typos. Measured the same day: a note that wrote
+*"the cable networks will tole[rate]"* for *"…will tolerate flicker"* was missed by a verbatim matcher,
+and three notes had quietly fixed `kernal`, `positionining` and `yor`. **A corrected quote is a quote
+the person did not say, and it is also a quote `rg -F` will never find again.** Put the clarification
+in the surrounding prose instead, where it belongs.
+
+Found by the mailing-list distillation (helper-2, who counted the shapes after their own tool was
+fooled by five of them).
