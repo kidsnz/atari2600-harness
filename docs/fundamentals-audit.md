@@ -92,6 +92,18 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   in the next instruction gives **19** — the first decrement has already happened by then
   (`litmus_askdontwait`, asserted). That is the value any caller sees; it does not settle where inside
   the store the decrement falls.
+  ⚠ **And that 19 is a modelling choice, not a measurement of the machine.** `Timer.Update` ends with
+  `tmr.ticksRemaining = 0`, above a comment from the engine's own author: *"the ticks remaining value
+  should be zero or one for accurate timing … **I'm not sure which value is correct** so setting at zero
+  until there's a good reason to do otherwise … **to match the debugging values in stella a value of 2 is
+  required**"* (`Gopher2600/hardware/riot/timer/timer.go`). So the write does not leave a residual phase
+  here — it resets it — and two emulators disagree about that number. **The Stella oracle cannot arbitrate:
+  `TIARegNames` has 37 entries and every one of them is TIA (`internal/oracle/stella_tia.go`); INTIM is not
+  among them.** This ⬜ is therefore not a gap a litmus ROM can close — it needs real hardware, and until
+  then the honest shape is the one `internal/emu/timerdiv_test.go` already uses for the twin question:
+  report the hazard, and state that the positive case has no witness rather than implying one with a
+  passing test. Found by the mailing-list distillation (helper-2); the three claims were re-measured here
+  (the comment read verbatim, the 37 counted from the array rather than from the prose that describes it).
 - ⬜ SECAM; real-game variable line counts (we already treat 262 as a range).
 
 ## 2. Horizontal positioning & HMOVE
