@@ -104,6 +104,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   fact, and when the layout is being drawn rather than budgeted, the second one is the one that
   lands: a band that hosts a repositioning cannot also be the thinnest band in the picture.
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
+- **Colour is a capacity tool, not only a look.** Two characters can share one set of graphics bytes
+  and differ only in `COLUPx`. Andrew Davie, 2003, on a Mario demo: *"you will see **two Marios** -
+  animating independently. The interesting thing here is that the Marios are **different colours - but
+  use the same graphics in ROM**… in this case I am **switching Red and Green** for display of the 2nd
+  Mario"* 〔`200303/msg00015`〕. He was solving a specific problem — *"this solves a problem I have with
+  Fu Kung! in **differentiating the players**, yet using the same graphics in ROM for each"* — and the
+  general form is that **a second character costs a colour register write instead of a sprite table**.
+  The saving is the whole table: for a 16-line shape that is 16 bytes per character, before animation
+  frames multiply it. The constraint is that the two must read as the same silhouette, which is a
+  drawing decision, not a technical one. Nothing here said this until 2026-09-07; the repository had
+  colour as an appearance axis only.
 - **Multi-kernel = reuse one object per region**: switch `REFP` / position / picture per Y band and reuse a single player for different purposes (Stay Frosty). Match a "never overlap on the same line" placement constraint with an AI that "never enters an occupied column" and flicker is zero. 〔mining 303364, 318140, 164247〕
 - **The stack costs 4 bytes, not a policy.** Christopher Tumber, 2004: *"I pretty much try to avoid
   using JSR completely, and only do so when absolutely needed … **RAM management is really one of the
