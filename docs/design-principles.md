@@ -123,6 +123,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   necessary and never sufficient, and a picture judged only here is judged on a display sharper than
   any 2600 ever had.** The remedy is not to soften the measurements; it is to **look at the artwork
   once through a CRT model before calling it finished**, as a separate act from verifying it.
+  ★**And name the missing leg correctly: this setup lacks a TEST path, not a DEVELOPMENT path.**
+  Working on an emulator and reaching for hardware only at the end is not a compromise forced by not
+  owning a console — it was already the standard practice on this list in 2000. Lee Krueger, asked
+  about making cartridges: *"I think any **new game development would be done on emus** and using the
+  cart for **real hardware testing**"* 〔`200002/msg00048`, 2000-02-22〕, summarised the same evening
+  by Dan Iacovelli as *"most people are using the emulation programs to develop the games and using
+  the system for testing"* 〔`200002/msg00049`〕. So the shape of this repository matches
+  twenty-six-year-old practice and the gap is precisely the last step. Describing it the other way —
+  as though authoring without hardware were itself the deficiency — **understates what the era
+  actually did** and points the remedy at the wrong end of the process.
   〔stella-list, *pixel smoothing (slightly OT)*, 1997; found by the mailing-list distillation
   (helper-2)〕
 - **Flicker is a last resort, and only for short-lived objects.** Never over a large area. Don't trust the emulator — verify by compositing several frames. 〔flicker-to-enhance-graphics〕
