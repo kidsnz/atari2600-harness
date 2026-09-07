@@ -13,3 +13,4 @@
 #
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
+roms/litmus/litmus_vdel_bits.bin  # 2026-09-07 — VDELPx bit decode (bit 0 only; $FE behaves as $00)

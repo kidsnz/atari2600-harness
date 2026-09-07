@@ -33,6 +33,13 @@ The 2LK writes GRP0 on line A and GRP1 on line B — exactly the structure VDEL 
 (one line later). So `VDELP0 = y & 1` gives back 1-px vertical granularity with the kernel
 unmodified. CI proof: P0's top edge moves **exactly +1 scanline per frame** through even and odd
 positions (`TestVDELOddEven`, pixel-row measurement).
+★**The mask itself is optional: `VDELPx` decodes bit 0 and ignores bits 1..7.** Measured
+(`internal/emu/vdelbits_test.go`, `roms/litmus/litmus_vdel_bits.asm`): writing **`$FE`** — seven bits
+set, bit 0 clear — behaves exactly like `$00`, and `$FF` exactly like `$01`. So the parity can go
+straight into the register with no `AND #1`, saving **2 cycles and 1 byte per object per frame** where
+cycles are scarcest. Thomas Jentzsch wrote it as a code comment in 2002 — *"don't care for the bits
+1..7, VDEL ignores them"* 〔`200204/msg00067`〕 — and until now nothing here had checked it. Keep the
+`& 1` only if the same value is also used as a number elsewhere.
 - Carry hygiene in shared lines: an `adc` after the sprite compare inherits its carry/`lsr`
   residue — our gradient flickered at stripe edges until the add became an `ora` (valid since
   the operands can't overlap). Constant-input ops beat flag-dependent ones inside kernels.

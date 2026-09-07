@@ -6,6 +6,38 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — VDELPx decodes bit 0 and ignores the other seven (2026-09-07)
+
+Thomas Jentzsch's two-line kernel writes the parity straight into the register, with a comment that
+was never checked here: *"don't care for the bits 1..7, VDEL ignores them"* 〔`200204/msg00067`〕.
+`two-line-kernel.md` instead tells authors to write `VDELP0 = y & 1`.
+
+`roms/litmus/litmus_vdel_bits.asm` parks OLD := `$00` and NEW := `$FF`, then writes six values and
+lets the picture answer — a lit band means the new graphic reached the screen (delay off), a dark band
+means the parked old one did. Measured: `$00` lit, `$01` dark, `$02` **lit**, `$03` dark, `$FE`
+**lit**, `$FF` dark. Seven set bits behave exactly like none. Jentzsch was right, and the mask can go:
+**2 cycles and 1 byte per object per frame**, in the part of the frame where cycles are scarcest.
+
+`$00` and `$01` are in the litmus as controls, because without them a run of dark bands could mean the
+ROM never draws and a run of lit ones could mean VDEL never engages. Found by the mailing-list
+distillation (helper-2).
+
+### Added — VDELPx decodes bit 0 and ignores the other seven (2026-09-07)
+
+Thomas Jentzsch's two-line kernel writes the parity straight into the register, with a comment that
+was never checked here: *"don't care for the bits 1..7, VDEL ignores them"* 〔`200204/msg00067`〕.
+`two-line-kernel.md` instead tells authors to write `VDELP0 = y & 1`.
+
+`roms/litmus/litmus_vdel_bits.asm` parks OLD := `$00` and NEW := `$FF`, then writes six values and
+lets the picture answer — a lit band means the new graphic reached the screen (delay off), a dark band
+means the parked old one did. Measured: `$00` lit, `$01` dark, `$02` **lit**, `$03` dark, `$FE`
+**lit**, `$FF` dark. Seven set bits behave exactly like none. Jentzsch was right, and the mask can go:
+**2 cycles and 1 byte per object per frame**, in the part of the frame where cycles are scarcest.
+
+`$00` and `$01` are in the litmus as controls, because without them a run of dark bands could mean the
+ROM never draws and a run of lit ones could mean VDEL never engages. Found by the mailing-list
+distillation (helper-2).
+
 ### Added — the stack costs four bytes, not a policy (2026-09-07)
 
 Christopher Tumber in 2004: *"I pretty much try to avoid using JSR completely … RAM management is
