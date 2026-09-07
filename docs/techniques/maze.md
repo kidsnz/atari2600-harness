@@ -78,3 +78,33 @@ every cell exactly 2px wide:
   the carve above is what would make it structural.
 - Combine with a player sprite (`dynamic-multisprite`) + collision (`CXPFB`) for wall collision to
   turn this skeleton into a playable maze game.
+
+## Two of the three maze rules are local; the third is not (2026-09-07)
+
+Thomas Jentzsch, who wrote Robot City, on generating by **adding** walls rather than removing them:
+
+> there are at least two ways to build a maze: remove or add walls. In Robot City I'm adding …
+> **1. there must be at least one wall at each 'wall connection point'**
+> **2. dead ends are not allowed**
+> **3. all area must be connected**
+>
+> #1 is **very easy (and fast)** and after some thinking and try-and-error, I found **a fast way for
+> #2** too that still accepts the first rule. But **#3 requires either some heavy restrictions while
+> adding walls (which I don't like) or some kind of floodfill**, that checks, if both sides of the
+> wall are still connected. That part is **most time consuming now and the duration can be quite
+> variable**.
+> 〔`200208/msg00283`〕
+
+★**The split is what to keep: rules 1 and 2 can be decided by looking at a cell's neighbours, and rule
+3 cannot.** Connectivity is a property of the whole grid, so it needs a flood fill — and a flood fill
+costs a variable amount of time, which on a machine with a fixed frame budget is the expensive kind of
+cost. It is not that connectivity is hard; it is that it cannot be answered locally, and everything
+this machine does cheaply is local.
+
+★★**This repository's generator sidesteps rule 3 entirely and gets away with it.** It carves by LFSR
+rather than by adding walls, and all 255 seeds turn out traversable (above) — so the flood fill was
+never needed. That is the same trade Jentzsch names as the alternative he did not like: *"heavy
+restrictions while adding walls"*, which is what a fixed carve pattern is. ★★★Worth knowing before
+adding rules to it: **the moment a generator has to decide connectivity rather than inherit it, its
+cost stops being predictable**, and a 2600 kernel cannot pay a variable cost at a fixed deadline.
+Found by the mailing-list distillation (helper-1).
