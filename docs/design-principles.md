@@ -104,6 +104,26 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   fact, and when the layout is being drawn rather than budgeted, the second one is the one that
   lands: a band that hosts a repositioning cannot also be the thinnest band in the picture.
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
+- **Two different needs share the word "random", and only one of them is expensive.** A starfield or
+  a terrain must be **reproducible** — Manuel Polik: *"Total randomness won't work, since you've to
+  **REPEAT** what you're doing every frame"* — and that is what a fixed-seed LFSR is for
+  (`roadmap.md` #7). A tetromino must only be **unpredictable**, and for that a counter is enough.
+  Eckhard Stolberg, 1997: *"Having a **counter run from 0 to 6, that increments in every frame**, gave
+  enough ramdomness for my Tetris version"* 〔`199706/msg00005`; `ramdomness` is his spelling〕 — seven
+  values, exactly the number of tetrominoes, so not even a modulo.
+  ★★**Measured** (`internal/emu/counterentropy_test.go`), sampling that counter on the frame the fire
+  button goes down, over 140 frames:
+
+  | presses | tally across the seven values |
+  |---|---|
+  | every 7 frames | `[0 0 0 0 0 20 0]` — every sample identical |
+  | every 3 frames | `[7 7 6 7 7 7 6]` — all seven, evenly, and entirely predictable |
+  | irregular gaps | `[2 4 4 4 3 1 3]` |
+
+  ★★★**The counter carries no entropy of its own**: synchronise the presses with it and the output is
+  a constant. What looks like randomness is *when a person pressed*. ★★★★**And the middle row is the
+  one to remember — it is MORE uniform than the irregular case and completely deterministic.** A flat
+  histogram is not evidence of unpredictability, and an auto-fire button is exactly a fixed period.
 - **An odd width is a power of two PLUS ONE, and the join is free.** A ball is 1, 2, 4 or 8 pixels
   and nothing else, so a shape that must be an odd number of pixels wide has no ball that fits it.
   Thomas Jentzsch, 2001: *"all cursors are **7 pixels wide** (has to be an **odd number** to make the
