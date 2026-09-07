@@ -56,7 +56,7 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   📖 Still documented-only (Stella PG PIA §2.3): **"INTIM holds 0 for one interval before the
   $FF wrap"** — the ROM steps straight through expiry and never samples the 0 interval.
   ✅ **The other way to use the timer — ask without waiting — measured 2026-09-04.** Every INTIM site
-  in this repository *waits* (`lda INTIM / bne loop`, five of them). stella-list 2002 polls instead:
+  in this repository *waits* (`lda INTIM / bne loop`). ⚠ **That said "five of them" until 2026-09-07 and the count was stale** — re-measured, the tree reads INTIM at **55 sites across 25 files**, of which **18, in 18 different files, are the waiting shape**; the conclusion held while the number rotted. Re-count with `git grep -n 'lda INTIM' -- roms/` and look at the line after each, since it is the branch that makes it a wait. stella-list 2002 polls instead:
   `lda #$FC / and INTIM / beq NoTime / <work> / jmp back` — ask whether there is room for one more
   unit, and if not, drop it. **The mask is what makes the question cheap and also what makes it
   lossy: the bits it hides are budget the program can no longer see.** Over a 20-unit `TIM64T`
