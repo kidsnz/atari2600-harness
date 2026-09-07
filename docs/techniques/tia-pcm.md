@@ -24,6 +24,16 @@ modulating to specific values across frames, plus golden frame + golden audio).
    on the channel being used as the DC output. Stated by Eckhard Stolberg in
    stella-list `199902/msg00036` (*"If you set the AUDCx register to 0 or 11, the
    output will always be high"*) and unmeasured here until now.
+
+   ★**The technique is two years older than that citation.** Eckhard Stolberg posted
+   working code for it on 1997-02-27: *"One of the things, that I wanted to add to it,
+   but don't have enough space for, is **volume samples**. I thought some of you might
+   want to use that in your games. So here are my test programs"* 〔`199702/msg00018`〕,
+   with `say.a65` — the source, AUDV0/AUDV1 and all — in the same batch 〔`199702/msg00020`〕
+   and a `wavconv` thread beside it 〔`199702/msg00017`〕. So the earliest record here was
+   not the earliest record: **the 1999 message explains the silent CARRIER, and the 1997
+   one is the technique itself, already running.** Found by the mailing-list distillation
+   (helper-3), verified here against the raw archive.
    **Do not take "constant" from a short window.** The first measurement of this used
    sixty frames of a ROM that wrote AUDC once at boot and reported four more silent
    carriers (2, 6, 10, 14 at AUDF=31). All four were false: AUDC=2 holds for 89 frames
