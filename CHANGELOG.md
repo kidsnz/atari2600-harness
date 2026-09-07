@@ -35,6 +35,38 @@ counter and no way to read a write-only register.**
 Found by the mailing-list distillation (helper-1 for the unanswered questions, helper-2 for the citation
 shapes, counted after their own tool was fooled by five of them).
 
+### Added — flicker is judged on its own axis, and what an archive is actually for (2026-09-06)
+
+**Coarse gets through; flickering does not.** Glenn Saunders, on why a 2600 credit-roll had to reach
+twelve characters a line without flicker because it was aimed at cable television: *"Because I don't
+think the cable networks will tolerate flicker. **Low res CG is one thing, but flicker is another.**"*
+〔`199708/msg00139`〕. A picture is not graded on one scale with flicker at its low end — the two are
+separate judgements. So `max_flicker_area` is not a proxy for "how good does it look"; it is its own
+gate, and a kernel may be as blocky as it likes on the other side of it. In
+`docs/integration-density-playbook.md`, beside the flicker-area row.
+
+★**The quote was recovered by accident, and the accident belongs in the record.** It had been
+transcribed as *"will tole[rate]"* — cut mid-word with an editorial bracket — and **the bracket hid the
+sentence that carries the whole finding**. This is what the rule in `docs/provenance.md` costs when it
+is broken, measured on the same day the rule was written.
+
+★★A second observer in the same thread read the flicker's SHAPE rather than its area: *"It was pretty
+obvious from the way it flickered, though, that you were drawing every other character every other
+frame"* 〔`199708/msg00129`, Lee Seitz〕. **`FlickerArea` returns how many pixels changed, not how they
+are arranged**, and "every other character" and one contiguous block of the same area do not look
+alike. A gap in the instrument, stated by someone who separated the two by eye in 1997.
+
+**And a distinction worth keeping** (`docs/capability-gap-audit.md`): the questions the list asked and
+nobody answered are not the same as the things a machine cannot judge. Craft quality needs a human
+because the answer is not in the machine. Those rows are the opposite — **the answer IS in the machine
+and nobody put the question to it.** Someone heard channel 1 pulling on channel 0 in 2004, on one PAL
+console, by ear; the mixer's own table gives 67% and 50% twenty-two years later. §131 has the same
+shape: seen by eye in 1997, measured here. **So the archive's value is not mainly the facts in it — it
+is that it says where to point an instrument.** A corpus of people noticing things without the means to
+check them is a list of experiments somebody already designed.
+
+Found by the mailing-list distillation (helper-3).
+
 ### Added — the pre-push hook refuses a workflow change aimed at `main` (2026-09-06)
 
 The revert below should not have needed to happen, and the fix is not a rule anyone has to remember.

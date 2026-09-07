@@ -183,6 +183,26 @@ flicker by area — *"an area as large as an Arkanoid wall is going to be hard o
 check asks the author for a ceiling once and keeps it thereafter. Found by the mailing-list
 distillation (helper-3); the two instruments built and calibrated here.
 
+★**And flicker is judged on a different axis from resolution, which the same archive says outright.**
+Glenn Saunders, explaining why a 2600 credit-roll had to hit twelve characters a line WITHOUT flicker
+because he was aiming it at cable television: *"Because I don't think the cable networks will tolerate
+flicker.  **Low res CG is one thing, but flicker is another.**"* 〔`199708/msg00139`〕. **Coarse gets
+through; flickering does not.** A picture is not graded on one quality scale with flicker as its low
+end — the two are separate judgements, and the judge in that case was a broadcaster rather than a
+player. So `max_flicker_area` is not a proxy for "how good does it look"; it is its own gate, and a
+kernel may be as blocky as it likes on the other side of it.
+
+★★The quote was recovered by accident and the accident is worth recording: it was first transcribed
+as *"will tole[rate]"*, cut mid-word with an editorial bracket, and **the bracket hid the sentence that
+follows** — the one that carries the whole finding. Nothing goes inside a quotation that the author did
+not write (`docs/provenance.md`); this is what it costs when something does.
+
+★★★A second observer in the same thread read the flicker's SHAPE off the screen rather than its area:
+*"It was pretty obvious from the way it flickered, though, that you were drawing every other character
+every other frame"* 〔`199708/msg00129`, Lee Seitz〕. `FlickerArea` returns how many pixels changed, not
+how they are arranged — and "every other character" and "one contiguous block" of the same area do not
+look alike. **That is a gap in the instrument, stated by someone who separated the two by eye in 1997.**
+
 The scorecard is a *criterion-referenced* instrument (per the deliberate-practice measurement
 literature), not a vanity number: each row is an objective, reproducible target, and progress =
 moving a chosen row toward its target **without regressing** the others (the interlock).

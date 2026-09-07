@@ -4276,6 +4276,17 @@ repository is that instrument. Two were closed the day this section was written,
 
 ★**The pattern is the point, not the list.** A question that went unanswered for twenty-five years is
 usually not hard — it is a question whose asker had no emulator, no cycle counter and no way to read a
-write-only register. Three of the six above are one litmus ROM each. **When reading the archive, record
+write-only register.
+
+★★**It is worth separating this from the things a machine genuinely cannot judge.** Craft quality, "does
+this look right", how much flicker a person will tolerate — those need a human because the answer is not
+in the machine. The rows above are the opposite case: **the answer IS in the machine and nobody put the
+question to it.** Both were noticed by a person first, and only one of them ends there. The audio row is
+the cleanest example — someone heard channel 1 pulling on channel 0 in 2004, on one PAL console, by ear;
+the mixer's own table gives 67% and 50% twenty-two years later. §131 (PAL odd scanlines) has the same
+shape: seen by eye in 1997, measured here. **So the archive's value is not mainly the facts in it — it is
+that it says where to point an instrument.** A corpus of people noticing things without the means to
+check them is a list of experiments somebody already designed. Found by the mailing-list distillation
+(helper-3, who drew the distinction). Three of the six above are one litmus ROM each. **When reading the archive, record
 the unanswered questions separately from the answers**; they are the cheapest measurement work in this
 repository, and they come with their own provenance. Found by the mailing-list distillation (helper-1).
