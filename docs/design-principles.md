@@ -63,6 +63,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   kernel that varies its line count must vary it in twos. Safe zone 262 (NTSC) / 264 (PAL).
   `→ design.ScrollScanlinesConstant`, which carries **two** checks under one name: the count is
   constant frame to frame, **and** it is even when `pal` is set (`pkg/design/pf.go:60`).
+  ★**The rule says what is illegal and not what to do about it, so here is the fix, from the person
+  who caught it happening.** Eckhard Stolberg, reviewing Andrew Davie's Qb in 2001: *"now you are
+  doing **three lines less per frame** than you should, which is **an odd number and therefore results
+  in the PAL colour loss**. You have to **reinsert them at some other space. Maybe just increase the
+  VBLANK timer**"* 〔`200103/msg00173`〕. ★★So a kernel that loses lines does not have to give them
+  back where it lost them — the frame only has to total right, and **VBLANK is the cheapest place to
+  put them** because nothing is drawn there. ★★★Note the shape of the bug too: the author had just
+  *fixed* something (a six-line VSYNC), and the fix is what unbalanced the frame. A line-count
+  regression usually arrives attached to a correction.
   **Promoted to its own rule 2026-09-03.** It had been living as a parenthetical inside the
   scrolling-background bullet above, which is a different subject and carries a different name.
   The distillation measured the cost of that: **eight corpus references cite this claim and every
