@@ -39,3 +39,33 @@ STA ENAM0 / STA ENAM1 / STA GRP0 / STA GRP1 / STA PF0 / STA PF1 / STA PF2
 ```
 〔VnoPF EOR #$EC → STA ENAM0..PF2 clear block〕
 - **Idiom.** If a loop's exit value is a constant **and** the next thing you do is zero registers, `EOR`-compare hands you the `0` for free — `CMP` would leave A holding the old counter value.
+
+## Packing PF0's nibbles: +3 cycles a line, or +19 written the obvious way (2026-09-07)
+
+PF0 uses only its high nibble, so a two-line pair fits in one byte. `design-principles.md` has the
+extreme — *"not drawing PF0 … frees 12cy per line + 18 bytes of RAM"* — and this page has nibble
+packing as a general idiom. The middle had no line anywhere, though Ben Larson was doing it in 2002
+and finding it awkward: *"The fact that I'm **packing both PF0 nibbles into one byte** probably
+doesn't help the situation"* 〔`200210/msg00045`〕.
+
+Measured over four kernels (`internal/cyclebound/pf0nibble_test.go`), the last two unrolled across two
+scanlines:
+
+| kernel | Krow cycles |
+|---|---|
+| one line per iteration, one byte per line | 22 per line |
+| one line per iteration, packed, parity tested at run time | 41 per line — **+19** |
+| two lines per iteration, one byte per line | 11 + 22 = 33 per pair |
+| two lines per iteration, packed, odd nibble via a table | 11 + 28 = 39 per pair — **+6, so +3 a line** |
+
+★**The same idea costs +19 or +3 depending on how it is written** — a factor of six, because unrolling
+removes the parity test entirely: the two halves of the pair know which nibble they are.
+
+★★**The unrolled control is what makes that readable.** The first version of this measurement compared
+a single-line unpacked kernel against an unrolled packed one, and made packing look *cheaper* than not
+packing. The saving was the loop overhead halving and had nothing to do with nibbles.
+
+★★★**What it buys and costs:** 16 bytes of RAM for a 32-line band, +3 cycles a line, 256 bytes of ROM
+for the shift table. Against the extreme — abandoning PF0 *gains* 12 cycles a line and 18 bytes — so
+packing is only the right answer when PF0's content is actually needed. Found by the mailing-list
+distillation (helper-1).
