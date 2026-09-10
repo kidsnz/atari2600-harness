@@ -123,3 +123,11 @@
 # other people's material must never enter it (umbrella CLAUDE.md §4). The tool now refuses to
 # write without an explicit -out; this is the second net.
 *.html
+
+# Scraped third-party material and its fetcher must never enter this repo.
+# Their home is reference/ (outside every git repo) — see the umbrella CLAUDE.md section 4.
+# Removed 2026-09-10: _blogtmp/ held 15 verbatim AtariAge blog posts (39,582 B) and
+# _blog_fetch.py named the path to a live session cookie.
+_blogtmp/
+_blog_fetch.py
+aa_cookie*.txt
