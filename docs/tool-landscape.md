@@ -72,7 +72,27 @@ verification is Gopher2600).
 **The owner already collected nearly all of these in `260304_Claude-Code-Pong/docs_atari/`** (→ gap C is a
 distillation problem, not a collection problem).
 
-- **Stella Programmer's Guide** (Steve Wright, 1979) `stella_programmers_guide.{html,pdf}` — the TIA bible
+- **Stella Programmer's Guide** `stella_programmers_guide.{html,pdf}` — the TIA bible, and **not the
+  original document**. Steve Wright wrote it 12/03/79; the copy here says *"Reconstructed by Charles
+  Sinnett 6/11/93"* and *"HTMLified by B. Watson 9/14/2001"*, and the PDF is a Word file
+  (`/Author (Bob Colbert)`, 74 fonts, 9 images) — **a retyping, not a scan**. Three hands sit between
+  Wright and this file, and retyping this document is known to change it: on AtariAge in 2024
+  (`368057`) someone redrew its timing diagrams and found the hand-drawn lines did not line up with
+  the OSC waveform; the answer, seven weeks later, was that they *"should actually be in the middle"* —
+  **the untidiness was the information**. Three further facts, none recorded here before 2026-09-10:
+  - **The trustworthy original is Atari Museum's `2600_Guide.pdf`** (identical to the archive.org
+    copy), per spiceware in `321100`; the MiniDig edition carries VSYNC typos (both should read
+    *"3 scanlines"*).
+  - **The community's current text is dionoid's 2024-12-14 revision** (`278499`) — OCR errors fixed,
+    missing content restored. A separate **1988-07-01 revision by Darryl May** circulates as a PDF
+    (`368057`); nobody in that thread could say what it changed, and it is **not in this tree**.
+  - **A substantive erratum**: the Guide's horizontal-positioning text (*"15 colour clocks"*) is
+    wrong without its missing premise — a bare `RESx` strobe is limited to **3 colour clocks**
+    (1 CPU cycle), corrected by seagtgruff in `172089`. This repository already uses the corrected
+    value (`docs/techniques/sprite-placement.md`, `x = 3c - 60`) and never absorbed the wrong one.
+  All 26 citations of the Guide outside `CHANGELOG.md` reference its prose, its register tables or
+  its 400 us rule; **none reference the timing diagrams**, so the redrawing risk does not reach any
+  claim here. Verified 2026-09-10.
 - **Guide to Cycle Counting** (Nick Bensema) `cycle_counting_guide.html` — ★ the core of B/C
 - **Programming for Newbies** (Andrew Davie) `Atari_2600_Programming_for_Newbies.{pdf,txt}` — especially Session 22 (horizontal position)
 - **woodgrain wiki** `Playfield_Timing.html` / `Clock_Speeds.html` / `Memory_Map.html` / `Bank_Switching.html` / `Sound.html`
