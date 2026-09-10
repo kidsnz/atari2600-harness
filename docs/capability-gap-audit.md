@@ -185,6 +185,20 @@ the wording is coarse.
   `TestHmoveMidStrobesAllFireButOnlyOneShifts` counts the strobes, so a regression that stops emitting them
   fails there even though every scenario assert would still pass. Negative control: hiding the mid-line latch
   reports "0 frames carried a mid-line strobe, expected 3".
+  **✅ WHY only one shifts — answered 2026-09-07, and the answer is 28 years old.** Bradford W. Mott swept the
+  HMOVE strobe across a whole scanline in 1998 and published the shift for every strobe cycle x every HMPx
+  nibble (`199804/msg00198`, thread "games that do bad things to hmove..."). Two facts in the HM=0 column
+  settle it: **cycles 21..54 read 0 for all sixteen nibbles** — a 34-cycle band where a strobe moves nothing
+  whatever HMPx holds — and the column reaches **-5 at cycles 69 and 70**. Measured here, this ROM's three NOP
+  paddings land the strobe at **CPU cycles 27, 51 and 70**: two inside the dead band, one on the -5 step. That
+  is the entire "only one of three shifts" observation, with no residue.
+  `TestHmoveMidCyclesAgreeWith1998Table` pins it against the table's *bands* rather than three magic numbers,
+  so a strobe drifting into a different band is reported as a drift and not as a wrong value. Negative
+  controls: changing the table's -5 to -4 reports "P0 moved -5, but the 1998 table's HM=0 column says -4";
+  narrowing the dead band to 21..40 reports that cycle 51 now falls outside both the band and the carried part
+  of the table. The 1998 table also shows **cycles 73 and 74 are byte-identical rows**, so the "no comb"
+  strobe is a **two-cycle window, not one** — and cycle 75 both re-raises the comb and flips the $8..$F half
+  positive, so overshooting by one costs twice.
 - **G6 ✅ MEASURED AND HANDLED (2026-07-30):** oracle sub-frame phase offset for per-frame-mutating RAM.
   **"Run N frames and dump RAM" does not name a moment, and the oracles pick different ones.** New fixture
   `roms/litmus/litmus_framephase.asm` bumps a separate counter at three points in one frame — `$80` just after

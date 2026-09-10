@@ -6,6 +6,33 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the HMOVE strobe cycle is an axis, and 1998 already measured all of it (2026-09-07)
+
+`litmus_hmove_mid` recorded on 2026-07-30 that only one of its three mid-line strobes moves the object, and
+said the reason was unknown. The reason was published in 1998. Bradford W. Mott (the author of Stella) swept
+the HMOVE strobe across a whole scanline and printed the resulting shift for **every strobe cycle x every
+HMPx nibble** 〔`199804/msg00198`〕. Reading the HM=0 column:
+
+- **cycles 21..54 are a 34-cycle dead band** — all sixteen nibbles read 0, so a strobe landing there moves
+  nothing whatever `HMPx` holds;
+- the column leaves 0 at cycle 64 and reaches **-5 at cycles 69 and 70**.
+
+This ROM's three NOP paddings land the strobe at **CPU cycles 27, 51 and 70** — two in the dead band, one on
+the -5 step. That accounts for the observation with no residue, and reproduces a 28-year-old hardware
+measurement against the engine. Two further facts from the same table, neither of which we held:
+
+- **cycles 73 and 74 are byte-identical rows**, so the "no comb bar" strobe is a **two-cycle window, not
+  one** — a materially different authoring target;
+- **cycle 75 both re-raises the comb and flips the `$8`..`$F` half positive**, so overshooting the window by
+  a single cycle costs twice.
+
+`TestHmoveMidCyclesAgreeWith1998Table` pins this against the table's *bands* rather than three magic numbers,
+so padding that drifts is reported as drift instead of as a wrong value. Negative controls: changing the
+expected -5 to -4 reports the disagreement with the cited column; narrowing the dead band to 21..40 reports
+that the cycle-51 strobe now falls outside both the band and the carried part of the table. `known-traps.md`,
+`verified-coverage.md` and the `G5` entry in `capability-gap-audit.md` all carry the axis now; the litmus's
+own header carries the answer where the open question used to be.
+
 ### Added — twenty measurements from the mailing-list distillation, in one line each (2026-09-07)
 
 The entries above cover the findings large enough to need their own. These are the rest of the day's

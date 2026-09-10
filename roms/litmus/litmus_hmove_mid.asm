@@ -14,6 +14,17 @@
 ;   つまり HM=0 の行中 HMOVE は、この ROM が試す3つのストローブ位置のうち**1つでしか動かない**。
 ;   位置だけを見るシナリオでは「打って効かなかった」と「打っていない」を区別できないので、
 ;   ストローブの本数まで数える internal/emu.TestHmoveMidStrobesAllFireButOnlyOneShifts を併設した。
+;
+; ★理由が判明 2026-09-07（★答えは1998年に在った）: Bradford W. Mott が HMOVE のストローブを
+;   1走査線ぶん掃いて「ストローブ・サイクル × HMPx 上位ニブル」の全表を公開している
+;   （reference/stella-list 199804/msg00198・"games that do bad things to hmove..."）。
+;   その HM=0 の列に2つの事実が在る:
+;     ・cyc 21..54 は【16値すべて 0】＝ 34サイクル幅の死角（どの HMPx でも動かない）
+;     ・cyc 64 で 0 を離れ、cyc 69 と 70 で【−5】に達する
+;   この ROM の3つの NOP 詰めは、実測で CPU cyc 27 / 51 / 70 に落ちる＝2つは死角、1つが −5 の段。
+;   「3つのうち1つでしか動かない」はこれで残らず説明が付く。
+;   internal/emu.TestHmoveMidCyclesAgreeWith1998Table が、表の【帯】に対して固定している
+;   （3つの数値に対してではない＝詰めがずれたら「ずれた」と報告される）。負の対照2本。
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
