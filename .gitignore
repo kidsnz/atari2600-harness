@@ -126,8 +126,33 @@
 
 # Scraped third-party material and its fetcher must never enter this repo.
 # Their home is reference/ (outside every git repo) — see the umbrella CLAUDE.md section 4.
-# Removed 2026-09-10: _blogtmp/ held 15 verbatim AtariAge blog posts (39,582 B) and
-# _blog_fetch.py named the path to a live session cookie.
+#
+# WHAT WAS HERE, and what is still reachable. Two different things were committed on
+# 2026-06-17 (450367f) and removed on 2026-09-10 (9d7d380) — a 12-week window in a
+# public repository:
+#
+#   (1) _blogtmp/ — 15 AtariAge blog posts as verbatim text, 39,582 B. Other people's
+#       writing. This is the licensing problem, and the reason reference/ sits outside
+#       every git repo in the first place.
+#   (2) _blog_fetch.py — 47 lines. Not other people's writing, so (1)'s wording does not
+#       cover it: line 4 read `open("../reference/atariage/aa_cookie.txt")`, and the file
+#       fetched through curl_cffi with a spoofed Chrome User-Agent.
+#
+# The history was deliberately NOT rewritten (decision 2026-09-10). `git show
+# 450367f:_blog_fetch.py` still prints both the cookie path and the technique, and it
+# always will. The reasoning: the blog text is public AtariAge material rather than a
+# secret; the cookie value itself was never committed (measured: zero hits across all
+# refs); the path names a file on one laptop and is useless elsewhere; and rewriting
+# every hash would disrupt the sessions sharing this working tree while leaving any
+# existing clone untouched anyway.
+#
+# It would also not have achieved much: the same technique is described in CHANGELOG.md
+# around line 8657 ("direct AtariAge fetch via curl_cffi (Cloudflare bypass)", "the
+# browser Cookie header incl. cf_clearance"), which is a change record and stays.
+#
+# This paragraph exists because the removal alone reads as concealment. Choosing to
+# leave something and forgetting it look identical from outside; only the note tells
+# them apart.
 _blogtmp/
 _blog_fetch.py
 aa_cookie*.txt
