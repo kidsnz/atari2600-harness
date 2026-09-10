@@ -40,7 +40,7 @@ extra pins?**
 |---|---|
 | F8/F6/F4 | the ROM itself, by touching a **hotspot address** |
 | FE | the **stack** — `$01FE` on the bus after a JSR, then `data >> 5` (no hotspot at all) |
-| Supercharger | a **stateful arming sequence** (`$F0xx`, then the next `$Fxxx` is a write) |
+| Supercharger | a **stateful arming sequence**: `$F0xx` arms it and latches that low byte as the value; the write lands on the **fifth subsequent address transition**, not the next access (the engine sets `Delay = 6`, decrements it only when the address actually changes, and commits at `Delay == 1`) |
 | double-ender | **the connector**, wired once and never changed |
 
 **Above A12 there is nothing at all, and that is a resource.** The 6507 has thirteen address lines,
