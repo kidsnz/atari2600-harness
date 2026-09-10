@@ -43,6 +43,17 @@ extra pins?**
 | Supercharger | a **stateful arming sequence**: `$F0xx` arms it and latches that low byte as the value; the write lands on the **fifth subsequent address transition**, not the next access (the engine sets `Delay = 6`, decrements it only when the address actually changes, and commits at `Delay == 1`) |
 | double-ender | **the connector**, wired once and never changed |
 
+> **The Supercharger's "fifth" is derived, not traced.** It follows from the engine's arithmetic
+> (`Delay` is set to 6, decremented once per address *transition*, and the write commits at
+> `Delay == 1` — five decrements) and from alex_79's 2013 description on AtariAge `topic/215572`,
+> which cites Kevin Horton's notes and the Cuttle Cart manual and says the value lands on "the
+> fifth address touched afterwards". Two independent readings of the engine and one independent
+> reading of the arithmetic agree. **What nobody has done is follow an execution**: whether
+> `registers.Listen` (the decrement) or `Access` (the `Delay == 1` commit) runs first within a
+> single bus event is unverified, and an off-by-one could hide there. `roms/litmus/litmus_superchip.asm`
+> is the pattern for settling it; until then this row is the best available inference, not a measurement.
+
+
 **Above A12 there is nothing at all, and that is a resource.** The 6507 has thirteen address lines,
 so A13–A15 of a 16-bit pointer are **never emitted** — measured 2026-09-04, the same ROM byte reads
 back from all eight odd 4K windows:
