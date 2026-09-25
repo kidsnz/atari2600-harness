@@ -39,7 +39,7 @@ extra pins?**
 | scheme | who supplies it |
 |---|---|
 | F8/F6/F4 | the ROM itself, by touching a **hotspot address** |
-| FE | the **stack** — `$01FE` on the bus after a JSR, then `data >> 5` (no hotspot at all) |
+| FE | the **stack** — `$01FE` on the bus, whatever instruction put it there (a JSR does, and so does an RTS), then the data bus one cycle later (no hotspot at all; AtariAge `topic/268780`). The engine (`mapper_scabs.go`) reads it as `data >> 5`: `%111` selects bank 0, `%110` bank 1, and ignores any other value, so between the two banks bit 5 decides. The patent's latch takes the top three bits regardless, as A13–A15 (AtariAge `topic/266200`), so "ignores" is the engine's reading, not verified on hardware |
 | Supercharger | a **stateful arming sequence**: `$F0xx` arms it and latches that low byte as the value; the write lands on the **fifth subsequent address transition**, not the next access (the engine sets `Delay = 6`, decrements it only when the address actually changes, and commits at `Delay == 1`) |
 | double-ender | **the connector**, wired once and never changed |
 
