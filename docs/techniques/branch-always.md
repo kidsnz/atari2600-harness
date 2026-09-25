@@ -43,8 +43,13 @@ Three seeds, each of which pins one flag so the following branch can never fall 
 | seed | flag it fixes | branch that is then unconditional |
 |---|---|---|
 | `lda #0` (`#$00`) | Z = 1 | `beq` |
-| `lsr` / `asl` (accumulator) | N = 0 (bit 7 shifted out) | `bpl` |
+| `lsr` (accumulator) | N = 0 (a 0 is shifted into bit 7) | `bpl` |
 | `lda #<non-zero immediate>` | Z = 0 | `bne` |
+
+`asl` is **not** a seed: after it, N is the old bit 6 (`$40` → `$80`, N = 1), so a following `bpl`
+can fall through — *"if you shift and THEN do a BMI, you're actually checking D6"*
+〔stella-list `199806/msg00116`〕. The engine agrees: `Gopher2600/hardware/cpu/cpu.go` sets `Sign`
+from the shifted value.
 
 ```
         lda #0              ; A = 0 AND Z = 1 — two results, both used
