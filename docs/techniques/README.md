@@ -162,10 +162,11 @@ incompatibilities` (200302), where the list's own conclusion was *"we should iso
 techniques that may fail on some systems and enforce the usage of lowest-common-denominator
 standards"*. The isolating is this column; the enforcing is not attempted.
 
-## Not a technique, but looked for here: game STATE
+## Game STATE — the page, and what the casebook adds
 
-Nothing in this directory is about **state machines**, and someone designing a game will look here
-first. The material exists, in `docs/casebook.md`, where it is written as what a commercial title
+The skeleton is a technique here: **[game-states.md](game-states.md)** — a state machine driving
+title → play → game-over, console switches and attract mode, with a demo ROM and a golden scenario.
+More material is in `docs/casebook.md`, where it is written as what a commercial title
 does rather than as something to reach for:
 
 - `casebook.md:94` — *"reconstruct the wall normal over multiple frames with a **trial-and-error
@@ -177,8 +178,8 @@ does rather than as something to reach for:
   a machine with one button says "not now".
 - `casebook.md:19`, `casebook.md:29` — two more.
 
-A pointer rather than a page, deliberately: writing a third copy is how the same fact ends up stated
-three ways and corrected in one. **`sprite-placement.md` names this failure in its own opening** —
+For the casebook material, a pointer rather than a copy, deliberately: writing a third copy is how
+the same fact ends up stated three ways and corrected in one. **`sprite-placement.md` names this failure in its own opening** —
 *"Knowing a table exists is not the same as reaching for it … a rule nobody reads is a rule that gets
 measured again"* — and it earned that sentence by having a measured table re-derived from scratch an
 afternoon later. Found by the mailing-list distillation (helper-2), who checked before claiming it
