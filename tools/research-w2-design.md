@@ -119,8 +119,8 @@ Gopher2600 のパレットとも微差あり（go ファイル冒頭コメント
   https://github.com/denilsonsa/gimp-palettes/blob/master/palettes/HW-Atari-2600-NTSC.gpl
 - **Wikipedia / HandWiki / Grokipedia "video game console palettes"**（YIQ 由来の解説 + 表）
   https://en.wikipedia.org/wiki/List_of_video_game_console_palettes
-- **TIA の色生成原理**: 3.579545MHz color clock の位相シフトで hue、振幅で luminance。NTSC = 8 hue ×
-  16 lum（うち lum bit0 無効で実質 8 段）= 128 色。PAL=104, SECAM=8。
+- **TIA の色生成原理**: 3.579545MHz color clock の位相シフトで hue、振幅で luminance。NTSC = 16 hue ×
+  16 lum（うち lum bit0 無効で実質 8 段）= 128 色（`pkg/design/color.go` の `Hue` は `return reg >> 4`）。PAL=104, SECAM=8。
   〔randomterrain S11 / Wikipedia〕
 
 ### RGB 差の結論
