@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — seven findings from the review of the distilled corpus, landed as a trial (2026-09-25)
+
+The first rows of the review ledger to reach the harness; each commit carries `Land-Key:` lines naming them.
+
+- `roadmap.md` called the 2-line kernel's VDEL odd/even refinement documented-only; `TestVDELOddEven` has
+  verified it since v1.24.0 (the same stale word also sat in a comment of `two_line_kernel.asm`).
+- `branch-always.md` listed `asl` as a seed that makes `bpl` unconditional. After `asl`, N is the old bit 6
+  (`$40` → `$80`, N = 1); only `lsr` qualifies 〔stella-list `199806/msg00116`〕.
+- `fundamentals-audit.md` italicised a paraphrase as a quote; restored to the source's words
+  〔stella-list `200401/msg00013`〕.
+- `techniques/README.md` said nothing in the directory was about state machines; `game-states.md` is.
+- `tools/research-w2-design.md` gave NTSC as 8 hues × 16 luminances = 128; it is 16 hues (`Hue` is
+  `reg >> 4`), 8 effective luminances.
+- `bankswitching.md`, FE: the switch fires on `$01FE` whatever instruction put it there — an RTS as well as
+  a JSR — and the engine maps `data >> 5` = `%111` to bank 0 and `%110` to bank 1, ignoring other values
+  (the engine's reading; not verified on hardware).
+
+The seven files grew by 1,075 bytes in total (`git diff --name-only 09bc1d7 HEAD`, `wc -c` before and after). No version bump: the unreleased entries since v2.0.0 are left to be
+cut into a release separately.
+
 ### Added — the HMOVE strobe cycle is an axis, and 1998 already measured all of it (2026-09-07)
 
 `litmus_hmove_mid` recorded on 2026-07-30 that only one of its three mid-line strobes moves the object, and
