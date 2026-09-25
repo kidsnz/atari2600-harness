@@ -20,10 +20,11 @@ The first rows of the review ledger to reach the harness; each commit carries `L
 - `tools/research-w2-design.md` gave NTSC as 8 hues × 16 luminances = 128; it is 16 hues (`Hue` is
   `reg >> 4`), 8 effective luminances.
 - `bankswitching.md`, FE: the switch fires on `$01FE` whatever instruction put it there — an RTS as well as
-  a JSR — and the engine maps `data >> 5` = `%111` to bank 0 and `%110` to bank 1, ignoring other values
-  (the engine's reading; not verified on hardware).
+  a JSR — and the engine maps `data >> 5` = `%111` to bank 0 and `%110` to bank 1, ignoring other values.
+  A 2019 hardware test (AtariAge `topic/293982`) reports bit 5 alone decides, so the engine can differ from
+  the cart below `$C000` — **Cited only, not verified**.
 
-The seven files grew by 1,075 bytes in total (`git diff --name-only 09bc1d7 HEAD`, `wc -c` before and after). No version bump: the unreleased entries since v2.0.0 are left to be
+The seven files grew by 1,268 bytes in total (`wc -c` of each file changed since `09bc1d7`, CHANGELOG excluded). No version bump: the unreleased entries since v2.0.0 are left to be
 cut into a release separately.
 
 ### Added — the HMOVE strobe cycle is an axis, and 1998 already measured all of it (2026-09-07)
