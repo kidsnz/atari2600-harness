@@ -2,7 +2,7 @@
 ; 「絵の1行を2走査線に伸ばす」＝TIA 更新を半分にして CPU 余裕を稼ぐ、実ゲーム定番の土台。
 ; 本デモは 96 ペア（=192行）で、ペアの A 行=P0 の縦判定＋背景グラデ、B 行=P1 の縦判定 と
 ; 仕事を2行に分担。1行 kernel なら同居が苦しい3仕事が余裕で収まる（A≈45cy/B≈40cy）。
-; 代償=縦解像度が半分（座標はペア単位）。1px 粒度が要るときの VDEL 偶奇技は doc 参照（documented）。
+; 代償=縦解像度が半分（座標はペア単位）。1px 粒度が要るときの VDEL 偶奇技は two_line_vdel.asm 参照（verified: TestVDELOddEven）。
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
