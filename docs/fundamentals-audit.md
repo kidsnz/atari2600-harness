@@ -516,8 +516,8 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   `$F8` is safe in every kernel here except the one that dispatches through the stack — which is
   exactly the kind of thing a convention phrased as "hoping" cannot tell you.
   📖 **Not measured: the reverse trick** — deliberately using the stack region as scratch. The list
-  offers it with its own caveat (*"just be careful about which temp variables each subroutine
-  uses"*); `known-traps.md` covers a variable at `$FF` being clobbered by a `JSR` push and says
+  offers it with its own caveat (*"But then you have to be carefully* [sic] *about which temp
+  variables your subroutines use."* 〔stella-list `200401/msg00013`〕); `known-traps.md` covers a variable at `$FF` being clobbered by a `JSR` push and says
   nothing about going the other way.
   (Stella PG). Real-game RAM budgets: Pitfall ≈ all 128 bytes (world = 1 byte!), Random-Dungeon ≈45 with
   aliased overlays, za2600 overflows into cart RAM. ⬜ a RAM-map audit feature (symbols → read/write
