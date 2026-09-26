@@ -187,9 +187,11 @@ def main():
 
         # (4) the ceiling
         if lines > MAX_LINES and f not in OVERSIZE_EXEMPT:
-            errors.append(f"{f}: {lines} lines, over the {MAX_LINES} cap — split it rather than let "
-                          f"one file accrete (one fact per file). If it must stay, add it to "
-                          f"OVERSIZE_EXEMPT WITH A MEASURED REASON.")
+            errors.append(f"{f}: {lines} lines, over the {MAX_LINES} cap — PRUNE it: keep only the "
+                          f"rules that still change behaviour (one rule line + one number each). "
+                          f"Do not split it and do not move text to _archive/: the removed text "
+                          f"stays in this folder's git history (git log). If it must stay long, "
+                          f"add it to OVERSIZE_EXEMPT WITH A MEASURED REASON.")
         if f in OVERSIZE_EXEMPT and lines <= MAX_LINES:
             errors.append(f"{f}: is exempt from the {MAX_LINES}-line cap but is now {lines} lines — "
                           f"the debt was paid, so drop the exemption rather than leave a licence "
