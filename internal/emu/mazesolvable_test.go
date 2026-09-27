@@ -30,6 +30,7 @@ import (
 // and so a design decision is involved. The decision turns out to be affordable to defer: at this
 // size, it never does.
 func TestEveryMazeSeedIsTraversable(t *testing.T) {
+	t.Parallel()
 	const (
 		playerWidth = 8
 		visible     = 160

@@ -34,6 +34,7 @@ import "testing"
 // The ROM takes both values from RAM and writes them with the CPU, so the register write is a real
 // store and only the choice comes from here.
 func TestAUDCSilentCarriers(t *testing.T) {
+	t.Parallel()
 	const (
 		ctrlAddr = 0x82
 		freqAddr = 0x83

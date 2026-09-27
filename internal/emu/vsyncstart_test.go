@@ -46,6 +46,7 @@ import (
 // document as a permanent unresolved worry. Family: `known-traps.md`'s "TRUE OF HARDWARE, AND NOT
 // OF WHAT WE MEASURE WITH".
 func TestWhatVSYNCsyncedOnStartHides(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("renders the whole ROM corpus twice")
 	}

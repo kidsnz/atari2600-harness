@@ -47,6 +47,7 @@ import (
 // repetitions, the whole capture), which is what a start-phase artefact looks like and
 // not what a wrong divisor looks like.
 func TestEveryPitchTheHardwareHasMatchesTheFormula(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("sweeps 512 register pairs against the emulator")
 	}

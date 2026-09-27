@@ -54,6 +54,7 @@ var deliberateStackROMs = map[string]bool{
 //
 // Found by the mailing-list distillation (helper-1).
 func TestStackFitsInATinyCornerOfRAM(t *testing.T) {
+	t.Parallel()
 	const (
 		warmupFrames  = 10 // SP is undefined until TXS runs; see the note above
 		measureFrames = 8

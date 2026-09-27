@@ -42,6 +42,7 @@ var randomStateDependent = map[string]bool{
 }
 
 func TestWhichROMsRestOnTheFixedPowerOnState(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("sweeps the whole ROM corpus twice")
 	}
