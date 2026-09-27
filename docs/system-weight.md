@@ -147,6 +147,37 @@ safely this time. Whoever picks this up needs a
 `warmupStable`/`buildAudioROM` pair that return errors instead of touching `t`, and a located
 explanation of the race — in that order.
 
+### The second attempt at (1), shipped 2026-09-27
+
+**The ceiling had been crossed.** From 2026-09-10 every CI run failed on `internal/emu` at exactly
+600.01 s, Go's default per-package timeout (the project never set one). Green runs on 09-07 had
+taken 442-584 s, and a run with `-timeout 30m` on a measurement branch read the real figure:
+**636.8 s**, 37 s over. Job wall-clock was about 24 minutes; green runs in the last 40 had taken
+13-22. The 14.45-minute maximum above is from 2026-08-24 and no longer describes this repository.
+
+**Where the time was.** Per test, locally: six of the package's 180 tests took 85.5% of it
+(`TestAUDCSilentCarriers` 30.5%, `TestWhatVSYNCsyncedOnStartHides` 23.4%, the pitch sweep 16.0%,
+then three smaller ones), and only one of its 115 test files used `t.Parallel`. The pitch sweep —
+the target of the first attempt — is the third-largest.
+
+**What shipped: `t.Parallel()` on those six tests, and nothing else.** It sidesteps both findings
+that stopped the first attempt: no goroutine is started inside a test, so no `t.Fatal` runs off the
+test goroutine, and no sweep loses a point. The six only read `.bin` fixtures (the audio ROMs are
+written into each test's own `t.TempDir()`), so no file is written by two of them at once.
+Measured in a worktree holding the same 209 `.bin` fixtures, with `GOMAXPROCS=4` to match the
+runner: **278.6 s → 146.3 s, pass/skip counts identical (178/2)**. `go test -race` over the six,
+twice: **0 DATA RACE** (38- and 44-minute runs) — two clean runs, not a proof of absence. On the CI
+runner: **`internal/emu` 636.8 s → 403.9 s**, job about 24 → 20 minutes, run `36338005821`. The
+per-package timeout stays at Go's default; raising it was considered and not needed.
+
+**Next in line, not done: `internal/cyclebound`** (294 s on CI). One test,
+`TestBlankClassificationAgreesWithTheMachine`, is 62% of it, and the same move does not transfer
+as it stands, for two reasons. Parallel tests only overlap other parallel tests, so marking one
+heavy test gains nothing by itself. And these tests assemble ROMs: `build.Assemble`'s scratch name
+is unique per *process* (`scratchPath`), which protects separate test packages but not two parallel
+tests in one process assembling the same kernel. Make the scratch name unique per call first, then
+measure the same way.
+
 ## 2. The debris sweep
 
 Sessions leave residue, and residue is not inert. Measured 2026-08-13: a subagent's **34 MB git

@@ -6,6 +6,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — CI red since 09-10: `internal/emu` back under the default timeout (2026-09-27)
+
+Every CI run since 2026-09-10 failed on `internal/emu` at Go's default 600 s per-package timeout;
+the real figure on the runner was 636.8 s. Six tests took 85.5% of the package and ran one after
+another. They now carry `t.Parallel()` — no test body, sweep or point count changed. On the CI
+runner `internal/emu` went **636.8 s → 403.9 s** and the job about 24 → 20 minutes; locally with 4
+cores 278.6 s → 146.3 s, pass/skip counts identical, and `go test -race` over the six twice found
+no race. The timeout itself was not raised. Measurements, and why `internal/cyclebound` (next
+heaviest) needs a per-call scratch name in `build.Assemble` before the same move, are in
+`docs/system-weight.md`.
+
 ### Fixed — seven findings from the review of the distilled corpus, landed as a trial (2026-09-25)
 
 The first rows of the review ledger to reach the harness; each commit carries `Land-Key:` lines naming them.
