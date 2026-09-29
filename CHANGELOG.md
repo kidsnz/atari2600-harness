@@ -6,6 +6,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — ten more review findings landed, second batch (2026-09-29)
+
+Each commit carries `Land-Key:` lines; each was checked by a separate reviewer before commit.
+
+- `multicolor48.md`, `score-kernel.md`: the last `sta GRP0` of a VDEL 48px row is required, not junk.
+- `known-traps.md`: the Stella-boot quote regains the word it dropped ("though").
+- `CLAUDE.md`: the `defuse` soundness count is no longer hand-written; the test that prints it is named.
+- `design-principles.md`, `capability-gap-audit.md`: Combat's vector-slot data survives because BRK is
+  never taken — SEI would not stop it; the RESxx +5/+4 delay is cited to its 2026-09-03 measurement.
+- `vertical-positioning.md`, `vertical_pos_dcp.asm` (comment only): DASM 2.20.14.1 assembles the illegal
+  mnemonics.
+
+Found while re-checking the review ledger, not fixed here: `internal/build/build.go`'s DASM error hints
+misfire when an indented data row lacks `.byte` (reproduced 2026-09-29).
+
 ### Fixed — nine more review findings landed, first measured batch (2026-09-28)
 
 Each commit carries `Land-Key:` lines. All were checked by a separate reviewer before commit.
