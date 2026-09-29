@@ -348,14 +348,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   making SWCHA constant by turning SWACNT to outputs trips the distinct-values guard.
 - ✅ Paddles INPT0–3 dump/charge — verified `litmus_paddle` (v0.54.0; transfer curve measured).
 - 📖 **SWACNT/SWBCNT DDRs** — documented only. **"Rarely game-relevant" was withdrawn 2026-09-03:**
-  it was true of *our* ROMs and not of the games. `docs/casebook.md:98` reads a commercial title
-  as **"gate joysticks through the port DDR"**, so the counterexample was already in this
-  repository, one file away. What is true is the narrower statement: **no ROM here writes
-  SWACNT or SWBCNT at all** (`rg -l "SWACNT|SWBCNT" roms --glob "*.asm"` → 0), and none needs to,
+  it was true of *our* ROMs and not of the games. A commercial title writes one: Combat stores
+  `#$10` into `SWBCNT` at start-up (`A9 10 8D 83 02` at $F00A of `sandbox/studies/combat/Combat.bin`). `docs/casebook.md`
+  once read that ROM as gating the joysticks through the DDR; it does not (corrected 2026-09-28), but the DDR write is real. What is true is the narrower statement: **no ROM here wrote
+  SWACNT or SWBCNT at all** (`rg -l "SWACNT|SWBCNT" roms --glob "*.asm"` → 0 on 2026-09-03; the same command returns 3 on
+  2026-09-28 — `litmus_swacnt.asm`, `litmus_swacnt_delay.asm`, `litmus_riot_mirror.asm`, added since), and none needed to,
   because the engine resets the RIOT chip memory to zero (`hardware/memory/vcs/riot.go` `Reset`),
   which is all-inputs, and `deriveSWCHA` then returns the peripheral value unchanged. So a DDR
   litmus cannot confirm existing practice — it has to **drive a port as an output**, which no ROM
-  here does.
+  here did then.
   **The list went further and we could not follow it, 2026-09-04.** A 2004 post reads the Stella
   Programmer's Guide saying SWCHB *"is hardwired to be input only"* and asks the obvious question —
   *"then why would they have the SWBCNT register?"* — then reports **Air-Sea Battle setting D4 of
