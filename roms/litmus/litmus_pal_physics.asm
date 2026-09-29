@@ -1,7 +1,7 @@
 ; litmus_pal_physics — does the same ROM move the same pixels PER FRAME on PAL and NTSC?
 ;
-; subpixel-velocity.md already carries the linear conversion: a PAL increment must be 83.39%
-; of the NTSC one to travel the same distance per SECOND. What it does not carry is the
+; subpixel-velocity.md already carries the linear conversion: an NTSC increment must be 83.39%
+; of the PAL one (a PAL increment 119.92% of the NTSC one) to travel the same distance per SECOND. What it does not carry is the
 ; consequence for anything that accelerates, and what nothing here had checked is the premise
 ; underneath both: that a ROM's per-frame arithmetic is untouched by the television standard.
 ;

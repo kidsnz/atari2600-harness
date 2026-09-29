@@ -90,9 +90,9 @@ the reason 8.8 is quoted here applies to this technique too, and this page had n
 today it contained no mention of PAL, NTSC, or a refresh rate at all.
 
 **The conversion factor, from our own constants** (`television/specification/specifications.go`):
-NTSC is `15734.26 / 262` = **60.0544 Hz**, PAL is `15625.00 / 312` = **50.0801 Hz**, so a PAL increment
-must be **83.39%** of the NTSC one to move at the same speed per second — 0.06 points from the nominal
-50/60. Worth stating precisely, because the list did not: the author who raised it wrote *"just ensure
+NTSC is `15734.26 / 262` = **60.0544 Hz**, PAL is `15625.00 / 312` = **50.0801 Hz**, so an NTSC increment
+must be **83.39%** of the PAL one to move at the same speed per second (a PAL increment is 119.92% of the
+NTSC one) — 0.06 points from the nominal 50/60. Worth stating precisely, because the list did not: the author who raised it wrote *"just ensure
 the NTSC m to be ~80%"* and then, parenthetically and unsurely, *"can someone provide the correct
 value? 83,4%?"*. **The confident figure was 3.4 points out and the hesitant one was right to two
 decimal places.**
@@ -102,8 +102,8 @@ decimal places.**
 same code travels **1.4380×** further per second on NTSC than on PAL — not 1.1992×. A 2004 author felt
 it as gravity and shipped a second build rather than retune: *"THE GRAVITY IN THE NTSC VERSION IS
 EFFECTIVELY **1.4x GREATER**. IT'S THE ONE CONSTANT I COULDN'T CHANGE… So anyway, I'VE INCLUDED A
-PAL60 VERSION"* 〔`200409/msg00309`〕. So **a game ported by scaling every velocity constant by 83.39%
-will still fall wrong**, and the acceleration constant needs 69.54% (83.39% squared).
+PAL60 VERSION"* 〔`200409/msg00309`〕. So **a PAL game ported to NTSC by scaling every velocity constant by
+83.39% will still fall wrong**, and the acceleration constant needs 69.54% (83.39% squared).
 
 ★★**And the premise both numbers rest on is now measured, not assumed**
 (`internal/emu/palphysics_test.go`, `roms/litmus/litmus_pal_physics.asm`): the same ROM produces

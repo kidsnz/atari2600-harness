@@ -10,8 +10,8 @@ import (
 // TestPALChangesPhysicsBySquareOfTheRateRatio measures the premise underneath
 // `subpixel-velocity.md`'s conversion factor, and then the consequence that page does not carry.
 //
-// The page says a PAL increment must be **83.39%** of the NTSC one to travel the same distance per
-// second, computed from the engine's own constants. That is the LINEAR case. Anything that
+// The page says an NTSC increment must be **83.39%** of the PAL one (a PAL increment 119.92% of the
+// NTSC one) to travel the same distance per second, computed from the engine's own constants. That is the LINEAR case. Anything that
 // accelerates is worse, and a 2004 author found out by shipping a PAL60 build rather than retune:
 //
 //	"THE GRAVITY IN THE NTSC VERSION IS EFFECTIVELY 1.4x GREATER. IT'S THE ONE CONSTANT I
