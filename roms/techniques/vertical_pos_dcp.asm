@@ -3,7 +3,7 @@
 ;   lda #H-1 / DCP sprDraw / bcs in-range
 ; — the classic idiom. DCP ($C7 zp) = DEC+CMP combined. sprDraw is initialized to sprY+H every frame,
 ; decremented every line = "draw only during the H lines where the countdown passes 0..H-1". Art is a reversed table.
-; DASM does not accept undocumented mnemonics → encode directly as .byte \$C7.
+; DASM 2.20.14.1 accepts undocumented mnemonics (dcp $80 = C7 80); .byte \$C7 is kept and assembles the same.
 ; Horizontal: fixed to X=80 every frame after startup (divide-by-15 + HMOVE table, pos(v)=v calibrated; same shape as sprite_anim).
         processor 6502
 VSYNC   = $00

@@ -35,8 +35,8 @@ Per visible line (Y register = line number):
 ### skipDraw / DCP variant — **verified** (v1.23.0, `vertical_pos_dcp.asm`)
 The classic undocumented-opcode idiom: per line `lda #H-1` / `DCP sprDraw` ($C7 zp = DEC+CMP) /
 `bcs draw`; `sprDraw` initialized to `sprY+H` each frame counts down through 0..H-1 for exactly
-H lines; art is stored bottom-up and indexed by the counter. DASM has no illegal mnemonics —
-encode with `.byte $C7`. **Measured on this kernel: max line 40→38 cycles, sprite line 31→30**
+H lines; art is stored bottom-up and indexed by the counter. DASM 2.20.14.1 assembles the illegal
+mnemonics (`dcp $80` → `C7 80`; `lax`, `sax` likewise), so `dcp` can be written as is; the kernel's `.byte $C7` assembles the same. **Measured on this kernel: max line 40→38 cycles, sprite line 31→30**
 (2–3 cycles — modest here; the idiom's real value is freeing A/X/Y pressure: no `tya`, so Y
 stays available for other per-line work). Pixel-identical to the compare version (CI-locked).
 - **Pointer pre-offset:** set `sprPtr = Art − sprY` in VBLANK and `lda (sprPtr),y` in-kernel;
