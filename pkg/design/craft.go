@@ -30,7 +30,7 @@ func WalkFrame(counter byte, speedBit uint) int { return int((counter >> speedBi
 type BackgroundSpec struct {
 	WidthPx   int  // 幅: 48 (反射の片側) or 96 (全幅相当)
 	Colors    int  // 色数: 1 or 2（2 は score-bit or per-band COLUPF）
-	Reflect   bool // PF 対称性: true=反射 / false=非対称（非対称は高コスト）
+	Reflect   bool // PF 対称性: true=反射 / false=repeat (right half copies left). An asymmetric PF (PF rewritten mid-line) is a separate axis, not this flag.
 	RowHeight int  // 行高: 1〜16 ライン/行（精細度 vs 負荷のトレードオフ）
 }
 
