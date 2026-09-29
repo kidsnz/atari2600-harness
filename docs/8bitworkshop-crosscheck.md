@@ -65,7 +65,7 @@ Sources: `reference/docs_atari/8bitworkshop_samples/*.asm` (32 files; 26 standal
 ```sh
 DASMINC=$(dirname $(which dasm))/../share/dasm/machines/atari2600   # or brew Cellar machines/atari2600
 cd reference/docs_atari/8bitworkshop_samples
-dasm multisprite3.asm -f3 -I"$DASMINC" -I. -o /tmp/ms3.bin
+dasm multisprite3.asm -f3 -I"$DASMINC" -I. -o/tmp/ms3.bin   # no space after -o: "-o file" fails (DASM 2.20.14.1)
 # then load_rom /tmp/ms3.bin (NTSC) → step_frame → analyze_screen
 ```
 
