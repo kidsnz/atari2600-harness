@@ -6,6 +6,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — nine more review findings landed, first measured batch (2026-09-28)
+
+Each commit carries `Land-Key:` lines. All were checked by a separate reviewer before commit.
+
+- `capability-gap-audit.md` CMB-5: the DASM used here (2.20.14.1) already fills unwritten ROM with `$FF`;
+  the zero-fill was the annotator's older DASM.
+- `casebook.md`: Combat freezes the joysticks in software (`BIT`/`BMI`/`LDA #$FF`), not through a DDR;
+  its one DDR write is `SWBCNT = #$10`. `fundamentals-audit.md`'s example follows the ROM bytes now.
+- `tia-pcm.md`: the scanline rate uses the nominal 3579545 Hz; 3579575 was one console's crystal marking.
+- `integration-density-playbook.md`: BRK as a call is 2 bytes (1 shorter than JSR); Video Olympics example.
+- `venetian-blinds.md`: Video Chess was Bob Whitehead with Larry Wagner.
+- `known-traps.md`: the 123-ROM false-positive count is dated; the HMOVE range is −8..+7 (also `hmove-slope.md`).
+- `8bitworkshop-crosscheck.md`: `dasm -o` takes the file name attached.
+
 ### Fixed — CI red since 09-10: `internal/emu` back under the default timeout (2026-09-27)
 
 Every CI run since 2026-09-10 failed on `internal/emu` at Go's default 600 s per-package timeout;
