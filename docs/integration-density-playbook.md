@@ -266,9 +266,13 @@ Re-verifying them is the first practice task (§E rung 1). Status:
 - ✓ **VERIFIED (2026-07-24, rung 1).** **BIT-absolute skip-next.** Raw `$2C` = 3 bytes / **4 cycles**;
   falling into it absorbs the next 2-byte instruction (`$F00D` → next PC `$F010`, skipping `lda #$22`) and
   leaves **A/X/Y intact** (A=$11, X=$BB, Y=$CC), moving only N/V/Z. Register-safety confirmed.
-- ☐ **Still to verify** (lower priority, deferred): **BRK-as-1-byte-call** (vs 3-byte `JSR`) and the
+- ✓ **BRK as a call is 2 bytes, not 1** (BRK+2 and the RTI return verified 2026-09-15 on a scratch ROM; cycles from the 6502 table): BRK pushes BRK+2 and RTI returns there, so
+  a call is `BRK` + one skipped byte — **1 byte shorter than `JSR`, not 2** — and since RTI restores the pushed status the
+  result comes back in A, never in flags; 13 cycles against JSR/RTS's 12. Shipped: Video Olympics' BRK vector is
+  `$F438` = `0A 69 00` ×4 + `40` (a nibble swap), called as `00 EA` from `$F262`, `$F2C8`, `$F453` (the 2K image runs in the $F000 mirror).
+- ☐ **Still to verify** (lower priority, deferred): the
   **shared envelope/glyph table** 24-byte saving (*Dominant Amber*) — reproduce with `assemble_and_load`
-  + byte count when a build actually reaches for them.
+  + byte count when a build actually reaches for it.
 
 **Unsolved questions (the research agenda this playbook opens):**
 1. **Compute↔storage crossover.** At what *generation cost per row/screen* does procedural-from-seed stop
