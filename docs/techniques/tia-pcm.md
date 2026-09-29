@@ -61,7 +61,7 @@ modulating to specific values across frames, plus golden frame + golden audio).
 
 ## Sample-rate facts (NTSC, from #184034)
 
-- Scanline rate = `3579575 Hz / 228 CC = 15699.89 Hz`.
+- Scanline rate = `3579545 Hz / 228 CC = 15699.76 Hz` (the colour subcarrier is 5 MHz × 63/88 = 3,579,545.45 Hz; `pkg/audio/audio.go` uses the same clock). #184034 wrote 3579575 / 15699.89 — corrected 2026-09-28.
 - TIA emits **two audio clock pulses per line** (A-φ1, A-φ2) → native
   `≈ 31400 Hz`. Pulse spacing is uneven (112 / 116 CC) → **average 114 CC/sample**.
 - Update rate sets the playback rate: 1×/line = 15700 Hz, 2×/line = 31400 Hz
