@@ -2,7 +2,7 @@
 ; technique: divtable (constant division by reciprocal-multiply + 1-step correction).
 ;
 ; Method (exact over 0..255, no tables, no illegal ops):
-;   q ≈ (A * RECIP) >> 8     where RECIP = round(256 / divisor)
+;   q ≈ (A * RECIP) >> 8     where RECIP = ceil(256 / divisor)
 ;        /3→86  /7→37  /10→26  /15→18
 ;   then a single bounded correction:  while rem>=d {rem-=d; q++} ; while rem<0 {rem+=d; q--}
 ;   The reciprocal estimate is within ±1 of the true quotient for every divisor here,
