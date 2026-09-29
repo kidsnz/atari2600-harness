@@ -62,8 +62,8 @@ For a line between two *moving* endpoints, recompute `NUM` once per frame in the
 and reset `acc` at the top of the band so the line always starts from the anchor.
 
 Slopes steeper than 1 px per scanline need the integer part too: move by `int` clocks every line
-(`HM` nibble = the whole part, up to 8) and let the accumulator add the extra one. Beyond ±8 px per
-line a single HMOVE cannot keep up and the object needs re-strobing.
+(`HM` nibble = the whole part) and let the accumulator add the extra one; the whole part plus that carry must stay
+within +7 left / −8 right per line. Beyond that a single HMOVE cannot keep up and the object needs re-strobing.
 
 **This is the same DDA as `docs/techniques/subpixel-velocity.md`**, aimed at a different consumer:
 there the accumulator spills into a *position byte once per frame*, here into an *HMOVE once per

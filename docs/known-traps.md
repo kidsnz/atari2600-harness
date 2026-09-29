@@ -24,7 +24,10 @@ Detection column: **static** = a source-text linter can flag it · **runtime** =
 to `$2C` (CXCLR) is write-only, so `lda GRP0` returns bus residue — which an emulator can make look stable and
 repeatable while real hardware does not. Measured false positives: **0 across 123 known-good ROMs**
 (31 techniques + 92 litmus), and the detector is not merely silent — the same scan matches 509 read-operand
-pairs in that corpus, so it is looking at something. Bait-tested in `--selftest`; negative control: disabling
+pairs in that corpus, so it is looking at something. (That count is dated 2026-07-30; litmus has since grown to 172. `scripts/check_traps.py` now
+walks `roms/techniques` plus the sibling works instead, and on 2026-09-28 found 0 across 417 files on this machine — 31 on a
+harness-only checkout. Re-run on the old corpus, techniques + litmus, it reports 2, both deliberate write-only reads in
+`litmus_floatbits.asm`.) Bait-tested in `--selftest`; negative control: disabling
 the rule fails the selftest by name.
 
 **A setup database can patch our ROMs, and its path is relative — measured 2026-09-05.**
@@ -323,7 +326,7 @@ leave the machine, and only 13 has been counted.
 | **a two-pixel stroke needs ≥5 source columns** | stem 2 + gap 1 + stem 2. Doubled, that row is **10 px** wide (12 px from a 6-column source), while the ball and the missile can only be **1/2/4/8 px**. So **no solid-block object can stand in for the full-width row of a two-stem letter at any scale**, and "just narrow the bars" cannot rescue a letterform that needs two stems on one row — it deletes the gap instead. | measured 2026-08-26 in a piece in the private `roms/` repository |
 | **internal draw delay after RESxx** | player draws **+5 CLK** late, missile/ball **+4 CLK** late (RESx resets instantly but the object appears later) — *first suspect when target X is off by ~5px* | 294398, 283075, 305780, 75335-cluster |
 | RESx strobe granularity | 3 color-clocks; RESP0 finishing at cy46 → X≈75 | 172089, 137739, 329611, 304182 |
-| HMOVE range | ±8 px / scanline; pulse count = upper nibble of `HMxx EOR $80` | 319456 |
+| HMOVE range | −8..+7 px / scanline (asymmetric: +7 left … −8 right); pulse count = upper nibble of `HMxx EOR $80` | 319456 |
 | coarse÷15 + fine HMOVE | `eor #7` → 4×ASL, ~30 cy; small real-HW latch differences | 304182, 284554, 160645 |
 | ÷15 / X(N) is kernel-specific | the absolute offset includes the prologue cycle count → **measure `read_tia` HmovedPixel, don't hardcode N** | (CLAUDE.md) + 294398 |
 | **positioning ÷15 loop crossing a page → judder** | if the `sbc #15` / `bcs` divide loop straddles a page boundary, the **taken `bcs` costs +1 cycle** → each iteration is 6cy(18px) not 5cy(15px); the coarse step no longer tiles with the HMOVE fine (±~7) → the object **judders ~3px at every 15px while moving** AND the X(N) offset inflates by +1cy/iteration. A *static* object hides it (only shows when it MOVES across cells). **Keep the divide loop on one page** (page-align it). Found: PONG smooth-ball, the loop sat at $F0FE/$F100 — moving it to $F100 (whole loop on one page) made the ball perfectly smooth (read_motion jerk→0). detect: runtime (read_motion jerk_rms) / listing (loop address vs page boundary) | in-house: PONG 2026-06-19 |
