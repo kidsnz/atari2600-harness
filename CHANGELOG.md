@@ -6,6 +6,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — six more review findings landed, fourth batch (2026-09-29)
+
+Each commit carries `Land-Key:` lines; each was checked by a separate reviewer before commit.
+
+- `subpixel-velocity.md` (and the comments in `litmus_pal_physics.asm`, `palphysics_test.go`): the
+  83.39% factor ran the wrong way. An NTSC increment is 83.39% of the PAL one; a PAL increment is
+  119.92% of the NTSC one.
+- `known-traps.md`, `scripts/check_traps.py`: `JMP *+3` is a legal three-cycle filler that keeps the
+  flags and reads no data; the text said none existed.
+- `pkg/audio/audio.go`, `fundamentals-audit.md`: PAL is about 15.9 cents flatter by the package's own
+  clocks, not 13.
+- `flicker-multiplexing.md`, `flickerduty_test.go`: "the eye tracks the duty ratio, so 2/3 looks calmer
+  than 1/2" was one 2003 opinion; a 2021 real-CRT test ranked them the other way. Both are now claims.
+- `sprite-placement.md` and every copy (`place`, `cmd/place`, the `plan_sprite_placement` description,
+  `litmus-results.md`, two litmus generators and their `.asm`, test comments): x=3 is where player
+  strobes up to write cycle 21 stop, not the leftmost x. A player written at cycle 74 wraps to 2, and a
+  missile copy past 160 or an HMOVE also reach 2. Comments only; no constant or ROM byte changes.
+
+Found while landing, not fixed here: a missile or the ball written at cycle 74 wraps to x=1, and a
+double or quad player at cycle 73 to x=0 (measured by a reviewer, outside this repository), so the
+unconditional "missile and ball stop at x=2" in `CLAUDE.md`, `internal/place` and the
+`plan_sprite_placement` description is too strong as well.
+
 ### Fixed — five more review findings landed, third batch (2026-09-29)
 
 Each commit carries `Land-Key:` lines; each was checked by a separate reviewer before commit.
