@@ -39,7 +39,7 @@ Krow:   sta WSYNC
         lda (p4),y     ; 47   tax      ; 49
         lda (p5),y     ; 54   tay      ; 56
         lda tmp        ; 59
-        sta GRP1 ; 62  stx GRP0 ; 65  sty GRP1 ; 68  sta GRP0 ; 71 (junk)
+        sta GRP1 ; 62  stx GRP0 ; 65  sty GRP1 ; 68  sta GRP0 ; 71 (value unused, write required: it copies GRP1 into P1's delayed register)
         dec row        ; 76
         bpl Krow       ; runs 3cy into HBLANK, halted by next WSYNC
 ```
