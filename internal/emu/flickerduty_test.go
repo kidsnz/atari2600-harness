@@ -107,8 +107,10 @@ OS:     sta WSYNC
 // Andrew Davie, proposing a three-frame Fuji over a two-frame one: *"**three frames**, first frame
 // with the outer bars, second with the left two, third with the right two. It gives you an
 // **11-pixel Fuji**… This one is **less 'flickery' in my opinion, because any of the bars is
-// displayed two out of every 3 frames**"* 〔`200309/msg00154`〕. The period went up and the flicker
-// went down, because what the eye tracks is the **duty ratio** — 2/3 rather than 1/2.
+// displayed two out of every 3 frames**"* 〔`200309/msg00154`〕. His reading was that the eye tracks
+// the **duty ratio** — 2/3 rather than 1/2. A 2021 test on real CRTs ranked them the other way (1/2
+// calmest, 3/4 worst; AtariAge `topic/315322`), so which duty looks calmer is not settled here. This
+// test measures only what the gate can see.
 //
 // `FlickerArea` compares two consecutive frames, and `max_flicker_area` gates on the worst pair.
 // Measured 2026-09-07 on two ROMs identical but for their duty:
@@ -116,7 +118,7 @@ OS:     sta WSYNC
 //	shown 1 frame of every 2    max 120   mean 120.0   0 of 12 pairs unchanged
 //	shown 2 frames of every 3   max 120   mean  80.0   4 of 12 pairs unchanged
 //
-// ★**The maxima are equal.** A gate written as `max_flicker_area` ranks Davie's calmer design exactly
+// ★**The maxima are equal.** A gate written as `max_flicker_area` ranks Davie's three-frame design exactly
 // level with the one he was replacing, because the worst pair is the same in both — the difference is
 // entirely in **how often** that pair occurs. The mean carries it: 80/120 is 2/3, the duty ratio
 // itself.
@@ -189,7 +191,7 @@ func TestMaxFlickerAreaCannotSeeDutyRatio(t *testing.T) {
 	// duty, so mean/max recovers how often the picture changes.
 	if r := mean3 / float64(max3); r < 0.6 || r > 0.72 {
 		t.Errorf("mean/max at duty 2/3 is %.3f, want about 0.667 (two of every three pairs differ). "+
-			"That ratio is the duty the eye responds to, and it is the quantity max_flicker_area "+
+			"That ratio is the duty, and it is the quantity max_flicker_area "+
 			"discards", r)
 	}
 }

@@ -30,12 +30,17 @@ limit to return here — this is a judgement — but the number exists so the ju
 one, and `HardwareCollisionUsable` is the other half of it: past two subsets the TIA's collision
 latches stop being trustworthy, so a high N costs more than looks.
 
-★**A longer cycle can flicker LESS, and the number this repository gates on cannot see it.** Andrew
+★**Does a longer cycle flicker less? The two sources disagree, and the number this repository gates on
+cannot see the difference either way.** Andrew
 Davie, 2003, proposing a three-frame Fuji over a two-frame one: *"**three frames**, first frame with
 the outer bars, second with the left two, third with the right two. It gives you an **11-pixel
 Fuji**… This one is **less 'flickery' in my opinion, because any of the bars is displayed two out of
-every 3 frames**"* 〔`200309/msg00154`〕. The period went **up** and the flicker went **down**, because
-what the eye tracks is the **duty ratio** — 2/3 rather than 1/2 — and the wider sprite came free.
+every 3 frames**"* 〔`200309/msg00154`〕. His reading: the period went up and the flicker went down
+because the eye tracks the **duty ratio** — 2/3 rather than 1/2. **Tested on real CRTs in 2021, the
+ranking ran the other way**: several people found 1/2 the calmest and 3/4 the worst, and the reason
+offered was the flicker frequency (30, 20 and 15 Hz), not the duty (AtariAge `topic/315322`; one
+participant added that the preferred rate differs from person to person). The wider sprite came free
+either way.
 
 ★★Measured on two ROMs identical but for their duty (`internal/emu/flickerduty_test.go`):
 
@@ -44,7 +49,7 @@ what the eye tracks is the **duty ratio** — 2/3 rather than 1/2 — and the wi
 | 1 frame of every 2 | 120 | 120.0 | 0 of 12 |
 | 2 frames of every 3 | **120** | **80.0** | 4 of 12 |
 
-★★★**The maxima are equal**, so a `max_flicker_area` ceiling ranks Davie's calmer design exactly level
+★★★**The maxima are equal**, so a `max_flicker_area` ceiling ranks Davie's three-frame design exactly level
 with the one it replaces. The difference is entirely in *how often* the worst pair happens, and the
 mean carries it — 80/120 is 2/3, the duty itself. This is not an argument for changing the gate: a
 ceiling on the worst pair is the right shape for *"no single transition may be too violent"*. It is
