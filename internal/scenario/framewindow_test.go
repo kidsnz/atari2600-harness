@@ -57,6 +57,12 @@ func (w windowFacts) reach() (window, last int, has bool) {
 // "the ROM is somewhere interesting at frame N"; if the line-length check stopped before N, it never
 // looked at that somewhere.
 //
+// ★That premise was wrong (corrected 2026-09-29). The window is stepped AFTER the timeline, which
+// runs to the last input or assert, so frame N is never inside it whatever `frames` says (measured
+// 2026-09-15; docs/scenarios.md). A ROM that loses lines only while a state is being entered passes
+// this test and the check alike. What the invariant still gives is a window at least as long as the
+// last input or assert frame number, on the state the run ends in.
+//
 // Measured 2026-09-07: **205 scenarios declare `frame_lines_stable` and 0 fall short.** The property
 // held everywhere and nothing enforced it, which is the state a rule is cheapest to add in.
 //
@@ -88,9 +94,10 @@ func TestFrameLineWindowCoversEveryStateTheScenarioReaches(t *testing.T) {
 		checked++
 		if window < last {
 			t.Errorf("%s: frame_lines_stable watches %d frames but the scenario acts or asserts as "+
-				"late as frame %d. Everything after frame %d is unchecked for line length — which is "+
-				"exactly where a state this scenario drives the ROM into would be.",
-				filepath.Base(f), window, last, window)
+				"late as frame %d. The window starts after the timeline, so those frames are not checked "+
+				"for line count either way; this only means the settled state is watched for fewer "+
+				"frames than that.",
+				filepath.Base(f), window, last)
 		}
 	}
 	if checked < 50 {

@@ -21,7 +21,8 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
 
   "inputs": [                           // D-2: input timeline (frame is 0-based AFTER warmup)
     {"frame": 1, "player": 0, "action": "up", "pressed": true}
-    // action: left|right|up|down|fire|center / applied before that frame is run
+    // action: left|right|up|down|fire|center/centre (joystick) · reset|select|color|p0pro|p1pro (console
+    // switches, `pressed`) · paddle (`value` 0.0-1.0) / applied before that frame is run
   ],
 
   "asserts": [                          // D-1: instantaneous numeric conditions at frame end
@@ -148,6 +149,16 @@ reused as-is for regression). **Unknown fields are an error** (typos are not swa
   runs 264 lines on every 120th frame, so a 60-frame window passes it and a 130-frame window catches it
   (`TestFrameLinesStable` pins both). Size the window past the ROM's slowest periodic event — bank switches,
   scene changes, respawn timers.
+  ★**Where the window sits: after the timeline, never inside it.** The timeline runs to the latest of its
+  last input, its last assert, `frames` − 1 and `fuzz.frames` − 1; the window's frames are stepped after that. So no frame
+  that has an input or an assert is in the window, and neither are the 2 warmup frames (`warmup_frames: 0`
+  still means 2). Measured 2026-09-15 by the review, outside this repository, on a ROM that runs 262 lines except one 263-line frame near frame
+  48: `frames` 100 plus a 120-frame window passes (`262x120`); one input at frame 99 and no `frames`
+  passes too; with no timeline the same window fails (`262x119 263x1`). **A transition the timeline
+  drives — a new game starting, a reset — is checked for line count only in the state it settles into**
+  (a `golden_frame` hash does cover the timeline frames). Covering the
+  timeline frames themselves would change what this check passes; it is not done yet, because how many
+  existing scenarios it would turn red has not been measured.
 
 - **`pf_deadlines`** (`true`) = every playfield write lands **before the beam reaches the columns it
   governs**, proven over all paths (`.asm` source only; a `.bin` scenario prints `skipped`). This is a
