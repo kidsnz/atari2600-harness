@@ -23,7 +23,7 @@ HMOVE is 0 via HMCLR.
 | DELAY | ResetPixel | HmovedPixel | Δ vs prev | note |
 |------:|-----------:|------------:|-------:|------|
 | 0 | 3 | 3 | — | **★corrected 2026-07-30: measured 3, not 72** — same left clamp as DELAY=1 |
-| 1 | 3 | 3 | — | **leftmost clamp (player minimum X=3)** |
+| 1 | 3 | 3 | — | **left clamp for write cycles up to 21 (player X=3; DELAY=12 below wraps to 2)** |
 | 2 | 12 | 12 | +9 | HBLANK→visible transition boundary (nonlinear) |
 | 3 | 27 | 27 | +15 | ← linear from here |
 | 4 | 42 | 42 | +15 | |
@@ -41,7 +41,7 @@ HMOVE is 0 via HMCLR.
 1. **Coarse adjust is perfectly linear:** for DELAY 3–11, `ResetPixel = 15·DELAY − 18`.
    One loop iteration = 5 CPU cycles = 15 color clocks = **15 px**. **3 px / CPU cycle**, confirmed on the emulator.
 2. **Wraps at the 160-wide visible region** (mod 160). DELAY=12 rolls back to 2.
-3. **Leftmost clamp = X=3** (player). Matches the constant in CLAUDE.md.
+3. **Left clamp = X=3** (player) for write cycles up to 21. The wrap in item 2 reaches 2, so this is not a leftmost-X constant (`CLAUDE.md` says there is none).
 4. **`HmovedPixel == ResetPixel`** (motion registers are 0 via HMCLR, HMOVE not fired).
    → firing HMOVE should produce a difference (verified in the next step).
 5. **Coordinate system:** `ResetPixel` / `HmovedPixel` / the beam's visible `Clock` are the same visible

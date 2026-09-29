@@ -145,7 +145,7 @@ func TestSpritePlacementPhysics(t *testing.T) {
 		}
 	}
 
-	// ---- rule 7: a normal-width player cannot be strobed left of x=3 ----
+	// ---- rule 7: a normal-width player written at cycle 21 or earlier stops at x=3 ----
 	// Write cycles 17 and 21 both land on 3, and 3 = 3*21 - 60 is where the clamp and the formula
 	// meet; 22 and 25 are above it and obey 3c - 60. This is what fixes where a picture as wide as
 	// the screen has to start.
@@ -166,7 +166,7 @@ func TestSpritePlacementPhysics(t *testing.T) {
 
 	// ---- rule 9: the clamps, and the fact that each is a WINDOW of write cycles ----
 	// A missile stops at 2, one clock left of where a player stops, so x=2 is a position no player
-	// can be put in by any strobe or any copy of one. Both cycles land on it: the clamp is not a
+	// reaches without the wrap in rule 7 (write cycle 74), by a strobe or by a copy. Both cycles land on it: the clamp is not a
 	// single cycle but a span, and that span is what lets an object AT THE WALL be strobed clear of
 	// another four pixels to its right. Anywhere else on the grid those two strobes are one cycle
 	// apart, which two 3-cycle stores cannot be. A picture as wide as the screen turns on this.
@@ -178,7 +178,7 @@ func TestSpritePlacementPhysics(t *testing.T) {
 	// ---- rule 10: the ball is on the missile's grid, clamp and all ----
 	// The fifth movable object, measured here for the first time. RESBL obeys x = 3c - 61 exactly
 	// as RESM does, so wherever a row has run out of missiles the ball is a spare one -- and it can
-	// reach x=2, which no player can.
+	// reach x=2, which no player strobe can without the wrap in rule 7.
 	eq("RESBL write cycle 24", starts(line(13, 1))["BL"], []int{11})
 	eq("RESBL write cycle 40", starts(line(13, 3))["BL"], []int{59})
 	eq("RESBL write cycle 17, clamped", starts(line(14, 1))["BL"], []int{2})

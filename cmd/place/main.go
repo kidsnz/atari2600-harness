@@ -1,7 +1,7 @@
 // place — can a row of shapes be drawn on one scanline, and if so how are the objects strobed.
 //
 //	place -at 3,35,67,99,131            # one pass of a ten-shape row starting at x=3
-//	place -at 2,34,66,98,130            # the same row one pixel left, where no player reaches
+//	place -at 2,34,66,98,130            # the same row one pixel left, where no player strobe lands without the wrap
 //	place -at 2 -nosolid 0              # and why that one cannot be drawn at all
 //
 // The shapes are the ones drawn on ONE scanline: in a staggered row that is every other letter,

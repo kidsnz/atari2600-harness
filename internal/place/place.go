@@ -10,7 +10,8 @@
 //	a missile  lands at x = 3c - 61 and stops at x = 2   (one clock to the LEFT of that grid)
 //	the ball   is a missile in this respect, exactly
 //
-// So a row that must begin at x=2 cannot put a PLAYER there, by a strobe or by any copy of one --
+// So a row that must begin at x=2 cannot put a PLAYER there by any strobe this package plans or by any
+// copy of one (a player written at cycle 74 wraps to 2, but this package does not plan the wrap) --
 // and yet it can be drawn, by turning the leftmost shape round so its missile takes the left four
 // clocks and its player the right eight. Working that out by hand went wrong twice before this
 // package existed: the first answer was "impossible", and it was wrong because the search was
@@ -29,7 +30,7 @@ import (
 const (
 	PlayerSlope     = 3
 	PlayerIntercept = -60
-	PlayerFloor     = 3 // a player cannot be strobed left of here
+	PlayerFloor     = 3 // where writes at cycle 21 or earlier stop; a write at cycle 74 wraps to 2, which this planner does not plan
 	SolidSlope      = 3
 	SolidIntercept  = -61 // missiles AND the ball
 	SolidFloor      = 2   // and they stop one clock left of a player

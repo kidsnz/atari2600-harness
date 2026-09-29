@@ -53,7 +53,7 @@ VbPad:  sta WSYNC
         nop
         nop
         nop
-        sta RESP0         ; write cycle 21 -> x = 3c-60 = 3, the leftmost a player reaches
+        sta RESP0         ; write cycle 21 -> x = 3c-60 = 3, the left clamp
         lda #0
         sta VBLANK
         lda #$FF

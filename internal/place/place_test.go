@@ -29,8 +29,8 @@ func TestPlacesTheRowThatFitsOnTheGrid(t *testing.T) {
 
 func TestPlacesTheRowThatStartsWhereNoPlayerCanBe(t *testing.T) {
 	// The same row one pixel further left. x=2 is on the missile grid and not the player's, and it
-	// is left of the player's floor as well, so the leftmost shape can only be drawn by turning it
-	// round. That the row places AT ALL is the whole point of this package: worked out by hand it
+	// is left of the player's floor as well, so with the strobes Solve plans (no player wrap, no HMOVE)
+	// the leftmost shape can only be drawn by turning it round. That the row places AT ALL is the whole point of this package: worked out by hand it
 	// came back "impossible" twice.
 	shapes := row(2, 16, 10)
 	p, err := Solve(shapes, 0, 0)
@@ -38,7 +38,7 @@ func TestPlacesTheRowThatStartsWhereNoPlayerCanBe(t *testing.T) {
 		t.Fatalf("x0=2 should place: %v", err)
 	}
 	if p.Splits[0] != MissileFirst {
-		t.Errorf("the shape at x=2 came out %s; no player can be strobed to 2", p.Splits[0])
+		t.Errorf("the shape at x=2 came out %s; no strobe Solve plans lands a player on 2 (it plans neither the wrap nor HMOVE)", p.Splits[0])
 	}
 	if err := Validate(shapes, p); err != nil {
 		t.Errorf("the plan does not check out: %v", err)
@@ -47,7 +47,7 @@ func TestPlacesTheRowThatStartsWhereNoPlayerCanBe(t *testing.T) {
 
 func TestRefusesWhatTheGridCannotDo(t *testing.T) {
 	// Negative control. Same position, but the shape is solid on neither half, so it needs a
-	// player at x=2 -- and no strobe, and no copy of one, reaches x=2 with a player.
+	// player at x=2 -- and no strobe Solve plans, and no copy of one, reaches x=2 with a player.
 	_, err := Solve([]Shape{{X: 2}}, 0, 0)
 	if err == nil {
 		t.Fatal("a shape at x=2 with no solid half has no placement, but one was returned")

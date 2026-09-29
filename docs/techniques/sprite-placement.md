@@ -65,10 +65,10 @@ of that explanation and leaves the rest open. Found by the mailing-list distilla
 | 4 | a missile follows its player's NUSIZ copies | 5 |
 | 5 | a strobe **does not draw the new position on the line it runs on** — of the FIRST copy. Later NUSIZ copies of the new base DO draw, on that same line: see rule 8 and `restrobe-copies.md` | 6 |
 | 6 | a GRP write takes effect at **screen x = 3w − 64** — four colour clocks of margin, no more | 7 |
-| 7 | a normal-width player **cannot be strobed left of x = 3** | 8, 9 |
+| 7 | a normal-width player written at cycle 21 or earlier **stops at x = 3**. Written at cycle 74 it wraps instead: `3c − 60` = 162 → **x = 2** (`litmus-results.md`, DELAY 12) | 8, 9 |
 | 8 | a strobe cancels the pending draw of the **FIRST copy only** | 10 |
-| 9 | a DOUBLE-width or QUAD-width player lands at **x = 3c − 59**, never left of x = 4 | — |
-| 10 | a missile is clamped at **x = 2** — one clock LEFT of anywhere a player can be — and **each clamp is a WINDOW of write cycles, not one** | 8, 9, 11, 12 |
+| 9 | a DOUBLE-width or QUAD-width player lands at **x = 3c − 59**, never left of x = 4 unless it wraps (not measured for wide players) | — |
+| 10 | a missile written at cycle 21 or earlier is clamped at **x = 2** — one clock LEFT of the player's floor in rule 7 (a wrapped player reaches 2 too; a missile's wrap is not measured here) — and **each clamp is a WINDOW of write cycles, not one** | 8, 9, 11, 12 |
 | 11 | the **BALL** places exactly like a missile: same `x = 3c − 61`, same clamp at 2 — **placement only, and they part company on everything else.** Re-strobed mid-line the ball draws **1 + k** blocks and a missile draws **1**; struck inside its own block a missile is EXTENDED past 8 px while the ball restarts and cuts the old one. Measured below, `litmus_restrobe_objects` | 13, 14 |
 | 12 | a NUSIZ copy past 160 **wraps to the left edge and draws there on the same line** — 2026-09-03: a quad-width P1 at x≈150 wrapped to 0-22 and collided with a playfield copy at the *other* end, which read as "the probe is on both copies" and sent an entire band chasing the wrong boundary (`litmus_pf0_reflect`'s points E and F are what caught it) | 15 |
 | 13 | **a mid-line `RESP` re-strobe is a placement mechanism, not only HMOVE**: it puts an object anywhere on the 3 px grid *during a drawn line*, for the price of a three-cycle store — see `restrobe-copies.md` | — |
@@ -282,8 +282,9 @@ choice of which side the four go on is not cosmetic — it moves the shape onto 
 Missile-first is normally unusable: the missile at L and its player at L+4 are **one write cycle
 apart**, and two stores are three. **At the wall it becomes usable**, because rule 10 says the
 missile's position stops moving there — strobe it at cycle 16 and its player at 22 and both land
-where they must. That is the only way a row can begin at x=2, and x=2 is the only place a row 156
-clocks wide can begin if the margins are to match.
+where they must. That is how a row begins at x=2 with strobes alone and no wrap; a player written at cycle 74
+(rule 7), a missile copy that passes 160 (rule 12) and an HMOVE after the strobe also reach 2. And x=2 is the
+only place a row 156 clocks wide can begin if the margins are to match.
 
     sta RESM0   ; write cycle 16 -> x=2   (the clamp: 16..21 all land here)
     sta RESP0   ; write cycle 22 -> x=6
