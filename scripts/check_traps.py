@@ -216,11 +216,11 @@ def scan_text(asm):
                                  f"(illegal) by default, `bit $00` (legal, but CHANGES FLAGS and "
                                  f"reads the SAME address) under NO_ILLEGAL_OPCODES. Either can "
                                  f"bankswitch a 3F/X07 cart. Even values are plain NOPs and are "
-                                 f"fine. ★There is no legal 3-cycle filler that touches no memory, "
-                                 f"which is why this is a warning and not an error: the macro's own "
-                                 f"author listed all three forms in 200207 and all three read $00. "
+                                 f"fine. SLEEP never emits a filler that reads no data: the macro's "
+                                 f"own author listed all three forms in 200207 and all three read $00. "
                                  f"If flags are expendable, `bit $00` is the cheapest; if they are "
-                                 f"not, `PHP`/`PLP` costs 7 cycles in 2 bytes and touches nothing "
+                                 f"not, `JMP *+3` keeps them in 3 cycles and 3 bytes, or `PHP`/`PLP` "
+                                 f"in 7 cycles and 2 bytes, touching only the stack "
                                  f"(measured — internal/emu/oddsleep_test.go)"))
 
         # 2b) the same skip written as a RAW BYTE, which the mnemonic matcher above cannot see.
