@@ -274,8 +274,8 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 - 📖 **Complete AUDC table consolidated** (Slocum guide v1.02 — held locally, authoritative; Stolberg's
   frequency/waveform guide; Stella PG): usable voices — Square(4), Bass(6), Pitfall(7), Noise(8),
   Buzz(15), Lead(12), Saw(1), Engine(3). Pitch: `f = base/(AUDF+1)/D`, base ≈ 31,399.5 Hz NTSC
-  (clock/114, 2 samples/line), CPU-clock modes (12–15) ÷3; D = 2/31/31/511/93/6/15/465. PAL ≈13 cents
-  flatter. Slocum's three tuning setups (which (AUDC,AUDF) pairs are in tune) are transcription-ready
+  (clock/114, 2 samples/line), CPU-clock modes (12–15) ÷3; D = 2/31/31/511/93/6/15/465. PAL ≈15.9 cents
+  flatter (from the two clocks in `pkg/audio`). Slocum's three tuning setups (which (AUDC,AUDF) pairs are in tune) are transcription-ready
   for `pkg/audio`.
   ✅ **The "duplicates" are two different things — measured** (`docs/verified-coverage.md:108`): the
   sources list {0,11} {4,5} {6,10} {7,9} {12,13} as one set of duplicates. That is right about

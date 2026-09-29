@@ -12,7 +12,7 @@ import (
 
 // BaseClockNTSC is the TIA audio clock (Hz). Color clock/114 = 2 samples/scanline.
 const BaseClockNTSC = 3579545.0 / 114.0 // ≈ 31399.5
-// BaseClockPAL is the PAL audio clock (≈13 cents lower).
+// BaseClockPAL is the PAL audio clock (≈15.9 cents lower: 1200·log2(3579545/3546894)).
 const BaseClockPAL = 3546894.0 / 114.0 // ≈ 31113.1
 
 // Name is the common name of an AUDC value (Slocum's naming). Duplicates return the canonical value's name.
