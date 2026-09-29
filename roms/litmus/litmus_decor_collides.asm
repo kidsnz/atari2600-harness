@@ -29,7 +29,7 @@ COLUP0  = $06
 COLUP1  = $07
 COLUBK  = $09
 RESP0   = $10
-RESM1   = $12
+RESM1   = $13
 GRP0    = $1B
 ENAM1   = $1E
 CXM1P   = $01           ; read address
@@ -53,11 +53,14 @@ Clr:    sta $00,x
         sta COLUBK
         lda #$30            ; missile 1 -> 8 clocks wide, so the overlap cannot be a near miss
         sta NUSIZ1
-        lda #$07            ; ★player 0 -> QUAD width (32 clocks). Measured, not assumed: at
-        sta NUSIZ0          ; ★normal width the two strobes land 22 colour clocks apart and the
-                            ; ★objects never touch — the first version of this ROM read no
-                            ; ★collision for exactly that reason, and `DecomposeRow` showed why
-                            ; ★(P0 at 3..10, M1 at 25..32). The TIA was right; the fixture was not.
+        lda #$07            ; ★player 0 -> QUAD width (32 clocks). The first version read no
+        sta NUSIZ0          ; ★collision at normal width, and `DecomposeRow` showed P0 at 3..10 and
+                            ; ★M1 at 25..32 — but the cause was its RESM1 = $12, which is RESM0: M1
+                            ; ★was strobed only by the init clear loop's write to $13, so 25..32 was
+                            ; ★where init left it. With RESM1 = $13
+                            ; ★(2026-09-29) both strobes land in HBLANK, M1 at 2..9 and P0 at 4..35 on
+                            ; ★row 50, and a normal-width P0 overlaps too. Quad width is kept; it is no
+                            ; ★longer what makes the overlap.
 
 Frame:
         lda #2

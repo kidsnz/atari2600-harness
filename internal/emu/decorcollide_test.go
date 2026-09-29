@@ -23,11 +23,15 @@ import "testing"
 // ★The negative control is band B — same geometry, `ENAM1` cleared. Without it a TIA that
 // latched unconditionally would pass, and so would a fixture whose read address was wrong.
 //
-// ★★The fixture itself is the second lesson. Its first version strobed RESP0 and RESM1
-// three CPU cycles apart and read NO collision, which looks exactly like the trap being
+// ★★The fixture itself is the second lesson. Its first version strobed RESP0 and what it called RESM1
+// (really RESM0; see ★★★) three CPU cycles apart and read NO collision, which looks exactly like the trap being
 // absent. `DecomposeRow` showed the objects at clocks 3..10 and 25..32 — twenty-two apart,
 // never touching. The TIA was right and the measurement was wrong, and only looking at the
-// pixels separated the two. The player is quad-width now so the overlap is not a near miss.
+// pixels separated the two. The player was then made quad-width to force the overlap.
+// ★★★2026-09-29: the fixture's RESM1 equate was $12 (RESM0) until then, so M1 was not
+// strobed except by the init clear loop's write to $13, and the overlap was wherever that left it.
+// Fixed to $13: M1 now lands at 2..9 and overlaps the quad P0 (4..35) at 4..9; both bands read
+// as before.
 func TestDecorationStillCollides(t *testing.T) {
 	e, err := New("NTSC")
 	if err != nil {
@@ -40,9 +44,10 @@ func TestDecorationStillCollides(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The objects have to actually overlap, or the bands below compare nothing. P0 is
-	// quad-width and M1 is eight clocks inside it, so the row reports a single P0 run
-	// wide enough to contain the missile.
+	// P0 has to be drawn, or the bands below compare nothing; this guard checks only that.
+	// The overlap itself shows through band A. P0 is
+	// quad-width (4..35 on row 50) and M1 is eight clocks wide at 2..9, so they share
+	// 4..9; the row reports M1 at 2..3 and one P0 run wide enough to cover the rest.
 	runs, _, err := e.DecomposeRow(50)
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +68,7 @@ func TestDecorationStillCollides(t *testing.T) {
 		t.Fatal(err)
 	}
 	bandA, bandB := r[0x00], r[0x01]
-	t.Logf("band A  M1 enabled, inside P0     CXM1P=$%02X  D7=%v", bandA, bandA&0x80 != 0)
+	t.Logf("band A  M1 enabled, over P0       CXM1P=$%02X  D7=%v", bandA, bandA&0x80 != 0)
 	t.Logf("band B  M1 disabled, same strobes CXM1P=$%02X  D7=%v", bandB, bandB&0x80 != 0)
 
 	if bandA&0x80 == 0 {

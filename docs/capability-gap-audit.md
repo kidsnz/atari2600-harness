@@ -4325,3 +4325,12 @@ check them is a list of experiments somebody already designed. Found by the mail
 (helper-3, who drew the distinction). Three of the six above are one litmus ROM each. **When reading the archive, record
 the unanswered questions separately from the answers**; they are the cheapest measurement work in this
 repository, and they come with their own provenance. Found by the mailing-list distillation (helper-1).
+
+### TIA names are declared per ROM, and one was wrong for weeks (2026-09-29)
+
+Every `.asm` here declares its own TIA equates; there is no shared header. `litmus_decor_collides.asm` had
+`RESM1 = $12` — `RESM0`'s address — so its "RESM1" strobe positioned M0 and left M1 where the init loop's write to `$13` had put it (Stella's
+capture showed M0 at 2 and M1 at 25 before the fix, M1 at 2 after). Its test still passed, because the overlap
+happened anyway. **Gap:** nothing compares each ROM's equates against the standard TIA map. A scan of the 209
+`.asm` files, treating TIA mirrors (`INPT4 = $3C`) as valid, finds one more, not yet examined:
+`litmus_jsr_stack.asm` has `REFP1 = $0B`, which is `REFP0`, and its header reads `$010B = REFP1`. Size: S.
