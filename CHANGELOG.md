@@ -6,6 +6,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — five more review findings landed, third batch (2026-09-29)
+
+Each commit carries `Land-Key:` lines; each was checked by a separate reviewer before commit.
+
+- `pkg/design/craft.go`, `design-principles.md`: `Reflect = false` is the repeated playfield (right half
+  copies the left), not an asymmetric one; asymmetric PF is a separate axis.
+- `divtable.asm` (comment only): `RECIP = ceil(256 / divisor)`, as its own table says.
+- `litmus_decor_collides.asm`: `RESM1` was declared `$12`, which is `RESM0`. Fixed to `$13`; the test
+  still reads `$81`/`$01`, the Stella TIA capture was retaken (37/37), and the narrative in the asm, the
+  test and `known-traps.md` now says what the first fixture actually did. `capability-gap-audit.md`
+  records the gap: nothing compares a ROM's TIA equates with the standard map.
+- `known-traps.md`, `scripts/check_traps.py`: the `A6 and A7 both low` condition is 3F's. X07 is wider
+  (per its spec, `$40`-`$7F` is a hotspot too while bank 14 or 15 is selected); cited, not verified, and
+  the engine has no X07 mapper.
+
+Found while landing, not fixed here: `litmus_jsr_stack.asm` declares `REFP1 = $0B`, which is `REFP0`.
+
 ### Fixed — ten more review findings landed, second batch (2026-09-29)
 
 Each commit carries `Land-Key:` lines; each was checked by a separate reviewer before commit.
