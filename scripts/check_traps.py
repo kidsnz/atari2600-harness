@@ -175,7 +175,8 @@ def scan_text(asm):
         if m and (int(m.group(2), 16) & 0x10C0) == 0:
             warns.append((n, f"`{m.group(1).upper()} ${m.group(2).upper()}` reads TIA space (A6 and A7 both low, "
                              f"$00-$3F) and can trigger a bankswitch on 3F/X07 carts — use `NOP $80` "
-                             f"or any address with A6 or A7 set"))
+                             f"(A7 set). $40-$7F is safe on 3F but not on X07, whose spec also switches on "
+                             f"A6-set TIA-space reads while bank 14 or 15 is selected"))
         # 2c) DASM's SLEEP macro, which hides the same bytes behind a macro call.
         #     ★Measured 2026-09-05 by assembling dasm 2.20.14.1's machines/atari2600/macro.h:
         #        SLEEP 2 -> EA          nop                      2 cy, legal, touches nothing
@@ -236,7 +237,8 @@ def scan_text(asm):
         if m and bankswitch_context and "@skip-ok" not in raw:
             warns.append((n, f"`.byte ${m.group(1).upper()}` is a NOP/BIT skip written as a raw byte — the "
                              f"operand it swallows is READ, so if that address has A6 and A7 low it can "
-                             f"bankswitch a 3F/X07 cart. Say why with `@skip-ok` if the address is safe"))
+                             f"bankswitch a 3F cart (on X07 A7 low is enough, while bank 14 or 15 is "
+                             f"selected). Say why with `@skip-ok` if the address is safe"))
         # 3) Variable assigned into the stack-collision zone ($F8-$FF) 〔known-traps C / mined 302998,301766〕
         #    ★2026-09-05: only when the symbol is used as an ADDRESS. `NAME = $FC` is an EQU,
         #    and an EQU's right-hand side is as often a value as an address — `COLM1 = $FC ;
