@@ -4,7 +4,7 @@
 zero flicker. Where flicker multiplexing (#10) time-slices across *frames* (30 Hz shimmer),
 Venetian Blinds time-slices across *scanlines within one frame*: even lines draw object A, odd
 lines object B, every frame, rock-stable at 60 Hz. The cost is the look: each object is striped
-("blinds") at half vertical density. Bob Whitehead built *Video Chess* (1979) on this — 32 pieces
+("blinds") at half vertical density. Bob Whitehead built *Video Chess* (1979, with Larry Wagner, credited with the chess logic 〔stella-list `200011/msg00069`, `200312/msg00057`〕) on this — 32 pieces
 on screen with two players and a lot of stripes.
 
 Learned from (clean-room): Video Chess analyses, AtariAge history threads. Demo:
