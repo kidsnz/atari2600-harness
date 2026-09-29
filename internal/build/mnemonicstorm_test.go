@@ -26,6 +26,10 @@ func TestMnemonicStormNamesTheCause(t *testing.T) {
 		// selected", and a hint that fires here would send a reader to line 1 for nothing.
 		{"two real typos", "\tprocessor 6502\n\torg $F000\nStart\n\tlxx #$00\n\tstx2 $80\n\tjmp Start\n" +
 			"\torg $FFFC\n\t.word Start\n\t.word Start\n", false},
+		// ★2026-09-29: three data rows that lost their `.byte` also storm (three unknown mnemonics,
+		// exit 5), but the cause is not line 1. The hint must stay away.
+		{"three data rows without .byte", "\tprocessor 6502\n\torg $F000\nStart\n\tjmp Start\n" +
+			"Gfx\n\t%00011000\n\t%00111100\n\t%01111110\n\torg $FFFC\n\t.word Start\n\t.word Start\n", false},
 	}
 
 	for _, c := range cases {
@@ -56,6 +60,13 @@ func TestMnemonicStormThreshold(t *testing.T) {
 		if want := n >= 3; (hint != "") != want {
 			t.Errorf("%d unknown mnemonics: hint=%v, want %v", n, hint != "", want)
 		}
+	}
+	// Values are not counted: a storm of data rows that lost `.byte` is not a missing processor.
+	values := "x.asm (5): error: Unknown Mnemonic '%00011000'.\n" +
+		"x.asm (6): error: Unknown Mnemonic '$AA'.\n" + "x.asm (7): error: Unknown Mnemonic '#%00000000'.\n" +
+		"x.asm (8): error: Unknown Mnemonic '255'.\n"
+	if mnemonicStormHint(values) != "" {
+		t.Error("fired on four unknown VALUES — a data row without `.byte` is not a missing processor")
 	}
 	// And it must not fire on an unrelated storm of errors.
 	other := strings.Repeat("x.asm (4): error: Branch out of range (200 bytes).\n", 9)
@@ -88,8 +99,21 @@ func TestOneUnindentedInstructionNamesItsOwnCause(t *testing.T) {
 		{"correct source",
 			"\tprocessor 6502\n\torg $F000\nStart\n\tcld\n\tlda #0\n\tjmp Start\n" +
 				"\torg $FFFC\n\t.word Start\n\t.word Start\n", false},
+		// ★2026-09-29: the same one-error shape from a data row that lost its `.byte`. The hint
+		// must fire and must name `.byte`, because indenting this line would change nothing.
+		{"one data row without .byte",
+			"\tprocessor 6502\n\torg $F000\nStart\n\tjmp Start\nGfx\n\t$AA\n" +
+				"\torg $FFFC\n\t.word Start\n\t.word Start\n", true},
+		// The 72751 shape: a bitmap row. DASM names '%00011000', which starts with neither `#`
+		// nor `$`, so a check that only looks for those two would stay silent here.
+		{"one bitmap row without .byte",
+			"\tprocessor 6502\n\torg $F000\nStart\n\tjmp Start\nGfx\n\t%00011000\n" +
+				"\torg $FFFC\n\t.word Start\n\t.word Start\n", true},
+		{"the same data row with .byte",
+			"\tprocessor 6502\n\torg $F000\nStart\n\tjmp Start\nGfx\n\t.byte $AA\n" +
+				"\torg $FFFC\n\t.word Start\n\t.word Start\n", false},
 		// The counter-bait: an ordinary misspelling must NOT be read as an indentation problem,
-		// because the token it names does not start with `#` or `$`.
+		// because the token it names does not start with a value character.
 		{"a plain typo",
 			"\tprocessor 6502\n\torg $F000\nStart\n\tcld\n\tlxx #$00\n\tjmp Start\n" +
 				"\torg $FFFC\n\t.word Start\n\t.word Start\n", false},
@@ -106,9 +130,13 @@ func TestOneUnindentedInstructionNamesItsOwnCause(t *testing.T) {
 			if c.want && err == nil {
 				t.Fatalf("this source cannot assemble, but Assemble returned no error:\n%s", out)
 			}
-			got := strings.Contains(out, "is an OPERAND, not an instruction")
+			got := strings.Contains(out, "is a VALUE, not an instruction")
 			if got != c.want {
 				t.Errorf("hint present = %v, want %v. DASM said:\n%s", got, c.want, out)
+			}
+			if got && !strings.Contains(out, "lost its `.byte`") {
+				t.Errorf("the hint names only the column-1 cause; a data row without `.byte` has the "+
+					"same signature. DASM said:\n%s", out)
 			}
 		})
 	}

@@ -138,10 +138,16 @@ func diagnosedFailure(out string) error {
 //
 // The threshold is three because a real source can have one or two genuine typos; a run of three
 // unrecognised mnemonics is not a typo, it is a missing processor.
+//
+// ★Only tokens that start with a LETTER are counted (2026-09-29). A data row that lost its `.byte`
+// storms too — three indented rows of `%00011000` give three unknown mnemonics and exit 5 — but the
+// tokens it names are values, and sending that reader to line 1 was wrong. Those are left to
+// operandAsMnemonicHint. The column-1 form still counts: `6502` is a value, but `lda`, `sta` and
+// `jmp` are three letters.
 func mnemonicStormHint(out string) string {
 	var n int
-	for _, ln := range strings.Split(out, "\n") {
-		if strings.Contains(ln, "Unknown Mnemonic") {
+	for _, m := range unknownMnemonicRe.FindAllStringSubmatch(out, -1) {
+		if c := m[1][0]; (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
 			n++
 		}
 	}
@@ -164,23 +170,30 @@ func mnemonicStormHint(out string) string {
 // DASM reads the first field of a line as a label unless the line is indented. So `lda #0` in column
 // 1 becomes the label `lda` and the mnemonic `#0`. ★Measured 2026-09-07: this is a **different
 // signature** from a missing `processor` directive, which produces a storm of ordinary-looking
-// mnemonics — here there is exactly ONE error and the token it names begins with `#` or `$`.
+// mnemonics — here there is exactly ONE error and, for this case, the token it names begins with `#` or `$`.
 //
-// That leading character is what makes the rule safe: an immediate or an address can only reach the
-// mnemonic position if the field before it was eaten as a label, and a real program has no
-// instruction whose name starts with either. The hint therefore does not guess — the shape it matches
-// has one cause.
+// ★That shape has TWO causes, not one (corrected 2026-09-29). A value reaches the mnemonic position
+// either because the field before it was eaten as a label (the line starts in column 1), or because
+// it is the first field of an indented DATA row that lost its `.byte`: `\t$AA` gives
+// `Unknown Mnemonic '$AA'`, `\t#%00000000` gives `'%00000000'` (DASM drops the `#`), and a labelled
+// row `Gfx #%00000000` gives `'#%00000000'` (AtariAge topic/72751). DASM's output does not tell the
+// two causes apart, so the hint names both. Values that start with `%` or a digit are matched too.
 //
 // The mailing list has the same diagnosis from 2001, for the `processor` line rather than an
 // instruction: *"You need to TAB both lines for DASM. Now it's assuming 'processor' as label and
 // '6502' as mnemonic"* 〔stella-list `200102/msg00253`, Manuel Polik〕. It is one mistake with two
 // error messages, and neither of them says "indentation".
 func operandAsMnemonicHint(out string) string {
-	re := regexp.MustCompile(`Unknown Mnemonic '([#$][^']*)'`)
-	m := re.FindStringSubmatch(out)
-	if m == nil {
-		return ""
+	for _, m := range unknownMnemonicRe.FindAllStringSubmatch(out, -1) {
+		if strings.ContainsRune("#$%0123456789", rune(m[1][0])) {
+			return fmt.Sprintf("\n\nhint: `%s` is a VALUE, not an instruction. Two mistakes put a value "+
+				"where DASM expects an instruction: the line starts in column 1, so the field before "+
+				"it was read as a LABEL (indent it), or it is a data row that lost its `.byte` (add "+
+				"it).", m[1])
+		}
 	}
-	return fmt.Sprintf("\n\nhint: `%s` is an OPERAND, not an instruction. DASM read the field before "+
-		"it as a LABEL, which happens when a line starts in column 1. Indent that line.", m[1])
+	return ""
 }
+
+// unknownMnemonicRe captures the token DASM names in each "Unknown Mnemonic" error.
+var unknownMnemonicRe = regexp.MustCompile(`Unknown Mnemonic '([^']+)'`)
