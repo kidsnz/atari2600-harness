@@ -53,6 +53,15 @@ extra pins?**
 > single bus event is unverified, and an off-by-one could hide there. `roms/litmus/litmus_superchip.asm`
 > is the pattern for settling it; until then this row is the best available inference, not a measurement.
 
+**A scheme can also have an input with no defined result.** A Rentacom 2-in-1 cartridge that no
+emulator ran was worked out from its board — two 74LS10s forming a NAND SR latch — by alex_79 on
+AtariAge `topic/293883`: any address with A12=0, A9=1, A6=0, A5=1 selects bank 0; A12=0, A9=1, A6=1,
+A5=0 selects bank 1; and A12=0, A9=1, A6=1, A5=1 is the latch's undefined state, so it *"may or not
+cause a bankswitch."* A list of hotspots cannot state that third row. **Cited only, not verified.**
+The same post notes that these addresses include the ones UA games use. The engine's UA mapper
+decodes the same four lines — `mapper_ua.go` `AccessPassive`: `switch addr & 0x1260 {` — and switches
+only on `$0220` (bank 0) and `$0240` (bank 1), so the third combination (`$0260`) never switches there:
+the engine picks one answer to a question the latch leaves open. Read from the code; **Not verified**.
 
 **Above A12 there is nothing at all, and that is a resource.** The 6507 has thirteen address lines,
 so A13–A15 of a 16-bit pointer are **never emitted** — measured 2026-09-04, the same ROM byte reads
@@ -72,7 +81,11 @@ part of the system can detect the difference."*
 That is what makes the trick safe: **a 16-bit pointer in RAM has three bits you may use for anything**
 — flags, a small counter, an object type — and they cost **no instruction to strip**, because the
 hardware never looks at them. Unlike ordinary bit-packing, there is nothing to mask off on the way
-out. (Portability caveat: the 7800's 2600 mode does give those bits meaning.)
+out. (Portability caveat: the 7800's 2600 mode does give those bits meaning.) One published use is a
+**bank number**: SvOlli's `bankjsr`/`bankjmp`/`bankrts` macros (from *Bang!*) carry the target bank in
+the top three bits of the destination address, and a back end copied to the same address in every bank
+shifts it out and masks it — `and #%111` for F4, `%011` for F6, `%001` for F8 (AtariAge `topic/319899`;
+**Cited only, not verified**).
 
 A caution the same thread supplies: **the two A12s are different pins.** The console's A12 is a
 chip-enable *output* as far as the cartridge sees it; a bank-switched cartridge's A12 is an address
@@ -87,6 +100,17 @@ then found the author had stated the conclusion himself further down the one the
 
 1. **Identical reset stub + vectors in every bank** (`$FFE0: lda $FFF8 / jmp $F000`,
    vectors → $FFE0): whichever bank is mapped at power-on, you boot into bank 0.
+   *Without a stub* (tjoppen, F4, AtariAge `topic/195113`): put the start code in the last bank, point
+   every other bank's reset vector at `$1FFB`, and put `$4C` (`JMP abs`) there. Fetching that opcode
+   touches the last bank's hotspot, so the operand at `$1FFC-$1FFD` is read from the last bank and names
+   its start — the same path as waking up there; stated cost 18 bytes per bank. batari's variant, which
+   works on edge- and level-triggered carts alike: `BRK` at `$1FF3` with the reset vector pointing at
+   it; BRK's discarded fetch of `$1FF4` — an F4 hotspot, not an F8 or F6 one — selects the first bank,
+   whose BRK/IRQ vector names the start. Both put code on hotspot addresses, which the same thread
+   calls safe only when that byte is identical in every bank. **Cited only, not verified.** Read from
+   the code; **Not verified**: `internal/emu.TestEveryBankCanBeBootedInto` would fail such a ROM
+   although it boots — a false alarm — because `stubSelectsBank` looks only for an absolute
+   `lda`/`sta`/`bit` of a hotspot after the reset vector.
 2. **Cross-bank trampoline at `$FF80`** (callable as a plain `jsr $FF80` from bank 0):
    ```
    bank0 $FF80: lda $FFF9    ; select bank1 → next fetch $FF83 comes from bank1
@@ -95,9 +119,24 @@ then found the author had stated the conclusion himself further down the one the
    bank1 $FF86: lda $FFF8    ; select bank0 → next fetch $FF89 comes from bank0
    bank0 $FF89: rts          ; back to the caller (stack is shared RAM, unaffected)
    ```
+   *Hidden by a macro* (Thomas Jentzsch, AtariAge `topic/285891`): `DEF_LBL Foo` records `Foo_BANK`;
+   `JMP_LBL Foo` assembles to a plain `jmp Foo` when that is the current bank, and otherwise to
+   `ldy #Foo_BANK / lda #>(Foo-1) / ldx #<(Foo-1) / jmp SwitchBank`, where `SwitchBank`
+   (`pha / txa / pha / lda $fff4,y / rts`) sits at the same address in every bank. The caller never
+   names a bank; the price is that A, X and Y are all spent, so nothing is passed in a register.
+   **Cited only, not verified.**
 3. **Data bank + RAM buffer**: bank 1 owns the level tables and the loader; the loader copies
    the selected level (8 PF bytes here) into zero page during VBLANK; bank 0's kernel renders
    only from RAM. Shared zero page is the contract between banks.
+   *Moving variables into cartridge RAM* (djmips, AtariAge `topic/106769`): write and debug with them
+   in zero page, then declare each one twice — `enemyXW = $1000`, `enemyXR = enemyXW+128` on a
+   SuperChip — and turn every store into the `W` name and every load into the `R` name. CBS RAM+ (`FA`)
+   has 256 bytes, written at `$1000-$10FF` and read at `$1100-$11FF` (the engine's `mapper_cbs.go`
+   has the same map), so there the offset is 256. Read-modify-write does not survive the split
+   (`docs/fundamentals-audit.md`). The procedure is **Cited only, not verified**.
+   *The kernel itself in RAM*: PitKat gives E7's 1K RAM bank wholly to its 8×8 tile display kernel —
+   code that runs from RAM, whose rewritten parts are the tile addresses and colours; no co-processor
+   (the author, AtariAge `topic/308669`). **Cited only, not verified**; the ROM was not run.
 
 ## The trap that bit us (now baked into the template)
 
@@ -107,6 +146,15 @@ returning from the trampoline flipped to bank 1, executed garbage, and hit the r
 the ROM sat in a reboot loop (symptoms: 350-line TV frames, RAM cyclically re-cleared,
 level stuck at 0). Diagnosed in minutes with `watch_ram` (the buffer's writer PC alternated
 between the loader and the boot-time `Clr` loop). Trampoline at $FF80 keeps a safe distance.
+
+**Touching a hotspot on purpose, and nothing else.** `lda $1FF9` spends A and `bit` spends the flags.
+SpiceWare's answer on AtariAge `topic/239091` is the undocumented `NOP` absolute: `nop SelectBank4`
+assembles to `0c fa ff` and *"works just fine"* (Collect2 had used `CMP`). In the engine `$0C` is
+`nop`, absolute, 3 bytes, 4 cycles, category `read` (`Gopher2600/hardware/cpu/instructions/definitions.json`),
+and the `NOP` case in `cpu.go` does nothing, so no register or flag changes; that it switches banks on
+hardware is **Cited only, not verified**. `STA` to the hotspot was only guessed in the same thread to
+cause bus contention, and the same thread reports that Centipede switches banks with `STA`. The opposite hazard — a `NOP`/`BIT` skip switching a 3F cart by accident — is in
+`docs/known-traps.md`.
 
 ## Verified
 - Loader contents land exactly ($81,$42,… for level 0; $FF,$7E,… after the switch).
@@ -149,3 +197,51 @@ two. Reading the +1 as the boundary made every maximum come out one too low. And
 of the sweep reported stale numbers, because the generated ROMs lived outside the module and `go test`
 served **cached results** across two regenerations — `-count=1` is not optional when the fixtures are
 somewhere the cache cannot see. Raised by the mailing-list distillation (helper-2).
+
+**A second price, counted in registers.** Thomas Jentzsch, on a proposed scheme that needs two writes
+per switch: *"The problem are not only the extra CPU cycles for the writes, but that you have to use 2
+registers. So that only one register is left to work with."* When a subroutine needs two, one goes
+through the stack or zero page (AtariAge `topic/279113`). The table above counts time; nothing here
+counted registers. **Cited only, not verified.**
+
+## Dividing a game between banks
+
+- **Split by function, not by play mode** (AtariAge `topic/319899`). A bank per mode needs the
+  sprites, tables and positioning routines in both. ben_larson's 16K *Panky* puts kernel, main loop,
+  in-game logic and graphics in one bank, room set-up and room data in a second, title/ending kernels
+  in a third and music in a fourth, so no graphics are duplicated. **Cited only, not verified.**
+- **Call a bank like a subfunction** (brpocock, AtariAge `topic/82141`): load a bank ID and a function
+  ID into registers and `jmp bank_switch`; the selected bank's common entry reads the function ID. The
+  shared RAM area is zeroed during the switch, which happens in VBLANK, and for a short script *"a
+  second switch could happen almost immediately, without the player seeing anything at all."* **Cited only, not verified.**
+- **What duplication costs**: the same author puts his 64K game at *"like 48k or so of unique data"*
+  (about 25% duplicated), because every bank holding map data needs its own copy of the travel kernel —
+  no switch is fast enough to fetch several tiles per row, and 128 bytes shared with game state cannot
+  cache them. An estimate for a game that was not finished, not a measurement: **Cited only, not
+  verified**. The stores-per-scanline table above is the measured half of the same reason.
+
+## The image: size, joining, recognition
+
+- **At least 2K.** *"A 2600 game must be at least 2K. If you want to do a 1K game then you should fill
+  the first 1K with #$00"* (debro, AtariAge `topic/63395`); the 1K image had run in PCAE and shown
+  nothing in z26. Why 1K fails is not said; what the engine does with 1K is **Not verified**.
+- **F8 is two 4K images end to end**: `COPY /B /Y bank1.bin + bank2.bin f8game.bin` (AtariAge
+  `topic/352624`; `cat` on macOS, **Not verified**). A switch from the first game lands at the next
+  address in the second, not at its start — the next-fetch rule of the trampoline above.
+- **Recognising the scheme from outside.** A dumper sees 4K at first, so it cannot fingerprint the
+  whole image as Stella does and has to trigger hotspots and look (Thomas Jentzsch, AtariAge
+  `topic/354336`). The Retron 77 dumper touches `$1FF6-$1FF9` one at a time and compares checksums of
+  3.5K, skipping the first 256 bytes (SuperChip RAM) and the last 256 (hotspots): a change on
+  `$1FF6/7` means F6, on `$1FF8/9` F8, none 4K; F4 is not detected. Reading each bank, it re-selects
+  before every byte at `$FFF0` and above. A two-part dumper (Teensy++ 2.0 and a connector) lists what it
+  reads as *"2k/4k and F8/F6/F4"* — sizes and schemes on one list (AtariAge `topic/305662`). **Cited
+  only, not verified.** The engine works from the whole file (`fingerprint.go`, `fingerprint()`): it
+  first tests signatures that do not depend on size — ELF, ACE, CDF, DPC+, DevCard, Supercharger
+  fast-load, 3E+, 3E — and only then switches on the size, testing byte patterns within some sizes.
+- **Byte fingerprints fire on operands.** Disc Match, a 64K EFSC ROM, was detected by Stella as 3F
+  because `LDY $3F85,X` assembles to `$BC $85 $3F` — its operand is the bytes of `STA $3F` — and it
+  occurred in several places; Stella's `isProbably3F` wants two. One padding byte before the graphic
+  moved the address and fixed it (AtariAge `topic/384121`; **Cited only, not verified**). In the engine,
+  8K, 16K and 32K images are tested for 3F before E0/E7 and the F8/F6/F4 default (after WF8 on 8K
+  and FA2 on 32K), and 3F wants more than five `85 3F` anywhere in the file (`fingerprintTigervision`);
+  its 64K path tries only EF. Read from the code; **Not verified**.
