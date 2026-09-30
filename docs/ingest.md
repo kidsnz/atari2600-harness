@@ -40,6 +40,15 @@ assigns each level a fixed hue. A picture designed here does not degrade on SECA
 Pinned in `internal/emu/palspec_test.go`, so if any of the three numbers moves, the work designed
 against it fails loudly.
 
+**What SECAM replaces it with is a fixed table, by luminance only.** The Stella Programmer's Guide
+(*PAL/SECAM conversions*): `0` black, `2` blue, `4` red, `6` magenta, `8` green, `A` cyan, `C` yellow,
+`E` white. The same section says a SECAM console *"takes the PAL software"* with the colour/B&W switch
+*"hardwired as black & white"*, so what appears there is the game's **black-and-white** table read
+through those eight hues. The engine's SECAM palette (`legacySECAMfromStella` in
+`Gopher2600/hardware/television/colourgen/legacy.go`, taken from Stella) holds the same eight hues in the
+same order — read from its hex values, not pinned by a test; only the count of eight is.
+**Cited only, not verified** on a SECAM console.
+
 **The canvas is not the screen. A 2600 pixel is wide.** Anything drawn at 100 % on a
 square-pixel canvas — the form this project's artwork arrives in — is stretched horizontally on a
 real display by somewhere between **1.60× and 1.82×**; the range is not measurement noise, it is the
@@ -48,12 +57,23 @@ settled by deleting the constant rather than picking a value. The useful form fo
 drawing is Erik Mooney's (stella-list, 2001-10): **an object 8 pixels tall and 5 pixels wide reads
 as a square.** So a circle is an oval on the canvas, taller than it is wide, and letterforms need
 about half as many pixels across as down.
+For a tile the same range puts an 8-pixel-wide cell at about 13–15 rows to read square
+(8 × 1.60–1.82, at one scanline per row), and the advice given to someone drawing an 8×8 Link in 2014
+moved that way: raindog, *"you might want to try 8x10 instead of 8x8 … you may even want to go up to
+8x12 pixels per tile"*; gemintronic, *"I'd seriously consider going at around 14 pixels high"* (AtariAge
+`topic/228629`; **Cited only, not verified**).
 
 **On a PAL console it is worse, and on a different axis.** The pixel aspect is
 `visible_lines / 120`, so PAL's 240 lines give **2.00** against NTSC's 1.60–1.82 — a letter keeps its
 height and gains a fifth of its width again. A 45° line reads as **27°** there against **31°** on
 NTSC. So "PAL support" changes the drawing twice over: the colours are re-chosen, and the proportions
 move.
+It changes the motion too: PAL runs 50 frames a second to NTSC's 60, and a port may retune each moving
+thing separately. Destroyer's first PAL build (0.5b, 2026-01) set the destroyer's and the submarines'
+speeds to be *"similar in both versions"* while *"the charges are moving a little quicker in the NTSC
+version for now"*; a week earlier, at 0.4b, its author had said his console checks were on an LCD,
+*"not the best to test real hardware"* (AtariAge `topic/386546`; **Cited only, not verified**). The Guide's way to make the change a
+table swap is in `docs/techniques/subpixel-velocity.md`.
 
 None of that has to be settled to work. The loop is *draw → build → look at it on the emulator →
 adjust*, and the eye closes the gap in one pass; the number only matters for the first guess. What
@@ -180,3 +200,59 @@ low-confidence multi-color band, the game is doing mid-line color splits — rea
 - An 8-px-wide, 4-clock-aligned shape is *undecidable* between playfield and sprite from pixels
   alone — extraction (M2/M3) emits confirmed data plus confidence-ranked candidates, and the
   final call stays with the author.
+- The playfield table comes out in **one layout**: a `byte` line per band holding every register
+  (`PF0,PF1,PF2`, or six for an asymmetric band) — `DASMPlayfield` in `internal/ingest/emit.go`. The other
+  common layout — **one labelled array per register** (`mountainsPF1: .byte …`) — is not emitted, and
+  the inputs are images or a ROM (`cmd/ingest -in`, `cmd/fieldtest -rom`), never assembler source. masswerk's Tiny
+  Playfield Editor reads and writes both layouts (its author: *"byte orders either per row (as before) or
+  by labeled arrays per playfield register, both for import and for export"*, AtariAge `topic/305741`;
+  **Cited only, not verified**), and `tools/research-w1-tooling.md` records that shape as worth adopting.
+  Here, transposing into it is done by hand.
+
+## Fitting the picture to the machine — decisions that go back to the artwork
+
+Everything above reads a picture that already runs. Before that, someone fits a drawing to the objects
+by hand, and the worked examples on AtariAge show the fitting changing the **drawing**, not only the
+code. The rule is in `design-principles.md` (*"Do not fix the picture first and then assign objects"*);
+these are cases. All are **Cited only, not verified**: none was built or run here, and the images in
+the threads were not seen.
+
+- **An assignment written down until it runs out.** BladeJunker (2011), fitting a duck-hunting screen:
+  tree, trunk and ground as an asymmetric playfield *"with 3 color changes from the top to the bottom"*;
+  the reticle as *"a flopped Player0 sprite with a couple side extensions using the Missle0 bit copied
+  and set to 8 times width"*; the duck as Player1 with per-line colour plus *"a few Missle1 bits
+  overlayed for any scanlines with 2 colors"*; then *"I ran out of objects for the buckshot pixels"*,
+  with a way out — make the clouds' colour from the playfield and the ball is free. He was *"no
+  programmer"*; a month earlier SeaGtGruff had called the screen *"pretty doable"* on the assumption of
+  a custom kernel that changes background or playfield colours mid-line (AtariAge `topic/188233`).
+- **Move the drawing onto the playfield grid.** johnnywc (2023) translated a Bruce Lee mockup element by
+  element: the score as the standard 48-pixel sprite; the mountain tops as playfield plus a 48-pixel
+  sprite plus the missiles *"(3 copies each) to smooth things out"*, at the price of HMOVE lines on the
+  left; the buildings all playfield over a grey background; and the ladder — *"use PF so you don't use
+  up a sprite, so I would change it so it would line up with the PF boundaries"*. The artist took it:
+  *"PF resulution/alignment woud be perfect. Actually most ladder in the game have "space" to the left
+  and right of them"*. That list also recommended CDFJ+ with the ARM; splendidnut's running prototype
+  in the same thread began with a symmetric playfield and no ladders, and later refused to simplify the
+  playfield graphics to stay inside 4K — *"a non-starter for me"* (AtariAge `topic/347106`).
+- **Check a mockup against that grid before building.** SpiceWare (2015): *"There's 40 PF pixels across
+  the screen. I made a 40x2 checkerboard image, scaled it to 640 across to match your mockup, and
+  overlayed it on the mockup … The pixels of your tree do not line up with PF pixels"*; and for a
+  mirrored playfield, *"chop the image exactly in half and the trunk is now 1/2 a PF pixel"* — the trunk
+  *"needs to be 2 pixels wide, not 1"* (AtariAge `topic/242131`). This pipeline's overlay is not that
+  check: its grid lines fall every 10 clocks (`internal/annotate`), so only the lines at multiples of 20
+  land on a playfield-pixel edge, and a mockup is not grade-A input.
+- **Gaps between tiles are a separator, not only coarseness.** Pitkat's R3 (2021) removed the gaps; its
+  author MarcoJ kept R2 available (*"It could come down to taste"*), and later said *"the gaps do help
+  convey separation for monochrome coloured objects side by side and also vertically"*, and that in R3 *"character
+  objects and ladders"* stayed 7px wide, off centre, and going gapless *"helps the soil/concrete and
+  bitmaps gel together moreso than the characters"*. One player, Pat Brady, preferred the gaps in play
+  and gapless on the title and selection screens (AtariAge `topic/308669`).
+- **Compressibility can be the budget.** deater78's Myst (16K E7 with 2K RAM, 2022–23): a scene is 448
+  bytes and had to compress with ZX02 to 256 or fewer, decompressed into cartridge RAM, for about 60
+  scenes to fit — *"it can't be too complex. The viewing pool scene I had to hack a lot of the detail out
+  before it would compress small enough"*. Decompressing took more than 262 scanlines, so it was split
+  up and paced by the timer to keep VSYNC (AtariAge `topic/338659`).
+- **A lattice from copies.** grafixbmp (2011): one player at *"3 close"*, the other at *"2 close"*
+  placed between its copies, both drawing a tall strip of hexagons with the two-copy one offset half a
+  hexagon down, gives a honeycomb; the colours are two — *"either one color if both are set to the same
+  thing or alternating pattern of 3 blue and 2 red"* (AtariAge `topic/179163`). No ROM was posted.

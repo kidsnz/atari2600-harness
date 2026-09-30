@@ -38,6 +38,12 @@ and `debuggerInit` provides a startup script.
 `step_scanline` / `step_cycle` / `read_cpu` / `read_ram` / `read_tia` / `breakif` / `get_screen`
 (framebuffer → image).
 
+**The accuracy is paid for in speed.** Its author, JetSetIlly, 2024: *"It's a slower emulator in general
+than Stella, so if you're machine is low powered it will struggle to run at full speed"* — said to a
+developer who could not find how to speed it up, in the thread where it reproduced a bank-switching
+failure that Stella's developer mode did not (`stella-oracle.md`; AtariAge `topic/367912`). Not timed
+against Stella here: **Cited only, not verified.**
+
 ### Stella (human-facing visuals + reference oracle)
 Confirmed to have **neither a socket nor headless rendering**. External control is only the snapshot style
 "`-dbg.script` dumps to a file → read it". Unsuited as the live MCP engine.
@@ -64,6 +70,18 @@ verification is Gopher2600).
 
 > **Important:** DASM's listing file **does not annotate cycle counts** (only line/address/bytes/source).
 > Always get cycles from a simulator (sim65 / 6502profiler / Gopher2600).
+
+The finer check people have asked for is an expected cycle per instruction. Thomas Jentzsch proposed it
+for Stella (about 2010): hints in comments such as `=@48`, `>@24`, `<@60`, *"Stella would check that
+information during runtime and react to it"*. Nukey Shay's example shows what a mismatch narrows to: at
+his label the count should be 15, and if not, *"either the BCS branch between the two segments crosses a
+page break … or the Y index when added to vector "p1GFX" crosses one"* — two causes, for that code
+(AtariAge `topic/164572`; **Cited only, not verified**; whether Stella shipped it is not in the thread).
+This repository checks per WSYNC interval, not per instruction: `prove_line_budget` proves each
+interval's worst case with branch and index page-crossing penalties counted (`internal/cyclebound`),
+`profile_line_budget` measures it, and the comments the prover reads are declarations, not
+expected-cycle stamps: `@lines N` says an interval spans N scanlines (budget N × 76), `@amax N` bounds a
+divide loop's accumulator.
 
 ---
 
@@ -96,7 +114,11 @@ distillation problem, not a collection problem).
 - **Guide to Cycle Counting** (Nick Bensema) `cycle_counting_guide.html` — ★ the core of B/C
 - **Programming for Newbies** (Andrew Davie) `Atari_2600_Programming_for_Newbies.{pdf,txt}` — especially Session 22 (horizontal position)
 - **woodgrain wiki** `Playfield_Timing.html` / `Clock_Speeds.html` / `Memory_Map.html` / `Bank_Switching.html` / `Sound.html`
-- **vcs.h / macro.h** — TIA register name definitions
+- **vcs.h / macro.h** — TIA register name definitions. In 2018 the copies DASM ships were in its
+  **source** download under `machines/atari2600` (the directory `8bitworkshop-crosscheck.md` passes with
+  `-I`); someone who had not found them in the SourceForge distribution had to ask, once Andrew Davie
+  stopped hosting his DASM site (AtariAge `topic/283030`, answered by Karl G; **Cited only, not
+  verified**); the same thread also points to SvOlli's `vcs.inc` as another version.
 - **the correct horizontal positioning** `8bitworkshop_samples/sethorizpos.asm` (divide-by-15 routine)
 - **real-game disassemblies** `game_disassembly/` (adventure, pitfall, kaboom and 21 others), `za2600/` (Zelda reimplementation)
 - **samples** `8bitworkshop_samples/`, `nanochess_samples/`, `spiceware_tutorial/`
@@ -110,6 +132,53 @@ distillation problem, not a collection problem).
 - **Atari Dev Studio** (VS Code) — bundles dasm+Stella+batari. Unsuited for MCP but useful as a **source of
   correct macOS binaries**
 - **batari Basic** — takes over kernel timing. A scaffold / comparison point when pure asm gets stuck
+- **The editor as a check.** Two habits from AtariAge. Write sprite bytes so they look like the picture:
+  Thomas Jentzsch attached a file in 2015 (`graphics.zip`) that lets you write `.byte zz_XXX____` in
+  place of a binary literal (`topic/233343`). And let syntax colouring see what the eye cannot:
+  SpiceWare's jEdit mode makes graphics written as binary numbers easy to see, and colours register
+  names, so `RESPO` typed with a letter O instead of `RESP0` shows in a different colour before anything
+  is assembled (`topic/230320`, 2014). **Cited only, not verified.**
+- **Page-constrained placement, as asked for in 2017, was mostly done by hand.** Kylearan (2017) wanted a linker
+  that places sections marked `align` or `nocross` (*"that part must not cross a page boundary"*); of
+  the alternatives offered (XA, ca65, KickAssembler, K2asm, ACME), *"From a quick glance … none of them
+  seems to support the "nocross" declaration in conjunction with a linker"*, KK's k65 *"more or less has
+  such a linker"* without standard mnemonics, and he started writing his own. Inside DASM the check is a
+  macro instead: same-page branch macros (`sbne` and the rest, credited to John Payson, posted by
+  SpiceWare) that stop the assembly when a branch target is on another page (AtariAge `topic/264527`;
+  **Cited only, not verified**). A taken branch that crosses a page costs a cycle (`docs/techniques/branch-always.md`).
+- **Keeping 6507 and ARM definitions in step (DPC+).** joe-musashi (2015): assemble once for the `.sym`
+  (no binary yet, since the ARM code is not built), turn the `DD_`-prefixed symbols into a C header with
+  `grep` and `awk`, build the ARM C, assemble again. Under `RORG` a symbol lands at the wrong address for
+  the C side — SpiceWare's font sat at `$Fxxx` in the symbol file where C needed `$4xxx`, handled with
+  DASM `echo "#define FONT ", [[Font & $fff] + $4000]d` or an `awk` `substr` — and constants are kept
+  apart from addresses by prefix (`DD_CONST_` / `DD_ADDR_`) (AtariAge `topic/236931`; **Cited only, not
+  verified**). This repository builds no ARM code; it reads `.sym` only to resolve symbols
+  (`internal/srcmap`).
+- **Labels from ca65 in Stella.** gauauu's 2018 script turns ld65's label file (`-Ln labels.txt`) into
+  DASM `.sym` lines (`<label> <addr> (R )`), so Stella shows labels for a ca65-built ROM; Stephen Anthony
+  said then that reading ca65 directly was on Stella's list but not scheduled (AtariAge `topic/278754`;
+  **Cited only, not verified**). This repository assembles with DASM only (`internal/build`), so its own
+  symbol reader never sees ca65 output.
+- **Why the 2600 long had no IDE.** Asked in 2005 why the 2600 had none, the answers were that the
+  parts existed and people wired them into their own editor (Andrew Davie: Visual Studio → DASM → a
+  Krokodile Cart; Cybergoth: TextPad with DASM and z26), and that the missing part was a debugger —
+  batari: *"all anyone here needs is a debugger. The ability to set breakpoints, single-step and all that
+  would be nice"*. Stephen Anthony announced Stella's integrated debugger for 2.0 in the same thread, and
+  not everyone wanted one (Cybergoth argued that working without it teaches more) (AtariAge
+  `topic/68569`; **Cited only, not verified**).
+
+---
+
+## Compatibility — the cartridge scheme can limit where a ROM runs
+
+An emulator-based console may not run the newer formats. On AtGames' Flashback emulator in 2016, the
+homebrews that did not work looked to one poster to be, in many cases, *"those that use
+newer developments like DPC+ and the Melody board, things that Stella supports"* — from someone who had
+*"only skimmed the compatibility list"*, so an impression, not a count; Thomas Jentzsch's position in the
+same thread: *"For me the only reference is the real existing hardware"* (AtariAge `topic/260084`). A
+mapper alone can be enough: the Myst port on an E7 cartridge (16K ROM, 2K RAM), 2023, *"due to the mapper
+it won't work on a 2600+"* (deater78, AtariAge `topic/338659`). **Cited only, not verified.** For the
+2600+ as an emulator, see the "Emulators can agree with each other" row of `known-traps.md`.
 
 ---
 
