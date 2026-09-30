@@ -4334,3 +4334,13 @@ capture showed M0 at 2 and M1 at 25 before the fix, M1 at 2 after). Its test sti
 happened anyway. **Gap:** nothing compares each ROM's equates against the standard TIA map. A scan of the 209
 `.asm` files, treating TIA mirrors (`INPT4 = $3C`) as valid, finds one more, not yet examined:
 `litmus_jsr_stack.asm` has `REFP1 = $0B`, which is `REFP0`, and its header reads `$010B = REFP1`. Size: S.
+
+### `dissect` cannot find interleaved graphics (2026-09-30)
+
+Some carts store sprite rows interleaved rather than one shape after another: Skiing keeps the same row
+of each glyph side by side and the next row 16 bytes on (AtariAge `topic/336063`, which also names
+Boxing, Football and Millipede; Cited only, not verified). `cmd/dissect` looks for the stored bytes as one
+contiguous table, forward or reversed. **Measured on two test ROMs:** the contiguous one matches
+`ROM $F700-$F706`; the interleaved one reports "no direct ROM match (computed or transformed data)" —
+the table is there, and the tool calls it computed. **Gap:** a strided search (step 16, and other powers
+of two). Until then, read that message as "not found contiguously", not "computed". Size: S.
