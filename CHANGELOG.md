@@ -6,6 +6,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — first review additions landed, a trial of eight (2026-09-30)
+
+Each commit carries `Land-Key:` lines; each was checked by a separate reviewer before commit.
+
+- `score-kernel.md`: BCD-to-binary conversion; holding glyph pointers instead of digits; a fixed
+  non-digit glyph; five checks for a score that does not appear; the VDEL-free wide version. Figures
+  marked measured come from throwaway ROMs, not litmus, so CI does not hold them.
+- `internal/build`: a third DASM hint names an include that could not be opened. The
+  missing-processor hint now counts only 6502 instruction names, so a missing `macro.h` no longer
+  blames line 1.
+- `capability-gap-audit.md`: `cmd/dissect` cannot find interleaved graphics (Skiing's 16-byte stride).
+
+Found while landing, not fixed here: DASM exits 0 when an `incbin` file cannot be opened (a 4096-byte
+ROM with the data missing), when the source is missing (0 bytes), and when an unused include is missing.
+
 ### Fixed — the last three review corrections landed, fifth batch (2026-09-30)
 
 Each commit carries a `Land-Key:` line; each was checked by a separate reviewer before commit. With
