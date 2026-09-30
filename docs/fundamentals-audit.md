@@ -115,6 +115,21 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   resolves `SpecPAL60`, but only to reach its colour generator. That insulation is an accident, not
   a decision, so `internal/emu/pal60rate_test.go` pins both halves and says what to do if either
   moves.
+- 📖 **A PAL console is different hardware, not the same console running a different game.** svolli,
+  correcting a reply that said only the cartridges differ: *"The chips differ EVEN IN THE PINOUT"* —
+  look for AUD1 on the TIA pinout — *"Not only is the TIA different, but the CLOCK of the TIA/CPU is
+  also slightly differ[ent]"* 〔AtariAge `topic/203273`〕. **Cited only, not verified** (no pinout was
+  read here). The clock half is already in this repository as numbers: `pkg/audio`'s `BaseClockNTSC`
+  and `BaseClockPAL` divide **3579545** and **3546894** Hz, so the PAL CPU (colour clock / 3) runs
+  **0.91 % slower**. That moves pitch (§6, 15.9 cents) and anything counted in seconds; nothing counted
+  in scanlines or cycles moves.
+- 📖 **One source, two regions: a numeric flag and `IF/ELSE/ENDIF`.** Medieval Mayhem's DASM source
+  (`NTSC = 0`, `PAL = 1`, `COMPILE_VERSION = NTSC`, then `IF COMPILE_VERSION = NTSC … ELSE … ENDIF`)
+  keeps **every colour constant twice** (red `$44` NTSC / `$64` PAL) and **rescales every frame-counted
+  delay by the frame rate** (`FIREBALL_DELAY` 70 NTSC / 59 PAL, i.e. ×60/64 against ×50/64)
+  〔AtariAge `topic/156147`〕. **Cited only, not verified** — the thread was distilled, not kept, and no
+  value was assembled here. The consequence for PAL60 follows from the ⚠ above, not from the thread:
+  PAL60 keeps 60 Hz timing, so a PAL60 build swaps the colours and **no** frame-counted delay.
 
 ## 2. Horizontal positioning & HMOVE
 - ✅ X(N)=3N−55 (missile/ball), player +1px; slope 3 px/cycle; divide-by-15 coarse; **no leftmost-X constant** (retracted 2026-07-30; it is kernel-specific) /
@@ -150,6 +165,11 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   〔Towers, *TIA Hardware Notes*, RESPx pipeline〕 `→ roms/litmus/litmus_respx_phase.asm` / `internal/emu/respxphase_test.go` (3 gradings, 2 negative controls: the player's offset forced to 4 fails by name; a flat sweep trips the slope control)
   point (explains our verified +5 family offsets). **RESBL re-emits START (ball restartable mid-line);
   RESPx does not** (player needs a 160-clock wrap). ✅ **double-strobe measured 2026-09-05** (`litmus_hmove_double`, `internal/emu/hmovedouble_test.go`). With `HMP0 = $70` (one strobe = -7) and the same `RESP0` each time: one strobe **3 -> 156**; two **back to back** `3 -> 4` (**+1** — neither one move nor two, a strobe inside the running ripple is a third outcome); two **24 cycles apart** `3 -> 156` (**the second adds nothing**); the same with `HMCLR` between, `3 -> 156` (control). ★So within one scanline this engine does **not** accumulate, which is what AtariAge `198577` reports of real hardware. ★★It does not settle the `known-traps.md` warning about strobes on DIFFERENT scanlines with positioning code between — that is a different experiment and is still open. Found by the mailing-list distillation (helper-2), cross-checking the two corpora against each other.
+  The mechanism, as stated on the forum and not checked against the schematic here: *"HMOVE is in and of
+  itself a sort of delay line, which is highly dependent against the timing of the horizontal blank"*,
+  so it cannot usefully be struck more than once a line — which is why a ball re-struck with `RESBL` for
+  a second copy on the same line cannot be moved separately 〔AtariAge `topic/257405`, tschak909〕.
+  **Cited only, not verified.**
 - ✅ **missile-locked-to-player (RESMP D1)** — the ⬜ was stale: `roms/litmus/litmus_resmp.asm` +
   `scenarios/resmp.json` already lock the offset at **+4** (player0.hmoved_pixel 24, missile0 28) and
   confirm it follows an HMOVE'd player. What that fixture could not answer is the word **"centered"**,
@@ -189,9 +209,26 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 - ✅ Moveable-object writes are shear-safe at CPU cycles 0–22 of the line — closed by derivation from
   verified constants (any write completing by cy 22 precedes every draw start: (X+68)/3 ≥ 22.67 even at
   X=0) plus litmus_48px6's measured mid-line GRP choreography (writes landing in copy gaps).
+  📖 **Shearing in shipped cartridges.** spiceware's definition is wider than this window: it *"can occur
+  when a TIA register is updated during the visible part of the scanline"*, any register. His example
+  is a colour register — the right edge of Air-Sea Battle's background gradient. The thread's own case
+  is Video Olympics games 9–12, **and only while the paddle is in the lower half of the screen**; a
+  second poster saw *"something similar"* on a plane's wing in Skydiver 〔AtariAge `topic/300648`〕.
+  **Cited only, not verified** — none of the three was run here. The
+  position condition matters for reproducing Video Olympics: the original shears there too, so a
+  shear in the same place is not by itself a defect of the reproduction.
 - ⬜ 48px kernel GRP write windows: **no local source documents the cycle map** — derive ourselves (the
   recipe exists in score6.asm: NUSIZ=3-close, RESP0/RESP1 3 cycles apart at ~cycle 26+, HMP1=$10, VDELP both
   on, 6-store choreography, font `align $100`).
+  📖 **Correction, 2026-09-30: a local source does document it.** Erik Mooney's 1997 walk-through of
+  Okie Dokie's routine gives the map instruction by instruction — cycle, pixel, and the contents of all
+  four registers (new and old copy of each) after every store 〔stella-list `199704/msg00137`〕. P0 at
+  pixel 123 and P1 at 131, counted **including HBLANK** (visible 55 and 63 in our coordinates); the three
+  preloaded digits go in at cycles 71 (previous line), 8 and 16, and the last four stores complete at
+  **44 / 47 / 50 / 53**, landing 1, 2, 3 and 4 pixels after digits 2, 3, 4 and 5 start to draw. The
+  fourth store's value is irrelevant — it exists only to copy GRP1 into GRP1's old register.
+  **Cited only, not verified**: his pixel column is cycle × 3, which ignores the TIA's write delay, so
+  the margins are his arithmetic, not a measurement.
 
 ## 4. Playfield
 - ✅ PF0/PF1/PF2 bit order; CTRLPF D0 repeat/reflect; per-scanline colors.
@@ -200,6 +237,10 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   WSYNC=0; `*`=previous line): repeated mode — LPF0 53\*–21, LPF1 64\*–27, LPF2 75\*–37, RPF0 27–48,
   RPF1 37–53, RPF2 48–64. Reflected mode — **RPF2 must complete exactly at cycle 48**. Mid-register late
   writes split *per pixel* (old bits left, new bits right) — well-defined, great litmus predicate.
+  A second, independent source for the reflected-mode 48, with cycle annotations in shipped code:
+  Stay Frosty's kernel, `stx PF2 ; 3 48 <- must be at 48` — *"Any sooner or later and the display will be
+  incorrect"*. spiceware moved that game from repeated to reflected asymmetric **to save cycles and RAM**
+  〔AtariAge `topic/254684`〕. **Cited only, not verified.**
 - ⚠️ Internal discrepancy found: SpiceWare Step 3 says the left-PF1 window opens at cycle ~66 of the prior
   line; Step 7 annotates ~71. Resolve by measurement; trust the harness.
 - ✅ **CTRLPF D1 SCORE / D2 PFP priority / D4–5 ball width** — verified `litmus_ctrlpf` (v1.53.0),
@@ -328,6 +369,11 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 
 ## 7. Input
 - ✅ SWCHA joystick bits (P0 high nibble R/L/D/U, 0=pushed) — verified `litmus_input` (v0.42.0).
+  **P1 is the low nibble, same order** — from the engine's source, not measured: `litmus_input` drives
+  P0 only, and `Gopher2600/hardware/riot/ports/ports.go` shifts player 1's data `>> 4` into bits 3–0.
+  **Not verified.** Consequence: one `lda SWCHA` serves both players, so changing one player's stick
+  (a one-player hack) means finding which nibble each read path keeps — easy if SWCHA is read once per
+  player, hard if not 〔AtariAge `topic/279174`〕.
 - ✅ **SWCHB console switches** — verified `litmus_swchb` (v1.46.0): D0 RESET / D1 SELECT
   (active-low), D3 color/BW, D6/D7 P0/P1 difficulty. Driven via `SetPanel`
   (reset/select/color/p0pro/p1pro) + scenario panel inputs.
@@ -375,6 +421,19 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   SWBCNT has any use?"* — went unanswered, and the same post reports Combat's own comment claiming
   the write stops joystick response **when it does not**. So we know two commercial titles do it and
   we do not know why, which is a sharper open question than the one this line started with.
+  📖 **Port A (SWACNT) as an output does have known uses, each for a peripheral** — the answer to a
+  2004 thread asking whether anything but a development tool drives it 〔stella-list
+  `200404/msg00412`〕: the **keyboard controller** is an x-y grid, the four RIOT lines drive x[3:0] and
+  the trigger plus two paddle inputs read y[2:0], one x line at a time 〔`200404/msg00419`, Chris
+  Wilkson〕; **Kid Vid** pauses its tape, **Mindlink** is told to send new data, the **Compumate**
+  keyboard bank-switches its cartridge through the joystick port, and **Star Raiders** sets all eight
+  pins to output — it still reads its joystick because it drives the pins high and a pressed direction
+  grounds one, which reads the same as driving it low 〔`200404/msg00421`, Eckhard Stolberg; the Star
+  Raiders account again in `200409/msg00070`〕. **The negative example: paddles do not use the port as
+  an output** — they dump their capacitors through a VBLANK bit (`200404/msg00421`). The same thread
+  also claims **Combat** drives port A; the byte count above found **zero** SWACNT writes in Combat (its one DDR
+  write is to SWBCNT), so that claim does not survive. **Cited only, not verified.** None of this says what Combat's and
+  Air-Sea Battle's **SWBCNT** D4 is for, which stays open.
   **A search note:** this was recorded as unverifiable an hour earlier because `reference/` holds no
   Combat ROM. It is in `sandbox/`, a sibling repository — **the search was scoped to one of the four
   and the conclusion was stated as if it covered all of them.**
@@ -412,6 +471,17 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   ⬜ **The power-up value is still the engine's choice, not a measurement.** `Reset` zeroes the RIOT
   memory explicitly; whether a real 6532 clears its DDR on RES is not established here. The table
   above measures what a *write* does, which is a different question from what reset leaves behind.
+  📖 **The list disagreed about it and did not settle it — cited only, not verified.** Eckhard
+  Stolberg: *"While the 6507 will be reset at power-up, the RIOT will not. It will remain it's state for
+  a short while after you turn the console off"* 〔stella-list `200409/msg00060`〕. Alex Herbert replied
+  that the RIOT shares the CPU's reset line, quoting the 6532 datasheet: *"a low /RES input causes a
+  zeroing of all four I/O registers. This in t[u]rn causes all I/O busses to act as inputs"*
+  〔`200409/msg00119`〕. The last word in the thread qualifies rather than decides: *"When turning power
+  off and on quickly reset may not get low"* 〔`200409/msg00121`, Edwin Blink〕. So the engine's zero
+  agrees with the datasheet as quoted, and whether a real console's RIOT is reset at power-up is still
+  disputed — the ⬜ stays. Stolberg's advice for a binary that
+  may start after a 7800 BIOS, a Supercharger or a Cuttle Cart loader has already run is the same in
+  general form: initialise everything your code depends on 〔`200409/msg00070`〕.
 
 ## 8. 6502/6507 precision
 - ✅ cycle accounting (76/line; WSYNC-stall exclusion).
@@ -444,6 +514,10 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 - 📖 **NMOS decimal mode: only the C flag is valid** after ADC/SBC (never branch on Z/N/V); D is
   unknown at power-up and survives interrupts → `CLD` in init is mandatory. BCD idiom:
   SED/CLC/ADC…/CLD; multi-byte chains keep the carry.
+  **Subtraction is the mirror pair, SED/SEC/SBC…/CLD**: `SBC` subtracts one more when C is clear, so a
+  `CLC` carried over from the addition idiom makes every subtraction one too large; with `SEC`, one off
+  the tens digit is `sbc #$10` 〔AtariAge `topic/301365`, JetSetIlly's correction of `clc / sbc #9`〕.
+  **Not verified** — `litmus_6502` measures the `ADC` side only.
   ✅ **The flag half is measured** (`docs/verified-coverage.md:88`, `litmus_6502` v0.44.0):
   $99+$01 under SED gives **A=$00 (correct)** and the pushed status $BD = **C=1 (correct), Z=0 and
   N=1 (both wrong for the decimal result)** — so "do not branch on Z or N" is our own measurement,
@@ -460,6 +534,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   (`READ_OP`), so a skip written as a raw `.byte $2C` / `.byte $0C` is invisible to it. The one
   such skip in our own tree is `roms/techniques/tia_pcm.asm:89`.
 - ⬜ RMW double-write bus behavior on TIA strobes (6502.org silent; needs visual6502/64doc as source).
+  📖 **The colour-register side has one report:** *"I tested LSR COLUBK this morning and it produces a 3
+  pixel wide line"*, with the use named beforehand — a 3-pixel object inside the playfield, 1 or 2 pixels
+  if timed across a pixel boundary 〔AtariAge `topic/238310`, zackattack〕. Whether that was hardware or an
+  emulator is not stated. The engine does perform the extra write — the `Modify` path in
+  `Gopher2600/hardware/cpu/cpu.go` writes the value it read back before the modified one ("phantom
+  write") — so the first colour on the line is **whatever the read returned**, and a read of `$09` is a
+  TIA **read** register (INPT1). The poster's own next step was to force that read to `$FF` so the
+  two writes that follow could be overridden with any colour — a bus-stuffing plan. **Cited only, not
+  verified**; the strobe side stays ⬜.
 - ✅ **skipdraw/DoDraw is 17 or 20 cycles, not a constant 18** — measured 2026-09-03; this line said
   "constant-18-cycle draw" and added "worth a cycle litmus", which was an accurate self-assessment.
   Timed WSYNC→GRP0 over eight frames of `roms/techniques/vertical_pos_dcp.asm`: **20 cycles on the 80
@@ -487,6 +570,14 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   Found by the mailing-list distillation (helper-2 and helper-1, who also found that the first post's
   code is broken — its wait loop branches to itself — so a reader who finds only that message copies
   something that hangs).
+  📖 **And 17/20 is a property of where the branch goes, not of skipdraw.** `vertical_pos_dcp.asm` puts
+  the draw path on the taken branch (`bcs VDraw`). Put the draw path on the fall-through instead, send the
+  skip path out of line and back with a `BEQ`, and the two paths cost the same with no table: **19/19**
+  for the DCP form, where the skip path loads its zero with `LDA temp1` (a zero-page byte holding 0,
+  3 cycles) instead of `LDA #0` (2) to burn the one cycle that balances it, for one byte of RAM; the
+  `SEC/SBC/ADC` form posted in the same thread adds up to **20/20** 〔AtariAge `topic/191440`, reveng〕.
+  **Not verified** — the counts are the posts' own annotations, including `STA GRP0`, and assume that
+  neither branch crosses a page, which a branch to code outside the kernel makes easy to break.
 - 📖 Mirror templates (woodgrain Memory_Map): TIA at $xyz0 (x even, z∈{0,4}); RAM $80–$FF mirrored
   at **$0180–$01FF — which is why the stack works**, and the mechanism is that the 6507's stack
   pointer is **only eight bits wide** while the address bus is thirteen, so the processor supplies
@@ -578,6 +669,13 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   From seed $01: `$01 $B4 $5A $2D $A2 $51 $9C $4E …`, ending `… $69 $80 $40 $20 $10 $08 $04 $02`;
   sha256[:16] of the 255-byte sequence = **1cc3384d72331258**. Seeding from INTIM is untested here —
   that is about *where the seed comes from*, not about the generator, and INTIM can read 0.
+  ✅ **`$B4` and `$8E` are two of sixteen — computed, not run** (2026-09-30, every EOR constant through
+  the same `lsr / bcc / eor`, every seed, no emulator): exactly **16** constants make the step a
+  permutation with one 255-long cycle — `$8E $95 $96 $A6 $AF $B1 $B2 $B4 $B8 $C3 $C6 $D4 $E1 $E7 $F3 $FA`,
+  the same sixteen Thomas Jentzsch listed beside the routine in 2004 〔stella-list `200401/msg00222`〕.
+  Because each of them puts all 255 non-zero bytes on one cycle, a second seed with the **same**
+  constant only replays the same sequence from another point; a second generator that should not track
+  the first wants a different constant from the list.
 ## 12. Harness/tooling implications
 - 📖 **Stella IS automatable for F-4** (debugger doc + installed Stella 7.0 verified): `<rom>.script`
   auto-runs at `-debug` startup (`frame N / tia / riot / dump 80 ff 7 / saveSnap / saveSes`); `saveSes`
