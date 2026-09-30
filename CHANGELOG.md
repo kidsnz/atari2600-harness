@@ -6,6 +6,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the last three review corrections landed, fifth batch (2026-09-30)
+
+Each commit carries a `Land-Key:` line; each was checked by a separate reviewer before commit. With
+these, every high-confidence correction the review found is in.
+
+- `internal/build`: the DASM hints named one cause where there are two. A data row that lost its
+  `.byte` no longer gets the missing-`processor` hint, and the one-error hint names both causes
+  (indent the line, or add the `.byte`). New tests drive real DASM through both shapes.
+- `docs/scenarios.md` and two scenario tests: `frame_lines_stable` is stepped after the timeline, so
+  no input or assert frame is ever checked for line count. The tests said otherwise; the check itself
+  is unchanged. The input list gains `reset`, `select`, `color`, `p0pro`, `p1pro`, `paddle`.
+- Four litmus ROMs read collisions through the `$3x` mirror now, not the write address (a `sta` typo
+  would have strobed `WSYNC`). This showed that the floating low bits of `litmus_cxclr`'s raw reads
+  are the last byte on the bus before the read (its zero-page address), not the `lda #2` before it; the scenario, the comments,
+  `CLAUDE.md` and `verified-coverage.md` now say so. Stella captures retaken (37/37 each).
+
 ### Fixed — six more review findings landed, fourth batch (2026-09-29)
 
 Each commit carries `Land-Key:` lines; each was checked by a separate reviewer before commit.
