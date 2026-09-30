@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -65,13 +66,13 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 		os.Remove(tmpBin)
 		os.Remove(lstPath)
 		os.Remove(symPath)
-		if hint := mnemonicStormHint(string(out)); hint != "" {
-			return string(out) + hint, "", "", err
+		// A missing include and a missing processor can happen together, so both may speak. The
+		// storm hint counts only real 6502 instructions, so a missing macro file does not trip it.
+		hints := unopenedIncludeHint(string(out)) + mnemonicStormHint(string(out))
+		if hints == "" {
+			hints = operandAsMnemonicHint(string(out))
 		}
-		if hint := operandAsMnemonicHint(string(out)); hint != "" {
-			return string(out) + hint, "", "", err
-		}
-		return string(out), "", "", err
+		return string(out) + hints, "", "", err
 	}
 	lb, _ := os.ReadFile(lstPath)
 	sb, _ := os.ReadFile(symPath)
@@ -143,11 +144,15 @@ func diagnosedFailure(out string) error {
 // storms too — three indented rows of `%00011000` give three unknown mnemonics and exit 5 — but the
 // tokens it names are values, and sending that reader to line 1 was wrong. Those are left to
 // operandAsMnemonicHint. The column-1 form still counts: `6502` is a value, but `lda`, `sta` and
-// `jmp` are three letters.
+// `jmp` are three instructions.
+//
+// ★And only the 6502's own instruction names (2026-09-30). A missing `macro.h` rejects
+// `VERTICAL_SYNC` and `SLEEP` -- letter-led, but macros, and the cause is the include, not line 1.
+// A two-letter typo (`lxx`, `stx2`) is not an instruction name either, so it still cannot count.
 func mnemonicStormHint(out string) string {
 	var n int
 	for _, m := range unknownMnemonicRe.FindAllStringSubmatch(out, -1) {
-		if c := m[1][0]; (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+		if opcodes6502[strings.ToLower(m[1])] {
 			n++
 		}
 	}
@@ -195,5 +200,55 @@ func operandAsMnemonicHint(out string) string {
 	return ""
 }
 
+// opcodes6502 is the documented instruction set: the names a source with no `processor` line still
+// uses, and so the names DASM rejects when the CPU was never selected.
+var opcodes6502 = func() map[string]bool {
+	m := map[string]bool{}
+	for _, op := range strings.Fields("adc and asl bcc bcs beq bit bmi bne bpl brk bvc bvs clc cld cli clv " +
+		"cmp cpx cpy dec dex dey eor inc inx iny jmp jsr lda ldx ldy lsr nop ora pha php pla plp rol " +
+		"ror rti rts sbc sec sed sei sta stx sty tax tay tsx txa txs tya") {
+		m[op] = true
+	}
+	return m
+}()
+
 // unknownMnemonicRe captures the token DASM names in each "Unknown Mnemonic" error.
 var unknownMnemonicRe = regexp.MustCompile(`Unknown Mnemonic '([^']+)'`)
+
+// unopenedIncludeHint names the cause when DASM could not open an include file.
+//
+// DASM does not stop. It prints a warning at the TOP and keeps going without the file, and what fills
+// the screen below is the damage, not the cause. Measured on DASM 2.20.14.1:
+//
+//	Warning: Unable to open 'vcs.h'          <- the cause (once per pass)
+//	--- Unresolved Symbol List
+//	WSYNC                    0000 ????         (R )
+//	Fatal assembly error: Source is not resolvable.   (exit 3)
+//
+// A missing `macro.h` adds `Unknown Mnemonic 'VERTICAL_SYNC'`, `'SLEEP'`, `'SLEEP'` -- three
+// letter-led tokens, but not 6502 instructions, so mnemonicStormHint stays quiet. When the
+// `processor` line is missing as well, both hints speak.
+// The negative control: a source that merely uses an undefined symbol prints the same list with
+// nothing above it, and gets no hint. (An include nothing uses fails silently: exit 0.)
+//
+// The shape -- the list is the consequence, the cause is above it -- is AtariAge topic/72751 (the
+// real error sat above "12 references to unknown symbols") and topic/287020.
+func unopenedIncludeHint(out string) string {
+	var names []string
+	for _, m := range unopenedIncludeRe.FindAllStringSubmatch(out, -1) {
+		if !slices.Contains(names, m[1]) {
+			names = append(names, m[1])
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("\n\nhint: DASM could not open `%s` (the warning at the top). Unresolved "+
+		"symbols, and unknown mnemonics that are macro names, are what that file would have defined. Put the "+
+		"file next to the .asm (the build adds that directory with -I) or fix the name.",
+		strings.Join(names, "`, `"))
+}
+
+// unopenedIncludeRe matches the warning DASM prints for an `include` it cannot open. It does not match
+// the output file's `Unable to [re]open`, whose message already names the file and the cause.
+var unopenedIncludeRe = regexp.MustCompile(`Unable to open '([^']+)'`)
