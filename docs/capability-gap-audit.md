@@ -168,6 +168,10 @@ the wording is coarse.
   the formant branch (SAM2600) has no coverage at all — it is a different technique, not a gap in
   this one. `roms/litmus/litmus_pcm.bin` is queued in `internal/oracle/testdata/stella_tia/CAPTURE_QUEUE`
   rather than captured, so the Stella oracle does not yet cover it.
+  **And the grader cannot see a table it cannot read as text.** `pcm.ParseTable` takes the source text, so a
+  ROM that pulls its samples in with `INCBIN` — the way the forum tells people to do it (SpiceWare, AtariAge
+  `topic/273769`: *"It's a binary file, not text, so use INCBIN"*) — has no `PCM_TABLE_BEGIN` and is refused
+  by `cmd/pcmcheck` rather than graded. Read from the code; **Not verified** by running such a ROM.
 
 ## Tier 3 — polish
 - **G5 ✅ RE-MEASURED 2026-07-30 — the entry was stale; both halves have been litmus-locked for some time,
@@ -486,6 +490,12 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   oracle into a majority verdict that surfaces "all software agrees but the hardware-grade member dissents" =
   the project's reason to exist. Self-test (gated on MAME present): MAME agrees with Gopher2600 on all 128 RAM
   bytes of `smoke` and they vote unanimously; `TestVoteDissent` proves a planted lone dissenter is named.
+  **Independence holds per behaviour, not per emulator.** On one 2017 ROM, stephena sorted five emulators
+  against his console: Stella 5 right, **Stella 4 and MAME giving the same wrong output**, z26 and Javatari each
+  wrong in another way (AtariAge `topic/271313`). Two shapes follow: MAME can share an error with a Stella (the
+  vote carries it, as in `known-traps.md`'s "Emulators can agree with each other and disagree with the
+  machine"), and the dissenters can scatter so that no majority exists. **Cited only, not verified**: Stella 4 is
+  obsolete, and whether today's MAME still shares that error has not been measured here.
 - **VV-7 ✅ DONE (v1.91.0):** perfect6502 (mist64, the visual6502 transistor netlist) as a hardware-grade
   **CPU differential**. It is CPU-only (no TIA/RIOT) so it is **NOT** a member of the full-system RAM vote
   (`cmd/oraclevote`) — forcing it in would mean hand-writing a 2600 around it, defeating the point. Instead it
@@ -802,6 +812,9 @@ recording before the items:
   indirect jump targets, and carries a Decoded/Blessed/**Executed** confidence ladder — the static-vs-dynamic
   distinction we need, already modelled. Its blessed set is a heuristic, so it is a cross-check and a data
   source, never the sound denominator.
+  A reading hint for that work: in commercial ROMs an indirect jump is more often a `PHA`/`RTS` dispatch
+  (`docs/techniques/rts-dispatch.md`) than a `JMP (ind)`, because it is shorter (nukey-shay, AtariAge
+  `topic/248203`). **Cited only, not verified** — no census here counts the two forms.
 
 ### SD-0 — Soundness and honesty repairs (blocking; do before anything is built on top)
 > **All five closed as of 2026-07-31.** Two of them were closed in the code and left open here — SD-0d was
@@ -1001,6 +1014,11 @@ Recorded because three of these were previously mistaken for hard limits when th
   unreachable from any public entry. `Prove` now takes a `.bin` directly — VideoOlympics 8 regions,
   Adventure 14, Seaquest 49, Chopper Command 29, all converged, with the `.asm` path byte-identical.
   `timinglint` still assembles; same one-branch change when it is wanted.
+  **A commercial positive exists, and it is of the other kind.** A-Team stores six bytes into zero page
+  `$87-$8C` — `LDA $FFF9` / `JMP $F669` — and runs them with `JMP.w $0087` 〔stella-list `200212/msg00079`,
+  Manuel Polik, 2002, who met it because DiStella left much of the ROM uncovered〕. That is code built in RAM,
+  not a store into the cartridge window, so `writes_into_code` is not meant to report it. **Cited only, not
+  verified** — A-Team has not been run through `defuse` here.
 - **Conditional bounds — DONE for the dominant case.** Measured first: of 29 unbounded regions across the
   technique corpus, **15 fail for one reason — "loop bound unknown"**. The body of such a loop is fully
   understood; only its trip count is missing, so the region's cost is still a known function of it and the
@@ -4280,6 +4298,13 @@ prover had been run.
 nowhere to spend while the deliverables are picture-led. Revisit if a piece wants sound
 over image.
 
+**A cheaper shape was not costed.** The table prices the wavetable mixer. The xSqueeker demo uses none of
+it: four 16-bit phase accumulators, a `ROL` after each add to collect the carry bit, and one `STA AUDV0`
+— each voice owns one bit of the volume register (Thomas Jentzsch reading the code, AtariAge
+`topic/257563`). No fetch, no running sum, no linearisation — but the four 16-bit adds remain, and its
+cycles per line are **Not verified** here, so whether it moves the trade above is open. It is still a demo
+with no game beside it.
+
 
 ## Questions the list asked and nobody answered — a measurement backlog (2026-09-06)
 
@@ -4344,3 +4369,86 @@ contiguous table, forward or reversed. **Measured on two test ROMs:** the contig
 `ROM $F700-$F706`; the interleaved one reports "no direct ROM match (computed or transformed data)" —
 the table is there, and the tool calls it computed. **Gap:** a strided search (step 16, and other powers
 of two). Until then, read that message as "not found contiguously", not "computed". Size: S.
+
+### `check_traps` misses an unstable opcode written as a raw byte (2026-09-30)
+
+Check 1 (unstable illegal opcodes) matches mnemonics only. Measured 2026-09-30 on two four-line sources:
+`lxa #$00` is an ERROR (exit 1); the same instruction as `.byte $AB,$00` passes as `traps OK` (exit 0).
+Check 2b already covers this shape for NOP/BIT skips ("written as a RAW BYTE, which the mnemonic matcher
+above cannot see"); check 1 has no such twin. Nothing in the tree writes `$AB`, `$8B` or `$4B` as code
+today — the only hits, two `byte $8B,$06` lines in `roms/techniques/sfx_demo.asm`, are a sound table — which
+is also the design constraint: a raw-byte match must fire on code and stay quiet on data. **Gap:** a raw-byte twin for check 1. Size: S.
+Found by the mailing-list distillation (helper-3, thread *games using unofficial opcodes*).
+
+### `Assemble` accepts three exit-0 results that are not the program (2026-09-30)
+
+`build.Assemble` rejects a non-zero exit and any `error:` line (`diagnosedFailure`). These pass both:
+
+- **An include nothing references.** DASM warns `Unable to open` and exits 0, and the file's bytes are
+  missing from the ROM. `unopenedIncludeHint`'s own comment records it — "(An include nothing uses fails
+  silently: exit 0.)" — but the hint runs only when `AssembleWithListing` fails.
+- **A source DASM cannot open.** DASM prints `Complete. (0)`, exits 0 and writes a 0-byte `.bin`
+  (AtariAge `topic/27857`, 2003; reproduced by the review on DASM 2.20.14.1, **Not verified** by a test
+  here). `Assemble` returns success, and `emu.LoadROM` then refuses the file as "Most likely a truncated or
+  partial download": the refusal is right and the cause it names is wrong.
+- **No output at all.** An old DASM exited 0 and wrote nothing (AtariAge `topic/111264`, fixed by moving to
+  2.20.07; **Cited only, not verified**). The `os.Rename` of the scratch file fails and catches it, but
+  `scratchPath`'s comment gives only the parallel-test reason, so the protection is incidental.
+
+**Gap:** fail in `Assemble` on `Unable to open` and on an empty output, and name the third reason beside the
+rename. Size: S.
+
+### The asymmetric-PF rewrite windows are cited, not swept (2026-09-30)
+
+`fundamentals-audit.md` §4 holds woodgrain's window table as 📖 and leaves a disagreement open (SpiceWare's
+Step 3 and Step 7 put the left-PF1 opening at ~66 and ~71). `pf_deadlines` checks the deadlines a kernel
+meets, not where each window opens and closes. **Gap:** one litmus ROM that sweeps the store cycle in groups
+— right-half windows, left-half windows, reflected mode, the per-pixel split — read back with `read_row`.
+Two design points from a sweep drafted in the review and not built: the sweep needs odd cycle offsets, so the
+padding needs a 3-cycle filler (`bit $80`, or `.byte $04,$00` = `NOP $00`, two bytes, when the flags must
+survive — written that way and measured in `roms/litmus/litmus_oddsleep.asm`); and old and new values must differ in every drawn bit
+(`$A5`/`$5A`; `$A0`/`$50` for PF0's top nibble; PF1's reversed bit order). Size: M.
+
+### No rule picks the filler byte of our own ROMs (2026-09-30)
+
+DASM here fills unwritten ROM with `$FF` (CMB-5 above), which decodes as `isc abs,X`, an undocumented
+read-modify-write. Barnstorming fills with `$EA` (DEBRO, AtariAge `topic/267367`; **Cited only, not
+verified**), which runs as `NOP` if the PC ever strays into it. **Gap:** nothing here chooses the filler; the
+only rule about it is that `internal/build/romsize_test.go` assumes `$FF`. Size: S.
+
+### The Stella oracle never tells Stella the TV format (2026-09-30)
+
+Neither place that starts Stella names a format. `cmd/stellacheck` (RAM and pixel modes) runs
+`exec.Command(stellaBin, romPath)`; `scripts/stella_oracle.sh`'s `tia` mode, which took the write-register
+captures, runs `"$STELLA" -dbg.res 1000x700 -dbg.fontsize small "$rom"`. The Gopher2600 side is NTSC on every
+path, by two routes: the RAM path leaves `oracle.Gopher`'s `Spec` empty, and the TIA and pixel paths call
+`emu.New("NTSC")` directly (`internal/oracle/stella_tia.go`, `cmd/stellacheck/main.go`). Stella takes the
+format from its properties database, keyed by the ROM's MD5, and otherwise auto-detects (SpiceWare, AtariAge
+`topic/224967`; **Cited only, not verified**). A ROM assembled here has a new MD5 on every change, so it is
+always auto-detected. Three litmus ROMs are PAL by design (`litmus_pal`, `litmus_pal_physics`,
+`pal_odd_lines`) and have `tia` captures; the header of `litmus_pal.txt` records the ROM hash and the frame
+count, not the format. **Gap:** pass the format when Stella is started, make the Gopher2600 side follow it,
+and write it into the capture header. Size: S.
+
+### From a drawing to tables: one top-first table, one form, no fit check (2026-09-30)
+
+What exists: `cmd/ingest` reads a screenshot PNG and puts paste-ready DASM tables into `report.json`
+(`playfield_asm`, `sprites_asm`; `internal/ingest/emit.go`), sprite rows in image order, top first.
+`pkg/sprite` turns ASCII art into GRP bytes, also top first. What the forum has built or plans, and this
+does not:
+
+- **Every form from one source.** Kernels that count down need bottom-first tables, and games keep
+  pre-shifted, flipped or re-ordered copies of the same art. Kept by hand, they drift: `pkg/sprite`'s digit 9
+  held score6's raw bottom-first bytes and drew as a 6 (`pkg/sprite/sprite.go`). jeremiahk's gen_gfx writes
+  every form from one file (AtariAge `topic/290501`); walaber's converter flips vertically, adds a zero row
+  and wraps the table in a macro (`topic/233343`).
+- **A build step, not a paste.** ZackAttack plans a framework in which a JSON manifest and the PNGs are read
+  and the asset code generated, and the game refers to each asset by id — described as an idea, not shipped
+  (`topic/347047`).
+- **A fit check from the picture's side.** `prove_line_budget` proves a kernel's cycles and takes asm;
+  `plan_sprite_placement` takes the left edges of the shapes on one scanline and says whether the objects can
+  be strobed to cover them. Neither is called from a drawing, so an impossible screen is found after its
+  kernel is written. lucienEn hopes his editor will fail generation when a line does not fit, once he
+  implements code generation (`topic/346095`).
+
+**Cited only, not verified** for the tools and plans named; none was run here. Size: M.
