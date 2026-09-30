@@ -36,18 +36,80 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 - **The higher the luminance the lower the saturation — it washes out toward white** (bright blue in particular stops being identifiable) → **place colours you want to read as vivid at mid-to-low luminance**. Saturation and luminance trade off. 〔132561〕 `→ design.Hue/Luminance/WashoutRisk, HueName, GradientSameHue, SameLuminance`
 - **The atom of the colour data model is "colour per scanline" = `colorPerRow[]`**: holding an array of scanline index → COLUPx value instead of a single `color` expresses vertical multi-colour (the cheapest multi-colour) directly. TIA Studio's M1 design decision converged on this too. 〔research w4 / `tools/research-w4-m1-open-questions.md`〕
 - **Background "shimmer / noise texture" is just streaming bits of the random seed into `COLUBK` every scanline (no dedicated RAM)**: water shimmer, sandstorm, twinkling stars — copy bits of the LFSR/randomSeed you already run into `COLUBK` per band and get them at **almost zero cost**. 〔Fishing Derby `.colorWaterShimmer` = a water effect that streams randomSeed bits into per-line COLUBK〕
+  - **The playfield version of the same noise is NOT near-zero cost.** Yars' Revenge's neutral zone is
+    random-looking — the original draws its own code as data — and batari's LFSR reproduction does four
+    things on every scanline — read the data, write PF, write the colour, step the LFSR — with the PF
+    write exactly timed; in the batari Basic standard kernel he was answering for, that costs the whole
+    playfield (a limit of that kernel, not a price the TIA sets). The zone is also shown only
+    every other frame, alternating with Qotile's shield, so it needs a second, PF-less kernel for the
+    other frames. The `COLUBK` stream above is the cheap end of this. **Cited only, not verified** —
+    his kernel (`ion.zip`) was not fetched. 〔mining 120680 yars-ion-field〕
+- **Take the hue away before calling a picture readable — a game that honours the colour/B&W switch
+  shows what is left.** The switch only sets `SWCHB` D3 (`litmus_swchb`; the engine flips it with the
+  `"color"` panel event in `internal/emu/emu.go`); what B&W mode looks like is whatever the game then
+  writes to its colour registers. Glenn Saunders on Seawolf 2, 2004: *"You have to be careful how you
+  alter the color registers for B&W. In B&W mode the bottom-most ship is almost invisible if not for
+  the stripe and the top tips, and the top ship's tips disappear. It's the whole contrast issue."*
+  〔`200401/msg00048`〕 A design separated by hue alone passes every colour check and fails
+  here. It is the cheapest look at the quantity `pkg/design/color.go` says is *not measured anywhere in
+  this tree* — how small a luminance difference still reads. **Cited only, not verified**: nothing here
+  has rendered a design with its hue removed.
+- **A whole screen in ONE hue is a style, and can be offered as an option.** The craft section has the
+  single-object case (8 px monochrome → spend it on the silhouette); this is the screen-wide one. One hue
+  × the 8 luminance steps above is the palette — bladejunker: *"Technically an eight color gradient"* —
+  and SpiceWare: *"While Space Rocks defaults to multicolor, you can select any chroma value for a
+  monochrome palette."* The claimed advantage is budget: *"if the color values are uniform across the
+  scanlines it falls in line with the limits of those graphic objects and their color output limit."*
+  **Cited only, not verified** — the cycles freed were not counted. 〔mining 317744 green-monochrome〕
+- **The ball is not a colour of its own — it is drawn in `COLUPF`.** Outside SCORE mode, on a line where
+  the playfield is yellow, the ball is yellow (in SCORE mode the engine paints the PF halves in
+  `COLUP0`/`COLUP1` and leaves the ball in `COLUPF` — `Gopher2600/hardware/tia/video/video.go`). atari2600land, 2021, wanting a letter drawn with the ball: *"can I make it
+  another color or does it have to be yellow since the COLUPF is yellow when I'm drawing the sides of the
+  wall?"* — and a post later, *"It must be yellow."* 〔mining 319062 x-vs-o〕 Budget the ball as **one
+  more shape in the playfield's colour, not one more colour**. The ink is measured here:
+  `internal/emu/respxphase_test.go` reads the ball's pixels as `COLUPF`'s colour — in the engine, with
+  the playfield empty and SCORE off (`litmus_respx_phase.asm`).
 
 ## Sprites (P0/P1)
 - 8 dots wide, one register (GRP 8-bit, MSB = leftmost). Width via NUSIZ 1x/2x/4x. 〔2k6specs, Davie S21〕
 - **Horizontal position = two stages**: coarse ÷15 (5cy loop) → fine HMOVE. Granularity 3px per CPU cycle (matches litmus). 〔Davie S22〕 `→ design.PositionSplit/CoarseIterations` `→ design.HMoveReachable`
-  - **The coarse-positioning line IS the kernel's tightest interval**: the `sta WSYNC`→`sta WSYNC` interval holds the ÷15 loop plus the fine tail (`eor` / ASL×4 / `sta`), so it **gets heavier in proportion to X**, and at maximum X the **worst case exceeds 76cy → the picture rolls** (a lucky test at small X passes; only a ∀ proof surfaces it). `prove_line_budget`'s `; @amax N` must sit on the line of the **`sta WSYNC` that OPENS the interval** to bind it (it has no effect on the `sbc` line). Ways to fit: **restrict the range of movement**, or **turn the ÷15 into a lookup table so it becomes constant-time** (tabulation is the standard density move). Constraining the loop alone still overruns while the fine tail remains. 〔density-ladder rung2 measured / prove_line_budget roll_free 2026-07-24〕
+  - **The coarse-positioning line IS the kernel's tightest interval**: the `sta WSYNC`→`sta WSYNC` interval holds the ÷15 loop plus the fine tail (`eor` / ASL×4 / `sta`), so it **gets heavier in proportion to X**, and at maximum X the **worst case exceeds 76cy → the picture rolls** (a lucky test at small X passes; only a ∀ proof surfaces it). `prove_line_budget`'s `; @amax N` must sit on the line of the **`sta WSYNC` that OPENS the interval** to bind it (it has no effect on the `sbc` line). Ways to fit: **restrict the range of movement**, or **turn the ÷15 into a lookup table so it becomes constant-time** (tabulation is the standard density move). Constraining the loop alone still overruns while the fine tail remains. 〔density-ladder rung2 measured / prove_line_budget roll_free 2026-07-24〕 A third, from Thomas Jentzsch, once the fine and coarse values are computed outside the kernel: *"two different codes for positioning objects on the left and right, giving you more free cycles for other stuff"* 〔`200410/msg00016`〕 — the range is not narrowed, the path is split by it (**Cited only, not verified**).
+- **Vertical position has no register at all.** SpiceWare: *"TIA's a scanline based video chip, as such
+  it has no concept of Y. Therefore it's up to your program to keep track of which row of the screen is
+  currently being drawn, and whether or not the sprite shows up on that row."* 〔mining 246500
+  help-with-movable-objects〕 Horizontal position is a strobe plus a nibble the chip keeps; vertical
+  position is only which lines the kernel writes a non-zero `GRPx` on, which is why every vertical
+  technique here (`techniques/vertical-positioning.md`, `techniques/two-line-kernel.md`) is bookkeeping
+  in RAM. **Cited only, not verified.**
 - **★RESxx's internal draw delay (first suspect in any position mismatch)**: the `RESxx` strobe resets the counter immediately, but **the object actually starts drawing later = player +5 / missile and ball +4 colour clocks** (if RESP0 completes at cycle 46, X ≈ 75). Measured 2026-09-03 for strobes in the visible area, 1x player (`roms/litmus/litmus_respx_phase.asm`, `internal/emu/respxphase_test.go`); AtariAge 294398 reports the same from Stella's source (`renderCounterOffset`). **When a target X is off by ~5px, suspect this first.** RESxx granularity is 3 colour clocks. 〔mining 294398, 283075, 305780, 172089, 137739, 329611, 304182〕 (this is the quantity that explains the codified `X=3N−54/55` from behind; the measurement is recorded in `docs/fundamentals-audit.md`)
 - **Position formula and write window for multiple objects**: `RESxx` while the beam is visible is forbidden (the immediate reset bends the picture) = look ahead in HBLANK or on the previous line. A shared loop walks consecutive `RESP0,x`/`HMP0,x` with `DEX/BPL` (`design.shared_setxpos`, implemented). The right-edge overflow limit is X ≈ 134 (the real cause is "N objects = N+1 scanlines"). 〔mining 67045, 308513, 340965, 311795 (RESxx × HMOVE race = implemented in Gopher2600)〕
 - **Burn one cycle to land RESP where you want it**: when coarse positioning has no NOP to spare, `sta.wx HMP0,x` (dasm `.w`/`.FORCE` forces Absolute,X = 5cy; ZP,X is 4cy) adds 1cy so the RESP0 strobe lands on **the cycle you intended**. 〔mining blog SpiceWare 12538〕
 - **Masked sprite drawing = 21cy** (cheaper than DoDraw's 26cy): `lda (img),y / and (mask),y / sta GRPx / lda (color),y / sta COLUPx` = **clip the shape and update the per-row colour at the same time**. Zero-pad so different sizes share a single mask. 〔mining blog SpiceWare 10890, 339509〕
+  - **DoDraw's 26 is the bottom rung of a ladder, and the rungs above it are cartridge hardware.**
+    SpiceWare, 2016, one multicolour-sprite line (graphics + colour): DoDraw **26** cycles (50 left) →
+    Activision's DPC **14** (`LDA DF0DATAW` / `STA GRP0` / `LDA DF1DATA` / `STA COLUP0`, 62 left) →
+    DPC+ **10** (the same with immediate loads, `LDA #<DF0DATAW`, 66 left) → bus stuffing **6**
+    (`STY GRP0` / `STY COLUP0`, 70 left). 〔mining 255177 so-what-is-dpc〕 **Cited only, not verified**:
+    all four are his annotations, the 26 above is the same author's figure (not an independent check),
+    and `fundamentals-audit.md` lists DPC+ and bus stuffing as not verified here.
+  - **DoDraw is 26 on BOTH paths by construction, and that is what makes it usable in exact-time
+    kernels.** SpiceWare: *"DoDraw is written so the cycles are exactly the same no matter which path
+    through the code is taken, which makes it very useful for kernels that require precise timing like
+    this"* — "this" being a reflected asymmetric PF whose right-hand PF2 write ends at exactly cycle 48.
+    〔mining 254684 asymetrical-reflected-playfield〕 A skip-draw is not balanced by default: the one
+    measured here, `roms/techniques/vertical_pos_dcp.asm`, takes **20 cycles on drawing lines and 17 on
+    skipped ones** (`fundamentals-audit.md`). Balance is a property of how the routine is written, not of
+    its name. **Cited only, not verified** for DoDraw's balance.
 - **div15's fine-movement range is implementation-dependent**: a naive div15 gives **−6..8px**; symmetrising with `eor #15` + `adc #((8+1)<<4)` gives **−7..8px**. Origin = Decuir / Video Olympics. Separate from HMOVE's raw hardware range (−8..+7) = it is a property of the routine. 〔mining 286698〕 (needs litmus backing)
 - **For early-HMOVE (HMOVE before WSYNC), the "do not move" value is HMPx $80 (= 8), not $00**: with $00, an object spanning the same scanline drifts 8px. The idiom positions with a dedicated 15px × 11 kernel. 〔mining 169471〕 (needs litmus)
 - **Striking HMOVE at cycle 73–74 suppresses the left-edge comb (black line)**: the known Cosmic Ark-family trick. 〔mining 165428, 183219, 319456 "HMOVE Shuffle"〕 **Measured 2026-09-03** — `roms/litmus/litmus_hmove_side.asm` band D is now graded: a late HMOVE adds **8 to the nibble** (HMP0 = $10 delivers nine clocks left, not one) and paints **no comb**, while a strobe right after WSYNC paints the comb with every HMxx at zero. `→ internal/emu/hmoveside_test.go`
+  - **The opposite use: HMOVE on EVERY line turns the comb from a blemish into a border.** Dennis Debro,
+    2002: *"I am also doing HMOVE on each scanline so I remove the comb effect"* 〔`200208/msg00235`〕.
+    Glenn Saunders, 2001, answering Pete Holland's question of how Activision got the black border
+    round its screens: *"They often used a wide-mode ball and set it to the side, or did an HMOVE on every
+    scanline"* — and he disliked it, *"as it wastes potentially valuable screen resolution"*
+    〔`200106/msg00092`〕. The per-line comb itself is band D's measurement above; **that
+    Activision titles do this is cited only, not verified**.
 - **Indirect-jump positioning: `JMP (ptr)` into a table of hardcoded positioning lines replaces the delay loop.** Each extra variant defers the RESPx strobe by 5 CPU cycles = **15 colour clocks**; the HMPx nibble loaded before the dispatch and applied by the HMOVE after it fills in between. **Nine variants reach 128 contiguous positions** — measured 136 — and they are contiguous *only* because the fine range (16 values, −7..+8) is at least the coarse step (15): the reachable intervals [15k−7, 15k+8] and [15(k+1)−7, 15(k+1)+8] meet exactly at their endpoint, so one fewer fine value puts holes in the set. Pays ROM for cycles, plus ≥ 2 bytes of RAM per object (pointer + HMOVE value). 〔Stella list, `star fire - return of the starfield ?!?`, 2002-07: Erik Mooney 200207/msg00330 + msg00334 for the mechanism, Manuel Polik 200207/msg00332 for the nine-parts arithmetic〕 `→ roms/litmus/litmus_jmpind_pos.asm` / `internal/emu/jmpindpos_test.go` (5 gradings, 2 negative controls). **Provenance correction:** this file previously credited the idea to Omegamatrix. That attribution is both later and a *different* shape — Omegamatrix folds the jump index into the HMPx low nibble, Erik's 2002 form dispatches through a plain pointer computed off-screen and keeps the nibble for movement.
 - **48px** = NUSIZ $03 (3 copies) + P1 shifted 8px right + VDEL double-buffering to swap GRP with a time offset. Reuse score/bitmap48. 〔48px-positioning〕 `→ pkg/sprite.SplitWide/NUSIZ / design.MaxChars(Text48px)`
 - **Do not fix the picture first and then assign objects.** Order = colour budget → assignment table → negotiate any shortfall via "share colours / double up objects / change the layout".
@@ -79,7 +141,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   file. A claim with no name of its own has no address, so nothing can point at it and survive an
   edit. That is the general lesson, not a fact about PAL. 〔200972 tile-scrolling-engines〕
 - **For HUD/text the character COUNT picks the technique**: 48px = 12 characters / venetian blinds = 32 characters (but only at 3px width). Either split the HUD into its own screen mode, or isolate it in a zone and reuse the score area for several purposes. 〔197162 text-hud〕 ⚠ **The 32-at-3px figure is the source's, not this repository's, checked 2026-09-07.** `roms/techniques/venetian.asm` demonstrates the mechanism — one player drawing figure A on even rows and figure B on odd, zero flicker, half the vertical density — and it draws **shapes, not characters**: measured, an 8-px band at clock 80..87 with runs of 1, 2, 4, 6 and 8 px. **Nothing here has ever rendered 32 characters this way**, so 3 px is the width the technique would require rather than a width anything has been read at. ★For comparison the text kernels ARE measured: 4 px a character at every rung of their ladder 〔`techniques/text12.md`〕, so venetian's 3 px would be **narrower than the narrowest thing this repository has drawn a letter at** — worth knowing before designing to it. `→ design.MaxChars` `→ design.MaxChars/FitsText`
+  - **The rungs around 12, from Robert M:** PF alone *"gives you 40 pixels / 4 per character giving you
+    10 characters across"*; the 6-digit score trick, 48/4 = **12** at low res 3×5 or 3×7; Stellar
+    Track's flicker, **12 hi-res** at 30 Hz; and **13 without flicker** — 3×5 letters in the PF with
+    *"the missles, ball and sprites to superimpose lines between the characters which would otherwise be
+    touching at their sides"* 〔mining 62722 couple-of-design-questions〕. **Cited only, not verified** —
+    the 10 and the 13 have not been built here.
 - **An asymmetric PF is expensive** (PF0/1/2 written twice mid-scanline; the PF0 window is only ~20cy). Compromises = central 32px / every other line with double height / venetian / RAM self-modification. 〔Davie S17, castlevania-port〕 `→ design.AsymPFLineFits/AsymPFReachableX`
+  - **The central-strip compromise buys two things at once.** tokumaru's 2010 Sonic mock-up: *"only the
+    central portion of the screen is used, meaning that only 2 playfield registers are used. Also, the
+    blanked area at the sides will conveniently hide portions of the sprites so that they can smoothly
+    scroll in and out of view."* 〔mining 170135 sonic-the-hedgehog-on-the-2600〕 One loss of width pays
+    for both the PF writes and the edge-entry problem. **Cited only, not verified** — a mock-up, not a
+    running kernel.
 - **Write deadlines for an asymmetric PF (measured cycles)**: when you display the left half and rewrite the right half on the same scanline, aim each write at the moment that PF is **no longer visible**. The classic kernel's actual values =
   first pass PF0[cy7] / PF1[cy14] / PF2[cy21] (for the left half — in time before it becomes visible) → then for the right half
   **PF0 rewritten at cy31 / PF1 at cy38 / PF2 at "exactly cy45"** (too early or too late and it breaks — adding a single nop destroys it).
@@ -113,6 +187,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   pay for a repositioning.** `RepositionCostScanlines = 1` and "the floors are thicker" are the same
   fact, and when the layout is being drawn rather than budgeted, the second one is the one that
   lands: a band that hosts a repositioning cannot also be the thinnest band in the picture.
+  **When no line can be spared for the repositioning, the picture decides where it goes.** hammersdev on
+  *Fate of a Bait* (2026), where the ball's motion value must be rewritten every line to draw a sloping
+  fishing line or worm: *"the code needs a specific condition regarding the slope of the fishing line or
+  worm body shape to start the reconfiguration for the next Objects area. In other words: It waits for a
+  constellation where the pixel position of the fishing line does not change from line to line or the
+  worm body stays the same."* That moment moves from frame to frame, so *"the intermediate areas must
+  have a certain minimum height (9) to ensure that, at some point, all conditions for the
+  reconfiguration are met"* 〔mining 386678 fate-of-a-bait-finished-homebrew〕. A gap band's height can
+  be the guarantee that an opportunity occurs, not only the cost of one. **Cited only, not verified.**
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
 - **A console switch can choose the TV standard, and the price is one switch.** A PAL frame needs
   more scanlines than an NTSC one, and that is a number the ROM decides — so a single build can serve
@@ -188,6 +271,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   frames multiply it. The constraint is that the two must read as the same silhouette, which is a
   drawing decision, not a technical one. Nothing here said this until 2026-09-07; the repository had
   colour as an appearance axis only.
+- **Height is a capacity tool too: a stack can be counted by how tall it is.** freshbrood, 2024, on a
+  solitaire layout: *"A "2" card sprite could actually be 6 pixels tall, while only drawing the number 2
+  at the bottom 5 pixels and setting the height to 5. Then as you stack it on top of an A it becomes 6
+  pixels tall and moves one y position down. Voila. Not fancy but now you can represent all 52 cards as
+  only 4 stacks with varying heights. You only need to flicker twice"* 〔mining 361594
+  quick-questions-for-atari-2600-programmers-thread〕. The count lives in each sprite's height and Y, so
+  four objects carry 52 cards. His order of work, the same day: *"Don't worry about making graphics look
+  good- just focus on making them functional and easy to understand first."* **Cited only, not
+  verified** — nothing here has drawn it.
 - **Multi-kernel = reuse one object per region**: switch `REFP` / position / picture per Y band and reuse a single player for different purposes (Stay Frosty). Match a "never overlap on the same line" placement constraint with an AI that "never enters an occupied column" and flicker is zero. 〔mining 303364, 318140, 164247〕
 - **The stack costs 4 bytes, not a policy.** Christopher Tumber, 2004: *"I pretty much try to avoid
   using JSR completely, and only do so when absolutely needed … **RAM management is really one of the
@@ -309,11 +401,31 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   Recorded as an open question with its falsifier named. Found by the distillation (helper-1), who
   declined to quote it as evidence for the same reason. 〔mining 168616 illegal-opcode stability (ASR caveat in the same note); 294471 §32 for the independent second report〕 **Corrected 2026-09-02**: this line previously listed ASR as stable and claimed it was "already used in 48px / dyn_multisprite". Both were wrong — those three ROMs use no illegal opcode at all, and no ROM in the corpus uses ASR/ALR (measured with two structurally different expressions, both exit 1). `scripts/check_traps.py:73` had already omitted ASR from what it recommends, so the docs were the outlier.
 - **The resource triangle + a register convention**: RAM (128B) / CPU (76cy) / ROM are mutually exclusive = growing one shrinks the others (plus the human cost). The Thomas Jentzsch convention = inside the kernel, pin the roles to **Y = scanline and sprite index, X = PF, A = everything else** and it runs faster. Use subroutines for code reuse only (the call cost is high). 〔mining 146817〕
+- **Packing a table pays only when the table dominates.** Ed Fries fitted a 26-letter 3×4 font into 28
+  bytes — letters overlapped vertically, three to a byte horizontally, unpacked by mask-and-shift — and
+  answered his own question: *"Is it useful? Not really because you probably waste more code space
+  dealing with the compactness of the font than you save in the storage of the font"* 〔mining 204475
+  what-is-it〕. Count the decoder against the saving before compressing; for scale, the 4×5 font in
+  `techniques/text12.md` is 200 bytes stored plainly. **Cited only, not verified.**
+- **Only the code that races the beam has to be assembly.** SplendidNut's 4K Frogger without flicker, 2024: *"Most of
+  the project is written in C. Only the score kernel, the frogs-at-home kernel, and the repositioning
+  routines are written in ASM. I'll probably convert the other kernels over to ASM so that I can utilize
+  early-HMOVEs to hide those black bars on the far left."* 〔mining 364255 a-remake-of-frogger-in-4k〕 The
+  split is by cycle-counting, not by importance — and a cosmetic (the comb, in the Sprites section) was
+  enough to move more code across it. **Cited only, not verified** — 4K and "without flicker" are the
+  author's.
 - **The canonical kernel vocabulary** (Andrew Davie): "**N-scanline kernel**" (one picture row = N scanlines) plus 4 shape axes = sprite spacing / PF spacing / symmetry (sym/asym) / reflection (mirrored). Adopted as the harness's internal kernel vocabulary. 〔mining 320714〕
 - **Movement = fixed-point subpixels**: hold position as 8.8 fixed point and add `vel` every frame → the carry moves the integer part = smooth slow motion, friction, gravity and wind in one framework. **A parabola = constant velocity in X × constant acceleration in Y** (no trigonometry). Enemy chasing = proportional homing from the sign-shift of `(target−pos)/16` (no division; 16 directions = octant + slope threshold — **but a signed shift is not free**: keeping the sign through `(target−pos)/16` costs a `cmp #$80` before each of the four `ror`s, so "no division" means four extra instructions, not none 〔107024:16〕). 〔mining 178177, 270373, 107024〕 (technique-candidate ㉕)
 - **×2^n on a small signed value = repeated `asl` (no multiply, sign preserved)**: in two's complement `asl` is exactly ×2, so a signed velocity such as BallDY becomes ×2^n with n `asl`s (e.g. the lookahead target = BallRow + 4×BallDY = two `asl`s + one `adc`). But (a) **the result's range widens → bit7 can no longer serve as the sign test** = do clamp/wrap tests on the value range instead (if the extrapolated target maxes out around ~190 the threshold is `cmp #220`; an application of known-traps' "bit7 clamping is not usable"), and (b) an input that overflows into bit7 during the shift (|value| × 2^n ≥ 128) destroys the sign = check the input range first. 〔in-house: PONG ai-variants v3 lookahead 2026-07〕
 - **A BCD score can be compared with `cmp` without decoding**: for a valid packed BCD byte, binary ordering = decimal ordering (the upper nibble dominates) → both `cmp #$11` (first to 11 points) and a ScoreR vs ScoreL comparison are correct as written. But **a binary difference is not a decimal difference** (it inflates by +6 across a digit boundary: $10−$09 = 7) → when the difference is used as a QUANTITY, bucket it with saturation so the coarseness is harmless (v4 rubberband's score difference → error-width modulation). The bit7 sign of a subtraction is valid only while |binary difference| < 128. 〔in-house: PONG ai-variants v4 2026-07〕
 - **★TIA revision differences are a trap when cross-checking against hardware**: HMOVE's "extra clock" effect (the Cosmic Ark stars) **reverses behaviour on post-1989 TIAs**, among others — **the same ROM produces a different picture per revision**. The harness's pixel comparison must **pin the TIA revision / emulator** before comparing (and record which revision the verification used). 〔mining 191061 Cosmic Ark stars〕
+  - **The shift is 17 px a line, not the 15 usually quoted, and that is on an ordinary TIA.** Crispy,
+    who re-implemented the TIA on an FPGA: *"the NTSC TIA produces 68 pixel clocks of horizontal
+    blanking. This translates to 17 extra clocks per line, and so the shift is actually 17 pixels"* —
+    one extra clock every four system clocks, over HBLANK's 68. He also shows the 1-1-2-0 width pattern
+    breaking where a pixel straddles blanking and active video. 〔mining 261596
+    cosmic-ark-star-field-revisited〕 This is the base effect, a different layer from the revision
+    difference above. **Cited only, not verified.**
 - **Minimum-byte initialisation + hotspot placement**: in a tight 2K/4K, Omegamatrix's 8-byte self-modifying init (`bne .loop+1` jumps between operator and operand → `#$0A` executes as an ASL) yields A=0 / X=0 / SP=$FF / carry clear. Put bank hotspots **at the highest addresses (near the already-used interrupt vectors)** and the free chunk is maximised (a ZP hotspot = Tigervision 3F saves 1 ROM byte + 1cy per switch). 〔mining blog 12061, 11811〕
 - **★The "lodging" pattern for physics lines (sharing a WSYNC line between mutually exclusive paths)**: splitting the Overscan physics into "one concern = one WSYNC line" runs out of lines, but **paths that are mutually exclusive within the same frame (normal / hit / miss / frozen …) may use the same line for different purposes** —— each path strobes line N's WSYNC itself and only the contents of the line are swapped (e.g. line 3 = paddle input normally / english computation on a hit / serve handling on a miss). Work that gets skipped (a frame's worth of paddle input not being applied, say) merely means "drawn with a value one frame old" = an invisible compromise. Keep **the total line count identical on every path** (offset the variable part with the number of filler lines). When a feature addition inflates the budget, first ask "which path is it exclusive with", and consider lodging before adding a dedicated line. Housekeeping that must run every frame (LFSR / counters / note length / switch polling) is safest gathered on **a dedicated line where all paths converge**. 〔in-house: PONG pf2 physics-line architecture 2026-07-02–03 (serve lodging → generalised to hit/miss → new line 5)〕
 
@@ -346,6 +458,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   short), or **an array** (correct, and paid for in RAM per instance). The first two cost nothing and
   feel different; only the third costs bytes. Decide it deliberately rather than inheriting whichever
   one the obvious code produces.
+- **★The lodging pattern has a RAM version: a graphics pointer is only a pointer while its band is
+  drawn.** nukey-shay: *"you can usually repurpose those for temp Ram outside of the kernel...so long as
+  you reset them before their display area(s) begin"* 〔mining 291287 indirect-addressing-question〕. The
+  same exclusivity as the WSYNC-line version, applied to bytes across the frame: a kernel's 2-byte
+  pointers are free from that kernel's end until they are set up again. `defuse` reports per region
+  which bytes are read, which is the check before reusing one. **Cited only, not verified.**
 - **★Placing a row of shapes and WRITING them are different limits, and the writes bind first.** A line's
   placement capacity is a search over strobe cycles (`plan_sprite_placement`); its write capacity is the
   graphics stores that must fit in the same 76 cycles (`prove_line_budget`). They are not the same number and
@@ -427,7 +545,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     **and TRUE interlace — two fields making one picture — is not in this repository at all**, which is
     worth saying because searching for it suggests otherwise: `interlac` matches **14 lines** here and
     **all fourteen mean line-interleaving of sprites**, the flicker/blinds sense. The count is right
-    and "we have it" would be a lie. People did attempt the real thing on this machine, and the way that
+    and "we have it" would be a lie.
+    **The mechanism, from a 2012 build that started from Billy Eno's and Glenn Saunders' sync
+    routines:** *"the sync for the second field starts half a line later, only that for PAL the sync is
+    2.5 lines long while for NTSC it's 3 lines"*, and it buys vertical scrolling of *"1 scan line per
+    field"* instead of 2 per frame. The author calls it *"a very subtle effect"* on a CRT, and guesses
+    z26 *"sometimes can get confused when mapping a specific sync signal to an even or odd field"* — so
+    an emulator picture does not judge it. 〔mining 200603 interlace-smooth-scrolling-demo〕 The ceiling
+    it works against: *"If you count interlace, 525 is the maximum number of scanlines in NTSC … the
+    maximum usable number of scanlines is 482, i.e. 241 noninterlaced"* (Glenn Saunders
+    〔`200106/msg00092`〕). **Cited only, not verified** — nothing here emits a half line.
+    People did attempt the real thing on this machine, and the way that
     thread went is the sharper illustration: the method was described on the list in **2000**; two
     other people built a working version in **2002** having *searched the archive first and missed
     it*; and the original author had to point them at his own post afterwards. Billy Eno, who built
@@ -458,6 +586,11 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     if the 3CC grid produced the ~18, which is a factor of three out; the code was right all along.
     Horizontal multi-colour tops out at ~18 bands / 3 colours (4 by borrowing SAX). Four arbitrary colours are impossible = substitute holes plus stacking. The SCORE bit (CTRLPF D1) splits the PF left/right. 〔mining 190154〕 `→ design.MinColorBandWidthPx, ScoreModeTwoColor`
 - **Kill the misread letter pairs**: L/I/T · U/W · M/H/N · O/0/D. An author cannot notice their own misreadings → **verify with another person or by reading aloud**; the final adjustment is single-pixel. 〔294306, 326595 (confirmed twice = a strong principle)〕
+- **At 4 px wide, seven letters are the hard ones: M, N, V, Q, Y, W, Z.** sheddy, on a 4×4 font called
+  surprisingly clear: *"Not surprising as it's not all 4x4! Sure something passable can be done for M,
+  N, V, Q, Y, W, Z. The others work well."* 〔mining 278281 160-pixel-display〕 A narrow font that reads
+  well may be cheating on exactly those letters, so draw them first. The text kernels here are 4 px a
+  character (`techniques/text12.md`). **Cited only, not verified.**
 - **In 8px monochrome, spend the entire budget on the silhouette**: concentrate on the single most identifying part (hat, moustache, etc.). If that is not enough, buy density with double width + venetian stripes. 〔106110〕
 - **A walk cycle needs a minimum of 2 frames at 50:50**: one bit of the frame counter (`and #2^n`) gives even spacing with no reset, and runs **only while moving**. 〔301861〕 `→ design.WalkFrame`
 - **Landscape gradients hold one hue and step only the luminance** (never mix hues). Depth from two layers: BG = far, PF = near. 〔160655〕 (consistent with the colour section's "high luminance → low saturation" rule)
