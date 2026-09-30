@@ -36,7 +36,7 @@ RESP0   = $10
 GRP0    = $1B
 HMCLR   = $2B
 CXCLR   = $2C
-CXP0FB  = $02          ; read: D7 = P0/PF, D6 = P0/BL
+CXP0FB  = $32          ; read: D7 = P0/PF, D6 = P0/BL ($32 mirror: WSYNC is $02)
 
 snap0   = $80          ; latch state before any clear
 snap1   = $81          ; after HMCLR
@@ -112,14 +112,16 @@ Vis:    sta WSYNC
 ; --- Overscan: 30 lines, with the three snapshots taken on the first ---
 ;
 ; NOTE (2026-09-03): the three snapshots below are stored RAW, and the scenario therefore pins
-; 130 / 130 / 2 rather than 128 / 128 / 0. CXP0FB drives only D7 and D6; every other pin floats,
+; 178 / 178 / 50 ($B2 / $B2 / $32) rather than 128 / 128 / 0. CXP0FB drives only D7 and D6; every other pin floats,
 ; and Gopher2600 fills a floating pin from the last value the CPU put on the bus
-; (memory.go: `data |= mem.LastCPUData & ^mem.DataBusDriven`). The last such value here is the
-; 2 from `lda #2 / sta VBLANK` on the very next line, so the low bits read back as $02 and
-; snap2 "clear" is $02, not $00.
+; (memory.go: `data |= mem.LastCPUData & ^mem.DataBusDriven`). The last such value is the byte
+; fetched just before the read: the operand of `lda CXP0FB` itself, $32, so the low bits read
+; back as $32 and snap2 "clear" is $32, not $00. (Until 2026-09-29 CXP0FB was declared $02 and
+; this note credited the 2 from `lda #2 / sta VBLANK`. Both were 2, so the two could not be told
+; apart; moving the equate to $32 moved the low bits to $32, measured.)
 ;
 ; So `scenarios/litmus_cxclr.json` pins TWO things at once: the collision latch (D7) and the
-; instruction that last drove the bus. Reordering these instructions harmlessly — changing
+; address the read goes through. Reading via another mirror of the same register — changing
 ; nothing the TIA does — moves the low bits and fails the scenario. That is not a bug, but it
 ; is not readable from the values either, which is why this note exists. A ROM written today
 ; would normalise to 0/1 before storing (see the flicker-attribution design) so the pinned value

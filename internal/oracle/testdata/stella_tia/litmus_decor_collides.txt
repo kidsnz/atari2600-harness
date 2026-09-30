@@ -1,6 +1,6 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_decor_collides.bin
-# binsha256: d5132e1c0922b07a57f4444660c5c984620fd974a8fccba921de4b41416f6c2c
+# binsha256: 130f796236ceb0dbe8082945b4837dbbc1a562646a749d98344ab247ae3b4940
 # binsha256-source: captured
 # frames: 5
 # stella: 

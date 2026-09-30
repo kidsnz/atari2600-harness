@@ -1,10 +1,10 @@
 # stella-tia-oracle capture
 # rom: roms/litmus/litmus_cxclr.bin
-# binsha256: 6db0728b4e5bfa5a7f0658c9a2133f48dc52ef35ecdc03131101429b6cc539fd
-# binsha256-source: backfilled-2026-09-04
+# binsha256: fae7c84cab90e411725f1ce19189f12c65d9a908ae9e1701ab627d494186757d
+# binsha256-source: captured
 # frames: 5
 # stella: 
-# captured: 2026-08-03
+# captured: 2026-09-29
 Stella 7.0
 > autoExec():
 

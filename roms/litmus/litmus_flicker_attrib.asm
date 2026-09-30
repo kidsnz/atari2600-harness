@@ -32,9 +32,9 @@
 ; * Every stored byte is NORMALISED to 0 or 1 before it lands in RAM. Raw CXP0FB must
 ;   not be stored: only D7/D6 are driven, and Gopher2600 fills the rest from the last
 ;   value the CPU put on the bus (memory.go "data |= mem.LastCPUData & ^mem.DataBusDriven"),
-;   which is why scenarios/litmus_cxclr.json pins 130 and 2 rather than 128 and 0 — and
-;   why a harmless reorder of that ROM's instructions would fail it without the TIA doing
-;   anything different. Normalising means the scenario pins the TIA and nothing else.
+;   which is why scenarios/litmus_cxclr.json pins 178 and 50 rather than 128 and 0 (the
+;   low bits are the read's own address byte, $32) — and why reading through another
+;   mirror would fail it without the TIA doing anything different. Normalising means the scenario pins the TIA and nothing else.
 ;
 ; Self-contained (no vcs.h). NTSC frame = 262 lines, MEASURED, not derived: the four
 ; blocks below strobe WSYNC 3 + 36 + 192 + 30 = 261 times and the frame comes out 262,
@@ -58,7 +58,7 @@ PF2     = $0F
 RESP0   = $10
 GRP0    = $1B
 CXCLR   = $2C
-CXP0FB  = $02          ; read: D7 = P0/PF, D6 = P0/BL
+CXP0FB  = $32          ; read: D7 = P0/PF, D6 = P0/BL ($32 mirror: WSYNC is $02)
 
 frame   = $80          ; 0..27, then the ROM idles
 scratch = $81

@@ -32,7 +32,7 @@ RESP0   = $10
 RESM1   = $13
 GRP0    = $1B
 ENAM1   = $1E
-CXM1P   = $01           ; read address
+CXM1P   = $31           ; read address ($31 mirror: VBLANK is $01)
 CXCLR   = $2C
 
         org $F000

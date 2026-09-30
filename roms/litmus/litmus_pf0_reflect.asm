@@ -59,8 +59,8 @@ HMCLR   = $2B
 GRP0    = $1B
 GRP1    = $1C
 CXCLR   = $2C
-CXP0FB  = $02          ; read: D7 = P0/PF
-CXP1FB  = $03          ; read: D7 = P1/PF
+CXP0FB  = $32          ; read: D7 = P0/PF ($32 mirror: WSYNC is $02)
+CXP1FB  = $33          ; read: D7 = P1/PF ($33 mirror, like CXP0FB)
 
 cur     = $80          ; this point's normalised reading
 prev    = $81          ; the previous point's, for the step count
