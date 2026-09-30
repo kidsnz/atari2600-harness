@@ -124,6 +124,15 @@ in both cases and RESMP1 in neither, so it is not a usable oracle for that regis
 reading matches what each ROM writes. `TestStella70MisreportsRESMP1` locks the behaviour so a fixed
 Stella makes the test fail and the register can be put back.
 
+**An outside case in the other direction.** The power-on RAM row above has Stella the one closer to
+hardware; here Gopher2600 was. Flap Ninja's demo went back to its title screen whenever the button was
+pressed, on a PAL light sixer with a Harmony cart (Bomberman94). MarcoJ found that Gopher2600 *"behaves like a
+console"* on that ROM, while *"Stella with developer mode"* could not be made to; the author (kikipdph) put it
+down to bank switching, replaced the binaries with ones that worked on Gopher2600, and MarcoJ confirmed they
+reached gameplay on a PlusCart — fails on hardware, reproduced in one emulator, fixed, confirmed on hardware
+(AtariAge `topic/367912`). **Cited only, not verified** — the ROM was not run here, and one case says nothing
+about which emulator is closer in general.
+
 ## Automation (v1.33.0)
 
 `scripts/stella_oracle.sh <rom.bin> [frames]` runs the whole loop hands-free: it launches
@@ -131,3 +140,80 @@ stellacheck and, in parallel, sends the backquote key to Stella via AppleScript 
 **One-time setup:** grant your terminal Accessibility permission
 (System Settings → Privacy & Security → Accessibility). The script preflights the permission and
 prints instructions if missing — until then the manual-keypress flow keeps working unchanged.
+
+## Stella facilities this oracle does not use
+
+Collected from forum threads. Where Stella 7.0's bundled manual (`Stella.app/Contents/Resources/docs/`
+`index.html` and `debugger.html`) names the same thing, that is said; **none of it was run here**.
+
+- **The TV format can come from the ROM's file name — a hazard for this oracle.** A PAL60 ROM under TV
+  Format = Auto Detect is detected as NTSC and its colours come out wrong (jamtex, AtariAge `topic/308669`);
+  a name containing `PAL60`, `PAL-60`, `PAL_60` or `PAL 60` gets the right format (thomas-jentzsch, same
+  thread). The patterns inside the Stella 7.0 binary (`strings`) are `[ _\-(\[<]+PAL[ _-]?60` for PAL60 —
+  which admits the underscore form, and needs a separator before `PAL` — and `[ _\-(\[<]+PAL[ _\-)\]>.]` for
+  PAL; the manual's filename table lists only `PAL60, PAL 60, PAL-60`, and its colour-based `-detectpal60` is
+  described as *"not very reliable"*. `cmd/stellacheck` launches Stella with the ROM path alone
+  (`exec.Command(stellaBin, romPath)`), so on the command line the file name is the only format hint Stella is
+  given. No capture in `internal/oracle/testdata/stella_tia/` fits the PAL60 pattern; two fit the PAL one —
+  `litmus_pal` and `litmus_pal_physics` — if Stella matches regardless of case, which was not checked
+  (**Not verified**), and the captures do not record which format Stella chose. The engine's own PAL60
+  inconsistency is a separate matter, pinned by `internal/emu/pal60rate_test.go`.
+- **Jitter/roll.** The 7.0 manual: `-plr.tv.jitter` / `-dev.tv.jitter` — *"Enable TV jitter/roll effect, when
+  there are too many or too few scanlines per frame"* (Alt+J / Cmd+J). stephena suggested it to an author whose
+  game held steady on hardware except for a jump at the moment a wave was cleared, and barely showed it in
+  Stella: make the failure visible first, then read the scanline count. SpiceWare's Frame Stats (Alt+L /
+  Cmd+L) showed 272, and 283 with RESET held — *"the difference of 11 will cause the screen to jump"* (AtariAge `topic/281093`). This
+  harness counts instead of showing: scenario `frame_lines_stable` (`docs/scenarios.md`); `internal/crt` has
+  no vertical axis for it (`rg -i 'jitter|roll' internal/crt` → 0). **Not verified** — the effect was not
+  turned on here.
+- **Undriven TIA bits.** reveng: run Stella with `-dev.settings 1` and `-dev.tiadriven 1` to make a read bug
+  such as `lda 0` written for `lda #0` obvious (AtariAge `topic/298427`). The 7.0 manual: *"Set unused TIA pins
+  to be randomly driven high or low on a read/peek. If disabled, use the last databus value for those pins
+  instead."* This engine returns the last bus byte (`internal/emu/floatbits_test.go`) — the model under which
+  that bug usually reads back the intended value. **Not verified** — `-dev.tiadriven` was not run here.
+- **Four standing guards** (Bruce-Robert Pocock, AtariAge `topic/353053`):
+
+  ```
+  breakIf { _scanEnd < #262 && _scan == 0 && _fCount > 1 }
+  breakIf { _scan > #262 }
+  breakIf { sp < $f0 }
+  breakIf { pc < $f000 }
+  ```
+
+  A short frame (seen only once the next frame's first line is produced, hence `_scan == 0`, then walked back
+  with Stella's rewind), an overrun, the stack pointer below the top of the variables (`$f0` for variables at
+  `$80…$EF`), and a jump out of a ROM based at `$F000`. He suggests a file such as `~/fly29.script` to have
+  them loaded automatically. Where Stella 7.0 looks for a per-ROM script is itself in doubt: its manual says
+  `"<rom_filename>.script" (located in the same directory as the ROM)`, but every capture in
+  `internal/oracle/testdata/stella_tia/` records `script file '~/Desktop/<rom>.script' not found`, after
+  running `autoexec.script` (Status, above).
+  **Not verified** — the guards were not run.
+- **Trapping a strobe.** `trapwrite RESP1` stops on every write to it: on Dragon Fire it showed RESP1 written
+  four times a frame and HMOVE used for only three of those positionings (SpiceWare, AtariAge `topic/219525`).
+  The conditional forms stephena announced for Stella's git, `trapreadif`/`trapwriteif` (AtariAge
+  `topic/271098`), are in the 7.0 command list as `trapReadIf`/`trapWriteIf`, *"On <condition> trap write
+  access to address(es) xx [yy]"*. For a ROM with no source this engine's counterpart is
+  `cmd/beamtrace -rom <bin>`, which lists every RESP0/1 and HMOVE write per scanline with its beam clock.
+  **Not verified** — neither trap was run here.
+- **Positions are the emulator's to show, not the program's to read.** The HPos Stella's debugger displays —
+  like this harness's `read_tia` `ResetPixel`/`HmovedPixel` — is internal state; there is no way to ask the TIA
+  for it, so a game that needs an X keeps it in a RAM byte and repositions from it every frame (Karl G,
+  SpiceWare, AtariAge `topic/304108`). **Cited only, not verified.**
+- **Snapshots in place of an input log.** Stella has no input recording; `saveStateIf` saves an extra state
+  whenever a condition holds, e.g. when a given input happens (thomas-jentzsch, AtariAge `topic/330559`), so
+  a rare input-dependent bug is reproduced from a state rather than a replayed input. The v3 table above
+  records that `saveState`/`saveStateIf` issued from `autoexec.script` wrote no file here; a call that does
+  work has not been found. **Cited only, not verified.**
+- **ARM cartridges: Stella's line count can be wrong.** alex_79 put a logic analyser on a 4-switch's TIA
+  output pins and read 263 lines from a DPC+ demo that Stella reported as 262; SpiceWare: Stella's
+  ARM emulation reports how many instructions ran, not how long, so Stella counts ARM code as 0 cycles,
+  *"for DPC+ as well"* (AtariAge `topic/183085`, 2016; later Stella versions not checked). **Cited only, not
+  verified.** Every capture here is of a `roms/litmus`, `roms/techniques` or probe ROM (their `# rom:`
+  headers), and none of those uses DPC+ (`rg -il 'dpc' roms/litmus roms/techniques --glob '*.asm'` finds only
+  an ADPCM comment).
+- **ROMs that break emulators**, thomas-jentzsch's list for a new emulator's author in 2015: Galaxians,
+  Meltdown, Pole Position, Kool-Aid Man, Swoops! (AtariAge `topic/241103`). In the same thread DirtyHairy
+  says Meltdown's left/right asymmetry was fixed in Stella and 6502.ts by better modelling of NUSIZ during
+  draw/decode (stella-emu/stella issue #63; an earlier, less accurate fix in #56). Kool-Aid Man is already in
+  `known-traps.md` for another reason (z26 recognised the ROM rather than emulating it). None of the five has
+  been captured. **Cited only, not verified.**

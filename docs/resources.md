@@ -99,11 +99,36 @@ $F0=right1 $E0=right2 $D0=right3 $C0=right4 $B0=right5 $A0=right6 $90=right7 $80
 - **Per-line HMOVE** turns the comb into a solid **bar** over the left 8 px (Pitfall!, etc.). HMOVE at
   **cycle 73–74** erases the black line.
 - Strobe HMOVE **right after WSYNC**. The low-level reference is Andrew Towers' "TIA Hardware Notes".
+- **Two more ways to live with the comb, both from the forum.** *Draw it into the picture:* in Double Dragon
+  most of the black strip down the left edge is HMOVE, with M1 supplying a few scanlines of it (SpiceWare,
+  reading Stella's debug colours, AtariAge `topic/278994`). *Cover it:* Missile0 at size 8X, x position 0,
+  enabled for the whole height of the screen (SpiceWare, AtariAge `topic/281341`). M0 draws in `COLUP0`
+  (`techniques/missiles-bullets.md`), so the strip is Player0's colour, and the same advice pairs it with
+  making Player0 black; it spends M0. Strobing HMOVE mid-line to hide the bar is ruled out in
+  `techniques/sprite-placement.md`. **Cited only, not verified** — neither game was run here, and the width
+  of Double Dragon's strip was not measured.
+- **What the comb costs the palette when none of these is used:** the author of Robo-Ninja Climb fixed the
+  background to black so the HMOVE lines would not show, and had to invert the player's colours to read against
+  it (gauauu, AtariAge `topic/281341`). **Cited only, not verified** — the game was not run here.
 
 ### Frame budget (settled values)
 - **1 line = 228 color clocks (HBLANK 68 + visible 160) = 76 CPU cycles** (3 clocks/cycle).
 - NTSC **262** = VSYNC 3 / VBLANK 37 / visible **192** / Overscan 30.
 - PAL · SECAM **312** = 3 / 45 / visible **228** / 36.
+- **Clocks by region.**
+
+  | | TIA clock (Hz) | CPU clock (Hz) |
+  |---|---|---|
+  | NTSC | 3,579,545 | 1,193,182 |
+  | PAL | 3,546,894 | 1,182,298 |
+  | SECAM | 3,562,500 | 1,187,500 |
+  | PAL-M | 3,575,611 | 1,191,870 |
+
+  Sources: alex_79, AtariAge `topic/316704`, and the Woodgrain Wizardry wiki's *Clock Speeds* page, which is
+  also where the engine's own CPU constants come from (`Gopher2600/hardware/clocks/clocks.go` names it) — so
+  this is one table found twice, not two measurements. **Cited only, not verified.** By arithmetic, the same
+  AUDF value plays 15.9 cents flat on PAL (3,546,894 / 3,579,545); `cmd/keyfit -clock` takes the audio base
+  clock, TIA clock / 114, and its help text gives PAL's as `3546894/114`.
 - **Caution:** real games deviate (NTSC 248–286, etc.). The harness does not hardcode "exactly 262" (use a
   range + warning).
 
@@ -157,8 +182,43 @@ bit:  4 5 6 7 | 7 6 5 4 3 2 1  0  | 0  1  2  3  4  5  6  7
   D0=1 → reflect (mirror)**.
 - litmus measurement (scanline 100): `PF0=$10`→clock 0-3 / `PF1=$80`→16-19 / `PF2=$01`→48-51, repeating in
   the right half. Each exactly 4 clocks wide.
+- **A mid-line colour change meets a column edge at only 13 of the 40.** A `COLUBK`/`COLUPF` store lands on a
+  3-clock grid (`1, 4, 7, …` in glurk's numbering) and a column edge on the 4-clock grid above; they coincide
+  every 12 clocks, at `4, 16, 28 … 148`. There is no HMOVE for colours, so the other edges cannot be nudged
+  into reach (glurk, AtariAge `topic/346375`). Why the two grids compose this way is `design-principles.md`,
+  "WHERE a boundary can fall" and "HOW WIDE the narrowest band can be". **Cited only, not verified:** the phase
+  was not measured here, and in the thread thomas-jentzsch first put it at `2, 5, 8` and then withdrew that.
+  The count depends on it — a phase of `0` would give 14 (`0, 12 … 156`).
 - **Caution (poke quirk):** write-only TIA registers ($0D/$0E…) do not persist stably under `poke` (poke is
   for RAM). To change rendering, **`sta` from ROM/kernel** rather than poke. Same for position and color.
+
+### Difficulty switches — wiring and the direction they fail
+- The two difficulty switches go straight to two pins of the RIOT (6532), not through the CD4050 buffer.
+  **B connects the pin to ground; A leaves it unconnected** (alex_79, AtariAge `topic/347840`, pointing to
+  the 2600 service-manual schematic, which was not read here; the post does not say which two pins).
+  **Cited only, not verified.** The engine's reading is pinned by `litmus_swchb`: SWCHB D6 (P0) / D7 (P1) = 1
+  means A (Pro).
+- So a failing switch fails toward **A**: oxidation or dirt that stops it making contact, and the game sees A
+  whatever the lever says. In that thread a console played hard mode with both levers on easy, and the fault
+  was a cold solder joint on a switch's ground. A game that gives the difficulty switches a job has to stay
+  playable with both stuck at A. **Cited only, not verified.**
+
+### Source conventions (DASM)
+- **`ORG $F000` is a convention for the reader, not a requirement of the machine.** The 6507 has 13 address
+  lines, so `$1000`, `$3000` … `$F000` reach the same ROM byte — the eight windows measured in
+  `techniques/bankswitching.md`, and the same eight nanochess lists as interchangeable. Two reasons for
+  `$F000` are on record: the convention of setting every unused address bit to 1 (Eckhard Stolberg, quoted in
+  `techniques/bankswitching.md`), and, in this thread, that the 6502's NMI/RESET/IRQ vectors are defined at
+  `$FFFA`/`$FFFC`/`$FFFE`, so with that origin (and `$F800` for 2K) the source spells them that way
+  (SpiceWare, nanochess, AtariAge `topic/273877`). **Cited only, not verified** that an `ORG $1000` source puts
+  its vectors at the same offsets in the image; the addresses stored in them would read `$1xxx`, not `$Fxxx`.
+- **DASM has no link step, so `include` is a paste.** One source file goes in and the image comes out:
+  `internal/build/build.go` makes every ROM here with a single `dasm <asm> -f3 -o<bin>` call, and `dasm`'s
+  usage line takes one `sourcefile`. An `include`d file is assembled as part of it, so splitting a source changes
+  nothing the machine sees. What splitting buys is placement: with subroutines, graphics and data in separate
+  files, reordering the `include` lines moves a block off a page boundary (Dionoid, AtariAge `topic/345618`;
+  **Cited only, not verified**). This repository's ROMs use no `include` at all
+  (`rg -n -i '^\s*include\s' roms --glob '*.asm'` → 0).
 
 ### Verification/test references (category 3) = NEW
 - **Klaus Dormann 6502 functional test** — the gold standard for CPU correctness (on success PC halts at a
@@ -175,6 +235,11 @@ bit:  4 5 6 7 | 7 6 5 4 3 2 1  0  | 0  1  2  3  4  5  6  7
 - 6502 instructions/cycles: masswerk `6502_instruction_set` (branch: not taken 2 / taken same page 3 / page
   cross 4; `abs,X`/`abs,Y`/`(ind),Y` crossing +1).
 - TIA register table: Stella Programmer's Guide / Computer Archeology / NO\$ `2k6specs` / `vcs.h`.
+  **Spell register names as `vcs.h` does** (`COLUPF`): code written in names nobody else uses is harder to
+  get help with (thomas-jentzsch, AtariAge `topic/220375`, to an author who said he had copied `COLLUPPF`
+  from the original Programmer's Guide; **Cited only, not verified**). The Guide is not a safe source for spellings: the HTML copy in the
+  umbrella's `reference/docs_atari/` has no `COLLUPPF`, but has both `COLUP0` and `COLUMP0`
+  (`rg -o -i 'COLU[A-Z0-9]+'` over it).
 
 ### Needs manual confirmation (the subagent couldn't WebFetch)
 - The bit notation of masswerk's HMOVE table (the summarizer dropped the sign bit. Substituted Stella Guide
@@ -226,6 +291,11 @@ Implementation spec for Phases 1–2. Latest Gopher2600 **v0.56.0** (2026-06), o
   `dump START [END] FLAGS` (**1=memory / 2=CPU / 4=inputs**, additive so `7`=all).
 - **Fixed Debug Colors:** `-tia.dbgcolors roygbp` = **P0=red / M0=orange / P1=yellow / M1=green / PF=blue /
   BL=purple** (fixed order P0,M0,P1,M1,PF,BL).
+- **Then switch objects off one at a time.** With the debug colours, toggling individual players and missiles
+  shows how any game's picture is put together (ZackAttack, AtariAge `topic/278994`) — and removing one is the
+  negative control for the colour reading. Stella 7.0's bundled manual (`docs/index.html`, Developer Keys)
+  lists Alt+Z / X / C / V / B / N (Cmd on macOS) for P0 / P1 / M0 / M1 / BL / PF. **Not verified** — the keys
+  were read from the manual, not pressed.
 
 ### Image overlay
 - **In-house Go** (`image`/`image/draw`/`image/png` + `fogleman/gg` for lines and text). **Do not shell out
