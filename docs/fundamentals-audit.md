@@ -250,7 +250,7 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   of the byte is the last value the CPU put on the bus (`Gopher2600/hardware/memory/memory.go:189
   "data |= mem.LastCPUData & ^mem.DataBusDriven"`), which is why
   `roms/litmus/scenarios/litmus_cxclr.json` asserts 178 and 50 rather than 128 and 0 (the low bits are the
-  read's own address byte, `$32`). With `A = $FF`,
+  last byte on the bus before the read, here its zero-page address `$32`). With `A = $FF`,
   Z answers "is the whole byte zero" and so moves when the address the read uses changes, with no
   change in TIA behaviour at all. With `A = $C0` the residue is masked and Z becomes a third useful
   predicate — "neither of these two pairs collided" — so one `BIT` yields three tests, not two.

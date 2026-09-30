@@ -33,7 +33,7 @@
 ;   not be stored: only D7/D6 are driven, and Gopher2600 fills the rest from the last
 ;   value the CPU put on the bus (memory.go "data |= mem.LastCPUData & ^mem.DataBusDriven"),
 ;   which is why scenarios/litmus_cxclr.json pins 178 and 50 rather than 128 and 0 (the
-;   low bits are the read's own address byte, $32) — and why reading through another
+;   low bits are the last byte on the bus before the read: its zero-page address, $32) — and why reading through another
 ;   mirror would fail it without the TIA doing anything different. Normalising means the scenario pins the TIA and nothing else.
 ;
 ; Self-contained (no vcs.h). NTSC frame = 262 lines, MEASURED, not derived: the four

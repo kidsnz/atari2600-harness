@@ -74,7 +74,7 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 | Player0–Player1 (CXPPMM) — the pair Frogger uses | `litmus_collide_pp` | `read_collisions.p0_p1 == true` |
 | Missile0–Player0 (CXM0P) | `litmus_collide_mp` | `read_collisions.m0_p0 == true` |
 | **All 15 pairs** at once (overlap P0/P1/M0/M1/BL + PF) | `litmus_collide_all` | every `read_collisions` field true |
-| Latches are **sticky**, **CXCLR** clears them, and **HMCLR does NOT** (it clears the motion registers — a different thing) | `litmus_cxclr` | CXP0FB snapshotted to RAM at 3 points: `$B2` collided → `$B2` after HMCLR → `$32` after CXCLR (low bits = the read's address byte, `$32`) |
+| Latches are **sticky**, **CXCLR** clears them, and **HMCLR does NOT** (it clears the motion registers — a different thing) | `litmus_cxclr` | CXP0FB snapshotted to RAM at 3 points: `$B2` collided → `$B2` after HMCLR → `$32` after CXCLR (low bits = the last byte on the bus before the read, here its zero-page address `$32`) |
 
 ## Input
 | Behavior | ROM | Evidence |

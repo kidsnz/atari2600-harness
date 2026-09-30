@@ -28,7 +28,8 @@ import "testing"
 // Every cell is normalised to 0 or 1 by the ROM. Raw CXP0FB must never be stored: only
 // D7/D6 are driven and the rest of the byte is the last value the CPU put on the bus,
 // which is why scenarios/litmus_cxclr.json pins 178 and 50 instead of 128 and 0 (the low
-// bits are the read's own address byte, $32). Pinning a raw read pins its address too.
+// bits are the last byte on the bus before the read, here its zero-page address $32).
+// Pinning a raw read pins that byte too.
 func TestFlickerCollisionAttribution(t *testing.T) {
 	e, err := New("NTSC")
 	if err != nil {
