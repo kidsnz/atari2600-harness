@@ -51,6 +51,13 @@ two colours above (the ball draws in `COLUPF`), the bat is flat: neither object 
 face is a rectangle unless the kernel reshapes it line by line (`hmove-slope.md` moves a missile or the
 ball per line). **Cited only, not verified**.
 
+**Nor a size register of its own.** A missile's width is in its player's `NUSIZx` (bits 4-5,
+`zone-multiplexing.md`), so repositioning missiles as extra bullets rewrites a register the player
+also draws with. SpiceWare's Draconian (2014) lets each reposition care only about the size of the
+object it moves and then runs one `FixSizes` clean-up after all repositioning to set every size
+right. Read from distilled notes, not the blog post (AtariAge blog entry `10896`); **Cited only, not
+verified**.
+
 ## The pattern
 
 - **Spawn**: fire edge (and no live bullet) → `RESMP0=2`, mark state "locking" (`bulY=$FF`).

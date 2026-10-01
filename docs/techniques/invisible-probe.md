@@ -39,6 +39,18 @@ missiles and the ball are **positionable one-clock objects that no colour regist
 So a missile riding on its own player is invisible **by construction** — there is no register to
 set wrong. That is the whole trick.
 
+**Why not test with the sprite itself: its hit shape is its picture, frame by frame.** bigmessowires
+(AtariAge `topic/347059`, 2023) tested his player graphic against a playfield maze: *"for the same x,y
+location of the character, some bitmaps may collide with the playfield and some don't"*, so turning
+from vertical to horizontal movement swapped the bitmap and left the character *"partly stuck inside
+the wall"*. One of his own options was this page's — *"a second TIA object under the main character
+sprite that's square and the same color as the background, so it's invisible"* — which he called
+*"Wasteful."* He first removed the sticking by redrawing every sprite, then moved the movement test to
+a CPU bounding-box check — *"so much smoother and better"*, though it *"requires a ton of CPU
+cycles"* where the TIA's is free — keeping hardware collision for *"determining when to activate or open or
+destroy something that the player touched, but not for constraining the player's movement."*
+**Cited only, not verified.**
+
 ## The three ways to hide a probe, and what each costs
 
 **1 — Same colour (a missile on its own player).** Free: `M0` cannot be a different colour from

@@ -235,3 +235,9 @@ is not measured.
 **The other end is none.** Karl G, 2021: *"I wanted to see if I could make a 4-player maze game with
 no sprite flicker and distinct player/object/maze colors and fit it into 2K, and this is the result"*
 (QuadTari, `chaser.bin`, AtariAge `topic/317525`). The thread does not say how the four are drawn.
+
+**None in one band, paid for elsewhere.** SpiceWare's Draconian (2014) draws its radar without
+flicker, after Ed Fries's Rally-X, with each kind of object in its own colour. The radar uses both
+players, so the six-digit score routine cannot share that part of the screen, and the score and lives
+are drawn in the playfield, the older way. Read from distilled notes, not the blog post (AtariAge blog
+entry `10896`); **Cited only, not verified**.

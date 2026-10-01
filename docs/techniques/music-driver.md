@@ -74,6 +74,13 @@ compatible designs; a real game would merge them (envelope volume + SFX channel-
   CPU clock (1,193,182 Hz, `resources.md`) C5 = 523.25 Hz is 2280 cycles a period, 1140 a half-wave,
   about 142 passes of an 8-cycle loop. It holds the CPU for as long as it sounds, and in the thread the
   tuning was still off after the DASM syntax fix it was given. **Cited only, not verified.**
+- **AtariVox oscillators as a voice** (reveng, AtariAge `topic/279099`, 2018): as far as he knew
+  nobody had released anything driving them directly. Notes are possible, *"but there's a lot of data
+  to feed to setup the oscillators, and with 1 byte a frame, you need to account for the delay in note
+  timing"*; his suggestion: *"you could setup the oscillator in advance, and just give it volume as a
+  "note on" a few frames early"*. Chords are *"a bit tough"*. For 21 Blue he tuned voice phonemes to
+  sing along with the intro tune instead, which he found easier. Where the one byte a frame comes from
+  is not stated. **Cited only, not verified.**
 
 ## Budgets and layouts from other drivers (cited)
 
@@ -120,6 +127,9 @@ the main effort. Fixes on record, all **Cited only, not verified**:
 
 - **Advance the music in fractional frames** — Jentzsch calls it *"(superior!)"*; TIATracker did not
   support it in 2017 as far as he knew, but *"the required code change is just minimal"* 〔`topic/270574`〕.
+  Its cost, from his own fractional-math version of Paul Slocum's driver: it *"allows very fine tuning
+  of the music speed, but makes it a bit more complicated to have other stuff in sync with music"*
+  〔AtariAge `topic/236117`, 2015〕.
 - **Change the frame length**: *"reduce the number of scanlines to (312 / 5 * 4 =) ~250, then the
   beats would be (almost 100%) identical too"* 〔same〕.
 - **Space the beats by a pattern** — MLdB's "Dopey fix" for Slocum's song player (2018): for each
@@ -128,6 +138,13 @@ the main effort. Fixes on record, all **Cited only, not verified**:
   beats take 5D frames instead of 6D, the 50:60 ratio, and no beat is dropped — MLdB contrasts it with
   moderntimes99's 2006 PAL revision, used in SpiceWare's Medieval Mayhem, which by his reading skips
   beats 〔AtariAge `topic/280139`〕.
+- **Switch the playback speed at assembly time** — Medieval Mayhem's copy of Slocum's driver
+  (`songplay.h`) is *"slightly modified from the original so the music will play at the correct speed
+  for both NTSC and PAL frame rates"*, in an `IF/ELSE/ENDIF` block on `COMPILE_VERSION`; SpiceWare
+  credits Erik Ehrling, who made the change *"after hearing the music in the PAL version"*, and adds
+  *"Knowing what I know now, I'd have made the PAL version of Medieval Mayhem a PAL60 build"*
+  〔AtariAge `topic/236117`, 2015〕. In `topic/280139` (2018) SpiceWare credits Medieval Mayhem's PAL
+  revision to moderntimes99, October 2006; neither thread says whether that is Erik Ehrling.
 - **Ship both**: the demo's 4K cartridge carries both builds and the Color/B·W switch picks one, *"as
   auto-detection needs a melody board, which is over the top for a 4k ROM"* 〔`topic/270574`, svolli,
   2018〕.

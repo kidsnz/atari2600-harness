@@ -120,6 +120,12 @@ cleanly onto gaps A–E. **Every abandonment died on unverified timing / positio
    (hardware-specific offset)", and the final values were found by trial and error: score `P0=48 / P1=124`
    (NUSIZ `$05`), paddle `P0=16 / P1=143`. → **evidence the model couldn't derive them and brute-forced.**
    This is exactly gap B, "can't pin it without running."
+   People fit constants this way too, so a published value is not evidence of a derivation. Eckhard
+   Stolberg, on the `;?????`-marked values in his free-moving 48-pixel sprite code that readers took for
+   "magic": *"Instead of doing proper cycle counting, I simply tweaked all the delay timer values and
+   player position values until all the writes to the graphics registers lined up perfectly"*; the
+   `;?????` were bookmarks for where he was working, *"So there is nothing magical about those values"*
+   (AtariAge `topic/215637`, 2013). **Cited only, not verified.**
 2. **Hand-placed NOP positioning** (`archive/claude.ai_ver/pong.asm` 243–281, 31 NOPs targeting
    "cycle ≈ 71") breaks if a preceding instruction changes by one. It regressed even though the correct
    `PosObject` (divide-by-15) exists.

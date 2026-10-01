@@ -79,6 +79,12 @@ number like 25173, and the 6502 has no multiply instruction. Cited only, not ver
   `and #7`; one table serves the other side through `EOR #$FF` (cybergoth). A new shift every few
   rows rather than every row makes the edge bend one way for a while before turning back, instead
   of zig-zagging (seagtgruff). AtariAge `topic/103236`; Cited only, not verified.
+- A whole scrolling map from little ROM. Reading Thomas Jentzsch's River Raid disassembly in 2017,
+  vidak was *"surprised at how little ROM data Carol Shaw used in setting up the entire map"* and
+  meant to copy *"the idea of controlled randomness"* — while weighing the opposite, an entire
+  playfield in ROM with bank switching, because ROM is cheaper now (AtariAge `topic/267694`). One
+  reader's impression, not a byte count; the disassembly was not opened here. Cited only, not
+  verified.
 - **Random access: seed from the place, not the order.** A stepped LFSR reproduces a world only in
   the order it was generated, and the bidirectional form above only by stepping through the
   screens in between. In a 1999 thread Dan Knapp suggested computing the "random" choice so that

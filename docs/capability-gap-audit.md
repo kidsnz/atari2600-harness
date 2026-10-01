@@ -83,6 +83,25 @@ the wording is coarse.
 - **Gap (remaining):** can't reliably author/verify "beyond bB / full-screen bitmap" DPC+ techniques. *Not*
   required for first authoring targets (vanilla + SC bespoke kernels) — this is the **advanced-track**
   foundation, and its separate-Superchip-RAM half is now done.
+- **Two DPC+ facts on record for that track**, both read from distilled notes, not the blog posts, and
+  both **Cited only, not verified** (no DPC+ fixture here, above):
+  - *Repositioning without a decision* (SpiceWare's Slick Kernel, Draconian, AtariAge blog entry
+    `10890`, 2014). Every kernel line ends in `jmp (NextKernel)` through a Jump Datastream; each entry
+    starts as the normal kernel's address, and the C code overwrites an entry with a reposition
+    kernel's address only for the lines that need one, so the 6507 never tests which object to move.
+    Reported effect: repositioning one object takes one scanline, where Frantic took four and Space
+    Rocks two, and any of the five objects can be the one.
+  - *The cartridge layout* (SpiceWare, *DPC+ARM Part 6*, AtariAge blog entry `11811`). Six 4K banks
+    selected by `$FFF6`–`$FFFB`; the last holds the 6507 code and is selected at power-on, and custom
+    ARM code, when there is any, starts in the first, so a bank used for ARM code is not used for 6507
+    code. 4K of Display Data and 1K of Frequency Data are copied from ROM to RAM at start-up; the 6507
+    reaches Display Data only through the data fetchers and the data writer, and never sees Frequency
+    Data, which custom ARM code shrinks by default to 512 bytes (the split can be changed), using the
+    rest for C variables and the C stack.
+    The DPC+ driver is copied to RAM and runs there. The ARM is an LPC2103 (ARM7TDMI-S); its erratum
+    MAM.2 — code run from flash can fail with the memory accelerator fully enabled (mode 2) — is named
+    as the cause of crashes in SF2 and Frantic, with mode 1 as the workaround; the driver, running from
+    RAM, is not affected. The six banks agree with the bank count in the table above.
 
 ## Tier 2 — depth / accuracy
 
@@ -815,6 +834,12 @@ recording before the items:
   A reading hint for that work: in commercial ROMs an indirect jump is more often a `PHA`/`RTS` dispatch
   (`docs/techniques/rts-dispatch.md`) than a `JMP (ind)`, because it is shorter (nukey-shay, AtariAge
   `topic/248203`). **Cited only, not verified** — no census here counts the two forms.
+  A practical hint from outside: Stella's own disassembler is also said to improve with running. To
+  get a usable `savedis` listing of a ROM, glurk told a ROM hacker to load the original game and *"play
+  it extensively. This allows the built in disassembler in Stella to work better"* (AtariAge
+  `topic/359993`). The thread does not say why, and the hacker, after about 15 minutes of play per ROM,
+  still wondered whether he had run them long enough. **Cited only, not verified** — no `savedis`
+  output is compared here.
 
 ### SD-0 — Soundness and honesty repairs (blocking; do before anything is built on top)
 > **All five closed as of 2026-07-31.** Two of them were closed in the code and left open here — SD-0d was

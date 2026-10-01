@@ -95,6 +95,11 @@ Per-band X lives in RAM (`zx0`/`zx1`); the kernel walks bands top→bottom and p
 - **Positioning costs scanlines.** Each band spends its first 1–2 lines on positioning; two sprites whose
   tops are too close vertically can clash (the lower one may be dropped). The general kernel mitigates via the
   priority counter.
+- **Without reuse, positioning can stay out of the visible lines.** Sohl: *"If you don't have
+  to reuse any of the movable TIA objects as multiple game entities, you can do all of the positioning
+  when the CRT beam is above (VBlank period) or below (Overscan period) the visible portion"*; reusing
+  one as a different entity at a different horizontal position puts the repositioning in the visible
+  portion, the cost in the entry above (AtariAge `topic/337214`). **Cited only, not verified.**
 - **Motion decides where the bands go, not the picture.** Dave C, 2023, to someone building a tool that
   splits a still screen into zones: *"deciding the ranges of vertical and horizontal motion determines
   when and where you would potentially need to reposition a sprite (unless you use a multisprite kernel
