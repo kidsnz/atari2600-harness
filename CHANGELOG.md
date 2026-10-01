@@ -6,6 +6,55 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the rest of the review's adopted rows landed (2026-09-30 to 2026-10-01)
+
+33 commits, 560 `Land-Key:` lines. Each commit covers the rows for one set of files; one writer wrote
+them and a separate reviewer checked every row against its source before commit. Every factual error
+the reviewer found was fixed by the writer first. Claims not measured here are marked **Cited only, not
+verified** or **Not verified**. With these, every high-confidence adopted row has been written, found
+already present, skipped with a reason, or sent to the document that owns it. The 24 rows sent
+elsewhere are not written yet.
+
+- `known-traps.md` (8 commits) and `design-principles.md` (6): new rows and sub-items, placed so that
+  existing rows keep their wording and every "row above" still names the same row. The ledger quotes
+  that point at these files match as many lines as before.
+- Technique documents: `paddle`, `bankswitching`, `kernel-micro-idioms`, `shared-setxpos`,
+  `music-driver`, `flicker-multiplexing`, `vertical-positioning`, `game-states`, `procedural`,
+  `score-kernel`, `two-line-kernel`, `sprite-placement`, `subpixel-velocity`, `input-budget`,
+  `zone-multiplexing`, `divtable`, `maze`, `text12`, `missiles-bullets`, `rts-dispatch`, `roadmap`,
+  `hmove-slope`, `pf-modes`, `asymmetric-pf-score`, `multicolor48`, `nusiz-shaping`, `hscroll`,
+  `sound-driver`, `blank-a-frame`, `flicker-collision-attribution`, `bitmap48`, `tia-pcm`,
+  `pitch-dither`, and the techniques `README`.
+- Other documents: `capability-gap-audit`, `fundamentals-audit`, `ingest`, `resources`, `stella-oracle`,
+  `tool-landscape`, `casebook`, `verified-coverage`, `authoring-protocol`, `mcp-tools`,
+  `build-to-learn`, `integration-density-playbook`, `scenarios`.
+- Code, comments only: `internal/build`, `internal/crt`, `internal/ingest`, `pkg/audio`,
+  `pkg/design`, `internal/cyclebound/pagesensitive_test.go`, `roms/litmus/litmus_floatbits.asm`.
+  No line outside a comment changed. The litmus ROM assembles to the same bytes.
+
+Rows were written against their sources, not the review's summaries. Where the two disagreed the
+source won. Examples: the engine's `CL` coordinate is `clock - 68`, so `CL=145` is cycle 71 and the
+thread's original 74 stands; the review had corrected it the other way. An unresolved-symbol list from
+DASM is not by itself a failure. The RTS dispatch is 4 bytes smaller than `JMP (Vector)`, not 2.
+`docs/provenance.md`, `docs/mining-digest.md` and `docs/ram-maps.md` are generated or built from
+other files, so they were not written by hand.
+
+Found while landing, not fixed here:
+
+- 60.0544 Hz (the broadcast figure, 3579545/227.5/262) is used as the 2600's frame rate in
+  `design-principles.md`, `known-traps.md` and `subpixel-velocity.md`. The 2600 runs at
+  3579545/228/262 = 59.92 Hz.
+- `design-principles.md`, WSYNC semantics, says "VBLANK = +1 line". Two sources say VBLANK changes
+  are delayed by one colour clock.
+- `maze.md` calls a maze cell "2 color clocks wide". Two playfield bits are 8 colour clocks.
+- `internal/ceiling/palpalette_test.go` says PAL has no red. The test looks only at the single
+  reddest entry ($46, an orange); `$62` and `$64` are dark reds.
+- `resources.md` gives `QUANTUM` as `CPU` or `CLOCK` and the bundled Gopher2600 as v0.56.0. The
+  bundled copy takes INSTRUCTION, CYCLE or CLOCK and is a later nightly.
+- `stella-oracle.md` Design 1 does not match how the 205 recorded captures were taken.
+- `shared-setxpos.md`'s "one scanline per object" does not hold for X >= 90.
+- Regenerating `provenance.md` or `mining-digest.md` drops the sections written into them by hand.
+
 ### Added — first review additions landed, a trial of eight (2026-09-30)
 
 Each commit carries `Land-Key:` lines; each was checked by a separate reviewer before commit.
