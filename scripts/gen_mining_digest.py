@@ -28,11 +28,15 @@ HARNESS = os.path.normpath(os.path.join(HERE, ".."))
 MINED = os.path.normpath(os.path.join(HARNESS, "..", "reference", "atariage", "MINED.csv"))
 DOCS = os.path.join(HARNESS, "docs")
 
-CATORDER = ["Color", "Sprite", "Text/HUD", "Multiplex", "Playfield", "Kernel",
+# Interlace? sits right after Multiplex because that is the category it was split out of
+# (87f6a92): until it was listed here, emit() dropped every thread classified into it.
+CATORDER = ["Color", "Sprite", "Text/HUD", "Multiplex", "Interlace?", "Playfield", "Kernel",
             "Bitmap", "3D/Vector", "Audio", "Tools", "Reference", "Pizza Boy"]
 CATNAME = {
     "Color": "色・パレット", "Sprite": "スプライト・位置決め", "Text/HUD": "テキスト/HUD/スコア",
-    "Multiplex": "多重化・フリッカー", "Playfield": "プレイフィールド・スクロール",
+    "Multiplex": "多重化・フリッカー",
+    "Interlace?": "ambiguous: alternate-line multiplexing OR true two-field interlace (read the thread)",
+    "Playfield": "プレイフィールド・スクロール",
     "Kernel": "カーネル予算・最適化", "Bitmap": "ビットマップ・高度カート",
     "3D/Vector": "3D・レイキャスト・ベクタ（技候補⑫）", "Audio": "音楽・効果音・音声",
     "Tools": "作画/音ツール（参照・著述には非直結）", "Reference": "逆アセンブル・参照ゲーム",
@@ -179,6 +183,29 @@ def ja_take(title):
     return m.group(1).strip() if m else ""
 
 
+# A prose section that sits under the header. It was first written into docs/mining-digest.md
+# by hand, which this generator then silently deleted on every regeneration (found
+# 2026-10-01 by diffing emit() against the committed file). It lives here now, verbatim,
+# so the file stays generated end to end. Edit it HERE. Its counts were taken by hand on
+# the date it names; this script does not recompute them.
+CLEAN_ROOM_LINE = """
+**Where the clean-room line actually falls, counted 2026-09-07.** The rule (`CLAUDE.md` iron rule 5,
+memory `feedback-goal-standard`) is that decoding a binary yourself is fair game and *somebody else's
+interpretation* is not. Asked of this file rather than assumed:
+
+| source kind | rows |
+|---|---|
+| machine output — DiStella, `cmd/dissect` | **58** |
+| **someone else's ANNOTATED source** | **1** |
+
+The one is `circus-atari-source` ("Commented Source Code for Circus Atari"), and its `feeds` column
+routes it to `reference/disassemblies / cmd/dissect` — **the thread is recorded, and the route is our
+own disassembler.** So the line holds where it is supposed to, and it holds 58 to 1. ★Worth counting
+rather than believing: the rule is easy to state and easy to erode one convenient row at a time, and
+until this it had never been asked of the digest. Raised by the mailing-list distillation (helper-1).
+"""
+
+
 def emit(rows, lang):
     by = {c: [] for c in CATORDER}
     for r in rows:
@@ -208,6 +235,8 @@ def emit(rows, lang):
                  "ここは harness 単体で引用できる要点地図。各行→効く design-principles 節 / `pkg/design` 関数 / 技候補。"
                  "`scripts/gen_mining_digest.py` が `reference/atariage/MINED.csv` から生成。\n")
     L.append("出典正本: `reference/atariage/MINED.csv`（%d行）。詳細は各 `notes.ja.md`。\n" % len(rows))
+    if lang == "en":
+        L.append(CLEAN_ROOM_LINE)
     for c in CATORDER:
         items = sorted(by.get(c, []), key=lambda x: x[1])
         if not items:

@@ -31,9 +31,17 @@ HARNESS = os.path.normpath(os.path.join(HERE, ".."))
 # English-only and every citation now reads `Source:` or 〔…〕, so nothing currently passes
 # on this alternative alone — it stays because dropping a marker can only turn a passing
 # file red, and a gate that goes red on a rename teaches people to delete the gate.
+#
+# The English phrases must start a word: `(?<![\w-])`, not `\b`, because `\b` sits between a
+# hyphen and a letter. Without it, "re-derived from scratch" counted as "derived from" — a
+# sentence that cites nothing — and `--list` would put it in the source column of seven technique
+# rows (bitmap48, multicolor48, nusiz-shaping, rts-dispatch, score-kernel, text12, text24; found
+# 2026-10-01). Paths, symbols and names are left unguarded: `gen_litmus_*`, `andrew-davie-*` still
+# name the litmus fixture and the person, so a prefix there does not change what is cited.
 MARKERS = re.compile(
-    r"source:|出典|learned from|reference:|based on|derived from|〔|"
-    r"litmus_|hardware basis|hardware-verified|foundation:|"
+    r"(?<![\w-])(?:source:|learned from|reference:|based on|derived from|"
+    r"hardware basis|hardware-verified|foundation:)|"
+    r"出典|〔|litmus_|"
     r"reference/|topic/\d|8bitworkshop|spice|davie|staugas|whitehead|hugg",
     re.IGNORECASE,
 )
@@ -321,6 +329,166 @@ def check_citations():
         stale = [p for p in KNOWN_ABSENT if _resolves(p)]
     return unresolved, stale, skipped
 
+# The prose sections that follow the generated index. They were first written into
+# docs/provenance.md by hand, which `--list` then silently deleted on every regeneration
+# (found 2026-10-01 by diffing the generator's output against the committed file). They
+# live here now, verbatim, so the file stays generated end to end. Edit them HERE.
+HAND_SECTIONS = """
+
+## How this repository cites the mailing list — and why a checker cannot follow it
+
+**Six shapes are in use. That is five too many, and it is a harness problem, not a tool problem.**
+Measured 2026-09-06, when a checker built to verify that quoted text really appears in the message it
+names reported thirteen wrong sources; a human opened all thirteen and **every one was correct here**.
+The tool was not weak — it was reading prose that cites in six different ways:
+
+| # | shape | example |
+|---|---|---|
+| 1 | full | `〔200405/msg00275〕` |
+| 2 | **continuation** — the year-month carries over from earlier in the sentence | `〔msg00286〕` |
+| 3 | **month + thread name, no number at all** | ``stella-list `200011` (`more-keyboard-nonsense`)`` |
+| 4 | range | `〔199803/msg00196–00199〕` |
+| 5 | comma list | `〔199703/msg00258, 199703/msg00204〕` |
+| 6 | **a quote from source, not from the list**, sitting beside a message number | ``hardware/memory/vcs/tia.go … *"left over from the address"*`` |
+
+Shapes 2, 3 and 6 are the ones that mislead: a checker looking for the nearest `YYYYMM/msgNNNNN`
+attaches the quote to a number that belongs to a different claim. **`check_provenance.py` does not have
+this problem** — it only asks whether a cited message EXISTS, which shape 1 and 4 and 5 all satisfy
+and 2, 3 and 6 simply do not trigger. The problem appears the moment anyone asks the stronger question,
+*does this quote appear in that message*, which is the question worth asking.
+
+**The rule for new prose:** cite in shape 1, `〔YYYYMM/msgNNNNN〕`, immediately after the closing quote.
+A range or comma list is fine when the claim genuinely spans messages. **Do not use a bare continuation,
+do not cite a thread by name without a number, and do not put a source-code quotation next to a message
+number.** ★And nothing goes inside the quotation marks that the author did not write — no `[sic]`, no
+bracketed completions, no silently corrected typos. Measured the same day: a note that wrote
+*"the cable networks will tole[rate]"* for *"…will tolerate flicker"* was missed by a verbatim matcher,
+and three notes had quietly fixed `kernal`, `positionining` and `yor`. **A corrected quote is a quote
+the person did not say, and it is also a quote `rg -F` will never find again.** Put the clarification
+in the surrounding prose instead, where it belongs.
+
+★★**And nothing comes OUT of a quotation either — least of all a hedge.** Measured 2026-09-06, after
+the typo sweep above had been declared finished: a second pass looking for *omissions* rather than
+substitutions found **45 unmarked deletions**, and five of them had removed the author's own qualifier —
+`(I think)`, `perhaps`, `(apparently)`, `(or my own)`. **A quotation with its hedge cut reads as an
+assertion the person did not make**, and unlike a typo it cannot be caught by reading: the sentence is
+grammatical, plausible and wrong about exactly one thing, which is how sure its author was. This
+repository already treats claim strength as part of a fact — that is what the `📖` legend in
+`fundamentals-audit.md` is for, marking what is documented but unmeasured. **The same discipline has to
+survive the trip through a quotation.** Marked elision (`…`, `[...]`) is fine and 146 instances of it
+were correctly left alone; what is not fine is silence.
+
+★★★**A third way to make a quotation lie: stop it one clause early.** Found the same day, 31 cases
+where a quotation ends mid-sentence and the original continues with a *but*. Cutting a quote is a
+normal thing to do — what is not normal is cutting it where the next clause **reverses** it:
+
+> *"…on the vintage ROMs were active high"* — and the original goes on, *"**But they are active low on
+> standard EPROMs.**"* 〔`200207/msg00165`〕
+
+**Read the quotation alone and you learn the opposite of the fact.** Another ended at *"adding another
+table is impossible"* where the author's next line reports having found a working example — a solved
+problem quoted as an open one. **When the continuation reverses the claim, extend the quotation.** That
+is not in tension with the rule above: the rule forbids adding text the author did not write, and
+restoring more of what they DID write is the same rule pointed the other way. Where the continuation
+merely adds detail or social chat, leave it — and where it strengthens rather than reverses, a note
+outside the quotation is enough. **The whole of this class cannot be automated**: only the *but* case
+is detectable, and `tole[rate]`'s missing sentence — the strongest one in that thread — was not a
+reversal and would never have been flagged.
+
+★★★★**A fourth way, and the simplest: wear the marker without being one.** A paraphrase set in
+`>` or `*"…"*` claims to be verbatim, and nothing in it can be repaired by restoring words — the whole
+line is the writer's sentence. The fix is not to edit the quotation but to **stop it claiming to be
+one**: drop the marker and let it be prose. This is the failure the other three are variations of, and
+it is the only one where a matcher's "does not appear in the source" verdict is exactly right.
+
+★★★★★The way these classes were found is worth as much as the fixes. The first sweep's detector compared
+word against word and **had no path at all for reporting a deletion** — not an oversight but a shape:
+it could not see omissions, so it reported none, and "243 typos" was the count of one class presented as
+the count of all of them. It took another session pointing at it from outside. **A tool's outline is
+invisible to the person holding it** — measured across nine wrong results in one day, the tool's own
+shape was recovered exactly once, and that once was when someone else named it.
+
+★★★★★★★★And the sharpest demonstration came from a session that refused to grade itself with
+somebody else's instrument. Told to fix nineteen listed omissions, it **wrote a second detector** rather
+than trust the list, and the first run reported **zero** across nine hundred notes. Before reporting
+that, it fed the detector sixty artificial deletions: **none of them fired.** The comparison had been
+reading its diff opcodes backwards — counting text present in the note and absent from the source
+(fabrication) instead of the reverse (omission). Corrected, the same control fired 57 of 60, and the
+real scan found **twenty-one more** than the list it had been handed. **A zero without a negative
+control is not a measurement**, and that one was a sentence away from being reported with confidence.
+
+Found by the mailing-list distillation (helper-2, who counted the shapes after their own tool was
+fooled by five of them).
+
+
+## Attribution without a message id is where misattribution lives (2026-09-07)
+
+Three quotations here named the wrong person. **All three attribute by NAME with no message id**, and
+of the 45 quotations that carry an id, **none is wrong**. That is the finding: the defect is not
+carelessness about who said things, it is the habit of writing a name without the number that would
+have checked it.
+
+| page | said | actually |
+|---|---|---|
+| `design-principles.md:283` | Eric Ball | **Glenn Saunders** 〔`200401/msg00063`〕 — Ball ANSWERED it in `msg00064`, and the reply quoted the question |
+| `design-principles.md:302` | Erik Mooney | **Billy Eno** 〔`200208/msg00131`〕 — whose post opens *"Erik, I searched the archives…"* |
+| `sprite-placement.md:31` | Erik Mooney | **KirkIsrael** 〔`200207/msg00046`〕 |
+
+★**Three different mechanisms, and none of them is inattention:**
+
+1. **A reply quotes the question.** Search the archive for the sentence and you land on `msg00064`,
+   whose byline is the replier's. The quoted text is `>`-marked in the source and the marker is lost
+   the moment the sentence is copied out.
+2. **A vocative read as a byline.** *"Erik, I searched the archives…"* is Billy Eno writing TO Erik.
+   The name nearest the quotation was the addressee.
+3. **A quotation without a `>`.** Bob Colbert repeats KirkIsrael's sentence unmarked in `msg00047`, so
+   a matcher — and a reader — takes it for his own words.
+
+★★The third one also lost the claim's shape. The original is a beginner asking *"since you can't read
+the **Horizontal Positions** directly, **right?**"*; this file had it as *"Erik Mooney said it plainly …
+you can't read the horizontal positions directly."* **A tentative question became a flat assertion by
+an expert** — the hedge-cutting failure recorded above, this time carrying a name with it.
+
+★★★**The rule, and it is cheap:** name a person and give the message id. The id is what makes the
+attribution checkable; a name alone asserts something no reader can verify and no gate can catch.
+Found by the mailing-list distillation (helper-3), whose detector had a 73% false-positive rate on the
+eleven it flagged — six were work titles read as people — and whose **population** (26 quotations
+attributed by name with no id) is the number worth keeping.
+
+## The archive's attachments were never fetched, and nothing here depends on them (2026-09-07)
+
+Roughly 1,200 messages in the stella-list archive carry attachments — ROMs, sources, zips. **They
+were deliberately not fetched** (author's decision, 2026-09-04). This section is the measurement
+that makes that decision safe to leave standing rather than a hope.
+
+**104** stella-list message ids are cited across `docs/`, `internal/` and `CHANGELOG.md`. All 104
+bodies are present in the local archive. **19 of them carry an attachment.** Each of the 19 was
+opened and read:
+
+| What the attachment is | Count |
+|---|---|
+| A binary, zip, or `.asm` offered **beside** the argument (`Attachment: lmnf12.bin`, `push.asm`, `songplay.zip`) | 18 |
+| A body that **is** a uuencoded blob (`199702/msg00017`, *"section 1 of uuencode 5.25 of file say.bin"*) | 1 |
+
+**In none of the 19 does this repository quote the attachment.** The eighteen are quoted from body
+text — Stolberg's *"I need to revise my 5 pixel delay theory again"*, Mooney's *"different results
+for both (d+3) positioning and (d-1) positioning between classic VCS and Atari JR"*, Bergstrom's
+`ClearMem` loop, which he pasted inline. The nineteenth is cited only as evidence that a `wavconv`
+thread existed at that date, which its subject line establishes without the blob.
+
+★**The one that came closest** is `199901/msg00099`: *"I'm attaching ALL of my data (hits.txt)"*. The
+data is genuinely gone. What this repository quotes from that message is the sentence **summarising**
+the data, not a number out of it — so the citation stands and the missing file bounds what could ever
+be asked of it.
+
+★★**What this does not say.** It is not a claim that attachments hold nothing worth having; 1,200
+files were not examined. It says the 104 citations already made do not rest on any of them, so
+fetching is a question about future work, not a repair of existing work. Re-run it before assuming it
+still holds — the ids are extractable with
+`grep -rhoE "[0-9]{6}/msg[0-9]{5}" docs/ internal/ CHANGELOG.md | sort -u`.
+"""
+
+
 def write_list():
     """docs/provenance.md = the consolidated element -> origin list (generated, never hand-written;
     the index you fall back to in the worst case)."""
@@ -337,6 +505,7 @@ def write_list():
     out.append("- **`pkg/design` functions** → source comment in each `pkg/design/*.go`.\n")
     out.append("- **Mined AtariAge threads** → `docs/mining-digest.md` (topic_id + URL → what it feeds).\n")
     out.append("- **Raw per-thread notes** → `reference/atariage/<id>-*/notes.ja.md` (provenance, not committed).\n")
+    out.append(HAND_SECTIONS)
     open(os.path.join(HARNESS, "docs", "provenance.md"), "w", encoding="utf-8").write("".join(out))
     print("wrote docs/provenance.md")
 
