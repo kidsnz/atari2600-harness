@@ -45,6 +45,17 @@ code that is already in the corpus: the joystick block at `roms/techniques/bulle
 directions, branches counted not-taken; each taken branch adds one) and the per-line paddle kernel
 quoted in `docs/techniques/paddle.md`.
 
+**The joystick figure is for the long form, and this repository ships both.** `bullets.asm`,
+`road.asm` and `exerciser.asm` reload `SWCHA` for each direction (`lda SWCHA / and #bit / bne`);
+`rpgmap.asm` reads it once and shifts each direction bit into carry (`lda SWCHA / asl / bcs` …). For
+four directions that is 4 × (3+2+2) = **28 bytes** against 3 + 4 × (1+2) = **15**, and with no
+direction held (every branch taken) 4 × (4+2+3) = 36 cycles against 4 + 4 × (2+3) = 24 — summed from the
+same instruction table, not run. The short form reads diagonals only if each direction's code leaves
+A alone: the shift form was first posted to the list with `bcc` jumps that could take only one
+direction, and Erik Mooney's correction was `bcs` past each direction's code, *"do stuff for right
+without changing A"* 〔stella-list `200207/msg00264`, `200207/msg00268`〕. `rpgmap.asm`'s `inc`/`dec` on
+memory satisfy it.
+
 **The ratio is the point.** Over 192 visible lines the paddle costs **1,536–3,072 cycles a frame**
 against the joystick's 40–44 — **35× to 77×** — and an NTSC frame holds 262 × 76 = 19,912
 cycles in total. So the paddle spends **8–15% of the whole frame**, and it spends it in the one
@@ -80,6 +91,18 @@ region that has no slack. The joystick spends 0.2%, in the region that does.
   of sixteen keys is down, and multi-tap needs only *one key at a time plus whether it changed*. The
   design does not make the read cheaper — it makes the answer smaller. That is the shape to look for
   whenever a device's cost is in resolution: **spend the resolution on time instead of on the read.**
+
+  ★**The trackball half has a second source from 2015, and a witness against it.** Crispy:
+  *"Polling the trackball requires a huge amount of CPU time. In order to get an accurate picture of
+  what the trackball is doing, it has to be polled every few scan lines, and preferably, every scan
+  line"* — and his answer moves the counting off the CPU: two 4-bit up/down counters clocked by the
+  trackball's pulses, read *"from address $280 once every frame during blanking"* as two's-complement
+  deltas 〔AtariAge `topic/239525`; CX-22-type signalling only〕. Against that, Thomas Jentzsch, whose
+  Trak-Ball hacks poll only inside the kernel, found the poll *"surprisingly tolerant to irregular
+  timing"* — every 8th scanline, gaps anywhere, *"A poll e.g. in 5, 14, 31 and 39 would work too"* —
+  and put it down to the trackball being relative to the previous read, where a paddle starts from
+  scratch every frame 〔AtariAge `topic/245239`〕. So "too hard to constantly read" holds for a
+  *continuous* read; how sparse a read still works is an open number. **Cited only, not verified.**
 
 ## Reading the shape, not the value
 
@@ -181,3 +204,84 @@ rather than a person judging them by feel.
 ★★★**The grace window is the same counter with a different trigger** — a state change rather than a
 button edge — and it is *not* measured here, because this litmus has no landing to hang it on. Named
 so it is not mistaken for covered. Found by the mailing-list distillation (helper-1).
+
+★★★★**A third time axis, and it starts on the release.** sohl's *Sweep Shot* (2022, 4K) asks one
+button *when* (*"you push the objects stronger if the beam activates on or very close to an object"*),
+*how long* (*"press too long and it looses effect"*) and *how soon again*: *"After you release the
+button, the beam will require a fraction of a second to recover before it can be utilized again"*
+〔AtariAge `topic/345816`〕. The first is the edge above; the second is the held-frames count that
+`DELAY` already keeps, used as a ceiling instead of a threshold; the third is the same counter started
+on the **release** edge, gating the next press. **Cited only, not verified** — the ROM was not run, and
+the thread does not say how it counts the recovery.
+
+## The keypad read, as one routine (2026-09-30)
+
+The sections above price the keypad's wait; this is the read itself, from a 2012 routine
+〔AtariAge `topic/204852`, wickeycolumbus〕. The keypad is 4 rows × 3 columns. Drive one row low through
+`SWCHA`, wait, test the three columns on `INPT4`, `INPT1` and `INPT0` (bit 7 clear = pressed), and count
+`X` down so it holds the key number when a column hits:
+
+```
+        lda #$FF
+        ldx #12
+        clc
+.new_row
+        ror                 ; walks a single 0 down from D7: rows on D7..D4, the left port's nibble
+        sta SWCHA
+        ldy #120
+.wait   dey
+        bne .wait
+        bit INPT4
+        bpl .keypressed
+        dex
+        bit INPT1
+        bpl .keypressed
+        dex
+        bit INPT0
+        bpl .keypressed
+        dex
+        bne .new_row
+.keypressed                 ; X = 0 when no key is down
+```
+
+The wait is 120 × (`dey` 2 + `bne` 3) = 600 cycles, about 500 µs — longer than the Guide's 400,
+because (per the thread) alex_79 raised it for ageing capacitors on hardware. **The thread also names
+an emulator difference:** in Stella a `SWCHA` write pulls the `INPT0`/`INPT1` lines low at once, so the
+routine works there with no wait at all — passing in Stella does not imply passing on hardware, only the
+reverse. That is the same looseness this engine shows (`litmus_swacnt` band 5, above). **Cited only,
+not verified** — the thread is held here as distilled notes, not its text; the routine was not run, and
+the `SWACNT` setup that makes the nibble an output is not part of it.
+
+## A port as a serial line (2026-09-30)
+
+`fundamentals-audit.md` records the send side (a dumper that talks serial out of a joystick port). The
+receive side, and how its timing was chosen, is in a 2016 routine by alex_79 that takes 19200 baud from
+a PC on the right port 〔AtariAge `topic/256433`〕. The order of the design is the reusable part: fix the
+tolerance first (*"max error allowed 2%"*); list the cycles one bit lasts on each machine (*"61.6 62.1
+92.4 93.2"* for 2600 PAL, 2600 NTSC, 7800 PAL, 7800 NTSC); pick one integer per machine that fits both
+regions (62 on the 2600, 93 on the 7800); write down the error it leaves (*"PAL: 52.44 us (error
++0.69%) NTSC: 51.96 us (error -0.23%)"*). Recomputed here from the colour clocks in `pkg/audio/audio.go`
+(3579545 and 3546894 Hz, CPU = ÷ 3): 62 cycles is 51.96 µs on NTSC and 52.44 µs on PAL against a
+52.083 µs bit — the same two errors. Each bit comes in with one instruction, `lsr SWCHA` (6 cycles):
+the routine's input is `SWCHA` D0 (`BITIN = %00000001`), so the shift drops it straight into carry and
+`ror buffer` assembles the byte. Its own comment states the condition — *"PORT A must be configured as
+INPUT !!"* — and `lsr` is a read-modify-write, so it also writes `SWCHA` back. **Cited only, not
+verified** — not run here.
+
+The same ports carry the AtariVox and SaveKey (I2C EEPROMs on a controller port), and a 2022 copy
+utility drives one on each port at once — the source in the left port, the destination in the right
+〔AtariAge `topic/332726`〕. **Cited only, not verified.**
+
+## When the players multiply, the cost leaves the read (2026-09-30)
+
+Thomas Jentzsch's *Pac-Line Panic* (2024, 4K) takes up to eight players at once — *"up to 8 players
+simultaneously (with QuadTari, else 4 players) using paddle buttons"* 〔AtariAge `topic/368501`〕; a
+QuadTari also changes what `VBLANK` D7 means, see `known-traps.md`. One button per player is the
+cheapest read on this page, and what eight players cost is **state**: *"The biggest programming
+challenge in this game was not the 4K ROM limit, but the 128 bytes RAM."* Kept naively each of the
+eight rows needs 27 bytes — 216 in all, more than the machine has — and the same post lists the cuts that
+brought the rows to 100 bytes and left 28 for everything else: one shared speed because *"the speeds
+are identical for all eight rows"*, animation derived from position instead of stored, a reserved
+position value meaning "not shown" instead of a status bit. So a multi-player design is budgeted first
+in **bytes per player × players**, and only then in cycles per read. **Cited only, not verified** — the
+byte counts are his; nothing here was built.

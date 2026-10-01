@@ -52,10 +52,33 @@ DaveC's `landscape.asm` (AtariAge; `reference/files-dave/`) and the 8bitworkshop
 - **Single-line vs 2-line kernel.** A *single-line* kernel updates the TIA every scanline (almost no spare
   CPU). A *2-line (double-line) kernel* repeats each sprite line over 2 scanlines, buying CPU time for logic —
   the more common choice for real games. Ours is effectively single-line.
+  **The choice can be made per band, not per frame.** Erik Mooney, 1997, planning a Space Invaders
+  whose invaders are playfield: the invader rows run in two-scanline blocks with *"about one spare
+  cycle"*, and for the shields — *"If the shields are 12 lines high (twice the invader height - this
+  matches the arcade), I can make the kernel in there operate in 3-scanline blocks instead of two, and I'll
+  have enough time to write player graphics registers four times."* Two more moves in the same message:
+  taking up Glenn Saunders's marching "legs" 〔stella-list `199704/msg00115`〕, one animation applied on a different line per
+  row — *"bottom two do the "legs" as their bottom line, middle two rows do the "legs" as the middle
+  line, and top row does it as the top line - this makes the "heads" of the top row thinner, just like
+  the arcade"* — so the rows look like different creatures for no extra data; and *"five rows of six
+  bytes"* of RAM laid out with *"a two-byte gap in RAM between each row, so the offset between rows is 8
+  which is a power of two.. I am using those gaps for other data"* 〔stella-list `199704/msg00117`〕.
+  **Cited only, not verified** — the band split and the legs are plans (*"I might be able to"*); what
+  the finished game does has not been checked.
 
 ## Forms (ours vs the general one)
 - **Static zones (this demo):** fixed bands, exactly P0+P1 per band, positions in RAM. Simple, deterministic,
   no per-frame sorting. Good when objects live in known rows (Frogger lanes).
+  **Vanguard's display is this form at full stretch** (Nukey Shay, 2010): *"Vanguard's display is just
+  a loop, either drawing the current enemy sprite or horizontal repositioning to draw the next enemy
+  sprite (via HMOVE)"* — still two players on any scanline — so *"the only limit to the number of enemy
+  sprites is the number of those "bands" between HMOVE lines visible on the left border."* The price is
+  motion, twice: *"sprites are not allowed to move between those HMOVE line sections"*, and *"The band
+  height is a bit larger than the sprites in Vanguard, so enemies have limited vertical movement as
+  well."* More bands, more enemies, less room for each to move. The general form below makes the
+  opposite trade — it chooses which objects to draw beforehand, so they can move over the whole display
+  〔AtariAge `topic/170088`〕. **Cited only, not verified** — Vanguard is in this repository only as a
+  measurement target (`docs/visual-ceiling.md`); its kernel has not been read here.
 - **General multi-sprite kernel:** a *sort → position → display* pipeline that Y-sorts an arbitrary set of
   objects each frame, allocates the nearest two to P0/P1, and (when a 3rd collides on a line) **flickers**
   them with a priority counter so they blink instead of vanishing. More flexible, more code. (Roadmap item.)
@@ -72,6 +95,24 @@ Per-band X lives in RAM (`zx0`/`zx1`); the kernel walks bands top→bottom and p
 - **Positioning costs scanlines.** Each band spends its first 1–2 lines on positioning; two sprites whose
   tops are too close vertically can clash (the lower one may be dropped). The general kernel mitigates via the
   priority counter.
+- **Motion decides where the bands go, not the picture.** Dave C, 2023, to someone building a tool that
+  splits a still screen into zones: *"deciding the ranges of vertical and horizontal motion determines
+  when and where you would potentially need to reposition a sprite (unless you use a multisprite kernel
+  … in which case you use one big zone for everything)"* 〔AtariAge `topic/346095`〕. A band boundary is a
+  reposition, and a reposition is needed only where some object's range of motion ends — so static zones
+  are designed from each object's motion range, which a still mock-up does not contain. **Cited only, not
+  verified.**
+- **One sprite across several zone kernels.** When the frame is split into mini-kernels run in sequence,
+  a sprite crossing a boundary has to be carried from one to the next. A 2007 thread gives two ways: one
+  Y counter and one graphics pointer shared by every kernel (Pitfall!'s — Harry starts in one kernel and
+  continues in the next), or a counter and pointer per kernel, easier to follow but heavy on RAM. It names
+  the symptom of getting it wrong — a sprite that turns into a big block at a zone boundary means its
+  pointer was not updated between kernels — and a third route, batari's FlipDraw, which needs no line
+  counter and can sit anywhere in several mini-kernels as long as the sprite data does not cross a
+  page — or even if it does, when each kernel is synced with `sta WSYNC` — and its branches do not
+  cross one 〔AtariAge `topic/112133`〕. **Cited only, not verified** — the thread is held here as distilled notes,
+  not its text, and FlipDraw's mechanics are not in it; the same thread's last resort (precompute each
+  line's `GRPx` into RAM) is the RAM-strip route above.
 - **Flicker** is the accepted way past the 2-per-line wall: alternate which objects get P0/P1 each frame; a
   priority counter gives the longest-unshown object precedence so motion stays legible.
 - **2-line kernel** is usually worth it (CPU headroom for game logic); cost is half vertical sprite resolution.

@@ -8,6 +8,16 @@ Breakout 1978, faithful ports like djmips APong) avoids this by running **sub-pi
 to rewrite every consumer of the position (here: the ÷15 coarse-positioning loop and its HMOVE
 fine-adjust, which read the integer X directly). Too invasive.
 
+**The other integer route is slower, but it steps.** Moving 1 px once every N frames gives speeds
+below 1 px/frame, still in whole-pixel jumps. A 2024 beginner tried both: *"Double
+incrementing/decrementing the x position per update is easy and doubles the speed"*, and a counter
+that waits frames before moving *"works okay at every other frame, but once you get to updating only
+every 4 frames the movement gets choppy"*. The answer he got was that speed lives in *"how you change
+the value of the player position variable, not about the divide loop"* 〔AtariAge `topic/359910`〕.
+So integers alone offer whole multiples of 1 px/frame, or 1 px every N frames. A fraction adds the
+speeds in between (0.75, 1.25, …); a speed of exactly 1/N px/frame comes out of the DDA as the same one
+step every N frames, so for that case the fraction changes nothing. **Not verified** — the choppiness at N = 4 is his report; nothing here has measured it.
+
 **Technique.** Keep the position an integer. Carry the *fraction of the velocity* in a separate
 1-byte accumulator and let it spill an extra whole pixel every few frames (a 1-D DDA / Bresenham
 error term):
@@ -64,6 +74,26 @@ Human speed discrimination (Weber fraction) is ~10-25%, so +100% always reads as
 while these steps read as smooth — matching what the arcade original actually did (it was never
 integer-jumped; it ran 0.5 → 0.75 → 1.0).
 
+**That is the size of a step; the interval between steps is a second axis this table does not touch.**
+Thomas Jentzsch, 2016, on playfield scrolling, which normally moves in 4-pixel steps: *"Depending on
+the game, you can create the illusion of smoothness. You just have to make sure that you scroll at
+least at 30Hz, even if it is 4 pixel at a time."* The same thread credits two homebrews' smoothness to
+scrolling *"at 30 FPS like Television"* (mr-sql), and has a poster holding that smooth playfield
+scrolling is not reachable at all (maiki) — answered in the same thread with a 1-pixel playfield
+scroll built from four kernels (iesposta, linking AtariAge `topic/224946`), which zackattack reports
+working on a regular CRT and misplacing one or more of the four on newer sets that "correct" the signal
+〔AtariAge `topic/249185`〕. **Not verified** — no step size
+or rate has been put on a screen here; the test would be 4-pixel steps at 30 Hz through `cmd/crtview`.
+
+**Friction caps the speed without a clamp.** Each frame, subtract the velocity shifted right by n
+(`vel −= vel >> n`) as well as adding thrust or gravity. The loss grows with speed, so the two balance
+at `vel = force · 2^n` and the object stops accelerating there by itself — a top speed nobody wrote as
+a constant. Thomas Jentzsch, 2006, from Thrust, SWOOPS! and Cave1K: with friction off, the
+helicopter-style control becomes practically unplayable 〔AtariAge `topic/90087`〕. **Cited only, not
+verified** — that thread is held here as distilled notes, not its text; the balance point is
+arithmetic on the idealised form, and an integer shift truncates, so a real top speed settles near it,
+not on it.
+
 **Verify it numerically.** Poke `Vel_int/Vel_frac/Err/Pos`, put the object in open space (no walls
 /paddles on its path, `Vel_Y = 0`), step N frames, read `Pos`: the delta must equal
 `round((Vel_int + Vel_frac/256) · N)` exactly, for both signs. Measured for pf2-06:
@@ -88,6 +118,23 @@ fixed-point position. Read to the end of its condition, it is not:
 *velocity* instead of the *position*, and converts the same way — by swapping the increment table. So
 the reason 8.8 is quoted here applies to this technique too, and this page had never said so: before
 today it contained no mention of PAL, NTSC, or a refresh rate at all.
+
+**What the swapped table holds, from 2003.** Thomas Jentzsch, reviewing a climbing game, suggested a
+fractional per-frame counter: `clc / sbc currentSpeed / sta playerMotion`, moving on the frames where
+the subtraction borrows — `SBC #$60` borrows on 3 frames in 8, a speed of $60/$100 〔stella-list
+`200304/msg00221`〕. His table: *"NTSC: $40-1, $55-1, $80-1, $100-1 ; for PAL use 6/5 of the NTSC
+value PAL: $4c-1, $66-1, $9a-1, ???"* 〔`200304/msg00200`〕. The `-1` pays for the `clc` (*"I am using
+CLC to be able to subtract $100 (by using $ff)"*, 〔`200304/msg00221`〕), and the `???` is the catch:
+6/5 of `$100` does not fit in a byte, so the fastest NTSC speed has no PAL entry. In this form the
+speed is the subtracted value over 256, so the hex table's PAL/NTSC ratios (computed: 1.1875, 1.2000,
+1.2031) are speed ratios and point the right way. His second form — *"subtact a constant value (e.g.
+30) from playerMotion and add the level speeds (*30)"*, with `30*4-1 … 30*1-1` against `36*4-1 …
+36*1-1`, and *"the conversion to PAL works best when it can be divided by 5"* 〔`200304/msg00221`〕 — does
+not carry over the same way. As described, the object moves once per `level × 30` subtracted, i.e. every
+n frames on NTSC, and the PAL values make that every 36n/30 = 1.2n frames: **slower on PAL, not faster**
+(a simulation of the described loop gives 0.83–0.86× the NTSC rate). Whether the 36 belongs on the
+subtracted constant instead is not settled in the thread. 6/5 is the nominal 60/50. **Cited only, not
+verified** — no ROM was built with either table.
 
 **The conversion factor, from our own constants** (`television/specification/specifications.go`):
 NTSC is `15734.26 / 262` = **60.0544 Hz**, PAL is `15625.00 / 312` = **50.0801 Hz**, so an NTSC increment
@@ -141,3 +188,40 @@ to get *partly* right: miss one bank and the game runs at two different speeds d
 somebody's port, not Atari's shipped PAL release. What was measured is **what a converter changed**,
 which is a different question from **how two official versions differ**. Byte counts only; no
 disassembly was read. Found by the mailing-list distillation (helper-2) and re-measured here.
+
+## Three rungs, and the game with no fraction to rescale (2026-09-30)
+
+spiceware, 2013, laid conversion out as a ladder with a different price on each rung: *"The simplest
+is to create a PAL60 game by only changing the colors. More complex is to also change the scan line
+count, to achieve PAL's 50 frames per second, and to implement fractional positioning (if you haven't
+already) so that the game plays at the same rate it does now. If you change the scan lines w/out the
+fractional positioning then the game will be slower when played on a PAL system."* He also names what
+keeps people on the first rung: *"The hassle of Fractional Positioning is part of why it's common to
+leave the PAL version running at NTSC's 60 frames per seconds"* 〔AtariAge `topic/213265`〕. The
+asker's price was RAM — *"I'm not using fractional positioning. I'm not sure I can free up that much
+extra RAM, I would need 17 more bytes of data"* — so on a 128-byte machine keeping the speed can be a
+RAM decision. **Cited only, not verified.**
+
+**The first rung, made cheap at assembly time.** spiceware again: *"use color constants everywhere …
+Then set COMPILE_VERSION to NTSC or PAL to select which build you're going to make. You'll end up with
+a PAL60 version"* 〔AtariAge `topic/238183`〕. The byte table above is why this rung is the one worth
+automating: the palette is most of what differs between the builds. **Cited only, not verified** — no
+build here is assembled that way.
+
+**The third rung when speed lives in a frame counter, not a fraction.** Everything above assumes a
+fraction to rescale. Thomas Jentzsch, 2017: *"many developers back then and even today choose to base
+their updates (movement, animation etc.) on a counter which is updated every frame … a NTSC to PAL-50
+conversion based on a frame counter will slow down by ~17%."* His fix runs the counter faster —
+*"Every 5th frame the counter has to be increased twice"* — without skipping the frames the game keys
+on: Pitfall! updates every 2nd, 4th, 8th and 128th frame. His code increments again whenever the
+counter lands on 83, on 19 mod 128, on 3 mod 32 or on 7 mod 8, in *"no extra RAM and 24 bytes ROM"* (his
+figure; summed here from the instruction sizes it is 26, which fits Omegamatrix's *"25 bytes"* for a
+one-byte-shorter version — **Not verified**) 〔AtariAge `topic/267100`〕. Counted here from those comparisons (a script over the 256 counter values,
+not a ROM): 43 of every 256 values are skipped, so the counter advances 256/213 = 1.2019 per frame.
+Over 500 frames it advances 598 to 603 depending on the starting value (601 most often, from all 256
+starts) against 6/5's 600 — the size of the *"off by just 2"* he reports, which is one start's result. **Every value it
+skips is odd**, so an update that fires on a multiple of 2^n is never skipped. What it does not catch,
+by his own list: updates that run every frame, and updates not on a 2^n boundary. Omegamatrix's `asl`
+variant in the same thread is a byte shorter; the same script finds it skips the same 43 values.
+**Cited only, not verified** — the PAL-50 build he attached was not run here, and *"99.66...%
+identical"* is his figure.
