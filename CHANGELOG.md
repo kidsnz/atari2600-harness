@@ -6,6 +6,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the redirected rows landed (2026-10-01)
+
+2 commits, 23 `Land-Key:` lines: the rows that the commits below had sent elsewhere because their
+first target did not fit. They were checked against their sources again rather than taken from the
+note that redirected them, by the same writer-and-reviewer split.
+
+- `resources.md`: `QUANTUM` takes `INSTRUCTION`, `CYCLE` or `CLOCK` (the bundled
+  `debugger/commands_template.go`), and the bundled Gopher2600 is `nightly-3-g5d532e88`. This fixes the
+  `resources.md` item in the list below. `tool-landscape.md` holds the one rule for recording which
+  version a statement is about.
+- `known-traps.md`: the quotes about a `#` written into an equate moved to the row that already states
+  that trap; the forgotten-`#` row points to it by name.
+- `bankswitching`, `capability-gap-audit`, `design-principles`, `gap-analysis`, `stella-oracle`, `invisible-probe`,
+  `missiles-bullets`, `music-driver`, `procedural`, `zone-multiplexing`, `flicker-multiplexing`.
+
+One redirected row is about a tool outside this repository and was not written here.
+
 ### Added — the rest of the review's adopted rows landed (2026-09-30 to 2026-10-01)
 
 33 commits, 560 `Land-Key:` lines. Each commit covers the rows for one set of files; one writer wrote
