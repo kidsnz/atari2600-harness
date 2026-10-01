@@ -174,6 +174,22 @@ reused as-is for regression). **Unknown fields are an error** (typos are not swa
   **What it cannot judge it says so about rather than passing:** a third write to the same register in one
   line, or a register with no column rule, is counted in the `outside these rules` figure printed with the verdict,
   and a declined analysis fails instead of passing silently.
+  **It checks the late edge only.** Each write's `MaxClock` is compared with its deadline
+  (`internal/cyclebound/pfdeadline.go`), and nothing compares the earliest clock, so a right-half
+  rewrite that lands before the beam has finished drawing the left half — the condition
+  `docs/techniques/asymmetric-pf-score.md` states as *"the mid-line rewrite must complete after the beam
+  draws the left half"* — passes. Measured 2026-09-15 by the review, outside this repository, white
+  playfield on a blue background: a ROM that writes the right half's PF1 in HBLANK passes
+  (`2 write(s) all land in time`) and draws the same picture hash as a ROM that never writes the left
+  value; the same write at clock 79 changes the picture and passes; at clock 115 it fails. (With
+  `COLUPF` and `COLUBK` both `$00` all three hashed alike — the window case needs a visible colour.)
+  A game kernel annotates both edges: spiceware's Frantic loop, posted in AtariAge
+  `topic/219525`, comments each store with a cycle window — `PF0R, 28-49`, `PF2L, before 38`,
+  `PF1R, 39-54`, `PF2R, 50-65`, `PF0L, after 55`, `PF1L, 66 - 28`. Converted with clock = 3 × cycle − 68,
+  the late ends 49/38/54/65/28 are clocks 79/46/94/127/16 against this check's deadlines 80/48/96/128/16,
+  and the early ends 28/39/50/55/66 are 16/49/82/97/130 against where the beam finishes the previous
+  use of each register, 16/48/80/96/128 — each within one CPU cycle (3 clocks). Cited only, not
+  verified: the kernel was not run here.
 
 `checks` (whole run): `ntsc_frame_lines` (`StepFrame`) / `frame_lines_stable` (`StepFrame` × N, histogram) /
 `pf_deadlines` (`cyclebound.CheckPFDeadlines`, static ∀) /

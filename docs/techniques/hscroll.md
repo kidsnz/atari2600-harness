@@ -26,6 +26,15 @@ reflect on; phase variable progresses 0→7 wrapping; 262 lines; golden-pinned.
 - For scrolling *graphics* (not stripes) the phase table generalizes to any 40-bit pattern; a
   longer level scrolls by streaming new columns into the table edge.
 - Vertical scroll is independent (shift the row pointer — see bitmap48's window).
+- **Hiding the 4-px step — three routes on record, none measured here.** *Space:* cover the moving
+  edge with an object — `known-traps.md`'s *smooth horizontal PF scroll* row ("use ball/missile edge
+  or delayed/tile scroll"). *Time:* step often enough — Thomas Jentzsch: *"you can create the illusion
+  of smoothness. You just have to make sure that you scroll at least at 30Hz, even if it is 4 pixel at
+  a time"*; mr-sql named KC and StarBlitz as scrolling *"at 30 FPS like Television"*. *Speed:* reveng
+  on Thrust: *"the snap scroll used in Thrust is pretty much the state of the art, if a game can
+  accommodate a non-continuous scroll. The speed of the eventual scroll masks the granularity of the
+  PF pixels nicely."* 〔AtariAge `topic/249185`〕 **Cited only, not verified** — none of those games
+  was run here, and the 30 Hz threshold is a statement, not a measurement.
 
 ## The eight-phase table is a periodic stripe, not a rotation (2026-09-07)
 

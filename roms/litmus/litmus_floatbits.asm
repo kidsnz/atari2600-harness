@@ -55,6 +55,20 @@
 ;	$84  HMP0 after the LSR: `lsr` is read-modify-write and $2B is HMCLR, a STROBE, so the
 ;	     write half must have cleared the horizontal-motion registers. If it did not, the
 ;	     read half above was not a real bus cycle either.
+;
+; ★★★★An ABSOLUTE read can separate the models too, if something other than its own address
+; is the last thing on the bus. supercat, 2005 (AtariAge topic/74034):
+;
+;	ldx #$80
+;	lda $FF80,x     ; "The last thing on the bus prior to the load would be the contents
+;	                ;  of ROM address $1F00."
+;
+; The page cross makes the 6502 read once at the un-carried address before the real one, and
+; that extra read fetches ROM data, so the residue is neither the address nor zero. That is
+; an instance of the condition docs/known-traps.md states (a read whose preceding bus byte is
+; not part of its own address). Not verified: this fixture does not do it, the engine was not
+; run on it, and that $FF80+$80 wraps to $0000 and the extra read lands on $FF00 (= $1F00) is
+; arithmetic, not a measurement.
         processor 6502
 VSYNC   = $00
 VBLANK  = $01
@@ -122,6 +136,13 @@ Strobe:
         ; AGREE, because the operand byte and the address are the same value — which is why this
         ; vector is worth pinning separately from the discriminator above: it says whether we
         ; reproduce a real game's behaviour, not which model we implement.
+        ;
+        ; ★★★★The $02 outcome is a fourth model, not only one emulator's bug. supercat, 2005:
+        ; "I believe older emulators would return the 'undefined' bits as zero, even though when
+        ; using real hardware they will usually hold the last thing that was on the bus"
+        ; (AtariAge topic/74034). He names no emulator or version and says "I believe" twice in
+        ; the post, so it is not added to the three-row list at the top of this file:
+        ; Cited only, not verified.
         lda #$02
         sec
         sbc $0F             ; the posted instruction, from the posted state

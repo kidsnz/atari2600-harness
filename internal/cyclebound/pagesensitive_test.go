@@ -23,6 +23,24 @@ import (
 //   - All 8 relative branches are PageSensitive, and pagePenalty returns 0 for them,
 //     because their +1 is charged on the CFG edge instead. If it stopped excluding
 //     them they would be charged twice.
+//
+// The same premises make the crossing a tool and not only a cost. Omegamatrix
+// (AtariAge topic/233300) buys a one-cycle delay for zero bytes "when you have a loop
+// without a WSYNC in your kernel":
+//
+//	lda (heroGfx),Y ;5
+//	sta.w GRP0      ;4 made absolute addressing to delay 1 cycle, takes an extra byte
+//
+// becomes
+//
+//	;adjust pointer to deliberately cross page boundary, save a byte
+//	lda (heroGfx),Y ;5+1
+//	sta GRP0        ;3
+//
+// That trade exists only because a crossing READ is charged and a write is not (the
+// first two bullets above). It also needs every Y the loop uses to cross; a pointer that
+// crosses on some lines and not others gives a delay that varies line to line (derived,
+// Not verified). Cited only, not verified: no fixture in this repository takes the trade.
 func TestPageSensitiveTableIsWhatTheCostingAssumes(t *testing.T) {
 	indexed := func(m instructions.AddressingMode) bool {
 		return m == instructions.AbsoluteX || m == instructions.AbsoluteY || m == instructions.PostIndexed

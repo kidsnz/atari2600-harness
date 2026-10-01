@@ -46,6 +46,29 @@ variables are provably **never live at the same time**, overlay them on the same
 (the stack/RAM-minimisation result from real-time systems). Density metric: *RAM-byte duty* (§D).
 *Source: 8bitworkshop "Tiny VCS kernels" (2025); real-time stack-minimisation (AbsInt/RTAS).*
 
+In DASM the overlay can be written where the RAM is declared, so the code uses real names instead
+of `temp+1`. Andrew Davie reserves one scratch area and re-opens it under new names per section
+(abridged):
+
+```
+    org $80
+temp        ds 8        ; general area for variable overlays
+    ; overlay section 1
+    org temp
+overlayvar1 ds 1        ; effectively 'temp'
+overlayvar2 ds 2        ; effectively 'temp+1'
+    ; overlay section 2
+    org temp
+linecounter ds 1        ; effectively 'temp'
+```
+
+He calls managing `temp+1` by hand *"prone to error"*, and the never-live-together condition above is
+his rule too: *"the same routine (or section of code) CANNOT use variables in overlay section 1 AND
+overlay section 2"*, plus *"Just be careful your overlays don't get bigger than the general area
+allocated for each section"* 〔stella-list `200102/msg00024`〕. Both are left to the author. This
+repository's `.asm` files declare RAM with equates and contain no `org`-back overlay. Cited only, not
+verified (not assembled here).
+
 ### 3. Generate from a seed — but only with a CHEAP generator. ★★★★ (conditional)
 *(procedural-from-seed, adversarially bounded)*
 Trade storage for a *tiny* amount of compute. Pitfall! synthesises all 255 screens from a

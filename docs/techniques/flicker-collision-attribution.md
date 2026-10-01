@@ -7,12 +7,13 @@ so attribution is something the kernel has to build.
 **Status:** the *behaviour* is ✅ measured — `roms/litmus/litmus_flicker_attrib.asm`,
 graded by `internal/emu/flickerattrib_test.go`, settles what the latches do across frames.
 This page adds what that fixture does not carry: **why the problem exists, what it costs a
-shipped game, and the two idioms the list converged on.** Both idioms are ⬜ unverified here.
+shipped game, and the three idioms the list converged on.** All three are ⬜ unverified here.
 
-**Source:** Stella mailing list, three messages from **2000-05 to 2004-12** (`200005/msg00038` Mark De Smet, `200007/msg00140` Thomas Jentzsch, `200412/msg00026` Nick Bensema). ★This line said *"eight years apart"* until 2026-09-06; the dates are in the archive and the span is **4.6 years**. A number that the document's own citations can settle should not be written out — write the endpoints and let the reader subtract.
+**Source:** Stella mailing list, four messages from **2000-05 to 2004-12** (`200005/msg00038` Mark De Smet, `200005/msg00043` Piero Cavina, `200007/msg00140` Thomas Jentzsch, `200412/msg00026` Nick Bensema). ★This line said *"eight years apart"* until 2026-09-06; the dates are in the archive and the span is **4.6 years**. A number that the document's own citations can settle should not be written out — write the endpoints and let the reader subtract.
 `200005/msg00038` (Mark De Smet, 2000-05-04) states the mechanism; `200007/msg00140`
 (Thomas Jentzsch, 2000-07-31) is the symptom in a finished game; `200412/msg00026`
-(Nick Bensema quoting Lee Fastenau, 2004-12-02) is the temporal idiom.
+(Nick Bensema quoting Lee Fastenau, 2004-12-02) is the temporal idiom; `200005/msg00043`
+(Piero Cavina, 2000-05-05) is the coordinate idiom.
 
 ## The failure, in a shipped homebrew
 
@@ -66,10 +67,28 @@ Here the flicker is not the problem, it is the channel: frame parity says which 
 screen, so one latched pair carries two questions. The cost is that a collision is answered at
 30 Hz rather than 60 Hz, and that the two entities must never need to be tested on the same frame.
 
+## Idiom C — do not ask the latch WHERE (coordinate)
+
+Answering a version of Idiom A that reads `CXM0P`/`CXM1P` every 16 lines down an Air-Sea Battle
+screen:
+
+> There's a simpler way of doing this: remember that in a game like Air-Sea Battle each
+> (pseudo)sprite has a fixed vertical position. You can check for collision between the missile and
+> P0 just once in a frame, and select which target was hit just from the y-coordinate of the
+> missile! misslY/16=index of the target that has been hit.
+> — `200005/msg00043`
+
+The latch answers *whether*; the missile's own Y, which the game already holds, answers *which*. One
+read and one CXCLR per frame instead of one per band, so nothing is spent inside the visible region.
+What it needs that Idiom A does not: every copy lives in a **fixed** band, so a band index is a
+function of Y. The 16 is the earlier poster's guess (*"let's say, I didn't count"*), not a
+measurement of Air-Sea Battle, and he did not know whether that game uses collisions at all. Cavina
+adds *"I used a more elaborate version of this concept for Oystron"*.
+
 ## What this page does not settle
 
-- **Neither idiom is measured here.** The litmus fixture covers what the latches do, not whether
-  either partitioning scheme survives a real kernel's cycle budget.
+- **No idiom is measured here.** The litmus fixture covers what the latches do, not whether
+  any of the three schemes survives a real kernel's cycle budget, and Oystron was not looked at.
 - **The zone read costs cycles inside the visible region**, which is where a multiplexed kernel has
   none to spare; no budget for it has been proved with `prove_line_budget`.
 - **Idiom B's 30 Hz answer** was not measured against a game's input latency requirement.

@@ -77,3 +77,10 @@ table format) / `cmd/dissect -audio` (transcribe back).
   tables. To verify by ear and by data: Stella for ears, `dissect -audio` for the score.
 - More voices/priorities (e.g. SFX queue, ducking instead of preemption) are straightforward
   extensions of `WriteM1` — add when a game needs them.
+- **A split with no preemption at all** is on record: joe-musashi's pattern player (used in D.K. VCS)
+  has an init and a play routine per channel — *"It is important that init and play routines have to
+  be called separately for each channel. This makes it possible to use only one channel, e.g., if the
+  other one is used for sound effects"*. In the same post, *"A song is made of a list of patterns and
+  each pattern is a table of AUDF/AUDC/AUDV values plus duration"*, the timer *"decreased every time
+  the play routine gets called (typically once per frame)"* 〔AtariAge `topic/247929`〕 — the order-list
+  layer this driver does not have (see `music-driver.md`, *Order list*). Cited only, not verified.

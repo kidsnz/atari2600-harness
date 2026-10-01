@@ -142,6 +142,14 @@ the low-nibble mask to `and #$07` gives `107/144 values exact, 144/144 still in 
   asserts. For real digitized speech you stream samples in the kernel (1–2×/line),
   which trades display time for fidelity (#184034: prioritize **sample rate** and
   **compression** over bit depth). `litmus_pcm` is the per-line case.
+  Two plans on record pay that trade only while the sound plays, rather than for the whole game:
+  Kevin Horton's software-mixed music (last section of this page) — *"The only downside is there can be no video
+  while this is occurring (except for maybe flashing the screen or some other relatively static
+  display)"* 〔stella-list `200109/msg00301`〕 — and kylearan's Space Taxi design: *"During speech,
+  the game might show a more simplified version of the level (without colors for example, or without
+  some objects), but it should be doable without having to switch the screen off"*, on the
+  condition *"if the game will be bigger than 4K"* 〔AtariAge `topic/261054`〕. Both are plans, not
+  shipped kernels — Cited only, not verified.
 - `pcmcheck` grades a stream on ONE volume register. The pseudo-5-bit variant above
   splits a level across AUDV0+AUDV1; grading that means running it twice, once per
   register, and the two halves are not independently meaningful.
@@ -176,3 +184,19 @@ and `AUDV0` — so replacing that literal would have moved the frequency and the
 digests would have differed for reasons unrelated to the tone generator. The test splits the load
 first, and fails loudly if the setup block ever changes shape. Found by the mailing-list distillation
 (helper-1).
+
+## The other direction: one volume register split among several voices (2001-09)
+
+The pseudo-5-bit trick above adds two registers into ONE sample. Kevin Horton proposed the reverse:
+several software oscillators (a phase accumulator per voice stepping through an 8-byte waveform
+table) summed into ONE register, so the register's 16 levels are divided among the voices —
+*"Each "channel" can range from 0 to 5. This gives 5*3 or a maximum of 15 levels used. Since there
+are two volume registers, 3*2 = 6."* He also meant to leave the TIA's own generators usable: *"I was
+thinking of defaulting the channel volume to 1, so the TIA's sound regs could still be used to
+generate things like percussion and SFX or something."* 〔stella-list `200109/msg00312`〕 Thomas
+Jentzsch asked whether the same split goes the other ways — *"So, you could also produce 2 channels
+with 8 volume values, 4 channels with 4 values, or 8 channes with 2 values (if there would be enough
+cpu time). And the channels only loose some (or a lot of) dynamic. Correct?"* 〔`200109/msg00336`〕 —
+and the thread's eight messages carry no answer. Horton posted fragments (the add chain, two
+waveform tables) but no working player; the cost he named is the picture (Caveats, above).
+Cited only, not verified.

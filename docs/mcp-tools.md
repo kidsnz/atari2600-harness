@@ -160,6 +160,17 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
     `ctrlpf` / `reflected`(D0) / `priority`(D2) / `scoremode`(D1).
 - Note: PF0 holds only the upper nibble (write `$FF` → read `$F0`) = real TIA behavior.
 - Verification: smoke's COLUBK=$1E / litmus_pf's nonzero PF. `internal/emu/emu_tia_test.go`.
+- **Both player graphics latches are returned, so the written value and the drawn value can be read
+  side by side.** `gfx_new` is what the last `GRPn` write stored; `gfx_old` is the copy taken when the
+  OTHER player's `GRP` is written; `vertical_delay` picks which of the two the TIA draws, so the drawn
+  byte is `vertical_delay ? gfx_old : gfx_new` (`Gopher2600/hardware/tia/video/player.go`
+  `SetVerticalDelay`, and the `GRP0`/`GRP1` cases in `video.go` that call `setOldGfxData`). This is
+  the view mos6507 asked Stella's debugger for in 2005: *"show the backup registers for (GRP0/1a as
+  they have been called on Stellalist) also, and the ball … being able to see the data move through
+  the backup registers and how this interacts with VDEL is an important tool in understanding VDEL"*
+  〔AtariAge `topic/74333`〕. **The ball's delayed copy is not returned**: `enabled` is the written
+  `ENABL`, and the engine's `EnabledDelay` has no field here. Read from the source; no test reads
+  `gfx_old` against a picture — Not verified.
 
 ### 5d. `read_audio`  ★ audio verification path (R-2, v0.17.0)
 - In: `struct{}`
@@ -218,6 +229,16 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
   ```
   - **Verification**: `roms/litmus/litmus_overrun.bin` (one heavy line of ~100cy before WSYNC) gives `Over=true`,
     `LineCycles=152`. smoke / frogger give `Over=false` (no false positives). `internal/emu/emu_budget_test.go`.
+  - **Why the budget is passed in rather than inferred.** Asked by Stella's maintainer how a debugger could
+    flag a line that runs long, Nukey Shay answered that there is no such event: *"A program never really
+    goes "over" 76 cycles...that's just how long it's able to accomplish tasks in a given scanline"*, and an
+    extra cycle need not be a defect — code can gain cycles *"in specific circumstances (such as branching or
+    reading an index over a page break)...but the program may be designed with this in mind and actually
+    count on those extra cycles to be present"* 〔AtariAge `topic/164572`〕. He states it as a possibility and
+    names no program — Cited only, not verified. So this tool reports only a logical line longer than the
+    budget the caller declares, and the static prover takes the same stance: `roms/litmus/cb_2line.asm`'s
+    `@lines 2` note is what lets a ~150-cycle WSYNC-to-WSYNC region CERTIFY against 2*76=152, and
+    `cb_2line_noann`, the same region without the note, is over budget.
 
 ## Acceptance check
 

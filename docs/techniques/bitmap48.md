@@ -30,3 +30,14 @@ columns with a window).
 ## Verified
 Window offset animates and bounces exactly as asserted (7@f10 → 22@f40 → direction flip →
 4@f100), positions 87/95, 262 lines every frame, golden-pinned.
+
+## Wider than 48 — what it was said to cost
+
+`sprite-placement.md` carries spiceware's claim that the missiles and the ball can widen a 48-pixel
+display. A tool that did it was posted in 2006: *"a 52-pixel wide sprite. It works by combining the
+48 pixel sprite with the missiles and the ball. One of the missiles becomes a 2-pixel sprite with a
+combination of HMM0, NUSIZ0, and ENAM0. The larger image takes a lot of ROM space, and is not as
+movable as the 48 sprite. I'll leave it to you to weigh the costs and benefits."* (Zach M,
+〔stella-list `200603/msg00001`〕). He does not break the 52 down or put a number on the ROM, and the
+picture uses up all three remaining objects. The tool and its output were not looked at here —
+Cited only, not verified.

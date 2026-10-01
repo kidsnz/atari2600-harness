@@ -15,6 +15,16 @@ with confidence, from basics to advanced tricks.
    push; write up the technique here.
 6. **Promote (optional)** — a stable, reusable kernel/generator graduates to `pkg/` (like `pkg/playfield` / `pkg/sprite`).
 
+Step 3 at its strongest was proposed for 2600 code in 2018 and not built in that thread. After a
+general-division challenge in which the routines were compared by bytes and registers, posters said
+their own were untested, and one listed cycle counts for 18 chosen inputs (49 to 259 cycles),
+ZackAttack: *"we should build a 2600 program to serve as a test harness for future challenges. I.E.
+for this challenge it could use the RIOT timer to track how long it takes a provided algorithm to
+perform all 65k possible divisions and then display a total in hex once it's done."* 〔AtariAge
+`topic/280991`〕 Row 15 below is the nearest thing here, and it is not that: its exhaustive check is
+over a Go model (`divtable.md`: *"exhaustively checked in Go before writing the asm"*), and the ROM
+itself is held by 13 RAM asserts.
+
 ## Every page must state a PRICE, and until 2026-09-06 they only priced one resource
 
 Measured that day over the 72 pages here: **41 state a cycle count. Zero state a RAM cost in

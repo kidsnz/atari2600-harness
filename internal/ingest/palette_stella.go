@@ -152,6 +152,23 @@ var stellaNTSC = [128][3]uint8{
 // 作品を PAL でも出すなら、色の選択そのものをやり直す必要がある——
 // ★★同梱エンジンは5仕様（NTSC/PAL/PAL60/PAL-M/SECAM）を持つが、この層には表が1枚しかない。
 // 固定してあるのは internal/emu/palspec_test.go。
+//
+// Re-choosing for PAL: one practitioner's table and rule, Cited only, not verified (neither
+// is checked against this table or the engine's PAL palette). Thomas Jentzsch keeps one name
+// per hue and assembles it per standard (AtariAge topic/266202); hue byte by hue byte:
+//
+//	NTSC  $10 $20 $30 $40 $50 $60 $70 $80 $90 $A0 $B0 $C0 $D0 $E0 $F0
+//	PAL   $20 $20 $40 $60 $80 $A0 $C0 $D0 $B0 $90 $70 $50 $30 $30 $20
+//
+// The PAL row climbs by $20 up to $C0, peaks at $D0 (his BLUE) and comes back down by $20:
+// a fold, not an offset, so an NTSC hue ramp does not keep its order on PAL. The three he
+// marks "no real equivalent" (NTSC $10, $E0, $F0) land on $20 and $30, which other names
+// already use, so 15 hues become 12 distinct PAL values. The thread does not say what the
+// table was matched against. His working rule for moving a finished NTSC palette
+// (topic/383581): "I usually only adjust the dark grays by increasing the luminance by one
+// (+2), because they are quite dark in PAL. And sometimes, when the NTSC palette used
+// multiple green/yellow/browns I change the color base constants (e.g. NTSC $20 is usually
+// mapped to $20 in PAL, but I change that to $40)."
 func NewStellaNTSCQuantizer() *Quantizer {
 	q := &Quantizer{}
 	for i, rgb := range stellaNTSC {

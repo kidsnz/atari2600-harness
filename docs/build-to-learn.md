@@ -13,6 +13,15 @@
 | the official manual | spec | archive.org (PDF + OCR `_djvu.txt`) | take the official edition as primary (beware other brands such as Sears) |
 | an annotated disassembly | impl (the implementation's answer) | AtariAge (Debro and others) / roll your own with distella if none exists | confirm **`dasm -f3` → byte-identical to the real ROM** |
 - The manual alone never captures the whole behaviour = **always add observation of real play** ([[feedback-verification-standard]]).
+- **Someone else's source may not assemble here even when it assembled for them.** None of this
+  repository's `.asm` files uses `SEG` (`rg -l --no-ignore -g '*.asm' -g '!**/Gopher2600/**' -g
+  '!**/third_party/**' -e '\bSEG\b' .` from `harness/` → 0 of 211, 2026-10-01), so a segmented source
+  is the unfamiliar case. Andrew Davie on a source that placed `ORG $F000` before its uninitialised-RAM
+  segment: *"move the ORG $F000 to AFTER the uninitialised RAM segment, just after the SEG"*, *"Each
+  segment should really be given an ORG"*, and *"It wouldn't even assemble for me without this change.
+  I don't know how you've managed to make it work so far!"* 〔stella-list `200402/msg00021`〕. He also
+  names reading *"the segment tables at the end of assembly"*. Why it built for one and not the other
+  is not said (a different DASM version is a guess). Cited only, not verified.
 
 ## Phase 0 — thorough scrutiny (always, before writing)
 1. **A manual ↔ code correspondence map** (`_casestudies/<game>/impl-map.ja.md`, clean-room prose only): map each section of the manual onto the disassembly's routines / RAM / tables. Format = a table (section | behaviour | code | RAM).

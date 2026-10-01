@@ -139,6 +139,26 @@ So the technique gives **one** in-between pitch per pair, not a continuum, and i
 midpoint. A note that needs something else needs a different key or a different octave —
 `technojacket`'s `cover-fs-hi` went up a fifth rather than up an octave for exactly this.
 
+## Faster than a frame, the ORDER of the swaps is a fourth axis (Cited only, not verified)
+
+This page swaps once per frame. Aleksi Eeben's Star Bars player swaps inside the frame (*"now it's
+once every 16th scanline"*). Version 1.2 changed two things at once: *"tuning rate is now halved and
+tuning bit patterns changed from evenly distributed bits (10001000, 10010010, 10101010) to adjoined bits
+(11000000, 11100000, 11110000 etc.) This makes TIA freq counter "overflows" less likely, because
+there's less transitions between the two AUDF values. If AUDF is changed to a value smaller than the
+current internal counter value the next output bit is delayed (until internal counter wraps), which
+builds interference or "wolf notes" (or a great E.T. landing sound) when the counter value, note
+frequency and Star Bars tuning rate happen to sync up."* 〔AtariAge `topic/353703`, 2023〕 The halving was
+from every 8th scanline to every 16th, and he keeps both causes open: *"Changing the bit patterns to
+adjoined bits possibly helped more than halving the tuning frequency."* The same 2, 3
+or 4 eighths, bunched instead of spread, means fewer moments where AUDF drops under a running count.
+The engine has the mechanism he describes: its divider resets only on equality or at the top,
+`if ch.divCounter == ch.registers.Freq || ch.divCounter == 0x1f {`
+(`Gopher2600/hardware/tia/audio/channels.go`), so a lowered `Freq` is passed and the count runs on to
+`0x1f` — read from the source. Not measured here: no fixture swaps inside a frame, and whether the
+per-frame swap above ever meets the delay was not checked. (The *wolf* elsewhere in this repository is
+"crying wolf", a false alarm — a different word.)
+
 ## It costs nothing audible
 
 A modulation puts energy either side of the note. Measured as the fraction of spectral energy
