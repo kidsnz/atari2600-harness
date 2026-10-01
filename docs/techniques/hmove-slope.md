@@ -128,3 +128,16 @@ Its x holds for 9, 15, 10, 11, 10, 12, 12, 8, 12 and 11 scanlines in turn: the m
 fixed period**, which is the observable signature of an accumulator rather than a fixed divider. The
 left-hand line is `M1` and is vertical in that frame (43 scanlines, 0 px of travel), consistent with
 only the reeling player's line being under tension. No disassembly was consulted.
+
+## A longer line from one player (cited, not measured here)
+
+Everything above is a 1-pixel object. Thomas Jentzsch's *Long line demo* (AtariAge `topic/327276`,
+2021, from johnnywc's Qix project) draws a Qix-style diagonal from ONE player instead, without
+flicker, generating it each frame by Bresenham and combining three things: NUSIZ stretch (single /
+double / quad, chosen by the line's width and angle), repositioning the player on every scanline,
+and shifting the line's bits inside the graphic so a segment can run past the player's 8-bit edge.
+The thread gives the reach as up to 44 px — the demo's own figure; nothing here has measured it.
+It also names the cost this file already pays: the HMOVE blank cuts horizontal resolution further,
+and TJ's idea for avoiding it is a well-timed RESP on every line instead of HMOVE. Cited only, not
+verified. The measured neighbours: per-line NUSIZ + HMOVE on one player is `nusiz-shaping.md`;
+mid-line RESP as a placement mechanism is `sprite-placement.md`.

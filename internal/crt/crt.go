@@ -109,6 +109,20 @@ func Bleed(src *image.RGBA, lumaTaps, chromaTaps int) (*image.RGBA, error) {
 // Persist averages frames, approximating phosphor persistence. It is what turns a two-frame flicker
 // into a dim steady object instead of a blinking one — the single most misleading difference between
 // a still capture and a screen.
+//
+// Stella 5.0 made its phosphor mode deliberately LESS forgiving than 4.x, with the blend still
+// adjustable. stephena, 2017: "the flickering still being present in the 5.0 version, that is
+// intentional. There will be a way to increase the phosphor blend level, to make it flicker less,
+// but the flicker won't be completely removed. This was done to simulate a real TV, since many
+// people were developing in Stella with phosphor mode on, and then finding out about the flicker
+// only when trying on the real thing. IOW, the flicker in Stella 4.x is quite simplistic and
+// forgiving compared to a real TV" (AtariAge topic/267481). This file's reading, not a measurement:
+// a plain average like Persist looks closer to the forgiving 4.x kind; nobody here has compared
+// either Stella version or Persist against a television. The same thread also shows "the real thing" is not one display:
+// the program was a "rock solid display" on its author's LCD while on a tester's 1990s CRT "the
+// flicker was terrible" (possibly not the same build: the author then posted his latest binary "in
+// case you're testing something different"). So a flicker that Persist turns steady is not cleared
+// by it. Cited only, not verified.
 func Persist(frames []*image.RGBA) (*image.RGBA, error) {
 	if len(frames) == 0 {
 		return nil, fmt.Errorf("no frames")

@@ -29,6 +29,20 @@ real Video Olympics look (4-px digits above the top wall). All digit cells verif
   (`sandbox/practice/pong/tools/pong_font_gen_pf.py`, OR-pair 8px→4px) so one painting feeds both the sprite-font
   and playfield-font versions.
 
+## Another glyph store: two digits in one PF1 byte, merged at run time (cited, not built here)
+The 5 pre-split tables above need no masking in the kernel. The other way round, for a layout
+where two narrow digits sit in PF1's two nibbles (MSB-first, so the high nibble is the left digit),
+keeps ONE table with each glyph drawn in both nibbles and merges per line (AtariAge `topic/169927`,
+2010, a Monaco GP scoreboard; Cited only, not verified):
+- **AND/ORA (seagtgruff):** `lda (first),y / and #$F0 / sta result / lda (second),y / and #$0F /
+  ora result / sta result` → `result` goes to PF1.
+- **EOR fold (bogax):** from bytes `ab` and `cd` (letters = nibbles), `lda ab / eor cd / and #$F0
+  / eor cd` leaves `ad` in A with no temporary — the second EOR cancels `c` and restores `d`.
+- nukey-shay's choice guide in the same thread: when RAM and time come first, split the digits
+  into separate tables so no mask is needed (four in his case; five in this file); when ROM comes
+  first, keep a reversed copy in the low nibble and align it with LSR/ASL. None of these forms has
+  been cycle-counted here.
+
 ## Verified numbers (PONG)
 - All four digit fields verified per zone with `read_row` (e.g. "83 38": left-8 bar clock 28-43
   = $1E pattern, right-ones straddle at clock 116-131).

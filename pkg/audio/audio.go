@@ -13,6 +13,12 @@ import (
 // BaseClockNTSC is the TIA audio clock (Hz). Color clock/114 = 2 samples/scanline.
 const BaseClockNTSC = 3579545.0 / 114.0 // ≈ 31399.5
 // BaseClockPAL is the PAL audio clock (≈15.9 cents lower: 1200·log2(3579545/3546894)).
+// Where 3546894 comes from is not recorded here. One corroboration, not a source: z26's raw audio
+// dump (SDL_AUDIODRIVER=disk → sdlaudio.raw) is described as "raw 8-bit mono unsigned audio data
+// at either 31400Hz (for an NTSC ROM) or 31113Hz for PAL" — the same pair as these two constants,
+// rounded — B. Watson, 2005 〔stella-list `200505/msg00149`〕; he does not say where z26 got it,
+// and his "from memory" caveat in that message is attached to the sox command line, not to the
+// rates. Cited only, not verified.
 const BaseClockPAL = 3546894.0 / 114.0 // ≈ 31113.1
 
 // Name is the common name of an AUDC value (Slocum's naming). Duplicates return the canonical value's name.

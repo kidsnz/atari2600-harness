@@ -48,6 +48,23 @@ func CheckColorBands(widthsPx []int, writeCycles int) []NarrowBand {
 // A TIA color register is D7..D4 = hue(0–15) / D3..D1 = luminance(0–7) / D0 unused.
 // Colors are held as "(hue, luminance) register values", not RGB (don't scatter raw hex).
 // [design-principles.md "Color (most important)" / mining symbolic-color-names, 118495]
+//
+// Name a colour constant after its ROLE, not its hue. mzxrules (AtariAge topic/383581, 2025, a
+// Zelda port) began with COLOR_RED / COLOR_GREEN and moved to names by purpose: five separate
+// "red" constants (PLAYER_02, EN_RED, EN_RED_L, PF_RED, HEALTH), each one macro line holding the
+// NTSC and the PAL value. His reason is a condition of that game — every sprite is drawn in a
+// single colour, so what must hold is that player, enemies and playfield stay distinct from one
+// another — and the benefit he names is that a PAL compromise (accepting a pink for a light red)
+// is then made per role. Cited only, not verified. He counts "about 3 proper red colors ($60, $62,
+// $64)" on PAL before luminance washes the hue to pink, and the engine's PAL palette agrees:
+// $60 = RGB(76,7,14), $62 = (124,10,21), $64 = (173,41,55), then $66 = (226,80,97) and
+// $68 = (255,122,142) (`go run ./cmd/palette -spec PAL`, 2026-09-30; the engine's table, not a
+// television). internal/ceiling's TestPALSpendsFourHuesOnGreyAndHasNoRed does not contradict this:
+// it looks only at the ONE entry with the largest R-(G+B)/2, which is $46's orange (215,106,38).
+// PAL has dark reds and lacks a BRIGHT one — the wording of the 1997 report that test quotes.
+// HueName below names hues for READING a value
+// back; it is not a naming scheme for constants. The NTSC/PAL pair itself is design-principles.md's
+// N_xx/P_xx convention.
 
 // LuminanceLevels is the practical number of luminance steps (bit0 unused → 8 steps).
 const LuminanceLevels = 8

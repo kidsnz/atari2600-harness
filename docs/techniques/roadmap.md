@@ -45,6 +45,18 @@ same pipeline; "documented" refinements noted per item remain available when a g
   **The measured FACTS are already up** and are not waiting on any of this: `design-principles.md`, "Placing a
   row of shapes and WRITING them are different limits".
 
+- [ ] **#38 Ball / missile as an extra COLOUR, not an extra mover** — #9 closed BL/M0/M1 as small
+  movers. Using one as a patch of colour inside a figure (the thread that raises it found it in
+  Snoopy and the Red Baron) is a different bill. SplendidNut: *"That's potentially 4 TIA registers
+  that have to be hit or changed within a scanline with the repositioning needing 2 registers
+  manipulated (min of 1/max of 3 registers depending on the situation)"*, each *"at appropriate
+  times within that line"* (AtariAge `topic/337214`; Cited only, not verified). His own breakdown:
+  resize; reposition = HMBL + HMOVE; enable = ENABL — not turned into cycles here. The colour is not free either: the
+  ball draws in COLUPF (`hmove-slope.md`), a missile in its player's COLUPx (`missiles-bullets.md`).
+  Measured pieces already in the catalogue: a per-line HMOVE accumulator at ~19 cycles
+  (`hmove-slope.md`), a NUSIZ write that must land before the beam (`nusiz-shaping.md`).
+  **Not started.**
+
 ## Notes
 - `reference/docs_atari/spiceware_tutorial/` (Darrell Spice Jr., *Let's Make a Game*, Steps 1–14) is a
   ready-made **general curriculum** that touches most of #2–#9 in build order — a strong execution guide,
