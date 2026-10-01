@@ -55,6 +55,30 @@ geometry on a PAL console and loses its colours.** The question came from a 2004
 shots fired from a fixed position instead of the ship's; this closes the horizontal-placement branch
 of that explanation and leaves the rest open. Found by the mailing-list distillation (helper-3).
 
+## Placing is not drawing — set X once, off screen, and draw by GRP alone
+
+A position, once set, holds until something changes it. glurk, 2024, to a beginner trying to split one
+positioning loop between P0 and P1 on the same line: *"when you set the X position of P0 or P1 or
+whatever, it STAYS set until you change it again"*, and *"It's perfectly OK, for example to set an X
+position and not even draw the sprite. Two independent things."* The beginner's answer was to strobe
+both in overscan and write non-zero GRP only when Y comes due 〔AtariAge `topic/367116`〕. "Something"
+includes HMOVE: the HMxx registers keep their values, so every later HMOVE moves the object again
+(`two-line-kernel.md`'s +3 px pitfall, found by `read_tia`).
+
+**The positioning lines are a cost, not a limit.** splendidnut in the same thread: a game that uses
+the five objects once each, without re-using them down the screen, can do all its positioning off
+screen with the standard routine, *"which would take at least 5 scanlines"*, because that routine
+takes a scanline per object. `design-principles.md` states the general count, "N objects = N+1
+scanlines". `plan_sprite_placement` answers where, not how many lines (see below).
+
+**Move the variable, not the object.** ZackAttack, 2018, removing the left copy of a three-copy enemy
+by narrowing NUSIZ and moving the base right by one copy pitch: *"I wouldn't use hmoves to adjust the
+position when the left copy is removed. Instead I'd just add 16 to the variable which stores P1's
+horizontal position. You're going to have to keep track of it's position for the collision detection
+anyway so I'd use the PositionObject() routine each frame"* 〔AtariAge `topic/274546`〕. The amount
+to add is the copy pitch of the mode in use: the medium modes he named are 32 apart (`$26` below), and
+16 is the close modes' pitch. **Cited only, not verified** for all three — none was run here.
+
 ## The rules
 
 | | rule | band |
@@ -76,6 +100,18 @@ of that explanation and leaves the rest open. Found by the mailing-list distilla
 Rule 9 is from the same session's probes rather than from this litmus, which grades normal width.
 Width itself is free: double and quad are the same single NUSIZ write and the same landing place;
 what they cost is screen area.
+
+**A counter model behind these offsets, from another emulator.** DirtyHairy, 2017, describing
+6502.ts's TIA core: there is *"a four color clock delay between RESx and the actual reset of the sprite
+counter to zero"*, *"the draw decode is triggered at a counter value of 156"* and takes four more
+clocks, *"effectively leading to an offset of four clocks to the right between the pixel where RESx is
+hit and the actual sprite position"*. Strobed during HBLANK the reset delay shrinks to two clocks (the
+ball's RESBL-triggered decode by two as well); on the last CPU cycle of an HMOVE-extended HBLANK the
+delays shrink by only one. He calls it *"just a model that describes the observable behavior"* and is
+not sure it describes the gate-level logic 〔AtariAge `topic/241103`〕. Checked against the numbers
+here by arithmetic: missile/ball +4 (`design-principles.md`) and rule 10's x=2 agree; players measure
+one clock more (+5, rule 7's x=3), which the model as quoted does not cover. The counter internals are
+**Not verified.**
 
 ## What rule 3 buys
 
@@ -128,6 +164,24 @@ With rule 4 on top, `NUSIZ0 = $26` (three copies 32 apart, missile 4 px wide) dr
 no HMOVE at all. The missile is solid, so the 4 px tail is all-on or all-off: a shape whose last
 four pixels are not uniform cannot use it.
 
+## What rule 4 decides — which missile carries a shot
+
+Rule 4 holds on every line the missile crosses, so a missile is multiplied wherever its player is in a
+copy mode; only its width is its own. Two designs on record are shaped by it:
+
+- Erik Mooney, 1998: his INV drew both players' shots with M1, because P0 is the shields, three
+  copies, and a shot on M0 would show three times while crossing them. Splitting the shots and
+  flickering only inside the shield band was the alternative he judged not worth it. In the same post,
+  Air-Sea Battle's missiles keep one width through bands of differently sized players
+  〔stella-list `199801/msg00298`〕.
+- Thomas Jentzsch, 2022, Top Bot&Tom 2: obstacles are P1 (so they can be wide or repeated) and M0,
+  because M1 would repeat with P1; M0 takes COLUP0, so the car, P0, has the obstacles' colour —
+  *"One of the usual Atari 2600 compromises, which favors gameplay over looks."* 〔AtariAge `topic/343591`〕
+
+So the free missile belongs to the player that is never copied on the lines the shot can reach, and
+the price is that player's colour (`invisible-probe.md` tabulates which register each missile takes
+its colour from). **Cited only, not verified** — neither game was run here.
+
 ## Rule 6, and why the number matters
 
 Band 7 parks P0 at x=30 with copies at 30, 62 and 94, puts GRP0 up as $FF in HBLANK and drops it
@@ -160,6 +214,15 @@ letters fit on a line rather than where one of them lands.
 **Rule 5 states the single-copy case**, which is what band 6 grades, and band 10 above is the same
 machine behaviour with copies switched on. Three probes in the originating work read rule 5 as
 general and each measured a one-copy player to check it, which cannot tell the two apart.
+
+**Rule 5 as a writing rule.** A beginner's sprite vanished whenever a negative HMP0 was applied, and
+Thomas Jentzsch, 2022, traced it mainly to RESP0, not HMOVE — the kernel strobed RESPx for both sprites
+on every drawn line. In his words the sprite *"gets positioned at the spot of the electron beam
+immediately, but it is not drawn immediately. The first copy is skipped"*, and *"the root cause is, that you use RESP0 in scanlines where you want the
+sprite to be drawn. This should be avoided."* 〔AtariAge `topic/344867`〕 Strobe on a line where that
+object's first copy is not wanted. Rule 13 is the deliberate exception — a line designed around the
+copy each strobe costs. **Cited only, not verified** for the thread's ROM; rules 5 and 8 are the
+measured part.
 
 ## Rule 13, and the ceiling it removes — the mid-line mover is not only HMOVE
 
@@ -267,6 +330,11 @@ shifts and two do nothing.
 cannot draw anything in x 0..7 of that line. If it must, the objects have to be arranged so no
 nudge is needed at all — every object seated on the RESP grid, which for two objects 32 px apart
 means making them COPIES of one object instead.
+
+**The published HMxx tables describe only the cycle-2 row.** Mord, 2009: *"The positive and negative
+values given in stella.txt, etc generally assume a standard HMOVE. IE: When the HMOVE is the first thing
+done in the scanline."* 〔AtariAge `topic/152403`〕 Every other row of the table above is a strobe those
+tables do not describe. **Cited only, not verified** for stella.txt's assumption; the table is measured.
 
 ## The three ways to cut a 12-clock shape, and why the cut decides where it can go
 

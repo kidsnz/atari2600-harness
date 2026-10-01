@@ -43,6 +43,55 @@ cycles are scarcest. Thomas Jentzsch wrote it as a code comment in 2002 — *"do
 - Carry hygiene in shared lines: an `adc` after the sprite compare inherits its carry/`lsr`
   residue — our gradient flickered at stripe edges until the add became an `ora` (valid since
   the operands can't overlap). Constant-input ops beat flag-dependent ones inside kernels.
+  The same residue also crosses from one object to the other. reveng, 2011, on a kernel whose two
+  compare routines ran without `SEC`/`CLC`: each player's arithmetic leaves a carry that depends on
+  its own Y and hands it to the other's `SBC`/`ADC`, so the poster saw *"Everything is fine until I
+  move player 0 up or down on the same scanlines as player 1. This messes up both players."* Adding
+  `SEC` before both fixed it, at a cost in cycles 〔AtariAge `topic/191440`〕. The DCP skipdraw in
+  `vertical-positioning.md` never reads the carry — DCP's compare sets it. **Cited only, not verified.**
+
+### What VDEL is for, and the mechanism under "parks in the shadow register"
+**Why it exists.** Eckhard Stolberg, 2002: in a two-line kernel with single-line positioning,
+without VDEL *"the code for updating the two players, missiles and one playfield register would have
+to fit into the HBLANK. With VDEL you can update one of the players at anytime you want during the
+two scanlines."* 〔stella-list `200202/msg00196`〕 reveng gave a beginner the same advice in 2011
+〔AtariAge `topic/191440`〕. So whether to use VDEL is a design decision: a kernel whose HBLANK already
+holds every write gains no timing from it (our reading), and keeps only the 1-px granularity above.
+**Cited only, not verified.**
+
+**The mechanism.** Each player has two graphics registers, new and old. A write to GRPx stores the
+value in that player's new register **and copies the OTHER player's new into its old**. That copy
+happens on every write, VDEL on or off; VDEL only chooses which of the two is displayed — alex_79,
+2018 〔AtariAge `topic/281539`〕, and Eckhard Stolberg in 2002 〔stella-list `200202/msg00205`〕. Neither
+post covers the ball; that a GRP1 write also copies ENABL's new into its old (the VDELBL case) is this
+repository's measurement and engine reading below, not theirs. Measured here in
+`fundamentals-audit.md` §3 (`roms/litmus/litmus_vdel_cross.asm`, `internal/emu/vdelcross_test.go`), whose entry latch runs with
+every VDEL bit clear and is what zeroes the old copies — without it band B passed on stale state. In
+the vendored engine the copy sits in the GRP0/GRP1 write path with no VDEL test
+(`Gopher2600/hardware/tia/video/video.go`: `UpdateSpritePixels`, and the delayed path in `Tick`).
+
+**Clearing P0 and the ball under VDEL takes a second GRP1 write.** spiceware, 2016, blanking
+objects in VSYNC so they stop wrapping round through the score: zero GRP1, GRP0, ENABL (and the
+missiles), then `sta GRP1` again — *"yep, twice - this makes sure GRP0 and ENABL are zeroed if VDELP0 or VDELBL are
+on"* 〔AtariAge `topic/253441`〕. The first GRP1 write copies whatever GRP0 and ENABL held before they
+were zeroed; only the second copies the zeros. `litmus_vdel_cross.asm`'s entry latch is the same
+sequence (`sta GRP1 ; latch old := 0 (ball + P0)`); the score symptom is **Cited only, not verified**.
+
+**A 1-line kernel can keep VDEL on for the whole display.** spiceware's Frantic kernel writes GRP1
+before cycle 22 on every line and stages GRP0 and ENABL later in the line — its cycle notes put them
+at 50 and 63, *"any, on VDEL"* — because their display waits for the next GRP1 write; he names
+Draconian's kernel as another 〔AtariAge `topic/257825`〕. Same thread, nukey-shay: in an
+`(indirect),Y` skipdraw, replace the secondary branch with `.byte $2C` (`BIT abs`) so both arms cost
+the same — the 4-cycle, 3-byte skip `integration-density-playbook.md` verifies; check the skipped
+bytes against the BIT-as-NOP read hazard in `fundamentals-audit.md`. **Cited only, not verified.**
+
+**The ball and missiles without quantising to four lines.** Missiles have no vertical delay
+(`fundamentals-audit.md` §3), so the odd/even trick above cannot reach them. spiceware, 2016, to a
+kernel that quantised the ball and missiles to 4 scanlines: keep two Y values per object, one for even
+rows and one for odd, and *"copy/paste your 2LK, turning it into a 4LK, and revise it so that the
+original 2LK uses one set of Y values and the cloned 2LK uses the other"* — supercat's suggestion;
+spiceware's Medieval Mayhem converts a subpixel Y into those per-row values 〔AtariAge `topic/253441`〕.
+**Cited only, not verified** — no 4LK was built here.
 
 ### Sprite thickness under 2-line — a symmetric centre feature is 2× too thick unless the row count is ODD
 A 2-line kernel fetches one shape byte per **two** scanlines, so every feature is an even number of
@@ -60,6 +109,38 @@ the shape to 7 content rows + 1 blank, still 2-line-paired (no parity shimmer). 
   → the **graphics-pointer 1-line kernel** (flip the line counter to Y, `LDA (Pxptr),Y` so X can stay
   pinned to `$1E` → missile reset becomes a 2-cy `TXS` instead of `PLA;PLA`). Researched, not yet built —
   memory `project-technique-candidates`. — in-house: Combat 2026-07-19/20.
+
+### Every object of a line is written in the same loop
+spiceware, 2019, to a beginner planning `JSR Kernel` for the playfield followed by `JSR DrawSprites`
+for the players: that cannot work, because the picture is generated as the beam passes — once the
+playfield loop has run, those lines are already on the screen. Players, playfield and colours for each
+line go into one kernel loop, and adding a sprite means weaving its GRP writes into that loop
+〔AtariAge `topic/291513`〕. **Cited only, not verified** (held here from the distillation note; the
+thread itself is not on disk here).
+
+### Advancing a table slower than the line counter, without dividing
+The pair index above already does this for one ratio (Y counts pairs, so a 2-line row needs no
+shift), and `sprite-animation.md` derives an art row with `tya / lsr / lsr`. When the playfield
+changes every 8 scanlines in a 2LK — every fourth loop pass — and there is no time to divide, two
+forms appear in one 2021 thread 〔AtariAge `topic/317058`〕:
+- **two counters** (splendidnut): an inner line counter that is reloaded when it runs out, and an
+  outer playfield-row counter decremented on each reload — any period;
+- **mask the loop counter** (SpiceWare's *Collect*): `tya / and #%11 / bne skip / inx` advances the
+  playfield index in X once per four passes — a power-of-two period only. With X busy, keep the index
+  in RAM (`ArenaIndex`) and load it only for the playfield writes.
+2019's version of the question 〔AtariAge `topic/291513`〕 kept the line counter in RAM and took the
+table index as counter `lsr` 1. **Cited only, not verified** — none of the three was built here, and
+both threads are held from distillation notes (neither is on disk here).
+
+### A variant: a blank "logic" line instead of a second drawing line
+Both lines of the A/B split above draw. ScumSoft, 2011, alternates a **draw** line with a **logic**
+line that blanks the graphics and spends its 76 cycles on computation — *"96 Scanlines of visible
+graphics"*, *"96 scanlines for logic"* — and swaps the two phases every frame (a 193-line pass
+alternates with a 192-line one), so each line is drawn on every other frame; he reports *"minimal
+flicker"*, and later reported a much better way to interlace the frames (not shown)
+〔AtariAge `topic/178066`〕.
+It pays the same halved vertical resolution as the 2LK and adds 30 Hz on every line (our reading of
+the frame swap). **Cited only, not verified.**
 
 ## Verified here (Gopher2600, locked in CI)
 - P0 (diamond, X=60) and P1 (frame, X=100) bounce independently in pair units over a striped
