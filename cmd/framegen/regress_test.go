@@ -123,8 +123,9 @@ func runClone(t *testing.T, rom string) (string, int) {
 // calibration used to copy zone 0's input into every later zone for an unfollowed
 // object, so the nop chain was handed a div-15 input. Measured on this ROM: P1 read 64
 // in zone 0 at input 58, zones 1-5 were handed the same 58 -- which the nop chain
-// places at 7 (zoneReadFor), not 64 -- and 190 of P1's 228 cells were wrong. The unmodified zone_multiplex follows both players, so
-// the pixel-exact case above never reaches this path.
+// places at 7 (zoneReadFor), not 64 -- and 190 of P1's 228 cells were wrong. The
+// unmodified zone_multiplex follows both players, so the pixel-exact case above never
+// reaches this path.
 //
 // The target is zone_multiplex with P1 frozen: all six zone X values are 60 and the
 // per-frame update subtracts 0 instead of 1, which keeps the update loop's cycle count
@@ -162,7 +163,8 @@ func TestAnUnfollowedPlayerKeepsItsPlaceInEveryZone(t *testing.T) {
 	if !strings.Contains(out, "zone kernel: 6 zones") {
 		t.Fatalf("no 6-zone plan in the output -- the path under test was not reached\n%s", out)
 	}
-	if !strings.Contains(out, "measured P1: drawn on 42 lines") || !strings.Contains(out, "1 distinct reset X [64(42 lines)]") {
+	if !strings.Contains(out, "measured P1: drawn on 42 lines") ||
+		!strings.Contains(out, "1 distinct reset X [64(42 lines)]") {
 		t.Fatalf("P1 is not at one reset X on all 42 of its lines -- it would be followed, "+
 			"and the path under test was not reached\n%s", out)
 	}

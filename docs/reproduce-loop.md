@@ -109,12 +109,15 @@ area and outvotes everything the reproduction exists to check. Read the per-elem
 percentage. Structural absence (`clone 0`) is reported apart from misplacement (`clone > 0`, wrong cells):
 different causes, different fixes.
 
-Field-measured over 31 technique ROMs: **22 pixel-exact, 8 with cells in the wrong place, 1 with an element
-absent** (`road`, whose missiles take 21 and 16 reset X with no blank line to move them in), **262 scanlines
-on every one**. Cartridges: **Outlaw and Combat pixel-exact** (with and without `-reset`), Fishing Derby
-partial. Of the 8 that differ, **five have exactly one reset X per player, measured** — `rts_dispatch`,
-`bitmap48`, `score6`, `text12`, `text24` — so their cells are copies and the block budget, not position;
-`hscroll` draws no player at all and its 64 cells are playfield. Read the per-element table and the measured
+Field-measured over 31 technique ROMs (re-counted 2026-10-01, `-frames 28`): **21 pixel-exact, 9 with cells
+in the wrong place, 1 with an element absent** (`road`, whose missiles take 21 and 16 reset X with no blank
+line to move them in), **262 scanlines on every one**. It read 22 / 8 until `multicolor48`'s kernel was
+rewritten in 4060492 (2026-08-09); the pre-rewrite source still reproduces pixel-exact, so the tool did not
+regress, the target changed. Cartridges: **Outlaw and Combat pixel-exact** (with and without `-reset`),
+Fishing Derby partial. Of the 9 that differ, **five have exactly one reset X per player, measured** —
+`rts_dispatch`, `bitmap48`, `score6`, `text12`, `text24` — so their cells are copies and the block budget,
+not position; `hscroll` draws no player at all and its 64 cells are playfield. `multicolor48` (198 cells)
+also has one reset X per player (P0 87, P1 95, measured), and its cause is not measured. Read the per-element table and the measured
 cause, never the percentage.
 
 ### Scenarios live in files, not in the package
