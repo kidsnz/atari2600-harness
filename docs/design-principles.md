@@ -203,8 +203,9 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   to-be-black-or-not-to-be-black-color-question〕 The 9 is the same arithmetic as the band floor at the
   top of this section (`STA zp` = 3 cycles × 3 clocks). **Cited only, not verified.** Drawing with
   blanking presumes a store to `VBLANK` takes effect within the line: the distillation notes of 〔mining
-  192183〕 record a one-colour-clock delay, where the delay list in the WSYNC rule below says "VBLANK =
-  +1 line"; neither has been measured here.
+  192183〕 record a one-colour-clock delay, as does the delay list in the WSYNC rule below, and the
+  bundled Gopher2600 schedules the change one colour clock late. The one colour clock has not been
+  measured here.
 
 ## Sprites (P0/P1)
 - 8 dots wide, one register (GRP 8-bit, MSB = leftmost). Width via NUSIZ 1x/2x/4x. 〔2k6specs, Davie S21〕
@@ -984,7 +985,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     frame's total is held by the bounds above; how much of it is picture is a margin set on 1970s
     sets (our reading). 200 and 205 are two of the line counts in the pixel-aspect note in the craft
     section. **Cited only, not verified** — no ROM's visible line count was measured for this.
-- **WSYNC semantics**: `sta WSYNC` halts the CPU until **the start of the next HBLANK** (68 colour clocks = 22⅔ CPU cycles). Choose where to write with the register-update delays in mind (colour = immediate / PF = 2-3 clocks / VBLANK = +1 line / note length = delayed). 〔mining 192183 register-update delay table〕
+- **WSYNC semantics**: `sta WSYNC` halts the CPU until **the start of the next HBLANK** (68 colour clocks = 22⅔ CPU cycles). Choose where to write with the register-update delays in mind (colour = immediate / PF = 2-3 clocks / VBLANK = +1 colour clock / note length = delayed). 〔mining 192183 register-update delay table〕 The VBLANK figure is seagtgruff's, also in an earlier thread: *"Changes to VBLANK are delayed by 1 color clock."* 〔mining 131319 asymmetric-reflected-playfield〕 The bundled Gopher2600 does the same: `tia.futureVblank.Schedule(1, reg.Value)`, so a mid-line write blanks the rest of that line, not the next one. On real hardware: **Cited only, not verified.**
   **`WSYNC` inside a kernel line is spent cycles, not alignment.** Verdant, 2024, to bkumanchik, whose
   kernel strobed `WSYNC` between computing the invaders and the missiles: *"strobing WSYNC literally
   throws away processor cycles so that our program can continue execution when the TV's electron beam
