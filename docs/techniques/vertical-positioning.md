@@ -41,7 +41,51 @@ mnemonics (`dcp $80` → `C7 80`; `lax`, `sax` likewise), so `dcp` can be writte
 stays available for other per-line work). Pixel-identical to the compare version (CI-locked).
 - **Pointer pre-offset:** set `sprPtr = Art − sprY` in VBLANK and `lda (sprPtr),y` in-kernel;
   pairs naturally with masking tables for tall sprites.
+  It has three preconditions; a 2004 cookbook attempt written without them showed the right graphic
+  only while Y was below the sprite height 〔`200404/msg00285`〕. Y starts at the kernel height and
+  counts down each line (each pair of lines in a 2LK) 〔`200404/msg00289`〕; the
+  pointer is set outside the kernel so it points at the art exactly when the right lines are
+  reached; and *"To avoid page penalties, this also requires the graphics to start at (align 256 +
+  kernel-height)."* 〔`200404/msg00292`〕 The asker's reply: *"most of the other descriptions I've seen
+  don't get into what all the preconditions (set up in the VBLANK) are."* 〔`200404/msg00293`〕
+  **Cited only, not verified** — the demos here index with X (`Art,x` / `ArtRev,x`), not `(sprPtr),y`.
 - Combine with #2 (animation): `Art` becomes `Frames + frameBase`.
+
+### The rest of the family — cited, not built here
+
+No demo or test here covers this subsection; every cycle count is the source's own annotation.
+**Cited only, not verified.**
+
+- **Zero padding takes the range test out of the kernel.** Pad the art with zero bytes above and
+  below and offset the pointer outside the kernel, so the line counter indexes the art directly and
+  out-of-range lines read a zero: the draw is `lda (ptr),y / sta GRP0`, **8 cycles a sprite** with no
+  branch (no page crossed), against 17–18 for a clipped draw — SpiceWare's padded form in *Medieval
+  Mayhem* (AtariAge `topic/88607`). Two sprites fit in 18: `lda (gfx1),y / tax / lda (gfx0),y /
+  sta GRP0 / stx GRP1` (`topic/296173`). The price is ROM for the padding and a vertical range bounded
+  by it — the trade `fundamentals-audit.md` measured for SwitchDraw's 256-byte table (17 cycles on
+  every line, 248 bytes a sprite), paid here with a pointer instead of an index. **When the kernel is
+  tight, always draw and let a zero hide it, rather than branch to decide whether to draw.**
+- **Two more ways to drop the range test** (AtariAge `topic/288362`): pad the art with zeros (e.g.
+  50 bytes either side) and reset the pointer periodically inside the kernel — `dey / tya / sbc
+  ObjectY` compares against the sprite, and when it is out of range the pointer's low byte is moved
+  onto the zeros, which needs the zeros and the art in one page; the padding costs ROM on both sides
+  (just-jeff). Or draw from a RAM buffer one kernel tall, cleared by pointing the stack at its end and pushing zeros with `PHA`, then filled
+  with the art — no padding at all, because RAM data can be rewritten where a ROM table can only be
+  pointed at (jeremiahk).
+- **Names for the rest of the SkipDraw family** (Verdant's 2024 catalogue, AtariAge `topic/363349`).
+  **MaskDraw** (SpiceWare) is the masked draw in `design-principles.md` (*Masked sprite drawing*):
+  `lda (pattern),y / and (mask),y / sta GRPx` is 13 cycles, 21 with the colour pair, and the mask is
+  an `align 256` block of `SPACE_BEFORE` zeros, `SPRITE_HEIGHT` `$FF`s and `SPACE_AFTER` zeros.
+  **FlipDraw** (Manuel Rotschkar) lets the `DCP` counter itself become the art index once in range
+  (`ldy Sprite_Y / lda (ptr),y`), 20 cycles on both paths with the draw on the fall-through — the
+  balanced-path move `fundamentals-audit.md` describes. Verdant rebuilt it from one mailing-list post
+  and could not find it in a ROM.
+- **The counting-up form uses `ISB` where this page uses `DCP`.** Steven Hugg's *Making Games for the
+  Atari 2600* draws with `lda #SpriteHeight / isb YP0 / bcs .DoDraw / lda #0` (INC, then SBC). Andrew
+  Davie's reading is that YP0 has to start as the **negative** of the sprite's Y; he says he has never
+  used it: *"It seems to me that .DoDraw will receive a non-zero index only when scanline >= -YP0, and
+  it will be valid for SpriteHeight+1 lines."* — and next, *"I might be out a line or two but maybe
+  that's how it works..."* (AtariAge `topic/296245`). SpiceWare had only seen `DCP` used for DoDraw.
 
 ## Verified here (Gopher2600, locked in CI)
 
