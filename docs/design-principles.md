@@ -692,7 +692,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   by his own account 〔mining 205205 old-tank-n-bomb-2600-game-erik-mooney-piero-cavina〕. **Cited
   only, not verified.**
 - Beyond 2 objects, multiplex by Y band; a horizontal repositioning costs one scanline; **an empty Y lane is mandatory**; the price is 30Hz flicker. 〔Bumbershoot〕 `→ design.NeedsFlicker/NeedsEmptyYLane/RepositionCostScanlines`
-  ★**"30 Hz" is the FIRST rung, not the price of multiplexing in general** — that predicate answers yes or no and gives the same answer for three objects and for twenty. `→ design.SubsetsFor` and `→ design.FlickerRateHz` give the ladder: 1–2 objects share nothing and run at the full 60.05 Hz, 3–4 need two subsets and land on the 30 Hz above, and it halves from there. Glenn Saunders, 1997: *"**It's never really necessary to drop below 30hz** and still manage to fill the screen with sprites"* 〔`199709/msg00139`〕; Piero Cavina five days later, on the other end: *"**'Adventure' must be the king of flicker**"* 〔`199709/msg00218`〕, and twenty-four objects in one room works out to **5.00 Hz**, which is the *"5hZ, maybe?"* he guessed. **Neither number was derived from the other.** Full table in `techniques/flicker-multiplexing.md`.
+  ★**"30 Hz" is the FIRST rung, not the price of multiplexing in general** — that predicate answers yes or no and gives the same answer for three objects and for twenty. `→ design.SubsetsFor` and `→ design.FlickerRateHz` give the ladder: 1–2 objects share nothing and run at the full 59.92 Hz, 3–4 need two subsets and land on the 30 Hz above, and it halves from there. Glenn Saunders, 1997: *"**It's never really necessary to drop below 30hz** and still manage to fill the screen with sprites"* 〔`199709/msg00139`〕; Piero Cavina five days later, on the other end: *"**'Adventure' must be the king of flicker**"* 〔`199709/msg00218`〕, and twenty-four objects in one room works out to **4.99 Hz**, which is the *"5hZ, maybe?"* he guessed. **Neither number was derived from the other.** Full table in `techniques/flicker-multiplexing.md`.
   **What that scanline looks like.** The same constraint was stated on the list in the form the
   person drawing the screen actually sees it — Piero Cavina, shipping a new build of *Look Mom No
   Flicker*: *"I've found an use for the ball :) Most of the changes aren't visible, but very
@@ -954,8 +954,8 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   programmer."* Of a piece with the rest of the machine: *"making the software do as much of the
   work as possible, so that the hardware could be cheaper — silicon was very expensive in those
   days."* Their statement of the budget is *"must finish displaying a single frame in exactly the
-  same time — 15.24 milliseconds"*; that is their round figure and not our measured refresh
-  (NTSC 15734.26/262 = 60.0544 Hz = 16.65 ms), so do not carry it as a constant. 〔Perry & Wallich, IEEE Spectrum 1983-03〕 **Overstretching Overscan = no picture / overstretching VBLANK = jitter** — the failures show up differently, so do not absorb the surplus on the VBLANK side (a jitter source). 〔mining 171270〕
+  same time — 15.24 milliseconds"*; that is their round figure and not the 2600's NTSC frame
+  (3579545/228/262 = 59.92 Hz = 16.69 ms), so do not carry it as a constant. 〔Perry & Wallich, IEEE Spectrum 1983-03〕 **Overstretching Overscan = no picture / overstretching VBLANK = jitter** — the failures show up differently, so do not absorb the surplus on the VBLANK side (a jitter source). 〔mining 171270〕
   (Ambiguity resolved 2026-08-06. The Japanese original's word order read as a contradiction; the sentence
   above is the only reading its own two failure modes support, so nothing is left to decide about the WORDING.
   **The CLAIM, though, is not verifiable here and is not treated as measured**: "no picture" and "jitter" are

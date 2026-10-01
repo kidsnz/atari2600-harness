@@ -4,14 +4,16 @@ import (
 	"math"
 	"testing"
 
-	"github.com/jetsetilly/gopher2600/hardware/television/specification"
+	"github.com/jetsetilly/gopher2600/hardware/clocks"
+	"github.com/kidsnz/atari2600-harness/pkg/audio"
+	"github.com/kidsnz/atari2600-harness/pkg/design"
 )
 
 // TestPALChangesPhysicsBySquareOfTheRateRatio measures the premise underneath
 // `subpixel-velocity.md`'s conversion factor, and then the consequence that page does not carry.
 //
-// The page says an NTSC increment must be **83.39%** of the PAL one (a PAL increment 119.92% of the
-// NTSC one) to travel the same distance per second, computed from the engine's own constants. That is the LINEAR case. Anything that
+// The page says an NTSC increment must be **83.21%** of the PAL one (a PAL increment 120.18% of the
+// NTSC one) to travel the same distance per second, computed from the 2600's own clocks. That is the LINEAR case. Anything that
 // accelerates is worse, and a 2004 author found out by shipping a PAL60 build rather than retune:
 //
 //	"THE GRAVITY IN THE NTSC VERSION IS EFFECTIVELY 1.4x GREATER. IT'S THE ONE CONSTANT I
@@ -26,7 +28,7 @@ import (
 //	          nothing about the television standard reaches the arithmetic
 //	MEASURED  the accelerating object's distance is quadratic in the frame count
 //	DERIVED   therefore the per-second ratio is the rate ratio for constant velocity and its
-//	          SQUARE for constant acceleration: 1.1992 and 1.4380 from the engine's constants
+//	          SQUARE for constant acceleration: 1.2018 and 1.4443 from the 2600's own clocks
 //
 // The first is the one that could have failed and is the reason the other two mean anything: if PAL's
 // extra 50 scanlines had changed how much work fits in a frame, the whole conversion would be about
@@ -91,14 +93,36 @@ func TestPALChangesPhysicsBySquareOfTheRateRatio(t *testing.T) {
 			lin)
 	}
 
-	// (3) The consequence, from the engine's own constants.
-	rate := float64(specification.SpecNTSC.RefreshRate) / float64(specification.SpecPAL.RefreshRate)
-	if math.Abs(rate-1.1992) > 0.001 {
-		t.Errorf("NTSC/PAL refresh ratio is %.4f, was 1.1992 — subpixel-velocity.md's 83.39%% is "+
+	// (3) The consequence, from the 2600's own clocks: the colour clock over 228 colour clocks per
+	// line over the line count. NOT from the engine's `specification` package — its RefreshRate is
+	// the broadcast line rate over the line count (`HorizontalScanRate: 15734.26` / 262 and
+	// `HorizontalScanRate: 15625.00` / 312), a television's figure rather than the console's, and
+	// its ratio is 1.1992.
+	ntscClock := audio.BaseClockNTSC * 114 // 3,579,545 Hz
+	palClock := audio.BaseClockPAL * 114   // 3,546,894 Hz
+	// pkg/audio records no source for the PAL colour clock. The engine's CPU clocks are the in-tree
+	// witness (`PAL = 1.182298`, `NTSC = 1.193182` in MHz, three colour clocks per CPU cycle, "Values
+	// taken from" a taswegian.com Clock-Speeds page that is cited there and not verified here).
+	if d := math.Abs(palClock - clocks.PAL_TIA*1e6); d > 1 {
+		t.Errorf("pkg/audio's PAL colour clock %.0f Hz is %.0f Hz from the engine's %.0f", palClock, d,
+			clocks.PAL_TIA*1e6)
+	}
+	if d := math.Abs(ntscClock - clocks.NTSC_TIA*1e6); d > 2 {
+		t.Errorf("pkg/audio's NTSC colour clock %.0f Hz is %.0f Hz from the engine's %.0f", ntscClock, d,
+			clocks.NTSC_TIA*1e6)
+	}
+	ntsc, pal := ntscClock/228/262, palClock/228/312
+	if math.Abs(ntsc-design.NTSCFrameRateHz) > 1e-6 {
+		t.Errorf("NTSC frame rate %.4f Hz here, %.4f Hz in design.NTSCFrameRateHz — the flicker ladder "+
+			"and this conversion have drifted apart", ntsc, design.NTSCFrameRateHz)
+	}
+	rate := ntsc / pal
+	if math.Abs(rate-1.2018) > 0.001 {
+		t.Errorf("NTSC/PAL refresh ratio is %.4f, was 1.2018 — subpixel-velocity.md's 83.21%% is "+
 			"1/this, so that number is stale too", rate)
 	}
-	if sq := rate * rate; math.Abs(sq-1.4380) > 0.002 {
-		t.Errorf("the squared ratio is %.4f, was 1.4380. This is the number the 2004 author felt "+
+	if sq := rate * rate; math.Abs(sq-1.4443) > 0.002 {
+		t.Errorf("the squared ratio is %.4f, was 1.4443. This is the number the 2004 author felt "+
 			"as \"1.4x greater\" gravity", sq)
 	}
 }

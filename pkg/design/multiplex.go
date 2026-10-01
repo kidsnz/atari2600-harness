@@ -32,13 +32,17 @@ func NeedsFlicker(sameYSprites int) bool {
 	return sameYSprites > DistinctPlayerSprites
 }
 
-// NTSCFrameRateHz is the engine's own NTSC refresh, measured rather than the nominal 60:
-// 15734.26 / 262. Kept here so the rate below and `subpixel-velocity.md`'s conversion factor
-// cannot drift apart.
-const NTSCFrameRateHz = 60.0544
+// NTSCFrameRateHz is the NTSC 2600's own frame rate rather than the nominal 60: the 3,579,545 Hz
+// colour clock over 228 colour clocks per line over 262 lines, ≈ 59.9227 Hz (the same colour clock
+// as `audio.BaseClockNTSC` × 114). It is not the broadcast line rate over 262 lines, 60.0544 Hz
+// (3,579,545 / 227.5 / 262 = 15734.26 / 262): 227.5 colour clocks is a standards-conforming set's
+// line length, not the 2600's, and a broadcast frame is 262.5 of those lines, 59.94 Hz. Nor is it
+// the engine's own `specification.SpecNTSC.RefreshRate`, which is that 60.0544 figure. Kept
+// here so the rate below and `subpixel-velocity.md`'s conversion factor cannot drift apart.
+const NTSCFrameRateHz = 3579545.0 / 228 / 262
 
 // FlickerRateHz reports how often each object is drawn when sameYSprites objects share the two
-// player slots, at 60 Hz frames.
+// player slots, at the NTSC 2600's frame rate (`NTSCFrameRateHz`).
 //
 // `NeedsFlicker` answers yes or no and says nothing about HOW MUCH — it returns the same answer for
 // three objects and for twenty. This is the missing half, and the archive gives both ends of it.
@@ -55,12 +59,12 @@ const NTSCFrameRateHz = 60.0544
 //
 // So the ladder is the frame rate over the number of subsets, and the two named points are:
 //
-//	 3-4 objects    2 subsets   30.03 Hz   the rate Saunders says is enough for a screen of sprites
-//	24   objects   12 subsets    5.00 Hz   Adventure's crowded room, named by the person who
+//	 3-4 objects    2 subsets   29.96 Hz   the rate Saunders says is enough for a screen of sprites
+//	24   objects   12 subsets    4.99 Hz   Adventure's crowded room, named by the person who
 //	                                       watched it as excessive
 //
-// The second line is arithmetic meeting an eyewitness: twenty-four objects sharing two slots is
-// exactly the "5hZ, maybe?" Cavina guessed at, which is the sort of agreement worth writing down
+// The second line is arithmetic meeting an eyewitness: twenty-four objects sharing two slots comes
+// to 4.99 Hz, the "5hZ, maybe?" Cavina guessed at, which is the sort of agreement worth writing down
 // because neither side was derived from the other.
 //
 // There is no hardware limit here to return — this is a judgement, and the number exists so the

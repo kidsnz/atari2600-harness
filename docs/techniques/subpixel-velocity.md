@@ -136,21 +136,27 @@ n frames on NTSC, and the PAL values make that every 36n/30 = 1.2n frames: **slo
 subtracted constant instead is not settled in the thread. 6/5 is the nominal 60/50. **Cited only, not
 verified** — no ROM was built with either table.
 
-**The conversion factor, from our own constants** (`television/specification/specifications.go`):
-NTSC is `15734.26 / 262` = **60.0544 Hz**, PAL is `15625.00 / 312` = **50.0801 Hz**, so an NTSC increment
-must be **83.39%** of the PAL one to move at the same speed per second (a PAL increment is 119.92% of the
-NTSC one) — 0.06 points from the nominal 50/60. Worth stating precisely, because the list did not: the author who raised it wrote *"just ensure
+**The conversion factor, from the 2600's own clocks** (the colour clock over 228 colour clocks per
+line — `pkg/audio`'s `BaseClockNTSC` and `BaseClockPAL` × 114, which agree with the engine's
+`hardware/clocks` CPU clocks × 3): NTSC is `3579545 / 228 / 262` = **59.9227 Hz**, PAL is
+`3546894 / 228 / 312` = **49.8607 Hz** (the PAL colour clock is **Cited only, not verified**: `pkg/audio`
+records no source for 3546894, and the engine's `hardware/clocks` only cites a taswegian.com page for its
+`PAL = 1.182298`), so an NTSC increment must be **83.21%** of the PAL one to move at
+the same speed per second (a PAL increment is 120.18% of the NTSC one) — 0.12 points from the nominal
+50/60. Until 2026-10-01 this page took the engine's `television/specification/specifications.go` rates,
+`15734.26 / 262` = 60.0544 Hz and `15625.00 / 312` = 50.0801 Hz, and gave 83.39%: those are broadcast
+line rates over the 2600's line counts, and the 2600's lines are 15,699.8 and 15,556.6 Hz (NTSC's broadcast line is 227.5 colour
+clocks, the 2600's 228). Worth stating precisely, because the list did not: the author who raised it wrote *"just ensure
 the NTSC m to be ~80%"* and then, parenthetically and unsurely, *"can someone provide the correct
-value? 83,4%?"*. **The confident figure was 3.4 points out and the hesitant one was right to two
-decimal places.**
+value? 83,4%?"*. **The confident figure was 3.2 points out and the hesitant one 0.2.**
 
 ★**That factor is for CONSTANT VELOCITY. Anything that accelerates is off by the SQUARE of it.** With
 `vel += g` and `pos += vel` once per frame, distance goes as the square of the frame count, so the
-same code travels **1.4380×** further per second on NTSC than on PAL — not 1.1992×. A 2004 author felt
+same code travels **1.4443×** further per second on NTSC than on PAL — not 1.2018×. A 2004 author felt
 it as gravity and shipped a second build rather than retune: *"THE GRAVITY IN THE NTSC VERSION IS
 EFFECTIVELY **1.4x GREATER**. IT'S THE ONE CONSTANT I COULDN'T CHANGE… So anyway, I'VE INCLUDED A
 PAL60 VERSION"* 〔`200409/msg00309`〕. So **a PAL game ported to NTSC by scaling every velocity constant by
-83.39% will still fall wrong**, and the acceleration constant needs 69.54% (83.39% squared).
+83.21% will still fall wrong**, and the acceleration constant needs 69.24% (83.21% squared).
 
 ★★**And the premise both numbers rest on is now measured, not assumed**
 (`internal/emu/palphysics_test.go`, `roms/litmus/litmus_pal_physics.asm`): the same ROM produces

@@ -19,13 +19,13 @@ incredible amount of flicker"* 〔`199709/msg00218`〕.
 
 | objects sharing the two slots | subsets | each drawn at |
 |---|---|---|
-| 1–2 | 1 | 60.05 Hz — no flicker |
-| 3–4 | 2 | **30.03 Hz** — the rate Saunders calls sufficient |
-| 12 | 6 | 10.01 Hz |
-| 24 | 12 | **5.00 Hz** — Cavina's *"5hZ, maybe?"* |
+| 1–2 | 1 | 59.92 Hz — no flicker |
+| 3–4 | 2 | **29.96 Hz** — the rate Saunders calls sufficient |
+| 12 | 6 | 9.99 Hz |
+| 24 | 12 | **4.99 Hz** — Cavina's *"5hZ, maybe?"* |
 
 ★★**The last row is arithmetic meeting an eyewitness.** Twenty-four objects sharing two slots comes to
-exactly the number he guessed at, and neither side was derived from the other. ★★★There is no hardware
+the number he guessed at, and neither side was derived from the other. ★★★There is no hardware
 limit to return here — this is a judgement — but the number exists so the judgement is made against
 one, and `HardwareCollisionUsable` is the other half of it: past two subsets the TIA's collision
 latches stop being trustworthy, so a high N costs more than looks.
