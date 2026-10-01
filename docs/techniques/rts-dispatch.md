@@ -94,6 +94,42 @@ fixed-height form; the elastic-spacer form is a documented extension.)
   even when the RAM list is rewritten mid-run (verified across the swap frame).
 - **Cost:** 2 bytes of stack per zone in the list (+2 for the terminator).
 
+## Neighbours — the same stack for other jobs, and the list as something else
+
+- **`RTS` or `JMP (ptr)`: the price is RAM, not ROM.** Rob Mundschau's single dispatch is `LDA
+  TableHi,X / PHA / LDA TableLo,X / PHA / RTS`, tables holding address−1; he wrote that it is 2 bytes
+  of ROM smaller than storing a vector and `JMP (Vector)`, and one cycle slower 〔stella-list
+  `200301/msg00031`〕. By the opcode table (zero-page vector) the `RTS` form is 9 bytes and 20 cycles
+  against 13 bytes and 19 cycles — 4 bytes, not 2 (**Not verified** — a hand count, not assembled).
+  Thomas Jentzsch named the real difference: *"The little advantage of the JMP() version is, that it
+  doesn't need extra stack RAM. Instead you can re(!)use two other currently unused bytes (e.g. a
+  pointer)"* 〔`msg00039`〕. The stack bytes are claimed at that moment; the vector can be two bytes
+  that mean something else outside the kernel. In this page's chain every zone's address sits on the
+  stack for the whole kernel (the **Cost** line above). **Cited only, not verified**.
+- **A variable delay, entered by `JMP (ptr)` and left by `RTS`.** shazz, timing a 48-px sprite into
+  place, pushes the continuation and jumps into a run of `nop`s: `STA WSYNC / LDA #>ScanLineLoop / PHA /
+  LDA #<ScanLineLoop-1 / PHA / JMP (DelayRoutine)`; the run ends in `RTS`, which lands on
+  `ScanLineLoop` 〔AtariAge `topic/215637`, 2013〕. Where `DelayRoutine` points into the run is the
+  number of cycles spent — 2 per `nop`, so he keeps separate even and odd tables. The push-(target−1)
+  -then-`RTS` above, used once to come back rather than to chain zones; `SLEEP` elsewhere in this
+  repository is a delay fixed at assembly time. **Cited only, not verified**.
+- **The list as a timeline.** The zone list here is spatial — one entry per band of the screen. In a
+  2025 thread on growing stalactites drawn in the playfield, two replies made the list temporal.
+  SplendidNut: treat *"each PF byte as its own unique stack of bitmap changes"*, each entry a pattern
+  and *"the countdown to the next change"* (16 bytes per PF column, 64 for a 32-pixel display).
+  Bit Expander: about 32 bytes, *"each one being an opcode to be executed by the kernel"* — 3 bits of
+  blocks to wait, 5 bits naming the PF bit to clear 〔AtariAge `topic/385470`〕. Thomas Jentzsch, who
+  asked, used neither: he stored the plain playfield, *"32 (columns) / 8 * 16 (rows) = 64 bytes"*.
+  **Cited only, not verified**.
+- **Zone seams show in the picture.** Each zone sets its own colours, and anything drawn across a zone
+  boundary shows the change. IanAjax's Impossible Mission mock-up (2026) staggers the side walls so
+  platform zones and object zones alternate, and because every zone is the same height the colour
+  steps read as *"a bit more like some design on the wall"*. Objects that use the ball also have a
+  playfield version, so one of them can share a level with another ball object 〔AtariAge
+  `topic/388301`〕. A mock-up, not a kernel; two days later the walls became a gradient
+  pattern that changes the playfield colours only 12 times, *"12 zones to switch between"*.
+  **Cited only, not verified**.
+
 ## See also
 - `zone-multiplexing.md` — the **static** form (fixed zones); this is its data-driven generalization.
 - `dynamic-multisprite.md` — sort/position/display + flicker (the general multi-sprite kernel).

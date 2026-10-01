@@ -66,3 +66,30 @@ and lost days to it; the one-way link (#36 pointed here, nothing pointed there) 
 - Wider displays (24/32 chars) need column flicker or RESPx re-strobing — recorded as catalog
   candidates with the measured constraints (9px strobe granularity, RESP-vs-GRP write conflicts)
   from the research thread; implement when a game needs them.
+- **A font, or the phrase itself.** Count the phrases before building a font. Nick Bensema, answering
+  a hiragana font: *"In practice, though, we're probably only going to use one or two phrases anyway,
+  so it might be more economical to just draw the characters in manually, like we do for English
+  text"* — his example spells *kudasai* in 24 bytes 〔stella-list `199804/msg00141`〕. A font pays for
+  its whole table, the build loop and the RAM buffer; a drawn phrase pays only its own bytes. One or two
+  fixed phrases: draw them (`bitmap48.md`). Many, or text that changes: the font.
+- **Duplicate each glyph nibble into both halves.** Every byte of the `Font` table in `text12.asm` is
+  `$0`–`$F`, so storing `$99` instead of `$9` costs no ROM. Piero Cavina: *"the same 4-bit character
+  twice in 1 byte, so that combining two of them into 1 byte can be done without shifting bits"*
+  〔stella-list `199709/msg00308`〕 — the four `asl` that `BuildBuf` spends on the left character
+  become a mask. Greg Troutman counted *"one mask operation (2 cycles) vs. 4 ASLs (8 cycles)"*, 180
+  cycles over a 30-byte line 〔`msg00311`〕; but once both halves are filled the right character needs
+  a mask too, so by the same count it is two `and`s against four shifts, 4 cycles saved per byte rather
+  than 6. Jim Nitchals' alternative keeps two font tables, one pre-shifted, and needs no mask at all
+  〔`msg00317`〕. **Not verified** — `text12.asm` still shifts.
+- **Taller rows 2 and 4.** Jim Nitchals, on his 5-row playfield text: *"Stretching rows 2 and 4 of the
+  text gives it better shape without taking up extra room in the bitmap (6 bytes of playfield x 5
+  lines.)"* 〔stella-list `199709/msg00299`〕. The stretch is in how many scanlines the kernel spends on
+  a row, not in the data. This page draws every row on 2 scanlines; giving rows 2 and 4 more is the
+  same trick. How many he used is not in the post. **Not verified**.
+- **Proportional glyphs, and no feature one scanline tall.** karl-g's tiny proportional font (2020)
+  starts from Andrew Davie's monospaced Glacier Belle (3 px × 12 lines) and changes only a few glyphs;
+  2 px between words read as cramped, so at least 3. The rule for drawing any glyph that will
+  **flicker**: no pixel feature one scanline tall — an LCD TV can swallow every other line of a
+  flickering picture and take the feature with it; make it at least 2 lines tall (any height above 1,
+  not necessarily even). A kernel that does not flicker, like this page's, is not affected
+  〔AtariAge `topic/312815`〕. **Cited only, not verified** — read from distilled notes, not the thread.

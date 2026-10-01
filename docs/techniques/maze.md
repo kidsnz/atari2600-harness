@@ -63,6 +63,41 @@ every cell exactly 2px wide:
 ## Notes / scaling
 - Bidirectional scrolling (Pitfall's left/right-stepping LFSR) lets the maze grow both ways; step
   the LFSR per cell instead of per row for finer structure.
+- **What a counter-generated world cannot do.** Glenn Saunders, on a large world in little RAM: *"It
+  can be done without much RAM by using polynomial counters ala Pitfall … With the counter, it has two
+  directions, forward and back. One dimensional. The problem with this is if you back up, the monsters
+  would have to reset. There is no way you can store the state of every monster in a world this big."*
+  〔stella-list `199907/msg00023`〕 The counter regenerates terrain in either direction for free; it
+  cannot remember anything that changed there, and stepping it forward and back walks a line, not a
+  grid. Decide before relying on it whether the player can return somewhere and expect it changed.
+  (He also suggested a random seed at every reset; this demo's fixed seed is the opposite choice.)
+- **Choosing the column count: walls and passages add up to 40.** The playfield is 40 pixels wide,
+  so `walls × wall width + passages × passage width = 40`. SeaGtGruff, with 1-pixel walls and one more
+  wall than passages: all passages 2 wide gives `(n + 1) + 2n = 40` → **13 passages, 14 walls**; the
+  most passages gives **20 walls and 19 passages**, all 1 pixel wide except the centre one at 2
+  〔AtariAge `topic/224797`, 2014〕. Arithmetic only (14 + 26 = 40, 20 + 19 + 1 = 40).
+- **One byte per row, not per scanline.** This demo keeps one byte per row by nesting a 12-line band
+  loop inside the row loop (`maze.asm`, `RowLoop` / `Band`). A kernel that has to stay one flat
+  per-scanline loop — an asymmetric playfield rewriting PF1/PF2 mid-line, say — can get the same
+  saving with a second counter. SplendidNut's insert, placed after the line's playfield writes, with X
+  preloaded to the last row:
+  ```
+  TYA            ; scanline counter
+  AND #7
+  BNE notNextRow
+  DEX            ; X = row index into the PF tables
+  notNextRow:
+  ```
+  X moves once every 8 lines and the tables shrink to one byte per row 〔AtariAge `topic/360395`,
+  2024〕. The posted comment calls `AND #7` *"essentially (Y mod 7)"*; it is **mod 8**, and a single
+  `AND` only works for a power-of-two row height. By the opcode table it costs 7 cycles when the branch
+  is taken and 8 when it falls through (same page) — **Not verified** in a kernel.
+- **Scrolling by sweeping an index the kernel already reads.** This demo scrolls by copying the row
+  buffer down every frame. SpiceWare's alternative, on Collect: the kernel picks which arena to draw by
+  an offset into the playfield tables (`ArenaOffset`), whose only two values are 0 and 22 — *"If,
+  instead, you vary the value over time from 0,1,...,21,22 you'll end up with a scrolling playfield"*.
+  No copy and no new kernel code, only another value in an index it already uses. He warned it is
+  *"chunky scrolling"* 〔AtariAge `topic/267694`, 2017〕. **Cited only, not verified**.
 - Carve guaranteed-solvable passages by forcing one open column per row (mask a passage bit before
   storing), the way Entombed guarantees a path.
   ★**Not implemented — and measured 2026-09-07 to be unnecessary at this size.** The generator is an

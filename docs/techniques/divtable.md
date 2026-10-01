@@ -112,3 +112,44 @@ on-screen value at `$B0` (÷15 of 90 = 6). 13 exact RAM asserts in total, `ntsc_
   state in their own zero-page bytes (the demo's sweep uses `swin`/`swix`, not Y/`tmp`).
 - For a single fixed divisor in a hot path, inline the specific reciprocal-shift chain instead of the
   general `DivCalc`; this catalog entry is the *general, exact* helper.
+- **A shift chain that is ×85 in disguise.** Alex Herbert's 8-bit ÷3 "from memory" — `sta temp /
+  lsr / lsr`, then `clc / adc temp / ror / lsr` four times 〔stella-list `200412/msg00075`〕 — returns
+  exactly `(A*85)>>8` for every input 0..255, so its error is the RECIP=85 row of the table above:
+  −1 on 85 inputs, exact on 171. The 85 are precisely the multiples of 3 from 3 to 255 (3/3 reads 0):
+  it is wrong on every input that divides evenly. David Galloway's reply in the same thread derives the
+  same ×$55 from 1/3 = $0.55 〔`msg00076`〕. **Not verified** in the emulator — the chain and `×85`
+  were modelled in Python over all 256 inputs, not assembled. When reading an old ÷3 chain, the sign of
+  its error tells which reciprocal it is.
+- **÷15 without a multiply: the nibble sum.** Because 16 ≡ 1 (mod 15), `n = 16h + l = 15h + (h + l)`,
+  so `n div 15 = h + (h + l) div 15` and `n mod 15 = (h + l) mod 15`, with `h + l` at most 30. Bob
+  Colbert's 1997 positioning routine does exactly this — `and #$0F` for `l`, four `lsr` for `h`, `adc`
+  the two, then one `cmp #$0F / bcc / sbc #$0F / iny` 〔stella-list `199709/msg00006`〕. No table, no
+  multiply. **One conditional subtract is exact for 0..254 but not for 255**, where `h + l = 30` needs
+  two (it returns 16 r15 instead of 17 r0) — checked in Python over all 256 inputs. Colbert's routine
+  increments its input first, so its failing input is 254. Cycle cost: **Not verified**.
+
+## When the divisor is a runtime value
+
+Everything above divides by a constant. Two shapes for a divisor known only at run time, neither
+implemented here:
+
+- **Binary long division — exact.** Shift the dividend's top bit through carry into the accumulator;
+  if the divisor fits, subtract it. MLdB: in binary *"the quotient of each step is always 1 or 0 … so
+  there's no division involved only a single subtract"*, and the carry from that step is the quotient
+  bit, rolled into *"the same variable that is used for the dividend, shifting the dividend out and
+  the solution in"* 〔AtariAge `topic/280991`, 2018〕. Repeated subtraction (Omegamatrix's loop in the same
+  thread, 7 instructions in its shorter form) is smaller, but its time grows with the quotient. MLdB's own version first
+  scales the divisor up to its largest power-of-two multiple that fits 8 bits, then steps back down; he reported
+  49 cycles for `255/255` and `128/128`, 243 for `0/1`, and 259 for `255/1`. **Cited only, not
+  verified** — nobody else in the thread ran any of the routines, and none was assembled here.
+- **Log/exp tables — approximate, any divisor.** Roger Williams' polar-to-cartesian converter (three
+  tables, *"a bit under 700 bytes"* including trig) notes that the log and exp tables also do *"general
+  purpose scaling multiplication and division … with few errors greater than 1 out to results of 45 or
+  so"* 〔stella-list `200110/msg00292`〕. Asked for the remainder (Thomas Jentzsch, `msg00313`), Chris
+  Wilkson gave `x = log(a) − log(b); q = int(antilog(x)); x = log(b) + log(q); r = a − int(antilog(x))`
+  〔`msg00319`〕. Williams drew the line himself: the trick *"works because I accept the rounding errors
+  … you couldn't use it to do base conversion because there are a lot of +-1 errors even close in. But
+  for drawing a display which can be approximate, it does the job"* 〔`msg00322`〕. If `q` is off by
+  one, the remainder `r = a − b·q` is off by the whole divisor `b` (**Not verified** — our arithmetic,
+  not the thread's), so it is for screen positions, not for score digits (base conversion is his own
+  counter-example). **Cited only, not verified**.

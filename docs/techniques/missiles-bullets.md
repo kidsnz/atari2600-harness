@@ -37,6 +37,20 @@ The three-way choice, from Manuel Polik on Star Fire (stella-list `200209/msg001
 So a coloured bullet costs either a flickering object or a 4-clock-wide one. Pick before drawing:
 this is the kind of constraint that a mockup cannot catch by itself (`design-principles.md`).
 
+**Borrow the other player's missile.** When the two players' colours are each other's — Sohl's
+example is Spy vs Spy, *"if your sprites have inverted colors relative each other"* — put `M1` (drawn
+in `COLUP1`) on player 0 and `M0` on player 1: *"You'd use Missile 1 with Player 0, and Missile 0 with
+Player 1"* 〔AtariAge `topic/337214`〕. Each player gets a second colour from a missile it does not own.
+The cost: neither missile is free to be its owner's bullet, and the accent changes whenever the other
+player's colour does. **Cited only, not verified**; it rests on the register fact at the top of this
+section.
+
+**Width from two objects is flat.** A paddle game short of objects can make its bat from the ball and
+a missile side by side, both set to 8 clocks, 16 wide 〔AtariAge `topic/317569`, 2021〕. Besides the
+two colours above (the ball draws in `COLUPF`), the bat is flat: neither object has a bitmap, so its
+face is a rectangle unless the kernel reshapes it line by line (`hmove-slope.md` moves a missile or the
+ball per line). **Cited only, not verified**.
+
 ## The pattern
 
 - **Spawn**: fire edge (and no live bullet) → `RESMP0=2`, mark state "locking" (`bulY=$FF`).
@@ -60,6 +74,13 @@ this is the kind of constraint that a mockup cannot catch by itself (`design-pri
   fine-adjust direction and breaks linearity). With indexed stores (`sta RESP0,x`) the measured
   calibration here is real X = A−3; with absolute stores it was A−9. **Calibrate per kernel
   with `read_tia`, never copy constants.**
+- **Write `ENAMx` before the visible line starts.** The picture begins about 22.7 CPU cycles after
+  `WSYNC` (68 colour clocks of HBLANK ÷ 3). nukey-shay diagnosed a missile drawn skewed at the left edge
+  as a `sta ENAM1` landing at cycles 22–25, already on screen. His fix: decide on the previous line's
+  spare cycles, keep the result in a temp byte, and on the line itself only `lda temp / sta ENAM1`,
+  done by cycle 18 〔AtariAge `topic/262272`, 2017〕. The same thread offers vertical delay for when even
+  that does not fit; it does not reach missiles, which have no VDEL (`fundamentals-audit.md`, measured).
+  **Cited only, not verified**.
 
 ## The ENAM "stack trick" — branchless 1-line missile enable (Combat)
 For a **1-scanline** missile, instead of the row-range compare you can enable ENAM branchlessly in
@@ -113,6 +134,13 @@ same trick from the same game, twenty-seven years apart. **`CPY` appears nowhere
 `two-line-kernel.md`**, which is why the alternative read as "a different technique" rather than as
 the same one with a different register. The saving is arithmetic on paper here and has not been
 measured; what is measured is that "irreducible" was too strong a word.
+
+**Three objects: start one higher.** Manuel Polik's Gunfight kernel points SP at `$1F` and pushes three
+times — `CPY verPosBL : PHP`, `CPY verPosM1 : PHP`, `CPY verPosM0 : PHP` — lighting ENABL, ENAM1 and
+ENAM0 from one branchless sequence 〔stella-list `200102/msg00367`, 2001〕. He re-points SP every line
+with `LDX #$1F / TXS` before the `WSYNC`, because his X indexes the player graphics. By the opcode
+table that is 18 cycles for the three pairs plus 4 for the reload, the 22 cycles nukey-shay quotes for
+the same shape 〔AtariAge `topic/262272`〕. **Cited only, not verified**.
 
 If the line still overruns, the fix is more budget (a 2-line kernel), or the graphics-pointer X-pin
 trick that collapses `PLA;PLA` to a 2-cy `TXS` (`two-line-kernel.md`).
