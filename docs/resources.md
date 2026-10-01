@@ -240,6 +240,14 @@ bit:  4 5 6 7 | 7 6 5 4 3 2 1  0  | 0  1  2  3  4  5  6  7
   from the original Programmer's Guide; **Cited only, not verified**). The Guide is not a safe source for spellings: the HTML copy in the
   umbrella's `reference/docs_atari/` has no `COLLUPPF`, but has both `COLUP0` and `COLUMP0`
   (`rg -o -i 'COLU[A-Z0-9]+'` over it).
+  **NO\$ is not a safe source either.** dirtyhairy, author of the TIA core in Stella 5 and 6502.ts, to an
+  emulator writer in 2018 (AtariAge `topic/279416`): *"The nocash description of the VCS that you quote in
+  your blog is a pretty dangerous resource, there is a lot of interpretation in it, and some parts are just
+  plain wrong."* The writer agreed — *"I agree it's not great and obviously wrong in places. Thankfully the
+  schematics tend to win out when I'm confused."* Neither says which parts, and the thread names no file:
+  that the description is the `2k6specs` above is our identification. **Cited only, not verified.** Both
+  `2k6specs` citations in `docs/` sit beside a second source (this line; `design-principles.md`
+  〔2k6specs, Davie S21〕).
 
 ### Needs manual confirmation (the subagent couldn't WebFetch)
 - The bit notation of masswerk's HMOVE table (the summarizer dropped the sign bit. Substituted Stella Guide
@@ -252,10 +260,13 @@ bit:  4 5 6 7 | 7 6 5 4 3 2 1  0  | 0  1  2  3  4  5  6  7
 ## Stream A results (harness building) 2026-06-09
 
 Implementation spec for Phases 1–2. Latest Gopher2600 **v0.56.0** (2026-06), official Apple Silicon support.
+**That is not the engine this tree builds against.** The untracked clone in `Gopher2600/` describes as
+`nightly-3-g5d532e88` (`git -C Gopher2600 describe --tags`, 2026-10-01): seven commits past `v0.56.1`,
+whose commit is dated 2026-06-01, before this section was written.
 
 ### Gopher2600 driving (engine)
-- **terminal commands:** `STEP` / `QUANTUM` (`CPU` or `CLOCK` — ★`CLOCK` steps in **color-clock units** =
-  beam granularity) / `SCANLINE` / `FRAME` / `PEEK` / `POKE` / `CPU` `RAM` `TIA` `RIOT` `TV` (display each
+- **terminal commands:** `STEP` / `QUANTUM` (`INSTRUCTION`, `CYCLE` or `CLOCK` — ★`CLOCK` steps in
+  **color-clock units** = beam granularity) / `SCANLINE` / `FRAME` / `PEEK` / `POKE` / `CPU` `RAM` `TIA` `RIOT` `TV` (display each
   subsystem) / `WATCH` (halt on read/write, symbols allowed) / `BREAK` / `TRAP` (halt on change) / `REWIND` /
   `SCRIPT` (record · replay) / `ONSTEP` · `ONHALT` · `ONTRACE` (auto-run each time). The startup script is
   **debuggerInit** in the config dir.
@@ -304,6 +315,9 @@ Implementation spec for Phases 1–2. Latest Gopher2600 **v0.56.0** (2026-06), o
   as the judgment basis.
 
 ### Needs confirmation (UNVERIFIED)
-- The argument spelling of `QUANTUM` (CPU/CLOCK/VIDEO) and the condition grammar of `BREAK`/`TRAP` → in-app `HELP`.
+- The condition grammar of `BREAK`/`TRAP` → in-app `HELP`. (`QUANTUM`'s arguments, once listed here as
+  CPU/CLOCK/VIDEO, are settled: the bundled engine's template line is
+  `cmdQuantum + " (INSTRUCTION|CYCLE|CLOCK)",` (`Gopher2600/debugger/commands_template.go`), and its
+  author lists the same three in AtariAge `topic/391096`.)
 - Gopher2600's minimum Go version → `go.mod`. / `regress` subcommand syntax → when starting the regression layer.
 - Stella `dump`'s exact output layout and the manpage wording (option names and color order verified; wording not).

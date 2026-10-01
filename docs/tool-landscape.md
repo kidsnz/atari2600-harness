@@ -108,12 +108,31 @@ distillation problem, not a collection problem).
     wrong without its missing premise — a bare `RESx` strobe is limited to **3 colour clocks**
     (1 CPU cycle), corrected by seagtgruff in `172089`. This repository already uses the corrected
     value (`docs/techniques/sprite-placement.md`, `x = 3c - 60`) and never absorbed the wrong one.
+    Section 8.0 of the HTML copy here repeats the 15-clock premise and then reads *"Objects can not
+    be placed at any color clock position across the screen"* — one of the Sinnett reconstruction's
+    spelling errors that dionoid, who used that reconstruction as the source of a printed booklet,
+    calls *"actually misleading"*: *"can now"* is meant (`205774`). He adds that *"the information
+    on the VDEL registers is incorrect"*, without saying which part (**Cited only, not verified**).
+    No other VDEL statement in this tree cites the Guide (`rg -i VDEL`, filtered for
+    `programmer|SPG|guide`, finds only this note, 2026-10-01).
   All 26 citations of the Guide outside `CHANGELOG.md` reference its prose, its register tables or
   its 400 us rule; **none reference the timing diagrams**, so the redrawing risk does not reach any
-  claim here. Verified 2026-09-10.
+  claim here. Verified 2026-09-10. Outside this entry they name the Guide but not its edition, and
+  the editions differ in their errors (above). **Name the edition when citing a document, and the
+  release or commit when describing an emulator's behaviour** — this repository's rule; the document
+  half is drawn from the editions above, not stated in any thread. Gopher2600's author suggested the
+  emulator half, after finding an AI-written emulation note that listed two `QUANTUM` modes where
+  the engine has three: *"include version information about the emulators in the md file. I use
+  semantic versioning for gopher2600 and try to log breaking changes when they occur"* (JetSetIlly,
+  `391096`, 2026; `docs/resources.md` carried the same kind of error — see its Stream A section).
 - **Guide to Cycle Counting** (Nick Bensema) `cycle_counting_guide.html` — ★ the core of B/C
 - **Programming for Newbies** (Andrew Davie) `Atari_2600_Programming_for_Newbies.{pdf,txt}` — especially Session 22 (horizontal position)
 - **woodgrain wiki** `Playfield_Timing.html` / `Clock_Speeds.html` / `Memory_Map.html` / `Bank_Switching.html` / `Sound.html`
+- **MiniDig — Best of Stella** (`http://www.qotile.net/minidig/`) — an earlier distillation of the
+  mailing list this tree's `stella-list` citations come from. kisrael's reading list on AtariAge
+  (`topic/320754`): *"The Stella mailing list was the previous core of Atari homebrew, this is a
+  distillation of disassemblies, tricks, etc"*. Not collected here; its edition of the Guide is the
+  one with the VSYNC typos above. **Cited only, not verified.**
 - **vcs.h / macro.h** — TIA register name definitions. In 2018 the copies DASM ships were in its
   **source** download under `machines/atari2600` (the directory `8bitworkshop-crosscheck.md` passes with
   `-I`); someone who had not found them in the SourceForge distribution had to ask, once Andrew Davie

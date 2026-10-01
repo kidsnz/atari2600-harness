@@ -496,6 +496,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     doubles the speed. 〔mining 322030 pf-2cc-wide〕 One emulator frame holds only one of the two
     patterns (our reading), as with flicker in the Multiplexing section. **Cited only, not verified** —
     only the distillation notes are held here, not the thread.
+- **A still playfield can be stored as variable-length bands, not one entry per line.** 8bitworkshop's
+  `complexscene` sample holds its picture as `.byte count, PF0, PF1, PF2` per band with a final
+  `.byte 0` ending the table, reads it through a zero-page pointer (`lda (PFPtr),y`), loads the three
+  PF bytes into X, a temporary and Y before `sta WSYNC` and stores them after it. In that two-line
+  kernel a count is two scanlines (our reading of its loop: two `sta WSYNC` per `dex`), so its eight
+  bands draw 94 two-line rows from 33 bytes. Read 2026-10-01 in the umbrella's
+  `reference/docs_atari/8bitworkshop_samples/complexscene.asm`; a 2020 beginner's thread worked through
+  the same format 〔mining 305503 reading-byte-tables; only the distillation notes are held here, not
+  the thread〕. The sample assembles (`8bitworkshop-crosscheck.md`, 26/26); **Not verified** — the
+  scanlines it draws were not measured here.
 - **A scrolling PF background is 3 layers — board RAM + display buffer + delta update** — plus tile-granular scrolling (avoids tearing). Iron rule = **keep the total scanline count constant from frame to frame** — the legal totals and the PAL parity constraint are the rule
   immediately below, stated once rather than twice. The scroll band is 10–16 lines top and bottom. 〔200972 tile-scrolling-engines, Boulder Dash style〕 `→ design.ScrollScanlinesConstant` **and `design.ScrollBackgroundFitsRAM`**. **Corrected 2026-09-03:** this line prescribed three layers and pointed only at the scanline check, which looks at line counts and PAL evenness and nothing else — so nothing asked whether the three fit. The same source says they usually do not: **a world you rewrite at run time needs SuperChip/CBS RAM, because the internal 128 bytes only hold a 120-byte-class malleable world** 〔200972:14〕. Budget the three layers plus the stack against `design.RAM2600` before choosing this structure. Found by auditing harness claims against the sources harness itself cites.
 - **PAL frames must have an even scanline count** — an odd total is not a legal PAL frame, so a
@@ -617,6 +627,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     background colour (iesposta's questions — missiles whose players are black). Which objects that
     costs depends on whether the wall is PF or background (our reading). `techniques/invisible-probe.md`
     hides an object the same way, for collisions. **Cited only, not verified.**
+  - **A true 3D engine in 4K without ARM was designed; in the six posts held here it is not shown
+    working.** bit-expander, 2014: rooms are convex zones joined by portals; the engine culls, rotates,
+    translates, clips and projects into RAM, then draws *"up to 21 color-textured polygons on screen
+    taken from RAM using the playfield"*, with *"the display is rotated 90 degrees to allow the colorful
+    textures"* and *"16 colors are allowed in the textures as the engine uses 8 shades to perform
+    Gouraud shading"*. *"63 bytes of RAM are used to store the 21 polygons, and this list is being
+    refreshed every other frame (30Hz)"*, the blanking time going to the engine on alternate frames. His
+    own status: *"Clipping to frustum is not working yet"*, and entering and exiting portals not yet
+    handled; gemintronic's build gave *"a scrambled screen"*, which he put down to the clipping code
+    *"messing the polygon list"*. 〔mining 222981 3d-fps-engine-for-the-2600; the copy here holds 6 of 13
+    posts, so how the thread ends is not known〕 The figures are a design's budget for a ceiling, not a
+    frame anyone in those six posts has seen. **Not verified.**
 - **Vertically moving platforms use two zones of complementary height**: build the upper and lower band heights so that "when one grows the other shrinks by the same amount" and the total line count stays constant = a stable picture (mismatched, you get motion blur). 〔mining blog SpiceWare〕
 - **Visible delay on a PF register write**: an `sta` to PF0/PF1/PF2 takes effect **2–3 colour clocks late**
   (colour registers are immediate). Complete the centre boundary of a reflected PF at **exactly cycle 48**

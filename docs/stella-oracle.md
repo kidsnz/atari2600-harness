@@ -166,6 +166,13 @@ Collected from forum threads. Where Stella 7.0's bundled manual (`Stella.app/Con
   harness counts instead of showing: scenario `frame_lines_stable` (`docs/scenarios.md`); `internal/crt` has
   no vertical axis for it (`rg -i 'jitter|roll' internal/crt` → 0). **Not verified** — the effect was not
   turned on here.
+- **Developer settings first.** thomas-jentzsch to an author, in his first post, testing an 8K game only in
+  Stella: *"When testing with Stella, please make sure that you have the developer options set. This will
+  help you to identify most of the errors."* The author had not known the developer menu and found *"one problem to
+  fix already"* (AtariAge `topic/327208`, 2021). The 7.0 manual: `-dev.settings <1|0>` *"Select developer
+  (1) or player (0) set"*, toggled with Alt+D / Cmd+D. "Most" carries no count, and the Flap Ninja case
+  (Status, above) is a hardware fault Stella with developer mode could not be made to reproduce.
+  `cmd/stellacheck` passes no `-dev.settings`. **Cited only, not verified.**
 - **Undriven TIA bits.** reveng: run Stella with `-dev.settings 1` and `-dev.tiadriven 1` to make a read bug
   such as `lda 0` written for `lda #0` obvious (AtariAge `topic/298427`). The 7.0 manual: *"Set unused TIA pins
   to be randomly driven high or low on a read/peek. If disabled, use the last databus value for those pins
