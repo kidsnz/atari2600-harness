@@ -25,6 +25,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     exist on PAL; compare the palette-side measurement in `visual-ceiling.md` (four of sixteen PAL hues
     are one grey). **Cited only, not verified** — his values have not been checked against the PAL
     table here.
+  - **Which set to use can be measured instead of switched, given an ARM on the cartridge.** SpiceWare,
+    2017, timing one frame with a Harmony/Melody timer, after ZackAttack's idea of telling the consoles
+    apart by their clocks: the-maxx's NTSC 2600 read `11d32A`, `11d32E` and `11d326`; Thomas
+    Jentzsch's PAL 2600 *"11Fd00..11Fd0F"*; alex_79's PAL 2600 Jr `11fd15`–`11fd20` and PAL 7800
+    `11fd31`–`11fd35`. SpiceWare: *"I'll use the middle of the extremes, (11d311+11fd20)/2 = 0x11E818
+    as the comparison point."* Two days later his menu was *"using the timer results to set the
+    initial value for TV-Type"*. It cannot tell a 2600 from a 7800: an NTSC 2600 reading of `11d312`
+    was *"within the range of my 7800, so we definitely cannot use the timer for 2600/7800
+    detection."* 〔mining 263219 ntsc-vs-pal-detection〕 The PAL readings are about 1.009 times the
+    NTSC ones, the ratio of the two colour clocks quoted at the top of the thread (3.546894 and
+    3.579545 MHz) (our arithmetic). **Cited only, not verified** — none of the readings was taken here.
 - **Add colours VERTICALLY = rewrite COLUPx per scanline** (one colour horizontally). **Horizontal multi-colour is expensive** (only the fakes: PF score / Chronocolour / flicker / stacking). 〔Hugg, Davie S21〕
   - **Minimum width of a horizontal colour band = store-instruction cycles × 3 colour clocks**. An arbitrary
     colour costs ~6cy per band (about 8 bands per line is the ceiling). There is also the trick of borrowing SP
@@ -55,6 +66,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     **The two compose, which is what the original was reaching for**: 12 is a multiple of 4, so a band written
     with a 4-cycle `STx.w` is automatically on the PF grid — 12 colour clocks is exactly 3 PF pixels. A 3-cycle
     `STA zp` buys 9 clocks, which is NOT a multiple of 4 and therefore cannot start and end on the grid.
+    - **The 9 turns up as a planning number.** johnnywc, 2023, on ianajax's mock-up of *Bruce Lee*:
+      *"The ladder you would want to also use PF so you don't use up a sprite, so I would change it so
+      it would line up with the PF boundaries.  You could in theory change the PF color right before
+      the ladder is drawn and again right after it's drawn (the minimum spacing between color changes
+      is 9 pixels)."* ianajax: *"Actually most ladder in the game have "space" to the left and right of
+      them."* 〔mining 347106 bruce-lee-2600-concept-mockup〕 The 9 is the `STA zp` figure above; a
+      change off the PF grid can fall unseen in the space beside a ladder (our reading). **Cited only,
+      not verified** — "in theory" is his, and no such kernel was built.
   - **A playfield colour stencil puts three differently coloured shapes on one line with two players.**
     SpiceWare's answer to jab (2021), who wanted three sprites in three colours: turn on the reflected
     playfield and light it only behind each shape, invert the player graphics (a 0 bit becomes 1) and
@@ -110,6 +129,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     bands, since a PF pixel is 4 clocks wide and a line gets one `COLUPF` unless cycles are spare.
     〔mining 166082 yars-safety-zone〕 **Cited only, not verified** — only the distillation notes are
     held here, not the thread.
+  - **Background bands can carry motion when nothing else on screen moves.** Verdant, 2026, on
+    vacuous_b's *Onward*: *"you could change the background colour in alternating bands which scroll
+    down the screen to keep the illusion of vertical movement going (and as a way to gauge the
+    player's speed) when there are no horizontal barriers on the screen."* vacuous_b: *"I'll have to
+    think of a way to maintain the feeling of speed when most or all of the other objects are off the
+    screen."* Later the same day: *"I tried to use the bg color to make a paralax effect and give the
+    illusion of constant movement of some kind. I kind of like it. I'll leave it in for testing and
+    see how it feels."* 〔mining 389551 new-game-late-beta-onward-2026〕 Here `COLUBK` carries motion
+    rather than texture, and no object is spent on it (our reading). **Cited only, not verified** —
+    his screen recording was not watched here.
 - **Take the hue away before calling a picture readable — a game that honours the colour/B&W switch
   shows what is left.** The switch only sets `SWCHB` D3 (`litmus_swchb`; the engine flips it with the
   `"color"` panel event in `internal/emu/emu.go`); what B&W mode looks like is whatever the game then
@@ -157,6 +186,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     ball."* 〔mining 352320 meooow-released-game-for-atari-2600〕 A player is one colour on a line; the
     ball adds `COLUPF`'s, and anything else drawn in `COLUPF` on those lines takes the same colour
     (our reading). **Cited only, not verified** — neither screen was looked at here.
+    - **The ball as the eye.** gauauu, 2018, asked how to liven up the player sprite of *Robo-Ninja
+      Climb*. LS_Dracon: *"Do you have spare cycles in the kernel to enable Ball? I think you can use it
+      for an extra color for the eyes."* gauauu: *"I've got time for either the ball or multiple
+      colors. I'll give the ball a try."* 〔mining 281341 sprite-graphics-adviceassistance〕 The same
+      kernel time buys either the ball's colour or colour changes down the player (our reading).
+      **Cited only, not verified** — LS_Dracon's mock-up was not looked at here.
 - **Black is a colour you need, not the absence of one.** Aloan (2015) asked why the palette has a black
   when the beam can simply be off. seagtgruff: blanking cannot draw fine pixels — *"It takes a minimum
   of 3 CPU cycles to turn blanking on or off"*, so *"the smallest "pixel" you can draw this way (by
@@ -187,6 +222,26 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     (`capability-gap-audit.md`), and `TestNoRomBreathesAcrossFrames` sweeps the corpus for it. Paying
     the worst case every time is the lodging rule's "same line count on every path" applied to one
     routine. **Cited only, not verified** for the always-two-lines routine.
+  - **Coarse plus fine can set a length, not only a position.** Christopher Rydberg, 2001, asked how
+    a health bar is drawn; Glenn Saunders, answering: *"You start out with an asymmetrical playfield
+    routine and you set up the bits to represent the coarse health (4 pixel chunks) and then you can
+    fill in the gaps (1-3 pixels if necessary) with a sprite colored the same as the playfield."* And:
+    *"I would align the sprite on the PF boundary and adjust the shape to use between 0 and 3 bits
+    rather than actually overlaying it, so that when the health is near zero you won't be stuck with a
+    sprite that's too fat to represent 1-3."* *"You can position the missiles to draw a line
+    representing the maximum health"*, a blue line above and below frames the bar, and *"As the health
+    deteriorates you can adjust the color registers, maybe shifting from green to yellow to red."*
+    〔`200109/msg00385`〕 Roger Williams, the same day, called it probably the best suggestion but one
+    that would make his knees knock as a beginner — *"Mixing playfield and sprite graphics and lining everything up creates whole
+    minefields in which bugs can live."* — adding *"I may be overstating the difficulty"* — and offered
+    a bar character set for the 48-pixel score routine instead 〔`200109/msg00388`〕. Erik Mooney:
+    *"If you leave out the part where you put two health bars on the same line, Glenn's solution is
+    quite elegant, workable, and good as an intro to object placement and manipulation."*
+    〔`200109/msg00390`〕 Saunders, to Williams: *"But if you did that you'd only have one health bar
+    available per scanline."* 〔`200109/msg00391`〕 Joe Grand's *SCSIcide* bar: *"It was a fairly coarse
+    counter, so I just used playfield graphics"* 〔`200110/msg00010`〕. Here the two stages are the
+    playfield's 4-pixel grid and the sprite's shape, not ÷15 and `HMOVE` (our reading). **Cited only,
+    not verified** — no bar has been built here.
 - **Vertical position has no register at all.** SpiceWare: *"TIA's a scanline based video chip, as such
   it has no concept of Y. Therefore it's up to your program to keep track of which row of the screen is
   currently being drawn, and whether or not the sprite shows up on that row."* 〔mining 246500
@@ -272,6 +327,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     loop is otherwise found when the image runs or is proved; this finds it when the source assembles.
     **Cited only, not verified** — the macro has not been assembled here.
 - **div15's fine-movement range is implementation-dependent**: a naive div15 gives **−6..8px**; symmetrising with `eor #15` + `adc #((8+1)<<4)` gives **−7..8px**. Origin = Decuir / Video Olympics. Separate from HMOVE's raw hardware range (−8..+7) = it is a property of the routine. 〔mining 286698〕 (needs litmus backing)
+  - **In Video Olympics the remainder reaches the high nibble through a `BRK` call.** clausb, on a
+    6507 crossword that left `RTI` out: *"RTI is used with BRK for an often-called subroutine, saving
+    2 bytes per call. Joe Decuir did this in Video Olympics for a nybble-swapper subroutine."*
+    〔mining 193203 6507-opcodes-crossword-puzzle〕 One of its three calls is in the positioning
+    routine at `$F445`: `SBC #$0F` in a loop counting Y, `EOR #$FF`, `SBC #$06`, `BRK` (the swap),
+    `STY WSYNC`, a `DEY` wait, `STA RESP0,X`, `STA HMP0,X` (our reading of the ROM's bytes). The
+    saving is 1 byte a call, not 2 — `integration-density-playbook.md` has the BRK-as-call measurement
+    and the same three call sites. **Not verified** — the routine was not run here.
 - **Moving an object relatively inside the kernel goes a few pixels at a time, and a paddle does not
   wait.** Thomas Jentzsch, 2025, on *StalaX*: *"Since the movement of the missiles is relative during
   the kernel, they can only move +/-7 pixel per missile. But the paddle can move much faster. So when
@@ -367,6 +430,32 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     lists removing *"the "flickering" in the charges movements while falling down"*. 〔mining 386546
     destroyer-atari-2600-update-released-v-13〕 Budget the elements not yet drawn before promising a
     line resolution to the ones that are. **Cited only, not verified** — the ROM was not run here.
+  - **The picture also grows as the kernel gets cheaper.** Dionoid, 2024, on his first game: *"For
+    my first game, I think I've rewritten my kernel more than 20 times, just because every week I
+    learned a new programming trick which saved some CPU cycles, and then I wanted to use those free
+    cycles to add a new display feature."* In the same post: *"76 is the magic number here, which is
+    the number of CPU cycles you can use on each scanline."* 〔mining 355941 am-i-too-old-for-asm〕
+    He wanted the cycles each trick freed for a new display feature, so the picture was not settled
+    before the kernel was (our reading) — one more reason for the order above. **Cited only, not verified** — his count is
+    his own ("I think").
+  - **A size drawn first can be changed by the code.** atari2600land, 2024, on *Up the Pineapples*:
+    *"Unfortunately, I had to embiggen the ant due to coding stuff. It was hard to face this
+    realization, but I needed to do it if I wanted to work on it any more. I think I'll worry about
+    scanline adjustments more towards the end of coding this because things are constantly changing
+    now."* He did come back to the line count: 258 (*"I know, it should be 262, so I think I'll
+    wait until I'm done with everything else to bump it up to 262."*), then *"+ made scanline steady
+    at 262."*, and in the last post held here: *"OK, I give up. This game is dead. If anyone wants to
+    figure out how to make the scanline steady 262 when you press reset and are invisible, have at
+    it."* — and in the same post, *"I'm giving up 2600. It's too hard."* 〔mining 373848
+    up-the-pineapples〕 He does not say which code forced the larger ant. **Cited only, not verified**
+    — the copy here holds 24 of the thread's 31 posts, so it may not be where the thread ends.
+  - **Or change the subject.** atari2600land, 2022, on turning a hamburger game into one about potato
+    chips: *"I needed to make the burger be one color since the missile would change colors. That and
+    I decided to make the game easier for me to program. So I changed the burger into a potato chip."*
+    〔mining 339833 potato-chips-en-masse〕 A missile takes its player's `COLUPx`
+    (`techniques/missiles-bullets.md`), so a player recoloured line by line recolours its missile on
+    those lines (our reading); a one-colour subject removed that, and he changed what the picture was
+    rather than the objects or the layout. **Cited only, not verified.**
 - missile/ball = lines, edges, vertical frames; player = area via double width / multiple copies / 4x. Build one apparent shape by stacking several objects.
   - **The playfield can be the body and an object the outline.** Sohl, on a screen of his *Immunity*,
     where he *"used the playfield bitmap and color to fill in part of my viruses in a non-play portion
@@ -376,6 +465,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     using-ballmissile-sprites-for-added-color〕. The squareness is the 4-clock PF grid; the object on
     top breaks its corners. It suits shapes that stay put, since the body cannot move by less than a PF
     pixel (our reading). **Cited only, not verified** — the screenshot was not looked at here.
+  - **A player can be a line too — here on one viewer's reading.** marcoj, on lisboa2k6's
+    *Bloxudoku*: *"I like the way the squares are evenly divided using the sprites and missiles in
+    single width."* bigmessowires, in the next post, read the board another way: *"I haven't looked at
+    the disassembly, but I think the game board is playfield blocks? Then you're switching the
+    background color between black, dark gray, and light gray at fixed positions, and using an
+    asynchronous playfield to draw the wooden pieces at the desired spots?"* 〔mining 345854
+    atari-2600-homebrew-wip-bloxudoku-v01-ntscpal-4k〕 The author's answer is not in the copy held
+    here (10 of 14 posts). **Cited only, not verified** — the ROM was not looked at here.
 - **A single irregular shape wider than 8px = "shape ONE player with a per-scanline NUSIZ + HMOVE table" — don't fall back on flicker**: keep GRP small and switch NUSIZ (size 1/2/4/8, copy count) and HMOVE on every scanline, and one player "stretches" into an irregular shape ~40 colour clocks wide (fish / shark / ship / wide creature). Accept a single colour. No extra object, no flicker. Confirmed on a live run. 〔Fishing Derby (David Crane / Debro disassembly) SharkTraveling*NUSIZValues = a shark made of per-line NUSIZ + HMOVE; ~40-clock width confirmed by running build/fishing_derby.bin〕 `→ casebook.md "large irregular shapes"`
 - **A 1px line at an arbitrary slope = missile/ball + fractional-HMOVE accumulation (Bresenham in HMOVE)**: take an M/BL drawn vertically, `adc` the slope held as integer + fraction on every scanline, and on carry apply a ±1px HMOVE through `HMMx`/`HMBL` — that yields the **diagonal lines** of a fishing line / tether / rope / laser (drop the assumption that only vertical and horizontal are possible). 〔Fishing Derby fishingLineSlope (Integer/Fraction) + HMOVE; right line = BL, left line = M1; the right line's slope confirmed on a live run〕 `→ casebook.md "diagonal lines"`
 
@@ -388,6 +485,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     to try and compensate."* 〔`199704/msg00197`〕 The frames between two coarse steps carry a motion of
     their own. The post he was answering gives the other choice, Atari's 2600 version, which changes
     shape only once per horizontal move, in time with the march sound. **Cited only, not verified.**
+  - **A PF pixel itself cannot be narrower; colour timing or time can make it look finer.** random-terrain, 2021, asked whether
+    playfield pixels can be 2 colour clocks wide. As the distillation notes record the thread, Thomas
+    Jentzsch's answer was no, and his workaround is to change `COLUPF`/`COLUBK` part-way through a PF
+    pixel, in steps of one CPU cycle (3 colour clocks, the "Two separate numbers" rule in the Colour
+    section). mr-sql's second workaround, shown in *Fluid City*, is in time: a 30 Hz animation
+    drawn at 60 Hz, with the PF pattern shifted on alternate frames, leaves a "phantom" pixel of half
+    the width and half the brightness beside the real one — 8-clock tiles give 4-clock phantoms, and
+    4-clock pixels would give 2. The notes record it as best on a CRT and gone when the B&W switch
+    doubles the speed. 〔mining 322030 pf-2cc-wide〕 One emulator frame holds only one of the two
+    patterns (our reading), as with flicker in the Multiplexing section. **Cited only, not verified** —
+    only the distillation notes are held here, not the thread.
 - **A scrolling PF background is 3 layers — board RAM + display buffer + delta update** — plus tile-granular scrolling (avoids tearing). Iron rule = **keep the total scanline count constant from frame to frame** — the legal totals and the PAL parity constraint are the rule
   immediately below, stated once rather than twice. The scroll band is 10–16 lines top and bottom. 〔200972 tile-scrolling-engines, Boulder Dash style〕 `→ design.ScrollScanlinesConstant` **and `design.ScrollBackgroundFitsRAM`**. **Corrected 2026-09-03:** this line prescribed three layers and pointed only at the scanline check, which looks at line counts and PAL evenness and nothing else — so nothing asked whether the three fit. The same source says they usually do not: **a world you rewrite at run time needs SuperChip/CBS RAM, because the internal 128 bytes only hold a 120-byte-class malleable world** 〔200972:14〕. Budget the three layers plus the stack against `design.RAM2600` before choosing this structure. Found by auditing harness claims against the sources harness itself cites.
 - **PAL frames must have an even scanline count** — an odd total is not a legal PAL frame, so a
@@ -495,6 +603,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   the background colour" (Multiplexing section), used to draw rather than to hide. **Cited only, not
   verified** — Mindmaster's layout is one viewer's reading of the debug colours, not its author's
   statement, and the thread does not return to the inversion.
+  - **The smoothing costs objects, and which ones depends on where the wall is.** Thomas Jentzsch,
+    replying to gip-gip's plan to add wall smoothing to VePseu (the copy here holds his reply only as
+    the next posts quote it): *"Smoothed walls are nice, that's for sure. But I agree, that not
+    using the players will make the games much less restricted. And since players and missiles share
+    the same color, the missiles cannot be used too (unless you want a monochrome look). So that only
+    leaves the ball, but one single object is not sufficient or you have to use flicker."* iesposta:
+    *"You are saying because this engine uses playfield for walls, the smoothing would have to be both
+    missiles making invisible (black) P0 & P1?"* and *"Mindmaster is inverse, so the ball and one
+    missile smooth leaving a free player and its missile?"* 〔mining 263329 3d-engine-for-vanilla-cart〕
+    So there are two ways to smooth an edge: add to the wall in the wall's colour (Jentzsch's reading
+    — for PF walls that is `COLUPF`, which only the ball has), or cut it away with objects in the
+    background colour (iesposta's questions — missiles whose players are black). Which objects that
+    costs depends on whether the wall is PF or background (our reading). `techniques/invisible-probe.md`
+    hides an object the same way, for collisions. **Cited only, not verified.**
 - **Vertically moving platforms use two zones of complementary height**: build the upper and lower band heights so that "when one grows the other shrinks by the same amount" and the total line count stays constant = a stable picture (mismatched, you get motion blur). 〔mining blog SpiceWare〕
 - **Visible delay on a PF register write**: an `sta` to PF0/PF1/PF2 takes effect **2–3 colour clocks late**
   (colour registers are immediate). Complete the centre boundary of a reflected PF at **exactly cycle 48**
@@ -861,6 +983,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     next frame *"until it encounters PF writes to alter the values"*. 〔mining 295514
     loop-counter-basics〕 **Cited only, not verified.**
 - Cycle saving = the unofficial ISC/ISB opcodes + borrowing SP as a line counter (needs litmus backing). 〔5cycle-color-cycling, illegal-opcodes〕
+  - **`SAX` applies one mask to several stores.** walaber, 2015, to mikes360, whose kernel ANDed one
+    mask into three registers: *"I think you could also use the SAX command, which ANDs A and X and
+    then stores the result. That way you only load the mask once and reuse it multiple times"*
+    (`LDA (maskPtr),Y` / `TAX`, then `LDA (gfxPtr),Y` / `SAX ENAM1` …). Kylearan, asked whether it is
+    stable: *"Yes, it's stable"*. mikes360: *"I have just given the sax a whirl and it saves me a total
+    of 5 cycles. I need to store x and load it back again as I use it as an index for playfield
+    drawing."* The next day the routine moved on: with the rail's data packed into one byte, the mask
+    is applied once with `AND` and `SAX` is gone from it. 〔mining 233300 tricky-graphics-suggestions〕
+    X has to be free to hold the mask, and saving it there cost part of the gain (our reading). `SAX`
+    is in the stability map below. **Cited only, not verified.**
 - **Stability map for illegal (unofficial) opcodes**: **the ones that are stable on real hardware are the LAX/SAX/SBX/DCP family**. ★**"Real hardware" here means original NMOS silicon.** A 2600 cartridge also runs on machines that are not 6507s at all, and AtariAge `113732-clean-assembly` reports **`SBX` and `ARR` failing on the Flashback 2** — a chip-level reimplementation. ★★We cannot check that (no Flashback 2 here, and the engine models a 6507), so it is the source's claim, not ours; but the map should not be read as "safe everywhere". ★★★The `ASR` row in `known-traps.md` already carries this kind of scope (*late Taiwanese Atari Jr*) and this one did not. Found by the mailing-list distillation 2026-09-05, cross-checking the two corpora against each other for the first time. **LXA/XAA are unstable = do not use** (they depend on the individual chip and on temperature). **`ASR`/`ALR` is NOT in the stable set** — the very source this line cites reports it **failing on official hardware**: late Taiwanese-built Atari Jr units, with Thunderground's score corrupting, and a second independent report (omegamatrix, on real hardware) says the same. The one byte and two cycles it saves are not worth a unit-dependent failure. Gate opcode-level code generation on this allow/deny table.
   **Extended 2026-09-04 — the map was right and incomplete.** `definitions.json` carries a
   `stability` field on exactly 8 of 256 opcodes (it is `omitempty`, so an absent field means
@@ -923,6 +1055,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   dealing with the compactness of the font than you save in the storage of the font"* 〔mining 204475
   what-is-it〕. Count the decoder against the saving before compressing; for scale, the 4×5 font in
   `techniques/text12.md` is 200 bytes stored plainly. **Cited only, not verified.**
+  - **Packing need not slow a lookup if the key is packed the same way.** Karl G, 2022, on the
+    word dictionary of *2600 Words*: *"I was thinking that compressing the dictionary down to two bytes
+    would mean slower word validation, since I'd have to perform a number of bit-masking and
+    bit-shifting operations to compare with the word in RAM. It just occurred to me that I could
+    instead compress the word to be checked down to two bytes, and then compare those bytes directly
+    with the compressed words in ROM. Instead of slowing down the process, it will actually speed it
+    up!"* 〔mining 331117 2600-words-wordle-clone〕 The two bytes hold a word's last three letters; the
+    first two select a table (reveng counted 310 pairs in the 10k list, *"So no one table is larger
+    than your bank size"*). When the encoding is a function, the lookup never runs the decoder above
+    (our reading). **Cited only, not verified** — he reports no timing.
 - **Adventure's 255-room ceiling is the width of a byte, not of the machine.** On a 2011 thread about a
   multi-load RPG, syntaxerror999 took Adventure's rooms to be capped *"(255 I think)"*. e1will: *"the
   255-room limit in Adventure is fairly easy to overcome. I'm currently working on a 300+ room
@@ -1010,6 +1152,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     the limited vertical space available, it'll probably come in pretty close between a table and an
     algorithm."* 〔`200001/msg00011`〕 Count both before choosing, as the packing rule above does for a
     font. **Cited only, not verified** — the thread does not say which he built.
+  - **The same parabola can make the trigonometry instead of avoiding it.** Kylearan, 2017, to
+    someone whose 255-entry sine table took *"a large chunk of my code"*: *"If you only need an
+    approximation and can get away with a small deviation from a "real" sine function (I often can),
+    you can also use parabolas to generate sine tables in assembly"*; and *"Of course RAM to store the
+    table is a problem here, but you only need half a sine table (or even only a quarter) and can
+    mirror the other half, and also a shorter table (128 or even 64 bytes for the full sine table)
+    might be sufficient."* 〔mining 265153 using-sine-and-cosine〕 Above, a parabola is a path that
+    needs no sine; here it is the sine, generated into RAM for some loss of accuracy (our reading).
+    **Cited only, not verified** — no sine table is generated here.
 - **×2^n on a small signed value = repeated `asl` (no multiply, sign preserved)**: in two's complement `asl` is exactly ×2, so a signed velocity such as BallDY becomes ×2^n with n `asl`s (e.g. the lookahead target = BallRow + 4×BallDY = two `asl`s + one `adc`). But (a) **the result's range widens → bit7 can no longer serve as the sign test** = do clamp/wrap tests on the value range instead (if the extrapolated target maxes out around ~190 the threshold is `cmp #220`; an application of known-traps' "bit7 clamping is not usable"), and (b) an input that overflows into bit7 during the shift (|value| × 2^n ≥ 128) destroys the sign = check the input range first. 〔in-house: PONG ai-variants v3 lookahead 2026-07〕
 - **A BCD score can be compared with `cmp` without decoding**: for a valid packed BCD byte, binary ordering = decimal ordering (the upper nibble dominates) → both `cmp #$11` (first to 11 points) and a ScoreR vs ScoreL comparison are correct as written. But **a binary difference is not a decimal difference** (it inflates by +6 across a digit boundary: $10−$09 = 7) → when the difference is used as a QUANTITY, bucket it with saturation so the coarseness is harmless (v4 rubberband's score difference → error-width modulation). The bit7 sign of a subtraction is valid only while |binary difference| < 128. 〔in-house: PONG ai-variants v4 2026-07〕
 - **★TIA revision differences are a trap when cross-checking against hardware**: HMOVE's "extra clock" effect (the Cosmic Ark stars) **reverses behaviour on post-1989 TIAs**, among others — **the same ROM produces a different picture per revision**. The harness's pixel comparison must **pin the TIA revision / emulator** before comparing (and record which revision the verification used). 〔mining 191061 Cosmic Ark stars〕
@@ -1315,6 +1466,22 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
 - **One interleaved HIRES buffer can feed BOTH players (P0 = even bytes / P1 = odd)**: a single 16-byte RAM buffer serves both sprites — pick a player's bytes with `AND #$FE` / `ORA #$01`, no shape math. Halves the RAM vs two separate buffers (~16 B) = a RAM-thrift move to hold in reserve for when 128 B is tight. 〔Combat shared 16B HIRES, P0/P1 interleaved; comparison §2.1/§2.2/§7〕
 - **Fan one byte out to many duties, phase-locked, when RAM is tight**: `CLOCK` serves **5 roles** (frame timer / attract color / debounce pace / score-flash clock …) and `GameTimer` serves **3** (match clock + bit7 in-progress flag + attract period), sub-fields phase-locked so their uses never collide. Master-class RAM economy — but **only pay this when RAM is actually scarce**: packing with 43 B free just spends clarity for nothing (premature optimization). Know it; deploy it only under pressure. 〔Combat `CLOCK` (5-duty) / `GameTimer` (3-duty) / `VCNTRL`; comparison §2.7/§7〕
 - **Load-level VBLANK with `TIM64T`/`INTIM` so the picture starts at a FIXED beam position — don't rely on a fixed WSYNC count + elastic filler**: arm a RIOT timer at VBLANK start, spin on `INTIM` until it expires, then begin the visible kernel = display-start **independent of how long the frame's logic ran**. A fixed WSYNC count + elastic `VBpad` tuned to today's code does NOT auto-absorb logic growth: add work and the picture dips (screen dip — the exact fragility the clone's positioner had to hand-engineer around). Prefer timer load-leveling when VBLANK work is variable or expected to grow. 〔Combat `VCNTRL`/`INTIM`/`TIM64T`; comparison §2.1/§6, diff-gaps (measure the VBLANK length with INTIM)〕 `→ techniques/sound-driver.md · game-states.md`
+  - **A timer step is 64 cycles, so one target line can have two right values, and a coarser timer
+    is set early.** Cye Freeman, 2004, timing his kernel with `TIM64T`, found his PAL value too high.
+    Lee Fastenau does not time his kernel — he counts its lines (*"my answer is no, I've never used
+    your method"*) — and his values are the timers of his own PAL support, tweaked until Z26 showed the
+    right line count: *"Fortunately,
+    I was able to narrow it down to a single working value, but because the timer resolution is 64
+    cycles, it was certainly possible for two consecutive values to work (both ending up in the correct
+    76-cycle scanline)."* 〔`200408/msg00055`〕 Alex Herbert timed it with `T1024T`: *"Over 13
+    scanlines pass in each tick of the timer with divide by 1024, so it means setting the timer a few
+    scalines early to get it to time-out on the correct scanline.  (I seem to remember it was 4
+    scanlines for NTSC, 2 for PAL.)."* His code then strobes `WSYNC` four times on the NTSC path and
+    twice on PAL, and he later dropped it to display the same number of lines in both modes
+    〔`200408/msg00054`〕. Thomas Jentzsch: *"I always start with such a timer controlled kernel and
+    remove the timer later."* 〔`200408/msg00056`〕 Freeman and Herbert time the visible kernel, not
+    VBLANK; Lee's two-value remark is about his own PAL timers, and the 64-cycle step is the same for
+    any `TIM64T` target (our reading). **Cited only, not verified.**
 - **One wrap-around clear loop, reused with 4 seed values for 4 clear extents**: `ClearMem` is a single loop whose start index (X seed) is set 4 ways to wipe 4 regions — one routine, four callers, vs four clear loops. Cheap ROM-thrift for init/reset paths that wipe several ranges. 〔Combat `ClearMem`; comparison §2.8/§7〕
 - **Audit your OWN hand-tuned code for cargo-cult — hand-tuned ≠ optimal, even in a 2K master ROM**: the annotated Combat disassembly honestly inventories its own cruft (a redundant double `STA GRP0`, a stray `WSYNC`, a self-flagged "why not `LDA MVtable+1,Y`?" 2-cycle miss). Model this: keep a written inventory of your ROM's own redundancy rather than assuming your tuned code is tight. (Applied to our clone, this surfaced ~250–400 B of recoverable duplication unrelated to its provability trade.) 〔Combat — Williams' annotations; comparison §7〕
   - **Shipped is not correct either: a real defect can sit where nothing visibly reads it.** ChildOfCv,
@@ -1352,6 +1519,15 @@ A second pass over Combat (1977) through 5 lenses BEYOND round-1's efficiency/st
 - **Rule-layering & productive imprecision as design moves.** (a) Billiard adds a scoring PRECONDITION (must-bounce-first) over the unchanged bounce engine → a bank-shot game with a higher skill ceiling from the same physics. (b) The faked Pong reflection is imprecise ON PURPOSE (guesses the wall normal, jiggers +22.5°) so bounces are never perfectly axis-aligned → livelier, unsolvable. (c) Removing "reverse" from tanks is control-limitation-as-identity. New modes come from preconditions/constraints/omissions, not new systems. 〔Combat `Launch`/`COLIS` billiard gate / `COLMPF` reflection SM / `CTRLTBL` "No reverse"; deep-read harvest 2026-07-23〕
 - **★SOUND PRIORITY = last-writer-wins on a 1-object-per-channel bus — arbitration is BRANCH ORDER, not a mixer.** The core 2600 audio mental model (only 2 channels). Each object owns one channel; precedence (explosion > shot-boom > engine > pong) is decided purely by which routine writes `AUDx0,X` LAST, via the branch order of the sound dispatch. A state flag can "steal" a channel (nonzero → emit the bounce tone INSTEAD of engine). Decide precedence by ORDERING writes, not comparing volumes — zero bytes of priority logic. 〔Combat MisLife dispatch (MisFly/MotMis/BoomSnd order) / `MOTORS` AltSnd hijack; deep-read harvest 2026-07-23〕
 - **★Live game data overlaid on the CPU IRQ/BRK vector slot = a 2K→4K port booby-trap.** A 2-byte pitch table sits at the IRQ/BRK vector address because a 2K cart mirrors $F000-$F7FF into $F800-$FFFF, so the "vector" bytes ARE read as an ordinary data table (`LDA table,X`). It survives only because the code never takes BRK — `SEI` would not help, since BRK ignores the I flag. A 2K→4K port silently breaks. Never overlay meaningful data on $FFFA-$FFFF unless you fully model the bank mirror. (harness-warn candidate → capgap CMB-6.) 〔Combat ORG $F7FC / AudPitch $0F,$11 at $F7FE; deep-read harvest 2026-07-23〕
+  - **The same slot from the other side: four of the six vector bytes are free if nothing needs
+    them.** nukey-shay, 2009: *"AFAIK, the NMI vector (at $xFFA-B) is not used by the 2600. You can use
+    these 2 bytes for whatever you want (or keep them unused along with the previous 2 bytes to
+    provide unmodded Supercharger-compatability). If BRK interrupts are not used by the program, the
+    interrupt vector ($xFFE-F) can also be used for something else if you wish (or kept unused for the
+    SC-compatability). All a general program needs is the cold start vector ($xFFC-D) to lead it to
+    the ram clear routine."* 〔mining 136813 help-debugging〕 Combat's pitch table is that use; the
+    warning above is what the 2K mirror adds to it (our reading). **Cited only, not verified** — the
+    Supercharger condition was not checked here.
 
 **AI-nav primitives (PONG-capstone material — from our Combat clone `combat_mine.asm`; the original 2-player Combat has NO AI, so these are authored-new and emulator-verified):**
 - **8-way octant seek from unsigned |dx|,|dy| + sign-first, with a >127px overflow guard.** Derive each axis's sign FIRST by unsigned CMP (a signed 8-bit subtract of two positions overflows once separation exceeds 127px: dx=-132 reads as +124), then form |dx|,|dy| by large-minus-small, then classify: 2·|dy|<|dx| → horizontal / 2·|dx|<|dy| → vertical / else diagonal (the ×2 via ASL+carry also handles 2·|d|>255). Picks one of 8 headings, division-free and overflow-proof on a 160px field. 〔clone `AiDxE`/`AiDyC`/`AiCls`; deep-read harvest 2026-07-23〕
