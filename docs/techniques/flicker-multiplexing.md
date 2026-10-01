@@ -84,6 +84,13 @@ as this harness's harshest blind spot — the numbers above say which colours ar
 of reach, not which ones look right. Pick the pair here; judge it on a screen. Found by the
 mailing-list distillation (helper-2).
 
+★**A third use: flicker that mixes depth order.** Thomas Jentzsch, 2022, to the author of *Raptor*:
+*"you are using the same PF priority flicker trick for the shield which I came up with for the clouds
+in Aardvark. And in your game it is a key element."* (AtariAge `topic/332187`). The post names the
+trick and nothing more. Our reading is that `CTRLPF` D2 (playfield priority, `pf-modes.md`) is
+toggled frame by frame, so an object is in front of the cloud or shield on one frame and behind it on
+the next. **Cited only, not verified** — neither ROM has been run here, and the D2 reading is ours.
+
 Learned from (clean-room): `multisprite2/3.asm` discussions (8bitworkshop), AtariAge flicker
 threads. Demo: `roms/techniques/flicker_multiplex.asm` — four bouncing color-coded balls, two
 drawn per frame by frame parity — locked in CI by `scenarios/flicker_multiplex.json`.
@@ -101,6 +108,10 @@ drawn per frame by frame parity — locked in CI by `scenarios/flicker_multiplex
 ### The full form (documented, build when a game needs it)
 Real engines improve on fixed pairs: **sort objects by Y each frame**, walk the screen assigning
 the next-starting object to whichever player is free (re-positioning a player mid-screen after
+its previous object ends), and only flicker the objects that actually collide on the same lines —
+with a rotation counter so no object starves. Fixed-parity pairs (this demo) are the verified
+core; sort + dynamic 2-of-N allocation + fairness rotation is the documented extension
+(`multisprite.inc` family).
 
 > **★A full sort is not what the technique costs.** Roger Williams, stella-list 2002-04, describing
 > what he named *FlickerSort*: it is a **single bubble pass per displayed frame**, not a sort —
@@ -114,10 +125,26 @@ the next-starting object to whichever player is free (re-positioning a player mi
 > 2002 thread is where the name was coined (Manuel Polik). Recorded because `pkg/design/multiplex.go`
 > already carries a post-mortem on the opposite failure — *a citation that does not support the claim
 > is worse than none*. Found by the mailing-list distillation (helper-1).
-its previous object ends), and only flicker the objects that actually collide on the same lines —
-with a rotation counter so no object starves. Fixed-parity pairs (this demo) are the verified
-core; sort + dynamic 2-of-N allocation + fairness rotation is the documented extension
-(`multisprite.inc` family).
+
+**Which form to build: supercat's ladder** (AtariAge `topic/78021`, 2005). The axis underneath is
+memory against sorting.
+- **Multiplex one player, keep the other fixed, and never let the multiplexed objects cross.** Most
+  2600 titles do this, he says: the kernel stays simple, and the records keep a fixed order because
+  moving on screen never reorders them. His advice to a newcomer is to start here.
+- **Let them cross** and it gets much harder: keep the records fixed and copy them into a sorted
+  structure before each frame, or re-sort them in memory as they move. This page's full form and
+  `dynamic-multisprite.md` are this rung.
+- **A row array** (the asker's design): for each sector of the screen (24 lines, say), a table of what
+  GRP0 and GRP1 show. Plain code, and it extends to 30 Hz flicker easily; the price is RAM — 27 bytes
+  plus 1 per sprite in the asker's version — and a simple version loses objects past five on one row.
+  A bug reported in that version: on the frame where a sector drops back to two objects and flicker
+  turns off, GRP0 and GRP1 can both draw the same sprite (seen as one extra frame of flicker).
+- **Y-sorted alternation**, when every sprite is (or can be treated as) the same height: list the
+  frame's sprites in Y order and hand them out P0, P1, P0, …; equal heights end in the order they
+  start, so strict alternation holds. He calls adding flicker to it awkward.
+
+He names *Dig Dug* as doing this with extra RAM on the cartridge. **Cited only, not verified** — read
+through our distillation note; the thread itself is not on disk here.
 
 ## Verified here (Gopher2600, locked in CI)
 - Four objects (two vertical bouncers at X=40/120, two horizontal at Y=60/120), all four
@@ -150,3 +177,61 @@ for what it costs and the two idioms, and `internal/emu/flickerattrib_test.go` f
 The 1998 advice was not wrong; it was practical. Software rectangles need no per-frame discipline and
 survive an author who forgets one. The hardware route is cheaper and conditional, and the condition is
 the thing to write down.
+
+## Choosing what flickers, how often, and how evenly (added 2026-09-30)
+
+Everything above decides *how many* subsets. Six threads decide the rest, and none of them was
+measured; each is **Cited only, not verified**, and none of the ROMs named has been run here.
+
+**How often is set by the motion, not only by the count.** `SubsetsFor` takes the number of objects
+on the same lines at one moment; how long they stay there decides how often the flicker happens at
+all. RevEng, on drawing every orbiting electron of an atom: *"With the orbiting motion, the time each
+electron shares scanlines with the others is fairly limited. It probably wouldn't be too bad with an
+intelligent flicker routine."* Karl G's answer was to ask for uranium's 92 (AtariAge `topic/302929`,
+2020).
+
+**But flicker that comes and goes has its own cost.** The full form above flickers only the objects
+that collide on the same lines, which makes the flicker intermittent. Thomas Jentzsch: *"Personally I
+find on and off flicker more noticeable and annoying than high frequency, constant flicker"*
+(AtariAge `topic/243516`, 2015). That is a third axis beside the duty and the frequency above, and
+the gate reads it backwards: an on-and-off pattern has the same worst pair as a constant one and
+more unchanged pairs, so `max_flicker_area` ties them and the mean prefers the one he finds worse.
+That reading follows from the duty table's definitions; **Not verified** by a ROM.
+
+**The duty need not be the same for every object.** Kirk Israel, 2004, planning a pterodactyl
+("Pterry") between the two JoustPong players: alternate `[1 2]`, `[1 P]`, `[1 2]`, `[P 2]`, so
+*"each player is shown 3 out of 4 frames, and Pterry is shown every other frame"*, against the even
+split where Pterry is solid and each player shows half the time; he worried only about missing hits
+〔`200402/msg00068`〕. The favoured objects get the 3-of-4 pattern — off one frame in four, the 15 Hz
+gap that the 2021 CRT comparison above ranked worst. Glenn Saunders answered by not flickering at all:
+draw Pterry with one missile 〔`200402/msg00069`〕, which Thomas Jentzsch said needs only relative
+repositioning — `HMMx` and `HMOVE`, no timed `RESMx` 〔`200402/msg00073`〕.
+
+**Which object flickers is a choice, and the threads choose by different rules.**
+- *Never the hero.* johnnywc on a *Bruce Lee* mock-up: *"My recommendation would be to have Bruce
+  never flicker and have the enemies flicker at 30hz, or you could flicker all 3 at 40hz. Of course
+  they would only flicker when all 3 are on the same line"* (AtariAge `topic/347106`, 2023-01-27).
+  His 40 Hz counts frames shown, two in three; the gap still recurs at 20 Hz. splendidnut's prototype
+  two weeks later puts the two enemies on one player object, and they flicker.
+- *By what lies underneath.* Thomas Jentzsch on *Pac-Line*: *"maybe it is better to flicker ghosts
+  and player. Because the player will never move over white playfield pellets. These make flicker
+  very obvious. For ghosts this is fine, but not for fruits."* The author found his own eyes were on
+  the ghost more than on Pac-Man, and hardware collision settled it: flicker Pac-Man against the
+  ghost and nobody dies, against the bonus and nothing is collected, so only ghost and bonus could
+  share (AtariAge `topic/364115`). That is the collision section above deciding a design.
+- *Inside something that already blinks.* In the same thread CapitanClassic suggested flickering the
+  power pellet, since the arcade one is lit *"approximately every 2 out of 3 frames"*. Two costs came
+  back: the pellet was eaten by hardware collision, so it could not be eaten while not drawn; and,
+  Thomas Jentzsch, it is drawn with the ball and the playfield, so it *"cannot be used for drawing
+  complex sprites"*.
+
+**Brighten what flickers.** SpiceWare, who flickers the player's character "when needed" in Space Rocks,
+Draconian, Frantic and Timmy: *"One thing that does help is to LumaBoost flickering objects - basically increase the color
+values by 2 for any object that is flickering. Thomas suggested that on Dec 1, 2012 during the
+development of Stay Frosty 2"* (AtariAge `topic/243516`). With luminance in D3..D1, +2 is one
+luminance step, and at the top step it carries into the hue nibble. How much of the dimming it repays
+is not measured.
+
+**The other end is none.** Karl G, 2021: *"I wanted to see if I could make a 4-player maze game with
+no sprite flicker and distinct player/object/maze colors and fit it into 2K, and this is the result"*
+(QuadTari, `chaser.bin`, AtariAge `topic/317525`). The thread does not say how the four are drawn.
