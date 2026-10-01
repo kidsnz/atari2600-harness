@@ -29,6 +29,27 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 | Cycle counting invariant (exec×3 == color clocks) | `litmus_cycles` | white-box test; per-instruction `exec×3 == color clocks`, re-based each frame. **★2026-07-30:** the old note "1 frame = 263×76 = 19988" was wrong — this ROM emits no VSYNC, so its frame grows 263→290→319→**350** (engine cap) and rests there; see `TestCyclesLitmusHasNoStableFrameLength` |
 | Per-scanline budget guard (overrun → halt) | `litmus_overrun` | `over=true`, `line_cycles=152`; no false positive on smoke/frogger |
 
+**A use of the post-underflow count: random bits.** Thomas Jentzsch, 2001, proposed to *"rely on the
+randomness (branches, page-faults etc.) of the execution time of your code between timer
+syncronisation"* with
+
+```
+    ldx #$FF
+.waitTim:
+    lda INTIM-$FF,x ; 5 waste one cylce here
+    bpl .waitTim    ; 2/3
+```
+
+*"Since the timer is counting every cylce after it reached zero and the loop needs eight cycles, this
+will return $F8..$FF, so the last 3 bits are somehow random. Or you could make the loop 16 cyles long
+and get 4 bits"* 〔stella-list `200110/msg00123`; his spellings〕. The eight checks out against the
+instruction table (`Gopher2600/hardware/cpu/instructions/definitions.json`): `LDA abs,X` is 4 cycles
+plus 1 because `$0185 + $FF` crosses into page 2, and a taken `BPL` is 3. The count it reads is the
+one `litmus_timer` measures (the timer row above). Where the bits come from is the part to watch — he
+adds *"it really depends on processing"* 〔`200110/msg00134`〕, and the harness has measured the same
+point for a frame counter: synchronise with it and the output is a constant (`design-principles.md`,
+`internal/emu/counterentropy_test.go`). The loop was not run here — **Cited only, not verified**.
+
 ## Horizontal position
 | Behavior | ROM | Evidence |
 |---|---|---|
@@ -75,6 +96,14 @@ noted); a scenario's file name does not always match its ROM (`litmus_48px` is d
 | Missile0–Player0 (CXM0P) | `litmus_collide_mp` | `read_collisions.m0_p0 == true` |
 | **All 15 pairs** at once (overlap P0/P1/M0/M1/BL + PF) | `litmus_collide_all` | every `read_collisions` field true |
 | Latches are **sticky**, **CXCLR** clears them, and **HMCLR does NOT** (it clears the motion registers — a different thing) | `litmus_cxclr` | CXP0FB snapshotted to RAM at 3 points: `$B2` collided → `$B2` after HMCLR → `$32` after CXCLR (low bits = the last byte on the bus before the read, here its zero-page address `$32`) |
+
+**Not measured here: latches do not set while `VBLANK` is on.** ZackAttack found it by breaking an
+instrument. His bus-stuffing demo read the collision registers to detect whether the stuffing had
+worked, and he hid that phase under `VBLANK`: *"collision registers won't be set if vblank is enabled.
+So enabling vblank to hide the detection phase ended up completely breaking it. I disabled vblank and
+set the color of everything to black instead."* (AtariAge `topic/273955`, 2018; **Cited only, not
+verified**). The engine agrees in code — `Gopher2600/hardware/tia/video/video.go` ticks the
+collisions only when `!vblank` — but no litmus here exercises it.
 
 ## Input
 | Behavior | ROM | Evidence |
@@ -139,6 +168,18 @@ velocity). `internal/motion`, surfaced as `cmd/motion`, the `read_motion` MCP to
 The metric is **self-validated** (the stutter must score above the glide, else it is vacuous) and was
 confirmed against the user's perception — `motion_stutter` run in Stella reproduced the symptom they reported, *buruburu* (judder).
 Src: Flash & Hogan, *The coordination of arm movements*, J. Neurosci. 1985 (minimum-jerk).
+
+**What the metric does not give is a threshold.** Asked (Tempest, 2001) whether choppy scrolling
+is a matter of speed or of how often the playfield is updated, Andrew Davie: *"Choppiness is a result of changing
+the scroll at a slow frame-rate. As your 2600 will be running at 50/60Hz, if you update your scroll at
+that rate, too, it won't be choppy. Anthing below about 30Hz starts to be noticeably bad."*
+〔stella-list `200104/msg00056`; his spelling〕. Rob Kudla in the same thread puts it in step size
+instead: *"Jumping two playfield pixels (8 regular pixels, 1/20th of the screen) per frame would start
+to get choppy"* 〔`200104/msg00059`〕. Neither has been put through `read_motion` — **Cited only, not
+verified**. Erik Mooney's grain for the same question — *"Horizontal scrolling must be in increments
+of 4 pixels for playfield, but vertical can be any speed at single scanline resolution"*
+〔`200104/msg00053`〕 — is what `litmus_pf_allcols` (4-clock columns) and `motion_glide` (+1 scanline
+a frame) measure.
 
 ## Not yet covered (open)
 Playfield priority/score mode (CTRLPF D2/D1), remaining collision pairs, paddles (INPT0–3 charge timing),

@@ -10,9 +10,20 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
 - **A. Image-first.** Design the screen/title in Photoshop **first**, then write the kernel to it. A designed
   48-px image → on-screen title goes through the **flicker-free 2-color 48-px kernel** (`multicolor48`/`bitmap48`).
   → see `docs/cookbook.md` "title from a Photoshop mock". *(This is the project's whole reason for the harness.)*
+  A mock made to try the object budget may be unfinished as a picture: bladejunker's character-select
+  mock was made to find how to distribute the drawing over the objects, and *"It's not a complete
+  mockup visually"* (AtariAge `topic/194635`; **Cited only, not verified** — read from distilled
+  notes, not the thread).
 - **B. Bottom-up build order.** Build + verify in the canonical 14-step sequence (stable display → timers →
   score → 2-line kernel → VDEL → playfield → input → variations → RNG → ball → missiles → sound → animation →
   polish). → `docs/cookbook.md`.
+  **Where each routine goes in the frame** is a separate choice. SpiceWare's starting layout: input,
+  movement of what the player does not control, display prep (position the TIA objects, set up what the
+  kernel needs), kernel, collisions — *"and I start out with 1-3 in Vertical blank and 5 in Overscan as
+  Vertical Blank has a lot more processing time available than Overscan. As the project progresses I
+  may have to shift some of the routines around"*; gauauu arrived at the same order (AtariAge
+  `topic/252613`; **Cited only, not verified**). The examples in `docs/design-principles.md` put
+  movement in overscan instead (Combat; the "lodging" pattern for physics lines).
 - **C. Know the ceiling.** Vanilla first; DPC+/ARM/CDF "beyond-bB" is a later track → technique-candidates.
 - **D. Audio truths.** TIA = LFSR-pair voices (not a table); AUDF-lowering lags ≤32cy; 2 voices can cancel to
   silence; Gopher2600 noise ≠ real HW → `docs/known-traps.md` E.

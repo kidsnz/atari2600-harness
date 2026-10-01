@@ -51,6 +51,18 @@ would push it to 276). The 10-cycle color burst (`lda/sta/sta`) lives entirely i
 the four GRP stores still complete at 21/26/34 then 62/65/68/71 — the same gap relations as the
 monochrome kernel, just shifted +7 cy vs score6 because of the inserted color fetch.
 
+**Why the stores cannot be moved earlier.** With two plain sprites a GRP write only has to land
+before the beam reaches the object; here it cannot. azure: *"if you're dynamically repeating
+sprites with NUSIZ0/NUSIZ1, such as using the 48 pixel trick, writing registers early doesn't work.
+Each write must occur precisely within a narrow window of time, because the kernel is playing a
+shell game with the GRP0 and GRP1 registers. That's the cost of using two sprite registers to
+simulate six sprites."* And: *"If you insert a nop in the middle of the 48-pixel sprite algorithm,
+you'll see rendering artifacts"* (AtariAge `topic/282244`). `litmus_48px6` measured that one
+placement works — a different kernel, stores at cycles 34/37/40/43, all 48 bits matching
+(`verified-coverage.md`); how narrow the window is, and that shifting the stores breaks it, was not
+run here — **Cited only, not verified**. The window for an ordinary write, cycles 0–22, is
+`fundamentals-audit.md`'s.
+
 **Data layout:** six column tables (`Col0..Col5`, one per 8px slice) and a `ColorTab`, all stored
 **bottom-row-first** (the kernel walks `row = HEIGHT-1 → 0`) within one ROM page (fixed pointer
 high bytes → `lda (p),y` is a deterministic 5 cy). `ColorTab[row]` is the COLUPx value for that
@@ -70,6 +82,35 @@ scanline; vary it to taste (here a 16-step rainbow).
 
 - The color table is independent of the graphic data — swap `ColorTab` for a flashing/cycling
   effect by offsetting the index per frame.
+- **In one thread a colour change inside the line was a placement problem, not a cycle problem.**
+  bigmessowires, colouring a row of playfield shapes with ten `COLUPF` writes a line: *"There's actually enough CPU
+  time to make all ten COLUPF changes on each line, but my problem was how they lined up with the
+  playfield beans. No matter how I shifted things around, at least one of the COLUPF changes always
+  fell inside of a visible bean"*. There it was solvable: glurk answered with a demo that did it
+  (`kernel-micro-idioms.md` has how he freed the registers), and the asker replied *"THANK YOU! You
+  were right"* (AtariAge `topic/346865`; **Cited only, not verified**). That kernel had cycles to
+  spare; this one does not (the budget bullet below). It does not meet the placement question
+  because both colours are written before the band starts, in HBLANK.
+- **Two colours at any position: inverse graphics.** SpiceWare: *"It's done by using inverse
+  graphics — the sprites are BLACK and the color comes from the background and the playfield/ball.
+  VBLANK is turned on/off so that the color of the playfield doesn't show on either side of the 48
+  pixels. VBLANK can't be changed at the exact cycle it needs to be, so the MISSILES are used to help
+  hide the background on both sides"*. He adds *"The VBLANK trick does have a shortcoming"*, which he
+  ties to a display whose *"brightness is adjusted incorrectly"* (AtariAge `topic/197100`; **Cited
+  only, not verified** — read from distilled notes, not the thread). The fixed-split version — the score bit, left half `COLUP0`, right half
+  `COLUP1` — is `design-principles.md`'s; `VBLANK` set and cleared inside a line as a mask is in
+  `known-traps.md`.
+- **Data in the instruction stream.** The Tiara flash cartridge's 32-character menu kernel keeps its
+  data in the operands of immediate loads. TomSon, its author (his reply survives here only as a
+  quotation in two later posts; the attribution is from the order of the thread): *"All the data is put into register immediate loads (with cycles to
+  spare)"*, through macros seeded with the text. SpiceWare: *"the use of register immediate load's
+  the same thing we're doing with Fast Fetchers + datastreams in DPC+ and CDF"*, and that capacity
+  is what limits colour — for DPC+ *"there's plenty of time to update color - problem is all 16
+  datastreams are already in use"*, while *"CDF has 32 datastreams"* (AtariAge `topic/266200`;
+  **Cited only, not verified**). `LDA #imm` is 2 cycles against 4 for this kernel's
+  `LDA ColorTab,y` (`Gopher2600/hardware/cpu/instructions/definitions.json`). On a plain ROM an
+  immediate is fixed when the source is assembled; the menu can change because the cartridge serving
+  it is a processor — our reading of the thread, **Not verified**.
 - For pixel-exact X placement of the band (1px instead of the 3px coarse grid), combine with the
   ÷3 coarse/fine table + clockslide from topic/209137 (technique ledger ⑯); orthogonal to the color trick.
 - Budget headroom is small (~73 cy used). Adding more per-row work (e.g. a second color register

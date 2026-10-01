@@ -21,6 +21,16 @@ func BinPathFor(asmPath string) string {
 // 失敗行を含む診断のため stdout+stderr を output で返す（成功時も dasm の "Complete." を含む）。
 // `-I<asm のディレクトリ>` を渡すので、cwd に関わらず `include vcs.h` 等が asm 自身の隣から解決する
 // （別ディレクトリから .asm シナリオを走らせても通る）。
+//
+// A crash is rejected but not explained. Measured outside this repository on DASM 2.20.14.1
+// (2026-08-28, by bisection, and again on 2026-09-18): one `.byte` line of 129 values (522
+// characters) kills DASM with SIGSEGV -- nothing printed, exit 139 in a shell, a 0-byte output
+// file left behind -- while 128 values (518 characters) assemble. err is non-nil, so the scratch
+// file is removed and nothing is accepted, but output is empty, so the caller gets no line to look
+// at. In 2004 the same family showed up as misleading errors on a macro call
+// longer than 255 characters (Manuel Rotschkar, stella-list `200410/msg00086`; Thomas Mathys
+// pointed at `#define MAXLINE 256` in DASM's main.c, `msg00090`). A generator that writes long
+// table rows should fold them. No test here reproduces it -- Not verified in this repository.
 func Assemble(asmPath, binPath string) (output string, err error) {
 	tmp := scratchPath(binPath, "bin")
 	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+tmp, "-I"+filepath.Dir(asmPath)).CombinedOutput()
@@ -103,6 +113,19 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 //
 // Found by the mailing-list distillation (helper-2), who could not run DASM and so reported it as a
 // question with the command to settle it rather than as a defect.
+//
+// Two quiet outputs this guard does not see, both reported on AtariAge and neither run here (Cited
+// only, not verified):
+//
+//   - A SOURCE that could not be opened. The whole output pasted in topic/246976 is a
+//     `Warning: Unable to open 'kernel.asm'`, an empty symbol list and `Complete.` -- no `error:`
+//     line. What marks it is the empty symbol table, not a message. (The DASM version is not given;
+//     a warning is deliberately not an error here -- diagnosed_test.go.)
+//   - UNRESOLVED symbols. topic/318210 (DASM 2.20.14) shows `--- 1 Unresolved Symbol` followed by
+//     `Complete. (0)`, and the ROM ran in an emulator. The one symbol was NO_ILLEGAL_OPCODES,
+//     which macro.h only tests with IFNCONST (internal/emu/oddsleep_test.go), so that list was
+//     harmless; a symbol used as an operand ends in `Source is not resolvable` and exit 3
+//     (unopenedIncludeHint). An unresolved list is therefore not a failure mark by itself.
 func diagnosedFailure(out string) error {
 	for _, ln := range strings.Split(out, "\n") {
 		if strings.Contains(ln, "error:") {

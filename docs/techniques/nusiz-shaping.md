@@ -87,6 +87,13 @@ step. Put `$00` on the lines inside a band and the whole band shares one edge.
   room for a little else — not something to run for two objects at once without a 2-line kernel.
 - **The colour is single.** COLUPx is per-line at best; a shape made of copies is one colour across
   its whole width on any given line.
+  A second colour costs the second player. SpiceWare's dragon in Medieval Mayhem: *"each player set
+  for 2x size / each player is a different color / each player shifted left/right over successive
+  scanlines"*, and Circus Convoy *"did add changing the colors of the players over successive
+  scanlines"*. alex_79 on why the pair reads as one sprite: *"Objects with lower priority will only
+  be seen through the "holes" of the ones that are on top of them, creating what seems a high res
+  multicolor sprite"* (AtariAge `topic/344242`; **Cited only, not verified**). That is two objects,
+  so the cost bullet above applies to it.
 
 ## Verified numbers
 
@@ -122,3 +129,31 @@ part of this repository and not in CI) with `emu.DecomposeRow`, 2026-08-04, one 
 register**, with the copy count changing from two copies to one wide copy inside four scanlines and
 the left edge stepping 44 → 43 → 42 on consecutive lines. That is this technique, read off the
 pixels — no disassembly was consulted.
+
+## Neighbouring uses of NUSIZ (cited, not built here)
+
+- **A black quad-width player as a mask.** omegamatrix, hiding a railing where it wraps at the right
+  edge: *"position P0 at pixel 143. Make COLUP0 black, and use Quad Size for NUSIZ0. P0 will be large
+  enough to cover up the railing if you make its length a few pixels shorter."* *"This works because
+  P0 always has priority over P1 and M1"* — the order `invisible-probe.md` reads from the engine's
+  `video.go`. He calls it *"a crappy one because you lose P0 an probably M0, and restrict the color"*
+  (his spelling; AtariAge `topic/233831`; **Cited only, not verified**). A black cover hides only
+  against a black background (our reading). His *"I seem to recall the positioning gets delay 1 or 2
+  pixels in quad size"* is measured here as one clock — the double/quad bullet above.
+- **Two quad-width players as one picture.** kiwi drew a forum avatar with them: *"I used 2 quad size
+  player to make the icon"* (AtariAge `topic/300645`; **Cited only, not verified** — read from
+  distilled notes, not the thread). A quad player is
+  32 clocks for 8 bits (`litmus_nusiz_quad`), so the picture is 4-clock pixels; the 1x pair joined
+  without a seam is `litmus_p0p1`.
+- **Removing one copy of three.** ZackAttack, 2018: *"I'd view the three enemies as a single enemy.
+  This aggregate enemy would have 8 states corresponding to which of the three copies is active. (3
+  copies, 2 states, 2^3=8 states total)"*, with a transition table of *"only 24 bytes of ROM"*, a
+  table for *"the NUSIZ1 value for each state (8 ROM bytes), and the horizontal offset for each
+  transition (24 ROM bytes). Still it's only taking up 56 bytes of ROM total"*. The code in his later
+  sketch he marked *"untested"*. Moving the
+  base when the left copy goes is `sprite-placement.md`'s "Move the variable, not the object". Nukey
+  Shay's alternative in the same thread: *"always draw 3 copies...but draw blank bitmaps in place of
+  the one(s) hit"*, with *"NUSIZ registers are only altered as bordering columns are removed
+  completely"* (AtariAge `topic/274546`; **Cited only, not verified**). That puts a GRP write between
+  two copies, and when such a write takes effect is `sprite-placement.md`'s rule 6, measured in
+  `internal/emu/spriteplace_test.go`.
