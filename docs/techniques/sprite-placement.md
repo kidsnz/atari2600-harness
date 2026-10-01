@@ -92,12 +92,14 @@ to add is the copy pitch of the mode in use: the medium modes he named are 32 ap
 | 7 | a normal-width player written at cycle 21 or earlier **stops at x = 3**. Written at cycle 74 it wraps instead: `3c − 60` = 162 → **x = 2** (`litmus-results.md`, DELAY 12) | 8, 9 |
 | 8 | a strobe cancels the pending draw of the **FIRST copy only** | 10 |
 | 9 | a DOUBLE-width or QUAD-width player lands at **x = 3c − 59**, never left of x = 4 unless it wraps (not measured for wide players) | — |
-| 10 | a missile written at cycle 21 or earlier is clamped at **x = 2** — one clock LEFT of the player's floor in rule 7 (a wrapped player reaches 2 too; a missile's wrap is not measured here) — and **each clamp is a WINDOW of write cycles, not one** | 8, 9, 11, 12 |
-| 11 | the **BALL** places exactly like a missile: same `x = 3c − 61`, same clamp at 2 — **placement only, and they part company on everything else.** Re-strobed mid-line the ball draws **1 + k** blocks and a missile draws **1**; struck inside its own block a missile is EXTENDED past 8 px while the ball restarts and cuts the old one. Measured below, `litmus_restrobe_objects` | 13, 14 |
+| 10 | a missile written at cycle 21 or earlier is clamped at **x = 2** — one clock LEFT of the player's floor in rule 7 (a wrapped player reaches 2 too, and a missile written at cycle 74 wraps further: `3c − 61` = 161 → **x = 1**, measured by a reviewer on the engine, outside this repository, 2026-09-29; no litmus here holds it) — and **each clamp is a WINDOW of write cycles, not one** | 8, 9, 11, 12 |
+| 11 | the **BALL** places exactly like a missile: same `x = 3c − 61`, same clamp at 2 for writes at cycle 21 or earlier, and the same wrap to **x = 1** when written at cycle 74 (rule 10's outside measurement) — **placement only, and they part company on everything else.** Re-strobed mid-line the ball draws **1 + k** blocks and a missile draws **1**; struck inside its own block a missile is EXTENDED past 8 px while the ball restarts and cuts the old one. Measured below, `litmus_restrobe_objects` | 13, 14 |
 | 12 | a NUSIZ copy past 160 **wraps to the left edge and draws there on the same line** — 2026-09-03: a quad-width P1 at x≈150 wrapped to 0-22 and collided with a playfield copy at the *other* end, which read as "the probe is on both copies" and sent an entire band chasing the wrong boundary (`litmus_pf0_reflect`'s points E and F are what caught it) | 15 |
 | 13 | **a mid-line `RESP` re-strobe is a placement mechanism, not only HMOVE**: it puts an object anywhere on the 3 px grid *during a drawn line*, for the price of a three-cycle store — see `restrobe-copies.md` | — |
 
 Rule 9 is from the same session's probes rather than from this litmus, which grades normal width.
+Its wrap was measured later by a reviewer on the engine, outside this repository (2026-09-29): a
+double or quad player written at cycle 73 wraps, `3c − 59` = 160 → **x = 0**. No litmus here holds it.
 Width itself is free: double and quad are the same single NUSIZ write and the same landing place;
 what they cost is screen area.
 
@@ -373,6 +375,8 @@ at it here both returned **"impossible"** for a row that places fine. The search
 It returns the object bases, NUSIZ codes and strobe cycles, or the reason there are none. Its
 constants are the ones in the table above, and `internal/emu/spriteplace_test.go` checks them
 against this litmus in CI — so the model cannot drift from the machine without going red.
+It never proposes the late-write wraps of rules 7, 9, 10 and 11: a strobe whose base would be 160
+or more is dropped from the search, and no wide-player NUSIZ code is in it.
 
 It answers PLACEMENT only. Whether the line then has the cycles to write every shape's bytes is a
 different question, and `prove_line_budget` is the one that answers it.

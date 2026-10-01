@@ -109,7 +109,7 @@ pass is permanently closed.)
   **`watch_ram`** (v1.20.0, RAM-change trap with writing PC) /
   **`read_motion`** (v1.79.0, VV-4: object motion-smoothness / jerk_rms over N frames = judder/ブルブル as a number) /
   **`prove_line_budget`** (v1.80.0, VV-2: STATIC per-scanline budget PROVER over ALL paths = the ∀ sibling of `assert_line_budget`; `cmd/cyclebound`+`internal/cyclebound`) /
-  **`plan_sprite_placement`** (WHERE a row of shapes can go, decided by SEARCH before any asm exists: three grids that do not line up — player `3c−60` floor 3, missile AND ball `3c−61` floor 2, each floor a WINDOW of cycles — plus copies that wrap past 160 and a 3-cycle floor between strobes. Returns object bases + NUSIZ + strobe cycles, or why none exists. `cmd/place`+`internal/place`; constants cross-checked against `litmus_sprite_place` in CI. Placement only — the cycles to WRITE the bytes are `prove_line_budget`'s question) /
+  **`plan_sprite_placement`** (WHERE a row of shapes can go, decided by SEARCH before any asm exists: three grids that do not line up — player `3c−60` floor 3, missile AND ball `3c−61` floor 2, each floor where writes at cycle 21 or earlier stop and a WINDOW of cycles; a late write wraps past it instead (player at cycle 74 → 2; missile or ball at 74 → 1 and double/quad player at 73 → 0, measured by a reviewer on the engine, outside this repository), and it plans none of those wraps — plus copies that wrap past 160 and a 3-cycle floor between strobes. Returns object bases + NUSIZ + strobe cycles, or why none exists. `cmd/place`+`internal/place`; constants cross-checked against `litmus_sprite_place` in CI. Placement only — the cycles to WRITE the bytes are `prove_line_budget`'s question) /
   **`beamtrace`** (v1.102.0, AT-2: write→visible-pixel timeline = per scanline, each TIA write's beam clock + the visible span it governs) /
   **`beam_race`** (v1.102.0, AT-3: advisory object-graphics-vs-beam map, factual/no-verdict; paired with scenario `checks.no_beam_race`) /
   **`spritepos`** (v1.102.0, AT-4: forward sprite-position solver = target X → SetXPos input + decomposition + snippet + emulator-verified achieved X) /
@@ -142,7 +142,9 @@ leftmost position is. Re-measured 2026-07-30 on `litmus_pos` with `cmd/calibrate
 pixel: sweeping DELAY past the wrap, **a PLAYER draws from clock 2** (`DELAY=12` → `reset_pixel` 2,
 `hmoved_pixel` 2, `decompose_row` shows P0 occupying clock 2..9), then 3 at `DELAY=13` and 14. So the stated
 player minimum of 3 was wrong for this kernel, and "the leftmost" is a property of the positioning code, not
-of the machine. Measure it for the kernel you have. (The missile/ball figure was not re-measured.)
+of the machine. Measure it for the kernel you have. (The missile/ball figure was not re-measured here; a reviewer
+measured on the engine, outside this repository, that a missile or the ball written at cycle 74 wraps to 1 and a
+double or quad player written at cycle 73 to 0, so their floors are not leftmost positions either.)
 
 **HMOVE** — upper nibble only, two's complement, **positive = left / negative = right**, range +7 to −8.
 Moves only at the HMOVE strobe. HMOVE is **right after WSYNC**. (All 16 nibbles: `$70`=left7 … `$00`=0 …

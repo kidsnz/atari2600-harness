@@ -41,8 +41,8 @@ NextFrame:
         lda #0
         sta VSYNC
         sta WSYNC
-        sta RESP0         ; P0 最左(X=3)
-        sta RESM0         ; missile0 最左(X=3)＝重なる
+        sta RESP0         ; P0 clamp X=3 (writes at cycle 21 or earlier; not the leftmost)
+        sta RESM0         ; missile0 clamp X=2 (writes at cycle 21 or earlier; not the leftmost)＝重なる
         ldx #36
 VBlank: sta WSYNC
         dex

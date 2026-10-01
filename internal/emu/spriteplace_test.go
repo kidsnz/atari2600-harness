@@ -165,8 +165,11 @@ func TestSpritePlacementPhysics(t *testing.T) {
 	eq("and the line after has all three", starts(line(10, 3))["P0"], []int{24, 56, 88})
 
 	// ---- rule 9: the clamps, and the fact that each is a WINDOW of write cycles ----
-	// A missile stops at 2, one clock left of where a player stops, so x=2 is a position no player
-	// reaches without the wrap in rule 7 (write cycle 74), by a strobe or by a copy. Both cycles land on it: the clamp is not a
+	// A missile written at cycle 21 or earlier stops at 2, one clock left of where a player stops, so
+	// x=2 is a position no player reaches without the wrap in rule 7 (write cycle 74), by a strobe or
+	// by a copy. The floor is not the missile's leftmost x either: written at cycle 74 a missile or the
+	// ball wraps to 1 (measured by a reviewer on the engine, outside this repository; no band here
+	// holds it). Both cycles below land on the floor: the clamp is not a
 	// single cycle but a span, and that span is what lets an object AT THE WALL be strobed clear of
 	// another four pixels to its right. Anywhere else on the grid those two strobes are one cycle
 	// apart, which two 3-cycle stores cannot be. A picture as wide as the screen turns on this.

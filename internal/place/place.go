@@ -10,6 +10,12 @@
 //	a missile  lands at x = 3c - 61 and stops at x = 2   (one clock to the LEFT of that grid)
 //	the ball   is a missile in this respect, exactly
 //
+// Those floors are where writes at cycle 21 or earlier stop, not the leftmost x. A write late in
+// the line wraps past them instead: at cycle 74 a player reaches x=2 and a missile or the ball x=1,
+// and a double or quad player written at cycle 73 reaches x=0 (the last two measured by a reviewer
+// on the engine, outside this repository). This package plans none of those wraps: candidates drops
+// every base at 160 or more, and no wide-player NUSIZ code is in its search.
+//
 // So a row that must begin at x=2 cannot put a PLAYER there by any strobe this package plans or by any
 // copy of one (a player written at cycle 74 wraps to 2, but this package does not plan the wrap) --
 // and yet it can be drawn, by turning the leftmost shape round so its missile takes the left four
@@ -33,7 +39,7 @@ const (
 	PlayerFloor     = 3 // where writes at cycle 21 or earlier stop; a write at cycle 74 wraps to 2, which this planner does not plan
 	SolidSlope      = 3
 	SolidIntercept  = -61 // missiles AND the ball
-	SolidFloor      = 2   // and they stop one clock left of a player
+	SolidFloor      = 2   // writes at cycle 21 or earlier stop here, one clock left of a player; a write at cycle 74 wraps to 1 (measured outside this repository), which this planner does not plan
 	ClampFirst      = 16  // the earliest write cycle measured to still land on a floor
 	LineClocks      = 160 // a copy past this wraps and draws at the left edge, same line
 	MinStrobeGap    = 3   // two stores cannot be closer than this

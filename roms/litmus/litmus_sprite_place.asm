@@ -18,8 +18,10 @@
 ;   6. a GRP write takes effect at screen x = 3w - 64, so it needs FOUR colour clocks of margin
 ;      ahead of the copy it feeds and not one more
 ;   7. a normal-width player written at cycle 21 or earlier stops at x=3 (cycle 74 wraps to 2)
-;   9. a missile and the ball are clamped at x=2 and a player at x=3, and each clamp spans a
-;      WINDOW of write cycles, not one
+;   9. written at cycle 21 or earlier, a missile and the ball are clamped at x=2 and a player
+;      at x=3, and each clamp spans a WINDOW of write cycles, not one. Neither is a leftmost x:
+;      written at cycle 74 a missile or the ball wraps to 1 (measured by a reviewer on the
+;      engine, outside this repository; no band here holds it)
 ;  10. a NUSIZ copy past 160 wraps to the left edge and draws there on the same line
 ;   8. and a strobe cancels the pending draw of the FIRST copy ONLY — the copies NUSIZ makes at
 ;      +32 and +64 are triggered from the reset position and still land on the strobe line
@@ -504,8 +506,9 @@ Vb:     sta WSYNC
         sta WSYNC
 
 ; ---- band 11: a missile is clamped at x=2, and the clamp is a WINDOW of write cycles ----
-; Band 8 showed a player clamped at 3. A missile stops one clock further LEFT, at 2 — a place no
-; player reaches without the cycle-74 wrap, by a strobe or by a copy. Both cycles below land on it, and
+; Band 8 showed a player clamped at 3. A missile written at cycle 21 or earlier stops one clock
+; further LEFT, at 2 — a place no player reaches without the cycle-74 wrap, by a strobe or by a
+; copy. Both cycles below land on it, and
 ; that the clamp spans SEVERAL cycles rather than one is the load-bearing part: it is what lets
 ; an object at the wall be strobed clear of another four pixels to its right, which anywhere
 ; else on the grid would be one cycle away and therefore impossible for two 3-cycle stores.
