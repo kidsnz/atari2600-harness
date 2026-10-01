@@ -2215,13 +2215,14 @@ func main() {
 					// correction with it. Under investigation; not changed blind.
 					have = zoneLeftmost(gotlx, [5][]int{}, fd.zones[k], i)
 					label = fmt.Sprintf("z%d%s", k, objNames[i])
-					if !fd.zfollow[i] && k > 0 {
-						// Not followed: one position for the whole frame. The later zones
-						// re-place it to the same input, so calibrating it once is enough
-						// and calibrating it per zone would fight itself.
-						zin[k][i] = zin[0][i]
-						continue
-					}
+					// A NOT-FOLLOWED object is calibrated per zone too. It has one
+					// position for the whole frame, but zone 0 is placed by the
+					// prologue's div-15 SetXPos and every later zone by the nop-chain
+					// block, two actuators with different maps, so the zone-0 input
+					// cannot be reused. Copying it was measured on zone_multiplex with P1
+					// frozen at one X: P1 read 64 in zone 0 and was misplaced in zones
+					// 1-5, 190 of its 228 cells wrong
+					// (TestAnUnfollowedPlayerKeepsItsPlaceInEveryZone).
 				}
 				if have < 0 {
 					// Not drawn THIS round is not the same as cannot be drawn. Every object
