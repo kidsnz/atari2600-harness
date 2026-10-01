@@ -6,6 +6,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the rest of the errors found while landing (2026-10-01)
+
+Each was fixed by one writer and checked by a separate reviewer; the code changes were shown failing
+before the fix.
+
+- **The 2600's frame rate is 59.92 Hz NTSC and 49.86 Hz PAL** (3579545/228/262 and 3546894/228/312), not
+  the 60.0544 Hz that the broadcast line rate gives over 262 lines. `pkg/design`'s constant, its
+  flicker-rate test, `internal/emu/palphysics_test.go` (which took its ratio from the engine's display
+  limiter) and four documents now use it; the NTSC/PAL factors become 83.21% and 120.18%. The PAL colour
+  clock is Cited only, not verified.
+- **`cmd/framegen` put an object it does not follow in the wrong place from zone 1 on**: it reused zone
+  0's div-15 input for the nop-run blocks of later zones. New test
+  `TestAnUnfollowedPlayerKeepsItsPlaceInEveryZone` (349 mismatched cells before the fix). Output for the
+  31 technique ROMs, Outlaw and Combat is unchanged. Its documented count was stale: 21 of 31 technique
+  ROMs reproduce pixel-exact, not 22, since `multicolor48`'s kernel was rewritten in 4060492.
+- **`stella-oracle.md` now describes the oracle as built** (`autoexec.script`, the ROM-only launch, what
+  each mode waits for, no calibration probe), not the first plan. `resources.md` no longer lists
+  `-dbg.script`, which Stella 7.0 does not have.
+- **`maze.md`**: a maze cell is 2 playfield bits, 8 colour clocks, not 2 colour clocks.
+- **Regenerating `provenance.md` or `mining-digest.md` keeps their hand-written sections**: the generators
+  now emit them. The digest generator no longer drops the `Interlace?` rows, and `check_provenance.py`'s
+  source markers no longer match inside longer words. The two documents themselves are not regenerated
+  here.
+
+With these, every item in the "not fixed here" list of the landing entry below (2026-09-30 to
+2026-10-01) is closed, and so is the `cmd/framegen` item of the entry just below. Still open: the
+unbounded `@lines 2` region in `shared_setxpos.asm`, and the older items further down (DASM exit codes,
+`litmus_jsr_stack.asm`'s `REFP1`, and the rest).
+
 ### Fixed — four overstatements found while landing (2026-10-01)
 
 Each was fixed by one writer, checked by a separate reviewer, and measured on the engine where the claim
