@@ -59,7 +59,7 @@ func CheckColorBands(widthsPx []int, writeCycles int) []NarrowBand {
 // $64)" on PAL before luminance washes the hue to pink, and the engine's PAL palette agrees:
 // $60 = RGB(76,7,14), $62 = (124,10,21), $64 = (173,41,55), then $66 = (226,80,97) and
 // $68 = (255,122,142) (`go run ./cmd/palette -spec PAL`, 2026-09-30; the engine's table, not a
-// television). internal/ceiling's TestPALSpendsFourHuesOnGreyAndHasNoRed does not contradict this:
+// television). internal/ceiling's TestPALSpendsFourHuesOnGreyAndHasNoBrightRed does not contradict this:
 // it looks only at the ONE entry with the largest R-(G+B)/2, which is $46's orange (215,106,38).
 // PAL has dark reds and lacks a BRIGHT one — the wording of the 1997 report that test quotes.
 // HueName below names hues for READING a value

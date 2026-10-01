@@ -86,7 +86,7 @@ described.
 **And PAL is not NTSC with different timing — it is a smaller box of colours.** Measured 2026-09-06
 (`internal/ceiling/palpalette_test.go`), with the NTSC table as the control in every comparison:
 
-| | grey hues | reddest entry |
+| | grey hues | reddest entry (largest R − (G+B)/2) |
 |---|---|---|
 | NTSC | **1** of 16 (hue 0) | `$46` → RGB(236, 51, 51) — a red |
 | PAL | **4** of 16 (hues 0, 1, 14, 15, all RGB(154,154,154)) | `$46` → RGB(215, 106, 38) — an **orange** |
@@ -106,8 +106,17 @@ conversion, not a fact about the hardware — and pinning it turned CI red. `NTS
 claim that survives the arithmetic.
 
 So a PAL kernel picks from **twelve** hues rather than fifteen, and **the same TIA code that paints a
-red on NTSC paints an orange on PAL** — a picture whose subject IS red does not port, and no other
-entry rescues it, because `$46` is already the reddest thing in the table. Both facts were reported on
+red on NTSC paints an orange on PAL** — a picture whose subject is a bright, intense red does not
+port, because `$46` already has the largest R − (G+B)/2 in the table. **PAL is not without red,
+though — it lacks a bright, intense one.** In the engine's PAL table (`go run ./cmd/palette -spec
+PAL`, 2026-10-01; the engine's table, not a television) hue 6 gives dark reds at `$60`, `$62` and
+`$64` — RGB(76, 7, 14), (124, 10, 21) and (173, 41, 55) — and then pinks: `$66` = (226, 80, 97) and
+`$68` = (255, 122, 142) keep the hue (351–354°) but lose saturation (HSV 0.76 at `$64`, 0.65 at
+`$66`, 0.52 at `$68`). The source quoted in `pkg/design/color.go` counts the same three proper reds
+before luminance washes the hue to pink (cited only, not verified). The measure rewards brightness,
+so these rank below the orange (R − (G+B)/2 = 109, 125, 138 for `$62`, `$64`, `$66`, against 143
+for `$46`). `$62` is the value a 2001 hardware report used to make red read as red on a PAL console
+(`internal/emu/palspec_test.go`; see `ingest.md`). Both facts were reported on
 the list in 1997 by someone who burned an EPROM to check them on a real machine rather than an
 emulator: *"the first and last two colours are the same grey. What is surprising is that the TIA has
 many nice colours but there isn't a bright, intense RED - at least in PAL"* 〔`199704/msg00150`,

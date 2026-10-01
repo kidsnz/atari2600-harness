@@ -2,7 +2,7 @@ package ceiling
 
 import "testing"
 
-// TestPALSpendsFourHuesOnGreyAndHasNoRed measures two properties of the PAL palette that
+// TestPALSpendsFourHuesOnGreyAndHasNoBrightRed measures two properties of the PAL palette that
 // decide what can be drawn on it, and that the NTSC palette does not share.
 //
 // Both were reported on the list in 1997 by someone who had burned an EPROM to check them
@@ -16,13 +16,29 @@ import "testing"
 //
 //   - PAL spends FOUR of its sixteen hues on the same grey (hues 0, 1, 14, 15). NTSC spends
 //     one. A PAL kernel therefore chooses from twelve hues, not fifteen.
-//   - The reddest colour PAL can make is an ORANGE. The same TIA code that paints a red on
-//     NTSC paints an orange on PAL, so a picture whose subject IS red does not port.
+//   - PAL has no bright, intense red (the 1997 report's words). The entry with the largest
+//     R-(G+B)/2 is $46 = RGB(215,106,38), an ORANGE; the same TIA code that paints
+//     RGB(236,51,51), a red, on NTSC paints that orange on PAL, so a picture whose subject is
+//     a bright, intense red does not port.
+//
+// This is NOT "PAL has no red". In the engine's PAL table (`go run ./cmd/palette -spec PAL`,
+// 2026-10-01; the engine's table, not a television) hue 6 runs $60 = RGB(76,7,14),
+// $62 = (124,10,21), $64 = (173,41,55): dark reds. Brighter steps of the same hue lose
+// saturation (HSV 0.76 at $64, 0.65 at $66, 0.52 at $68, hue 351-354 degrees throughout):
+// $66 = (226,80,97) and $68 = (255,122,142) are pinks, which is how
+// pkg/design/color.go's source puts it (about three proper reds, $60-$64, before luminance
+// washes the hue to pink; cited only, not verified). The metric below rewards brightness as
+// well as hue, so these rank under the orange: redness 109 ($62), 125 ($64), 138 ($66),
+// against 143 for $46. Outside the engine, $62 is the value a 2001 hardware report used to
+// make red read as red on a PAL console, and internal/emu's
+// TestSameColourByteIsADifferentColourOnPAL asserts it is dominantly red in the engine's PAL
+// table. The 1997 report does not speak about dark reds; what it says is that there is no
+// bright, intense red.
 //
 // ★The NTSC side is the control. Every assertion below is a comparison between the two
 // specs, so a palette table that had gone uniformly grey — or a comparison accidentally
 // reading the same spec twice — fails rather than passes.
-func TestPALSpendsFourHuesOnGreyAndHasNoRed(t *testing.T) {
+func TestPALSpendsFourHuesOnGreyAndHasNoBrightRed(t *testing.T) {
 	abs := func(x int) int {
 		if x < 0 {
 			return -x
@@ -41,7 +57,8 @@ func TestPALSpendsFourHuesOnGreyAndHasNoRed(t *testing.T) {
 		return out
 	}
 	// "Redness" = how far the red channel stands above the mean of the other two. The
-	// reddest entry in the table is the best red the machine can draw.
+	// reddest entry is the strongest red by this measure. It is not the only red: the
+	// measure rewards brightness, so a dark red ranks below a bright orange.
 	reddest := func(p Palette) (code, redness int, rgb [3]int) {
 		redness = -1 << 30
 		for i := 0; i < PaletteSize; i++ {
@@ -76,10 +93,11 @@ func TestPALSpendsFourHuesOnGreyAndHasNoRed(t *testing.T) {
 		t.Errorf("NTSC has %d grey hues and PAL %d — the specs are not being told apart, so "+
 			"neither figure means anything", len(gN), len(gP))
 	}
-	// The claim is not "PAL's red is dimmer"; it is that PAL has no red. The reddest PAL
-	// entry has a green channel high enough to read as orange.
+	// The claim is that PAL has no bright, intense red, not that it has no red ($60-$64 are
+	// dark reds and $66 a pink; see the comment above the test). The entry with the largest
+	// redness has a green channel high enough to read as orange.
 	if rgbP[1] <= rgbP[0]/3 {
-		t.Errorf("PAL's reddest colour RGB%v has little green in it — it IS a red, and the "+
+		t.Errorf("PAL's reddest colour RGB%v has little green in it — it IS a bright red, and the "+
 			"1997 report that PAL has no intense red does not hold here", rgbP)
 	}
 	if rP >= rN {
