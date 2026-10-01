@@ -1772,11 +1772,14 @@ func kernelHas(blocks []writeBlock, reg string) bool {
 func emit(fd *frameData, zin [][5]int, vblankAdj, osAdj int) string {
 	in := zin[0]
 	nlines := fd.h
-	// Positioning costs one scanline per placed object (SetXPos opens with a WSYNC)
-	// plus one for the HMOVE line. That used to be the constant 3 — two players and
-	// HMOVE — and stayed 3 when missiles and the ball became placeable, which
-	// overshot the overscan count into `ldx #257` on Fishing Derby: an immediate
-	// operand that does not assemble, so the clone could not even be built.
+	// Positioning costs at least one scanline per placed object (SetXPos opens with
+	// a WSYNC) plus one for the HMOVE line. A far-right object can take two, when its
+	// div-15 wait pushes the next WSYNC off the line; that is not counted here, the
+	// frame-length calibration in main measures it and corrects the overscan.
+	// posLines used to be the constant 3 — two players and HMOVE — and stayed 3
+	// when missiles and the ball became placeable, which overshot the overscan
+	// count into `ldx #257` on Fishing Derby: an immediate operand that does not
+	// assemble, so the clone could not even be built.
 	posLines := 1
 	for i := range fd.obj {
 		if fd.placeable(i) {

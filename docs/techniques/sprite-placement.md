@@ -68,8 +68,9 @@ includes HMOVE: the HMxx registers keep their values, so every later HMOVE moves
 **The positioning lines are a cost, not a limit.** splendidnut in the same thread: a game that uses
 the five objects once each, without re-using them down the screen, can do all its positioning off
 screen with the standard routine, *"which would take at least 5 scanlines"*, because that routine
-takes a scanline per object. `design-principles.md` states the general count, "N objects = N+1
-scanlines". `plan_sprite_placement` answers where, not how many lines (see below).
+takes at least a scanline per object, and two for one far enough right (`shared-setxpos.md`).
+`design-principles.md` gives N+1 scanlines for N objects while every input stays inside a limit set by
+the code after the strobe. `plan_sprite_placement` answers where, not how many lines (see below).
 
 **Move the variable, not the object.** ZackAttack, 2018, removing the left copy of a three-copy enemy
 by narrowing NUSIZ and moving the base right by one copy pitch: *"I wouldn't use hmoves to adjust the

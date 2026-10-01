@@ -59,8 +59,15 @@ WaitObj:
 
 **Design rule:** lay the X coordinates in RAM at **consecutive addresses in RESxx order**
 (P0,P1,M0,M1,BL). Then a `DEX/BPL` loop + one trailing `WSYNC`+`HMOVE` positions all five.
-Each `SetXPos` does its own `WSYNC`, so it costs **one scanline per object** (5 lines for 5
-objects) plus the final HMOVE line.
+Each `SetXPos` does its own `WSYNC`, so it costs **one scanline per object, or two when the next
+`WSYNC` misses the line**, plus the final HMOVE line. In this loop an input of 90 or more pushes the
+next call's `WSYNC` onto the following line, so the demo's five objects take 7 lines, not 5 (measured
+below). Two is the most: at input 255 the next `WSYNC` starts at 5q+46 = 131 (q = 17, the count
+below), inside the second line. Measured on copies of the demo with BL's input changed (2026-10-01,
+`cmd/scenario` `ntsc_frame_lines`): 89 gives 261 lines (BL's extra line gone, M1's left), 90 and 255
+give 262, as 140 does; M1 at 80 and BL at 75 give 260. The last object, P0, is followed by
+`rts`/`dex`/`bpl`/`sta WSYNC` rather than another call, so it keeps to one line up to input 134: with
+M1 at 80 and BL at 75, P0 at 134 gives 260 lines and P0 at 135 gives 261 (same method).
 
 **The one-line cost holds only while the next `WSYNC` is reached in time.** The wait grows by 5
 cycles per 15 px, and `SetXPos` returns right after its strobe, so it is the *next* call's `WSYNC`
