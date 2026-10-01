@@ -6,6 +6,38 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — four overstatements found while landing (2026-10-01)
+
+Each was fixed by one writer, checked by a separate reviewer, and measured on the engine where the claim
+is about the engine. Comments and documents only: no constant, threshold or ROM byte changes.
+
+- The missile/ball floor of 2 (and the player's 3) is where writes at cycle 21 or earlier stop. A missile
+  or the ball written at cycle 74 wraps to 1, and a double or quad player written at cycle 73 to 0
+  (measured on the engine outside this repository, with one-cycle-early and -late controls).
+  `place.Solve` plans none of those wraps, so its answers are unchanged. `CLAUDE.md`, the
+  `plan_sprite_placement` description, `internal/place`, `sprite-placement.md`, `verified-coverage.md`,
+  the sprite-place litmus generator and two collision litmus comments now say so. This closes the item
+  left open by the fourth batch.
+- A `VBLANK` write takes effect one colour clock late, not one line (`design-principles.md`,
+  `known-traps.md`). Two forum sources say so, and the bundled Gopher2600 schedules it with
+  `futureVblank.Schedule(1, …)`. On real hardware: Cited only, not verified.
+- `shared-setxpos.md`: a position costs two scanlines once an input of 90 or more makes the next call's
+  `WSYNC` late (the demo takes 7 lines for 5 objects; measured with `cmd/scenario` frame-line counts).
+  `design-principles.md`'s N+1 holds only within a limit set by the code after the strobe.
+  `sprite-placement.md` and a `cmd/framegen` comment follow. Framegen's own positioning stays at one line
+  per object.
+- PAL lacks a bright, intense red, not every red: `$60`, `$62` and `$64` are dark reds in the engine's
+  table. The test is renamed `TestPALSpendsFourHuesOnGreyAndHasNoBrightRed`; what it asserts is unchanged.
+
+These close three items of the "not fixed here" list two entries below (VBLANK, PAL red, shared-setxpos).
+Still open from that list: 60.0544 Hz, the maze cell width, `stella-oracle.md` Design 1, and the
+generated files.
+
+Found while fixing, not fixed here: `cmd/framegen` copies the first zone's div-15 input
+(`zin[k][i] = zin[0][i]`) to a player that does not move, which misplaces it (a reviewer reproduced it:
+190 cells of P1 stop matching on a `zone_multiplex` copy). The `@lines 2` region in
+`shared_setxpos.asm` is reported unbounded by `cyclebound`, so the prover does not use it.
+
 ### Added — the redirected rows landed (2026-10-01)
 
 2 commits, 23 `Land-Key:` lines: the rows that the commits below had sent elsewhere because their
