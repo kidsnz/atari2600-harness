@@ -298,7 +298,10 @@ whose commit is dated 2026-06-01, before this section was written.
 
 ### Stella (oracle + annotated screenshot)
 - 1x single: `stella -snapsavedir DIR -sssingle -ss1x -snapname rom ROM`.
-- `-dbg.script FILE` (load order `autoexec.script` → `<rom>.script` → `-dbg.script`).
+- Debugger commands go in `~/Library/Application Support/Stella/autoexec.script`, run on entering the
+  debugger. There is no `-dbg.script` flag: Stella 7.0's `-help` lists `-dbg.pos`, `-dbg.res`,
+  `-dbg.fontsize` and other `-dbg.*` options, and no `-dbg.script` (how the oracle drives it:
+  `docs/stella-oracle.md`, Design).
   `dump START [END] FLAGS` (**1=memory / 2=CPU / 4=inputs**, additive so `7`=all).
 - **Fixed Debug Colors:** `-tia.dbgcolors roygbp` = **P0=red / M0=orange / P1=yellow / M1=green / PF=blue /
   BL=purple** (fixed order P0,M0,P1,M1,PF,BL).

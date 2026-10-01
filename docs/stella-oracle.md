@@ -5,15 +5,41 @@ run the same ROM to frame N in both, compare RAM ($80–$FF) and TIA state numer
 "emulator-verified" facts (HMOVE side effects, SCORE×PFP, late-HMOVE +8…) toward "two independent
 implementations agree".
 
-## Design (validated against the Stella 7.0 docs + installed binary)
-1. Place a debugger script next to the ROM (`frame N / tia / riot / dump 80 ff 7 / saveSes`).
-2. Launch `Stella -debug -userdir <tmp> <rom>`; the script auto-executes at debugger entry.
-3. Poll for the `saveSes` session text file; kill the Stella process (no quit command exists).
-4. Parse the RAM dump block from the session file → byte-compare vs the harness `read_ram` at frame N.
-   (TIA/RIOT register compare = same parse; pixel compare = v2, needs palette→TIA-index mapping and
-   horizontal 2:1 downsampling of Stella's `-ss1x` snapshots.)
-5. One-time calibration: a probe ROM writing its frame counter to RAM aligns Stella's `_fCount` with
-   Gopher2600 frame numbering.
+## Design (as built in `cmd/stellacheck` and `scripts/stella_oracle.sh`, on Stella 7.0)
+The first plan followed the Stella 7.0 manual (`fundamentals-audit.md` §12). The 2026-06-11 session
+and the v3 work of 2026-08-03 (both below) found part of every step did not hold on this setup. These
+are the steps the code takes:
+1. Write the debugger commands to `~/Library/Application Support/Stella/autoexec.script`:
+   `reset / frame N / dump 80 ff 7`, with `savesnap` before the `dump` under `-pixels`
+   (`cmd/stellacheck`, which backs up any existing file and restores it afterwards), and only
+   `reset / frame N` in `tia` mode (`scripts/stella_oracle.sh`, which overwrites the file and leaves
+   it that way). No per-ROM script is written. The manual puts
+   `"<rom_filename>.script"` *"in the same directory as the ROM"*, but all 205 captures in
+   `internal/oracle/testdata/stella_tia/` record Stella looking for `~/Desktop/<rom>.script` (not
+   found) after `Executed 2 commands from` autoexec. There is no `-dbg.script` flag either (Stella
+   7.0's `-help` has no such option; harness `CLAUDE.md`).
+2. Launch Stella with the ROM path (`cmd/stellacheck`: `exec.Command(stellaBin, romPath)`; `tia` mode
+   adds only `-dbg.res` and `-dbg.fontsize`). No `-debug`: it did not enter the debugger on this setup.
+   No `-userdir`: it redirected neither the autoexec nor the `saveSes` file. The debugger is entered with
+   the backquote key, pressed by a person or sent through AppleScript by `scripts/stella_oracle.sh`,
+   and the script auto-executes at debugger entry.
+3. RAM and pixel modes (`cmd/stellacheck`) poll for the new `~/Desktop/<rom>_dbg_*.dump` written by
+   `dump`, then kill the Stella process. `tia` mode polls for nothing: it pastes `tia` and `saveSes` at
+   the debugger prompt (output of commands run from the autoexec is discarded, v3 below), waits fixed
+   sleeps, kills the Stella process, and only then takes the one `~/Desktop/session_*.txt` that was not
+   there before launch. The code never asks Stella to exit; the nearest command in the 7.0 command list,
+   `exitRom`, is *"Exit emulator, return to ROM launcher"*.
+4. Parse the RAM rows of the `.dump` file → byte-compare vs the harness RAM at frame N
+   (`oracle.Gopher{}.DumpRAM`). The other comparisons use other files: the write-only TIA registers
+   come from the session text (`oracle.ParseStellaSession`, v3), and pixels from the `savesnap` PNG,
+   which `ingest.Normalize` scales down horizontally and the measured Stella palette maps to TIA
+   colour codes (v2).
+5. Frame alignment: `reset` at the head of the script makes the snapshot N frames from power-on,
+   whenever the debugger is entered. No probe aligning Stella's `_fCount` with Gopher2600's frame
+   numbering was built. The two emulators still cut "frame N" at different points within the frame
+   (Frame-boundary phase, below). The phase probe that exists, `litmus_framephase`
+   (`TestOracleSamplingPhaseIsMeasured`), measures Gopher2600 against MAME; no Stella RAM dump of it
+   is kept.
 
 ## Status — ✅ WORKING (v1, one human keypress) — `cmd/stellacheck`
 The interactive session (2026-06-11) resolved every unknown:

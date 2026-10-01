@@ -683,6 +683,8 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   (no headless), no quit command (kill externally), no input timelines. **v1 design: RAM + TIA register
   compare at frame N** (exact, palette-free); image compare v2 (Stella doubles pixels horizontally; map
   palettes to TIA indices first). Needs a one-time frame-numbering calibration probe.
+  (This is the plan as first written; the oracle as built changed part of every step — see
+  `docs/stella-oracle.md`, Design.)
 - ⚠️ AtariAge blocks direct fetching (Cloudflare 403) — use the Wayback Machine; randomterrain mirrors
   Davie/SpiceWare content. Disassembly corpus is ISO-8859+CRLF — `grep -a`.
 - 📖 Davie's *Newbies* Revised PDF = editorial consolidation of Sessions 1–25 + opcode appendix; no new

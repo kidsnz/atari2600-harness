@@ -52,8 +52,11 @@ every cell exactly 2px wide:
 
 ## Verified facts
 - 2px expansion is exact: every generated PF byte has its bits in adjacent pairs (e.g. `207 =
-  11001111`, `240 = 11110000`, `60 = 00111100`), so each maze cell is exactly 2 color clocks wide —
-  a walkable passage width.
+  11001111`, `240 = 11110000`, `60 = 00111100`), so each maze cell is exactly 2 playfield bits wide —
+  8 color clocks, since each PF bit is 4 (harness `CLAUDE.md`, playfield; the "2px" on this page
+  counts PF bits, not color clocks) — a walkable passage width. In the engine, `read_row` on
+  `maze.bin` at frame 30 (scanlines 60, 100, 200; one reading, not a test) gives every run as a
+  multiple of 8 clocks, the shortest 8.
 - Same seed ⇒ same maze (scenario pins LFSR state + specific PF bytes; the golden hash pins the
   full rendered frame).
 - Frame is a clean 262 NTSC lines with the compute folded into the 37-line VBLANK budget.
