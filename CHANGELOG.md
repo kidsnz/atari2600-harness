@@ -6,6 +6,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — the first cited-only review rows land; the prover stops over-allowing @lines (2026-10-02)
+
+Each was written by one writer and checked by a separate reviewer before commit.
+
+- **152 rows the review judged worth adding but had only cited (confidence B)** land in
+  `design-principles.md`, `known-traps.md`, `kernel-micro-idioms.md` (sections 24-33),
+  `fundamentals-audit.md`, `integration-density-playbook.md` and `input-budget.md`. Every claim not
+  measured here is marked Cited only, not verified or Not verified. Each row was re-read against its
+  source, and where the review's summary disagreed with the source the source is what was written.
+- **`fundamentals-audit.md` section 10** gave "debugger sanity" as Jentzsch's reason for a distinct RORG
+  per bank; his reason is that even 4K slices land on TIA and RAM addresses. The debugger reason stays,
+  with its own source.
+- **`internal/cyclebound` no longer certifies kernels that overflow**: `hscroll` and `two_line_vdel`
+  declared `@lines 2` on regions the machine runs in one line, so a copy a few cycles over still
+  CERTIFIED while drawing 263 lines. Both are now `@lines 1` (same bytes; both Stella captures still
+  match), which the prover rejects at 79>76 and 78>76 — a false rejection, so 13 of 31 technique kernels
+  certify, not 15. The prover also read an `@lines`/`@amax` on the line after a WSYNC as belonging to
+  the region before it; fixed, with no verdict change over 211 kernels. New check
+  `TestLinesDeclarationIsNotSlack` fails when a declaration grants more lines than the machine uses.
+- `known-traps.md`: `build/picture.html` embeds stills and runs no emulator; the stack-collision row's
+  detect column now matches `check_traps.py` rule 3 ($F8-$FF). `mcp-tools.md` describes
+  `assemble_and_load` as built (source lines on a flat 2K/4K image only). `score-kernel.md` and two
+  comments limit "no seventh place" to a kernel that places each player once per line.
+
+Found, not fixed here: `sfx_demo` draws 263-line frames while an effect plays (scenario input: 262x143
+263x27) and its `@lines 3` certifies it; it is the one listed exception to the new check. When
+`assemble_and_load` fails on an exit-0 build, the cause hint is not passed back to the caller.
+`cmd/fieldtest` and `cmd/dissect` run PAL-detected ROMs with NTSC colour and audio tables.
+
 ### Fixed — the build refuses DASM's silent failures; the generated indexes are rebuilt (2026-10-02)
 
 Each was fixed by one writer and checked by a separate reviewer.
