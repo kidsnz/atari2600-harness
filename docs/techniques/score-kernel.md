@@ -138,7 +138,16 @@ allowance. That is not a bug in the budget — a two-line region is a real thing
 holds this as a standing negative control.
 
 ★★★**And the seventh store buys nothing anyway: the band stays 46 px.** The "6" was never a cycle
-budget — it is two players × three NUSIZ copies, and there is no seventh place to put a seventh image.
+budget — it is two players × three NUSIZ copies, and **with each player placed once for the line, as in
+this kernel,** there is no seventh place to put a seventh image. Other kernels make one. A mid-line
+`RESPx` re-strobe restarts a player's copies, and two players reach sixteen slots on one line — measured,
+`restrobe-copies.md` (`TestRestrobeAddsCopies`); the missiles and the ball are places as well. A slot is not
+yet an image: each still needs its byte written in time, and `restrobe-copies.md` finds the bytes, not the
+slots, set the count. A seven-digit, flicker-free score is reported — omegamatrix, 2012: *"I always wanted
+to have a score go from 0 to 9,999,999 on the Atari. I wanted to have no flicker in the score, any background
+color, and regular sized digits. This routine accomplishes all these things"* (AtariAge `topic/198217`).
+The routine is an attachment that was not read or run here, so both that it does this and how it places
+its seventh digit (the thread's text does not say) are Cited only, not verified.
 Question raised by the mailing-list distillation (helper-2), who asked where the six stores sit inside
 the 76 cycles and whether the remainder admits a seventh.
 

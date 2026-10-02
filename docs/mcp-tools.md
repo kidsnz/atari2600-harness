@@ -72,10 +72,20 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
 
 ### 1b. `assemble_and_load`  ★ build-loop shortening (P3, v0.16.0)
 - In: `{ AsmPath string; BinPath string (defaults asm→.bin); TVSpec string (default NTSC) }`
-- Behavior: `exec.Command("dasm", asm, "-f3", "-o"+bin).CombinedOutput()`. On success, `emu.New`+`LoadROM` to load immediately.
+- Behavior: `build.AssembleWithListing` (`internal/build/build.go`) runs
+  `exec.Command("dasm", asmPath, "-f3", "-o"+tmpBin, "-l"+lstPath, "-s"+symPath, "-I"+filepath.Dir(asmPath)).CombinedOutput()`.
+  The image goes to a per-process scratch name and is renamed onto `BinPath` only on success; the listing (`-l`) and
+  symbol table (`-s`) are read back, deleted, and given to `srcmap.Parse`, so later tool output can name the source
+  line of a PC — on a flat 2K/4K image only. `internal/srcmap/srcmap.go`: *"Map itself is FLAT 2K/4K only"*; on a
+  banked image *"Parse drops bank 0's rows entirely"* and *"stores banks 1..n's offsets as if they were CPU
+  addresses"*, and this handler never calls `ParseBanked`/`AttachBanked`. An exit status of 0 is not taken on its own: an `error:` line in the output, or an image DASM left
+  incomplete, is a failure too. On success, `emu.New`+`LoadROM` to load immediately.
 - Out: `{ Ok bool; BinPath string; DasmOutput string; Loaded bool; Coords }`.
   - On failure, **do not raise an MCP error**; return `Ok=false` + `DasmOutput` (the failing `"file (N): error: ..."` line) so
-    the model can fix and resubmit on the spot. Self-contained in `cmd/harness` (dasm assumed on PATH).
+    the model can fix and resubmit on the spot; when the cause is one `internal/build` recognises (an include it
+    could not open, every instruction rejected at once as with no working `processor` line, an operand read as an
+    instruction) a hint naming it is appended.
+    The assembling is `internal/build`'s, shared with `build.Assemble` (dasm assumed on PATH).
 - Verification: MCP e2e — smoke.asm loads OK / a broken asm gives Ok=false + the failing line.
 
 ### 2. `step_frame`
