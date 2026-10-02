@@ -101,6 +101,38 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     playfield-resolution. 〔mining 323770 three-sprites-color〕 **Cited only, not verified** — taken from
     the distillation notes; the thread copy and omegamatrix's `Test3Sprites(mod).asm` were not read
     here.
+  - **Chronocolour need not rotate, and then it does not flicker.**
+    Andrew Davie, 2004: Interleaved Chronocolour (ICC) shows each line's red, green and blue pixels in
+    three successive frames; the variant he proposed keeps *"a single colour per line, with each
+    successive line alternating between red, green, blue"*, each three lines forming an RGB triad.
+    *"The memory requirements are 1/3 of the original interleaved chronocolor(TM) technique, but this
+    technique is a lot less flickery.  Actually, it doesn't flicker at all."* 〔`200408/msg00065`〕
+    For the interlaced two-field form he proposed next, Davie claimed *"improved perceived resolution
+    (we're doubling vertical resolution with the interlacing anyway)"*; Thomas Jentzsch, replying to
+    that line: *"Yes, but IMO you are also reducing the effective vertical resolution by combining 3
+    lines."* 〔`200408/msg00070`〕 What Davie then posted as ROMs was an interlaced two-field version,
+    which he said uses 2/3 of ICC's ROM for the image 〔`200408/msg00071`, `msg00083`〕. Jentzsch, on an AV-modded PAL
+    console, preferred ICC — *"much better colors (more brilliant, higher saturation) and a higher
+    vertical resolution (the SpastiColour version looks quite "striped", the black lines are too
+    obvious)"* 〔`200408/msg00076`〕 — and so did Darrell Spice 〔`200408/msg00081`〕; Lee Fastenau called it
+    *"a valid, flicker-free(ish) alternative to ICC"* 〔`200408/msg00082`〕; one PAL TV showed both in
+    black and white 〔`200408/msg00084`〕. Davie: *"I think the preference is for ICC;  but in a crunch a
+    very acceptable result can be achieved by the new method."* 〔`200408/msg00083`〕 So in the parent
+    line Chronocolour is a fake of horizontal colour but not necessarily a flickering one (our reading).
+    **Cited only, not verified** — the single-field triad was described, not posted as a ROM, and
+    nothing here was run.
+  - **A Chronocolour picture is made before the converter: split the colours, then dither each to one
+    bit.** Davie, in the same 2004 post: ICC *"actually managed to look OK by preprocessing of the
+    image -- separating an image into separate colour planes and then (and this is the REALLY important
+    bit) colour-reducing these planes to a single bit per pixel WITH DITHERING."* 〔`200408/msg00065`〕
+    In 2003 Adam Thornton asked for a tool that *"resizes it to 48x128, does the splitting into three
+    color channels, and then runs it through banker"* (Davie's converter); Davie: *"Generally the
+    process of producing good Interleaved Chronocolour images is an iterative one - though I do get
+    excellent efforts first-time, these days.  Have good contrast seems to be the key."*
+    〔`200303/msg00090`, `msg00092`〕 Thornton then did the steps by hand — sized, split, *"dither the
+    channels down to monochrome"*, Banker on each — and got illegal instructions or *"an image that
+    bears no obvious relation to what I wanted"* 〔`200303/msg00093`〕; no answer to that is in the thread
+    as held here. **Cited only, not verified.**
 - **There is no "one correct RGB"**: Stella generates the palette from YIQ dynamically, so the same register value differs by a dozen up to 0x20 between emulators and settings.
   For us the running table `internal/ingest/palette_stella.go` is authoritative (100% match against Stella). 〔rgb-color-values, 118495〕
 - **hue ↔ colour map**: hue1 = yellow / hue4 = red / hue8 = blue / hue12 = green (hue15 ≈ hue1). hue1 is the standard choice for yellow. 〔132561〕
@@ -394,6 +426,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     〔`200106/msg00092`〕. The per-line comb itself is band D's measurement above; **that
     Activision titles do this is cited only, not verified**.
 - **Indirect-jump positioning: `JMP (ptr)` into a table of hardcoded positioning lines replaces the delay loop.** Each extra variant defers the RESPx strobe by 5 CPU cycles = **15 colour clocks**; the HMPx nibble loaded before the dispatch and applied by the HMOVE after it fills in between. **Nine variants reach 128 contiguous positions** — measured 136 — and they are contiguous *only* because the fine range (16 values, −7..+8) is at least the coarse step (15): the reachable intervals [15k−7, 15k+8] and [15(k+1)−7, 15(k+1)+8] meet exactly at their endpoint, so one fewer fine value puts holes in the set. Pays ROM for cycles, plus ≥ 2 bytes of RAM per object (pointer + HMOVE value). 〔Stella list, `star fire - return of the starfield ?!?`, 2002-07: Erik Mooney 200207/msg00330 + msg00334 for the mechanism, Manuel Polik 200207/msg00332 for the nine-parts arithmetic〕 `→ roms/litmus/litmus_jmpind_pos.asm` / `internal/emu/jmpindpos_test.go` (5 gradings, 2 negative controls). **Provenance correction:** this file previously credited the idea to Omegamatrix. That attribution is both later and a *different* shape — Omegamatrix folds the jump index into the HMPx low nibble, Erik's 2002 form dispatches through a plain pointer computed off-screen and keeps the nibble for movement.
+  - **Erik Mooney's first form, in 2001, threaded the strobe through the playfield writes.** Eleven kernels `Kernel0`…`Kernel10`, each placing `STA RESP0` one step later among the line's
+    six playfield writes, entered by `LDY SpritePosition` / `LDA BranchTable,Y` / `STA KernelBranch` /
+    `JMP (KernelBranch)`, with the strobe positions *"equal to or less than 15 pixels"* apart and HMOVE
+    finishing the job: *"So you've positioned your object by using lots and lots of ROM, but only 28
+    cycles all told (including the last HMOVE).  Much less than using a full 76 cycle scanline."*
+    〔`200108/msg00348`〕 Thomas Jentzsch: *"you will either need more than 11 routines for that or need
+    some extra cycles, because the writes to RESP0 will not automatically fit into the other code"*, and
+    *"It sounds possible to me, but not a simple task, because of the synchronization with the
+    playfield writes. I haven't heard of that solution before"* 〔`200108/msg00374`〕. Mooney: more routines
+    cost *"ROM, not any more cycles"*, and he asked whether an indirect jump across a page boundary
+    needs care 〔`200108/msg00380`〕. Paul Slocum planned to try it under an asymmetric playfield in
+    reflect mode, where *"the second write of PF2 has to land right on the exact cycle"*
+    〔`200108/msg00353`〕. The page trap measured here for `JMP (ptr)` is a pointer stored at `$xxFF`,
+    whose high byte is fetched from `$xx00` (`litmus_6502`, `fundamentals-audit.md`). The 28 is his
+    count, not ours. **Cited only, not verified.**
 - **A slide of `CMP #$C9` delays in single cycles, where indirect-jump positioning steps in fives.**
   kylearan: *"tricks like having several "cmp #$c9" instructions to use as a slide to jump into for
   cycle-exact kernel positioning, are also very similar to some obfuscation techniques, and in fact
@@ -632,6 +679,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     separate 32x80 version that *"requires much more ROM per level"*, and whether it masks is not said.
     〔mining 261054〕 **Not verified** — an idea he was not yet sure of; the copy here holds 150 of the
     thread's 181 posts.
+  - **Or pay in time: rewrite on some lines and rest on others.** Erik Mooney, 1997, in a thread
+    about the HMOVE comb: *"try to have scanlines during which you don't need to rewrite the playfield -
+    Centipede, Millipede, and my as yet unnamed program rewrite the playfield twice per line for four
+    lines, then turn the playfield completely off for four lines, during which you can position objects
+    and so on.  Pac-man only needs to rewrite the playfield twice in a line every eighth scanline - the
+    rest of the time, it's a standard reflected playfield."* 〔`199703/msg00249`〕 Most of the compromises above
+    give up width or height; this one gives up the asymmetric rewrite on some lines (our reading).
+    **Cited only, not verified** — his account of the three commercial ROMs was not checked against
+    them.
 - **Write deadlines for an asymmetric PF (measured cycles)**: when you display the left half and rewrite the right half on the same scanline, aim each write at the moment that PF is **no longer visible**. The classic kernel's actual values =
   first pass PF0[cy7] / PF1[cy14] / PF2[cy21] (for the left half — in time before it becomes visible) → then for the right half
   **PF0 rewritten at cy31 / PF1 at cy38 / PF2 at "exactly cy45"** (too early or too late and it breaks — adding a single nop destroys it).
@@ -806,6 +862,27 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     may not fit NTSC's (our reading; the thread does not say which difference is the one that bites).
     Speed is a separate problem — the frame-counter rule in the craft section. **Cited only, not
     verified** — his own "IIRC", and no conversion was tried here.
+  - **Thomas Jentzsch planned the one-binary version for *Thrust* and named what changes.** Eckhard
+    Stolberg, 2000: *"If you still have plenty of space, maybe you could put a PAL mode into the same
+    binary."* 〔`200006/msg00026`〕 Jentzsch: *"I thought about two different bins when i started developing Thrust. Your idea
+    is much better, i think correcting the timings for VBLANK and overscan and some game-speed-parameters
+    should do it."* 〔`200006/msg00030`〕 Stolberg: *"That would help, although most PAL TVs can handle
+    60Hz displays just fine. The real difference is in the palette."*, and a PAL mode must always give
+    an even number of scanlines 〔`200006/msg00040`〕. A plan, not a report of the result. Next to
+    Cavina's switch, which buys only the line count, Jentzsch's list adds game speed, and Stolberg names
+    the palette as the larger difference (our reading). **Cited only, not verified.**
+  - **A kernel that reads a table per line pays for PAL's extra lines in ROM.** Eric Ball, 2002, on
+    *Skeleton*: *"it is going to be difficult to accomodate the 20% increase in table size for the PAL
+    version"* 〔`200209/msg00047`〕. Manuel Polik did not see why a conversion should cost space: *"Just
+    adjust the number of WSYNCs for PAL to burn the additional lines away, that shouldn't cost a single
+    byte."* 〔`200209/msg00080`〕 Ball: *"For a normal kernel, that may be true.  But the Skeleton kernel is
+    based on very large look up tables and heavy use of LDA (ZP),Y.  For every line on the screen, I
+    have 6 bytes of maze lookup.  And the skeleton player graphics are also done for each visible line.
+    So for PAL, the active screen increases by 20% from 190 lines to 228 lines, with a similar increase
+    in lookup table size."* 〔`200209/msg00085`〕 Polik's alternative was to draw the NTSC screen and add
+    38 `WSYNC`s at the bottom 〔`200209/msg00088`〕; Ball wanted the full screen, with the skeletons 20%
+    taller too, and had *"very nearly filled the entire 4K ROM, even with the NTSC version"*
+    〔`200209/msg00090`, `msg00094`〕. **Cited only, not verified.**
 - **Two different needs share the word "random", and only one of them is expensive.** A starfield or
   a terrain must be **reproducible** — Manuel Polik: *"Total randomness won't work, since you've to
   **REPEAT** what you're doing every frame"* — and that is what a fixed-seed LFSR is for
@@ -1072,6 +1149,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     frame's total is held by the bounds above; how much of it is picture is a margin set on 1970s
     sets (our reading). 200 and 205 are two of the line counts in the pixel-aspect note in the craft
     section. **Cited only, not verified** — no ROM's visible line count was measured for this.
+  - **The total has a range too.** NoLand's summary of a Digital Press table of measured line counts,
+    as the distillation notes record it: NTSC standard 262, minimum 238, maximum 290, median 262; PAL
+    standard 312, minimum 258, maximum 336, median 312 — most games keep the standard, some, popular ones
+    among them, depart from it significantly, and televisions tolerate considerable variation. 〔mining 303750
+    inconsistent-scanline; only the distillation notes are held here〕 The same thread's requirement is
+    that the count be the same in every frame, which agrees with `frame_lines_stable` asking for one
+    value rather than 262 (`internal/emu/framelines_corpus_test.go`). **Cited only, not verified** —
+    the table was not seen here, and no television was tried.
 - **WSYNC semantics**: `sta WSYNC` halts the CPU until **the start of the next HBLANK** (68 colour clocks = 22⅔ CPU cycles). Choose where to write with the register-update delays in mind (colour = immediate / PF = 2-3 clocks / VBLANK = +1 colour clock / note length = delayed). 〔mining 192183 register-update delay table〕 The VBLANK figure is seagtgruff's, also in an earlier thread: *"Changes to VBLANK are delayed by 1 color clock."* 〔mining 131319 asymmetric-reflected-playfield〕 The bundled Gopher2600 does the same: `tia.futureVblank.Schedule(1, reg.Value)`, so a mid-line write blanks the rest of that line, not the next one. On real hardware: **Cited only, not verified.**
   **`WSYNC` inside a kernel line is spent cycles, not alignment.** Verdant, 2024, to bkumanchik, whose
   kernel strobed `WSYNC` between computing the invaders and the missiles: *"strobing WSYNC literally
@@ -1161,6 +1246,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     player became coloured, and *"of course it came down to a single cycle being available"* 〔`200102/msg00235`〕.
     `integration-density-playbook.md` rejects compile-time "feature modules" because they yield N
     binaries; here the switches are a cut list for one build (our reading). **Cited only, not verified.**
+  - **The bytes an optimisation pass finds are paid for in structure.** Davie's *Qb* post-mortem,
+    2001: *"It constantly amazed me how, whenever I really needed to squeeze some space out of the code
+    (which was just about every day for the last three weeks), I could find almost as much space as I
+    needed.  I recall being jam-packed, then saving 70 bytes, then 'spending' it, then saving another
+    190, then spending that, then finding another 100... etc.   I guess each iteration the code was
+    becoming more and more esoteric and less structured."* And afterwards: *"I'd recommend saving 500
+    bytes JUST for the finishing touches that everyone requests."* 〔`200103/msg00196`〕 The Combat rule
+    near the end of this file says the same of RAM — packing *"spends clarity"* (our reading). **Cited
+    only, not verified.**
+  - **A macro is one line in the source and every instruction it expands to in the budget.** Manuel
+    Rotschkar's 2003 `SET_POINTER pointer, address` stands for `LDA #<address` / `STA pointer` /
+    `LDA #>address` / `STA pointer+1`; its header notes *"Alters the accumulator"* and gives no cycles
+    or bytes 〔`200311/msg00089`〕. With a zero-page pointer that is 10 cycles and 8 bytes (our arithmetic:
+    2+3+2+3 cycles, 2 bytes each). Count a kernel line from the expansion, not the source. **Cited
+    only, not verified.**
   - **"RAM is faster than ROM" is true of one addressing mode.** Thomas Jentzsch, 2023: *"Loading from
     zeropage RAM is faster, not RAM in general. But only for non-indexed loads."* and *"There is no
     opcode for lda zp,y. Instead the assembler creates lda abs,y, which requires 1 extra byte. But
@@ -1229,14 +1329,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   another byte, and T1024T can be used as temporary storage of another byte if your program is quick
   about it"* — and *"None of it really matters, tho...since a cartridge can just include it's own Ram
   memory scheme"*. jeremiahk once set collision latches on purpose to save one byte in a score kernel:
-  *"a major pain in the neck"*. 〔mining 279317 using-overscan-to-store-data〕 eshu, 2012: *"SEI and
+  *"a major pain in the neck"*. 〔mining 279317 using-overscan-to-store-data〕 omegamatrix, 2012, of the
+  same timer: *"using TIM1T as a storage container"*, a trick first used in the game his seven-digit
+  score display came from 〔mining 198217 7-digit-full-sized-score-display〕. eshu, 2012: *"SEI and
   CLI gives you an extra bit of storage - things are that tight on the 2600 that it's actually
   handy!"* 〔mining 193203 6507-opcodes-crossword-puzzle〕 The I flag is free because the 6507 has no
   interrupt pins 〔mining 188134〕 and BRK ignores it (the IRQ/BRK rule in the Combat section). Reading
   either flag back takes a `PHP` and a test of bit 2 (I) or bit 3 (D) — the bits the engine's status
   register uses (`Gopher2600/hardware/cpu/registers/status.go`) — and while a bit is parked in D,
-  `ADC`/`SBC` are off limits (reveng's condition). **Cited only, not verified** — none of these has been
-  built here.
+  `ADC`/`SBC` are off limits (reveng's condition). On a 7800, where the worry was that the I flag is
+  fixed, batari reported using it to tell a cold start from a warm one in *Stella's Stocking* and that
+  it worked on several 7800s, and bruce-tomlin that a 7800 has already locked out its own mode when a
+  2600 game starts 〔mining 160610 making-use-of-the-status-register; only the distillation notes are
+  held here〕. **Cited only, not verified** — none of these has been built here, and the 7800 is not
+  modelled here.
   - **An upper bound, counted once and never built.** Thomas Jentzsch in the same thread: *"I wonder
     about the maximum storage in TIA"* — 20 bits of playfield, 32 from GRP0/1 with their shadow
     registers, 4 ENAM, 2 ENABL, 20 HM, ~37 from object positions, 4 CTRLPF (*"I don't think it is
@@ -1260,6 +1366,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     A11 (A12 selects the cartridge), so his "bit 12" is that line counted from one (our reading). The
     2K mirror is the one the IRQ/BRK rule in the Combat section depends on. **Cited only, not
     verified.**
+  - **A game with no zero-page RAM was called possible, and one was built.** omegamatrix, 2012:
+    *"A game that uses no ram is possible. To be fair I would say no zero page ram"*, listing what is
+    left — *"Accumulator / X register / Y register / Stack pointer / Timer (all modes) / SWCHB (up to
+    eight bits) / the Interrupt bit in the status register / All collisions (15 bits) / REFP0 and REFP1
+    (1 bit each) / the GRPx registers, ENxx registers"* 〔mining 197100 asm-or-bbasic; only the
+    distillation notes are held here〕 — which `SWCHB` bits are safe is under *SWCHB's unused bits as
+    storage* in `techniques/kernel-micro-idioms.md`. *Ramless Pong* (jeremiahk, 2019), as the notes record it, keeps
+    its state in X and the stack pointer, parks one in `T1024T`/`INTIM` while the two are swapped twice
+    a frame, and holds the ball's horizontal direction in the I flag, read back through a collision
+    〔mining 291778 ramless-pong; only the distillation notes are held here〕. **Cited only, not verified**
+    — none of it was built here.
 - **Only the code that races the beam has to be assembly.** SplendidNut's 4K Frogger without flicker, 2024: *"Most of
   the project is written in C. Only the score kernel, the frogs-at-home kernel, and the repositioning
   routines are written in ASM. I'll probably convert the other kernels over to ASM so that I can utilize
@@ -1298,6 +1415,9 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     mirror the other half, and also a shorter table (128 or even 64 bytes for the full sine table)
     might be sufficient."* 〔mining 265153 using-sine-and-cosine〕 Above, a parabola is a path that
     needs no sine; here it is the sine, generated into RAM for some loss of accuracy (our reading).
+    How much loss, for the textbook parabola `4x(π−x)/π²` over a half period (the thread does not say
+    which parabola): at most 0.056 of the peak, near x = 0.15π — about 7 counts at amplitude 127 (our
+    arithmetic, a million-step sweep).
     **Cited only, not verified** — no sine table is generated here.
 - **×2^n on a small signed value = repeated `asl` (no multiply, sign preserved)**: in two's complement `asl` is exactly ×2, so a signed velocity such as BallDY becomes ×2^n with n `asl`s (e.g. the lookahead target = BallRow + 4×BallDY = two `asl`s + one `adc`). But (a) **the result's range widens → bit7 can no longer serve as the sign test** = do clamp/wrap tests on the value range instead (if the extrapolated target maxes out around ~190 the threshold is `cmp #220`; an application of known-traps' "bit7 clamping is not usable"), and (b) an input that overflows into bit7 during the shift (|value| × 2^n ≥ 128) destroys the sign = check the input range first. 〔in-house: PONG ai-variants v3 lookahead 2026-07〕
 - **A BCD score can be compared with `cmp` without decoding**: for a valid packed BCD byte, binary ordering = decimal ordering (the upper nibble dominates) → both `cmp #$11` (first to 11 points) and a ScoreR vs ScoreL comparison are correct as written. But **a binary difference is not a decimal difference** (it inflates by +6 across a digit boundary: $10−$09 = 7) → when the difference is used as a QUANTITY, bucket it with saturation so the coarseness is harmless (v4 rubberband's score difference → error-width modulation). The bit7 sign of a subtraction is valid only while |binary difference| < 128. 〔in-house: PONG ai-variants v4 2026-07〕
@@ -1597,6 +1717,17 @@ These cannot be quantified and need a judgement from Claude, a person, or an ima
   player is the check. **Cited only, not verified.**
 - **Misread letter pairs** (L/I/T · U/W · M/H/N · O/0/D): an author cannot notice their own misreadings = verify with another person or by reading aloud. Hard to mechanise. 〔294306, 326595〕
 - **In 8px monochrome, spend the entire budget on the silhouette**: which part carries the identity is a subject-dependent aesthetic judgement. 〔106110〕
+  - **A second answer: what the object does can matter more than whether it is recognisable.** Manuel Polik, 2001, had tried a
+    train and a stampede for *Gunfight 2600* (*"it all either looked crap or wasn't playable"*,
+    `200109/msg00393`) and could not draw *"some recognisable cattle"* — *"'brown something' blobs"*
+    〔`200110/msg00005`〕. Glenn Saunders: *"the idea isn't to make it recognizable as much as presenting a
+    different gameplay dynamic with some rationalized explanation to make it fit into the theme."* *"The
+    arrows, for instance, are recognizable but they are so big they look like spears.  That's not a
+    criticism, it's okay because we are talking about abstractions here."* *"It's the properties of the
+    objects that mean more than the shape, I think."* 〔`200110/msg00007`〕 Chris Wilkson agreed, recalling
+    *"the HMOVE bars in Soccer"* explained as referees: *"how many people think they look like referees?
+    I don't.  But it doesn't matter.  It's a rational explanation."* 〔`200110/msg00012`〕 Whether to aim
+    at recognition at all is part of the same judgement (our reading). **Cited only, not verified.**
 - **The role split missile/ball = lines, player = areas**: which stack of objects builds one apparent shape is a composition judgement. 〔Davie〕
 - **GameState = one variable + a kernel per state**: a structural pattern, not a numeric test. 〔title-to-game-transition〕
 - **The ISC/ISB illegal opcodes + borrowing SP as a line counter**: a cycle-saving trick. Whether it is usable is backed by litmus measurement (guaranteed by verification, not by code). 〔illegal-opcodes〕
@@ -1648,6 +1779,21 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     remove the timer later."* 〔`200408/msg00056`〕 Freeman and Herbert time the visible kernel, not
     VBLANK; Lee's two-value remark is about his own PAL timers, and the 64-cycle step is the same for
     any `TIM64T` target (our reading). **Cited only, not verified.**
+  - **Budget every routine at its worst case.** Robert Colbert, 1997, whose code to move and schedule
+    five copies of player 0 fits in VBLANK, on why his sort no longer stops early when a pass makes no
+    swaps — he took the flag out *"on purpose"*: *"with the 2600, you need to assume that every routine
+    will execute the WORST-CASE SCENARIO every time, so checking for better than that actually is a
+    waste of time!  If you do check for better than worst-case, you may be in for a surprise later when
+    conditions are such that the worst-case occurs, or worse yet - two of your routines encounter the
+    worst-case in the same frame..."* 〔`199710/msg00111`〕 An early exit shortens only frames that would
+    have fitted anyway (our reading). **Cited only, not verified.**
+  - **Logic that grows while a switch is held shows up as lines.** Kirk Israel, 2004: his game sat in
+    *"a frame-free limbo as reset was being held"*; after looking at what *Joust* does he moved the reset
+    check to the end of the game loop, *"that way the game displays but is frozen til reset is
+    released. The problem is, because it's doing the init code over and over, it pops up to 267
+    scanlines until Reset is released"*. His other options were to start on the press and ignore the
+    hold, or to start a new game on release 〔`200403/msg00125`〕; Rob and Albert Yarusso preferred
+    starting on release 〔`200403/msg00126`, `msg00127`〕. **Cited only, not verified.**
 - **One wrap-around clear loop, reused with 4 seed values for 4 clear extents**: `ClearMem` is a single loop whose start index (X seed) is set 4 ways to wipe 4 regions — one routine, four callers, vs four clear loops. Cheap ROM-thrift for init/reset paths that wipe several ranges. 〔Combat `ClearMem`; comparison §2.8/§7〕
 - **Audit your OWN hand-tuned code for cargo-cult — hand-tuned ≠ optimal, even in a 2K master ROM**: the annotated Combat disassembly honestly inventories its own cruft (a redundant double `STA GRP0`, a stray `WSYNC`, a self-flagged "why not `LDA MVtable+1,Y`?" 2-cycle miss). Model this: keep a written inventory of your ROM's own redundancy rather than assuming your tuned code is tight. (Applied to our clone, this surfaced ~250–400 B of recoverable duplication unrelated to its provability trade.) 〔Combat — Williams' annotations; comparison §7〕
   - **Shipped is not correct either: a real defect can sit where nothing visibly reads it.** ChildOfCv,
@@ -1697,5 +1843,12 @@ A second pass over Combat (1977) through 5 lenses BEYOND round-1's efficiency/st
 
 **AI-nav primitives (PONG-capstone material — from our Combat clone `combat_mine.asm`; the original 2-player Combat has NO AI, so these are authored-new and emulator-verified):**
 - **8-way octant seek from unsigned |dx|,|dy| + sign-first, with a >127px overflow guard.** Derive each axis's sign FIRST by unsigned CMP (a signed 8-bit subtract of two positions overflows once separation exceeds 127px: dx=-132 reads as +124), then form |dx|,|dy| by large-minus-small, then classify: 2·|dy|<|dx| → horizontal / 2·|dx|<|dy| → vertical / else diagonal (the ×2 via ASL+carry also handles 2·|d|>255). Picks one of 8 headings, division-free and overflow-proof on a 160px field. 〔clone `AiDxE`/`AiDyC`/`AiCls`; deep-read harvest 2026-07-23〕
+  - **Twelve headings in thirteen table entries, method unpublished.** Thomas Jentzsch, 2002, on the
+    tank AI of *Robot City*: *"There are 12 possible distance combinations (arranged like the hours on a
+    clock) and each requires special handling.  After some brainstorming I found a surprisingly easy way
+    to convert the distances into 13 indexes, which I could use for table access. That's the code I'm
+    most proud of (only one byte wasted in table!)."* 〔`200208/msg00032`〕 The classifier above picks a
+    heading by compares; his ends in a table read, and how the index is formed is not in the thread.
+    **Cited only, not verified.**
 - **Shortest-arc turn on a power-of-two direction ring.** To rotate toward a target heading the short way on a 16-step wrap ring: diff = (target − current) & $0F; if 0 done; CMP #9 → 1..8 turn CW (INC), 9..15 turn CCW (DEC). One compare picks the correct rotation sense across the wrap with no signed distance and no table. Generalizes via CMP #(N/2+1); rate-limit the turn. 〔clone `AiMove`/`AiCW`/`AiTe`; deep-read harvest 2026-07-23〕
 - **Map-free navigation primitives (four independently-testable behaviors on a bare greedy seeker).** (1) Stall→180° reversal: every 32 frames sample horizontal headway; |Δ|<2px = wedged → about-face (gate OFF where an axis is intentionally frozen, else a legit vertical climb reads as "stuck"). (2) Reactive wall-slide: on wall-contact (CXP1FB) skip accel + rotate one notch + snap velocity to zero, so the heading sweeps off the wall — no normal, no map. (3) Ammo-gate fire-when-aligned: fire only when off-axis error < half a tank height; a hold sets a quick re-check WITHOUT charging the post-shot cooldown (hold ≠ fired). (4) Scatter-decoy target-swap: inside a concave pocket substitute hard-coded exit waypoints for the target (seek core unchanged) with the escape direction LATCHED against mid-corridor oscillation. Grow AI as named, separately-verifiable layers over "walk toward target." 〔clone `AiStk`/`P1Snap`/`AimOK`/`TgtEsc`; deep-read harvest 2026-07-23〕
