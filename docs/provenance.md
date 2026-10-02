@@ -10,20 +10,29 @@ Recording is the strict part (CI-enforced); this list is just the consolidated l
 | `audio-envelope-idioms.md` | **Source:** studied clean-room from the annotated *Combat* disassembly (Roger Williams' `Combat.asm`), deep-read harvest 2026-07-23 〔Combat.asm sound routines: MOTORS / BoomSnd / SNDP〕. These are **reference idioms distilled from the original ROM** (label names + generalized prose only) — *not yet reimplemented / CI-locked* in this harness; standalone demo + scenario = TODO. Complements the three verified audio docs: `sound-effects.md` (frame-table SFX), `sound-driver.md` (music + SFX priority), `music-driver.md` (per-note instrument envelopes). Those are about **driver architecture**; this doc is about **reusing gameplay state as audio state** to get envelopes for zero extra bytes. |
 | `bankswitching.md` | Hardware basis: `litmus_bank` / `_f6` / `_f4` (v0.43.0; hotspots, AUTO fingerprint, per-bank |
 | `bitmap48.md` | Lineage: RevEng's Bitmap Minikernel (AtariAge topic/168603) — "point the six score pointers at |
+| `blank-a-frame.md` | Hardware basis: **not measured here.** The only evidence in this repository is a 1999 report from |
+| `branch-always.md` | Hardware basis: **`litmus_6502`, pinned by regression** — not by its comments. The ROM saves each |
 | `divtable.md` | Source studied: `reference/atariage/113254-fast-divide-by-seven/notes.ja.md` (Apple Assembly Line |
 | `dynamic-multisprite.md` | **Source:** clean-room synthesis of standard 2600 multi-sprite / flicker-sort practice (AtariAge topic 107063 *interlacing-multi-sprites*; bB multisprite kernel as seen in Pizza Boy) extending technique #10; hardware-grounded + CI-locked by `scenarios/dyn_multisprite.json`. |
+| `flicker-collision-attribution.md` | **Source:** Stella mailing list, four messages from **2000-05 to 2004-12** (`200005/msg00038` Mark De Smet, `200005/msg00043` Piero Cavina, `200007/msg00140` Thomas Jentzsch, `200412/msg00026` Nick Bensema). ★This line said *"eight years apart"* until 2026-09-06; the dates are in the archive and the span is **4.6 years**. A number that the document's own citations can settle should not be written out — write the endpoints and let the reader subtract. |
 | `flicker-multiplexing.md` | Learned from (clean-room): `multisprite2/3.asm` discussions (8bitworkshop), AtariAge flicker |
 | `game-states.md` | New hardware verification: `litmus_swchb` + `scenarios/swchb.json` — **SWCHB read side verified** |
+| `hmove-slope.md` | **Source:** the situation and the idea come from the Fishing Derby entry in `docs/casebook.md` |
 | `hmove-two-step.md` | **Source:** in-house invention, PONG fly-off work 2026-07-02 (session fa891501). Budget wall measured |
 | `hscroll.md` | (`reference/2600-technique-sources/sidescroll/`). |
+| `input-budget.md` | Hardware basis: `litmus_paddle` (v0.54.0; INPT0 dump/charge transfer curve measured) · |
+| `invisible-probe.md` | Hardware basis: **the hiding is not measured here.** The priority chain below is read from the |
 | `kernel-micro-idioms.md` | **Source:** studied clean-room from the annotated *Combat* disassembly (Roger Williams' `Combat.asm`), deep-read harvest 2026-07-23 〔Combat.asm kernel + movement + score routines〕. **Reference idioms** (label names + generalized prose only) — *not yet reimplemented / CI-locked*; standalone demo + scenario = TODO. Each is an instruction-level packing / aliasing / branchless trick that saves cycles or bytes in the tightest loops. |
 | `maze.md` | **Source:** mined from AtariAge topic 296383 (US Games *Entombed* maze-generation investigation; |
 | `missiles-bullets.md` | New hardware verification: `litmus_resmp` + `scenarios/resmp.json`. |
 | `multicolor48.md` | Lineage: AtariAge topic/209137 (SeaGtGruff's 76-cycle multicolor 48px kernel) laid on top of the |
 | `music-driver.md` | demos use, distilled clean-room from **TIATracker** (kylearan, forums.atariage.com/topic/250014; |
+| `nusiz-shaping.md` | **Source:** the situation and the idea come from the Fishing Derby entry in `docs/casebook.md` |
 | `paddle.md` | Hardware basis: `litmus_paddle` (v0.54.0; INPT0 dump/charge transfer curve measured). |
 | `pf-modes.md` | Learned from (clean-room): Stella Programmer's Guide CTRLPF; spiceware Step 7. Demo: |
+| `pitch-dither.md` | **Source:** in-house, 2026-08-09, reproducing Satoshi Tomiie's "Bassline" — the record's key |
 | `procedural.md` | Hardware basis: `litmus_lfsr` (v0.46.0; period 255, never-zero, `eor #$8E` taps verified). |
+| `restrobe-copies.md` | **Source:** `reference/atariage/180632-32-character-text-display` records solidcorp's 2011 |
 | `road.md` | **Source:** clean-room re-implementation studying the 8bitworkshop `road.asm` (Steven Hugg, |
 | `rpgmap.md` | (`reference/2600-technique-sources/za2600/`, recovered from the legacy ATARI AR folder). |
 | `rts-dispatch.md` | Distilled notes: `reference/atariage/313777-modular-kernel/notes.ja.md`. |
@@ -32,12 +41,13 @@ Recording is the strict part (CI-enforced); this list is just the consolidated l
 | `sound-driver.md` | **Source:** standard 2600 music+SFX driver architecture; hardware basis `litmus_audio`, tuning math in `pkg/audio`; cf. `music-driver.md` (TIATracker, AtariAge topic 250014). |
 | `sound-effects.md` | **Source:** standard frame-table SFX pattern; hardware basis `litmus_audio` (AUDC/AUDF/AUDV), tables generated by `pkg/audio` helpers. |
 | `sprite-animation.md` | Learned from (clean-room, ideas only — implementation is our own): Darrell Spice Jr., |
+| `sprite-placement.md` | **Source:** measured here 2026-08-21 while fitting a 12 px letterform onto the 2600 for a piece in |
 | `subpixel-velocity.md` | **Origin.** 8bitworkshop `brickgame` DDA; the identical idiom is the fraction-then-carry propagation |
 | `text12.md` | using the same hardware-verified 48px VDEL 6-store choreography as the score kernel — with a |
 | `text24.md` | (`reference/2600-technique-sources/za2600/`); this is the supercat "two groups" realization |
 | `tia-pcm.md` | (`log2(31) = 4.95` bit). Source: seagtgruff / Tjoppen / batari, AtariAge thread |
 | `two-line-kernel.md` | Learned from (clean-room): Darrell Spice Jr. *Let's Make a Game* Step 4; `multisprite.inc` |
-| `venetian-blinds.md` | ("blinds") at half vertical density. Bob Whitehead built *Video Chess* (1979) on this — 32 pieces |
+| `venetian-blinds.md` | Learned from (clean-room): Video Chess analyses, AtariAge history threads. Demo: |
 | `vertical-positioning.md` | Learned from (clean-room, ideas only): Darrell Spice Jr. *Let's Make a Game* Step 5; the |
 | `zone-multiplexing.md` | DaveC's `landscape.asm` (AtariAge; `reference/files-dave/`) and the 8bitworkshop multisprite kernels |
 

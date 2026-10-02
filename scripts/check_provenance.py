@@ -77,15 +77,58 @@ def rel(p):
     return os.path.relpath(p, HARNESS)
 
 
+# The labels a technique page uses to OPEN its provenance line — the words before the colon in
+# "Hardware basis: `litmus_bank` …", "**Source:** …", "Learned from (clean-room): …",
+# "**Origin.** …". The vocabulary is read off the pages themselves (every leading "Label:" on the
+# technique pages was counted; these are the ones that introduce where a technique came from), not
+# invented here. "**Status:** ✅ measured … `litmus_…`" is a second, weaker tier: it says what
+# verified a technique, not where it came from, and every page that has a Status line with a marker
+# also has a Source line further down — so Status is taken only when no origin label is found.
+#
+# Why the index needs them (found 2026-10-02 by regenerating `--list` and diffing it against the
+# committed file): the first line anywhere that matches MARKERS used to win. That held while the
+# pages were short. Then the mailing-list distillation added quotations near the top of many pages,
+# and a quotation ends in 〔…〕 — a marker — so the index row for bankswitching.md became the
+# middle of a 1983 IEEE Spectrum quote ("would have cost only 50 cents …") instead of its
+# "Hardware basis:" line. Measured on the pages of that day, the old rule and this one disagree on
+# eight: four more existing rows that would have become quotation fragments (flicker-multiplexing,
+# rts-dispatch, score-kernel, subpixel-velocity), two pages new to the index that would have entered
+# mid-paragraph (branch-always, invisible-probe), and venetian-blinds, whose row had always been a
+# prose line that matched only on the name "Whitehead" and is now its "Learned from" line. A cited
+# quotation is evidence for one sentence; the labelled line is the page's statement of where the
+# technique comes from.
+def _label(words):
+    return re.compile(
+        r"^[>\s*_-]*"                   # blockquote, list bullet, emphasis
+        r"(?:" + words + r")"
+        r"(?:\s*\([^)]*\))?"            # "Learned from (clean-room, ideas only):"
+        r"\s*\**\s*[:.]",               # "Status:", "**Source:**", "**Origin.**"
+        re.IGNORECASE,
+    )
+
+
+ORIGIN_LABEL = _label(r"source(?: studied)?|hardware basis|new hardware verification|foundation|"
+                      r"lineage|learned from|origin|distilled notes")
+STATUS_LABEL = _label(r"status")
+
+
 def first_marker_line(path):
-    """Return the first line that states provenance (the short source sentence, for the index)."""
+    """Return the line that states provenance (the short source sentence, for the index).
+
+    In order: the first line that OPENS with an origin label and itself carries a marker; else the
+    first such line opening with "Status:"; else the first line carrying any marker — the old rule,
+    kept so that a page written before the labels still gets a row rather than a dash."""
     try:
         with open(path, encoding="utf-8") as f:
-            for line in f:
-                if MARKERS.search(line):
-                    return line.strip().lstrip("# ").strip()
+            lines = f.read().split("\n")
     except OSError:
-        pass
+        return ""
+    for label in (ORIGIN_LABEL, STATUS_LABEL, None):
+        for line in lines:
+            if label is not None and not label.match(line):
+                continue
+            if MARKERS.search(line):
+                return line.strip().lstrip("# ").strip()
     return ""
 
 
