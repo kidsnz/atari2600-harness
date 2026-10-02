@@ -36,8 +36,9 @@ import "testing"
 // only exist after macro expansion.
 //
 // The third option is the one this test measures: Jim Nitchals, 199704, "if you need to delay for
-// 7 cycles, a PHP/PLP is a code-compact way to do it." Measured here at 7 cycles in two bytes,
-// restoring every flag and touching no address outside the stack.
+// 7 cycles, a PHP/PLP is a code-compact way to do it." Measured here at 7 cycles, restoring every
+// flag and leaving A, X and Y alone. Its only data access is the stack (PHP writes it, PLP reads it,
+// per the engine's cpu.go); this test does not watch the bus, so that part is not measured.
 func TestSpendingAnOddNumberOfCyclesHasThreeAnswersAndTwoAreTraps(t *testing.T) {
 	e, err := New("NTSC")
 	if err != nil {
@@ -77,7 +78,7 @@ func TestSpendingAnOddNumberOfCyclesHasThreeAnswersAndTwoAreTraps(t *testing.T) 
 		{"php", 0x02, 3, ""},
 		{"plp", 0x03, 4, ""},
 		{"php/plp", 0x04, 7,
-			"the odd delay that is legal AND touches no address: two bytes, seven cycles"},
+			"the legal odd delay, two bytes, seven cycles, whose only data access is the stack"},
 		{"ds 2,$EA", 0x07, 4, "the even baseline this repository already uses"},
 	} {
 		if got := cy(tc.addr); got != tc.want {

@@ -35,7 +35,7 @@
 ;       $81  cycles for `bit $00`   (want 3)
 ;       $82  cycles for `php`       (want 3)
 ;       $83  cycles for `plp`       (want 4)
-;       $84  cycles for `php/plp`   (want 7 — the odd delay, legal, no address touched)
+;       $84  cycles for `php/plp`   (want 7 — the odd delay, legal, touches only the stack)
 ;       $85  flags after php/plp round-trip, want the same byte that went in ($B5)
 ;       $86  1 if A, X and Y survived php/plp unchanged
 ;       $87  cycles for `ds 2,$EA`  (want 4 — the even baseline this repository already uses)

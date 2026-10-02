@@ -85,8 +85,11 @@ func TestMnemonicStormThreshold(t *testing.T) {
 //
 // DASM reads the first field of an unindented line as a label, so `lda #0` in column 1 becomes the
 // label `lda` and the mnemonic `#0`. Measured 2026-09-07: one error, and the token begins with `#`.
-// That leading character is the whole rule — an immediate or an address can only reach the mnemonic
-// position if the field before it was eaten as a label.
+// A value in the mnemonic position has two causes, not one (corrected 2026-09-29; see
+// operandAsMnemonicHint): the field before it was eaten as a label because the line starts in
+// column 1, or it is the first field of an indented data row that lost its `.byte` (`\t$AA` gives
+// `Unknown Mnemonic '$AA'`). DASM's output does not tell them apart, so the cases below require the
+// hint to name the `.byte` cause too.
 func TestOneUnindentedInstructionNamesItsOwnCause(t *testing.T) {
 	cases := []struct {
 		name string

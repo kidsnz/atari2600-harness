@@ -9,7 +9,7 @@
     { "at_frame": 2, "field": "ram.0x82", "op": "==", "value": 134, "note": "php = 3 cy" },
     { "at_frame": 2, "field": "ram.0x83", "op": "==", "value": 135, "note": "plp = 4 cy" },
     { "at_frame": 2, "field": "ram.0x84", "op": "==", "value": 138,
-      "note": "php/plp = 7 cy — the legal odd delay that touches no address" },
+      "note": "php/plp = 7 cy — the legal odd delay; it reads and writes only the stack" },
     { "at_frame": 2, "field": "ram.0x87", "op": "==", "value": 135, "note": "ds 2,$EA = 4 cy" },
     { "at_frame": 2, "field": "ram.0x85", "op": "==", "value": 181,
       "note": "$B5 round-trips through plp/php unchanged: every flag restored" },
