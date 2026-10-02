@@ -92,7 +92,7 @@ NextFrame:
         sta VSYNC
         sta WSYNC
         sta WSYNC
-        sta WSYNC          ; @lines 2 — vblank-top setup (shadow clear + BCD score increment) spans 2 scanlines; verified stable 262
+        sta WSYNC          ; @lines 2 — vblank-top setup (shadow clear + BCD score increment) spans 2 scanlines; copied from score6, but THIS frame is 269 lines, not 262 (see header)
         lda #0
         sta VSYNC
         lda #2
@@ -169,7 +169,7 @@ VB:     sta WSYNC
         ; --- スコア 8 行（6-store 振付・ストア完了 55/58/61/64cy） ---
         lda #7
         sta row
-Krow:   sta WSYNC          ; @lines 2 — last kernel line + sprite-clear cleanup span 2 visible lines; verified stable 262
+Krow:   sta WSYNC          ; @lines 2 — score6's annotation, kept as the bait: here EVERY Krow line overruns into a second scanline, and the frame is 269 lines, not 262 (see header)
         ldy row             ; 3
         lda (p0),y          ; 8
         sta GRP0            ; 11  B0→P0新

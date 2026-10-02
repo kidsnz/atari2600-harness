@@ -87,7 +87,7 @@ NextFrame:
         sta VSYNC
         sta WSYNC
         sta WSYNC
-        sta WSYNC          ; @lines 2 — vblank-top setup spans 2 scanlines; verified stable 262
+        sta WSYNC          ; @lines 2 — not this region's length: it runs 36 cy (1 line) to SetXPos's WSYNC; the frame's 2 extra lines are SetXPos calls with input >= 90 (docs/techniques/shared-setxpos.md), and the prover refuses this region (call inside loop body); verified stable 262
         lda #0
         sta VSYNC
         lda #2

@@ -108,7 +108,7 @@ VBwait: lda INTIM
         sta RESP1
         lda #$10
         sta HMP1
-        sta WSYNC          ; @lines 2 — coarse-position setup region spans 2 scanlines; verified stable 262
+        sta WSYNC          ; @lines 2 — HMOVE line + TextLine's pointer setup span 2 scanlines (83 cy); verified stable 262
         sta HMOVE
         ds 12, $EA          ; SLEEP 24
         sta HMCLR
