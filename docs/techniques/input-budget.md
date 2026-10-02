@@ -29,6 +29,14 @@ one as *"which device, and what it forecloses"*. `paddle.md` describes the paddl
 detail and this page describes the budget; **until now neither said that picking one costs an axis**.
 Found by the mailing-list distillation (helper-2).
 
+★**Packing the lines into a code costs the same thing from the other side.** grafixbmp, 2009, proposed
+reading a stick's four direction lines as a 4-bit number — up+down and left+right never close together
+in practice, so each player's nibble could carry 0–15. Thomas Jentzsch's objection: sixteen separate
+actions can be defined that way, but they can no longer be combined — on a sixteen-button controller,
+two keys pressed at once would read as one of the sixteen 〔AtariAge `topic/149883`; held here as
+distilled notes, not the posts' text〕. A device spends axes when it is chosen; a code spends
+simultaneity when it is designed. **Cited only, not verified.**
+
 ## Where the cost lands
 
 | device | read shape | cost | where it lands |
@@ -61,6 +69,14 @@ against the joystick's 40–44 — **35× to 77×** — and an NTSC frame holds 
 cycles in total. So the paddle spends **8–15% of the whole frame**, and it spends it in the one
 region that has no slack. The joystick spends 0.2%, in the region that does.
 
+**The keypad row also has an ordering from the list** (its 400 µs number is below). grafixbmp, 2011,
+ranked devices by the coding they take: joysticks *"minimal coding"*; paddles *"moderate to
+considerable coding depending on amount used. Difficult because of time it takes for caps to discharge"*; keypads *"average to moderate
+coding Cross-reading the buttons take some time to process"*; driving controllers *"Average coding.
+Doing more than standard joysticks but quicker than paddles"*; Sega Genesis pads *"minimal coding,
+quite similar to joysticks"* 〔AtariAge `topic/177790`〕. It ranks effort, not cycles, and has no
+trackball entry. **Cited only, not verified.**
+
 ## What that forces
 
 - **The joystick is the default not because it is simplest but because its cost is once.** A
@@ -69,6 +85,14 @@ region that has no slack. The joystick spends 0.2%, in the region that does.
 - **A paddle game's kernel is designed around the paddle**, not the other way round: `paddle.md`
   measures 0 / 63 / 170 lines for three positions, which is the count *being* the value — the
   kernel cannot also be doing something expensive on those lines.
+  Thomas Jentzsch, 2004, gives a reason that is not the budget: *"The time intervall between those
+  checks should be (almost) identical, else the control will become "strange". Only because the
+  kernel usually provides those constant time intervalls for a quite long time, the paddle checks are
+  always(?) done inside the kernel."* Asked whether VBLANK would do: *"Only if you need only very few
+  different values and are able to poll the hardware registers in constant intervalls."* In the same
+  thread Christopher Tumber read four paddles in overscan for Quadraside with *"something like 13
+  paddle positions"* 〔stella-list `200402/msg00230`, `200402/msg00238`〕. The trackball paragraph below
+  records the opposite finding for the trackball. **Cited only, not verified.**
 - **Devices that need continuous sampling do not fit.** The list said so in 1997 with a consequence
   rather than an argument: *"there are no perportional trakball games. It's too hard to constantly
   read a trakball, which is why the Atari trakballs have a joystick emulation mode"* — the trackball
@@ -91,6 +115,13 @@ region that has no slack. The joystick spends 0.2%, in the region that does.
   of sixteen keys is down, and multi-tap needs only *one key at a time plus whether it changed*. The
   design does not make the read cheaper — it makes the answer smaller. That is the shape to look for
   whenever a device's cost is in resolution: **spend the resolution on time instead of on the read.**
+  ★★★★★**The list had the scheme three years earlier, with a variant that spends the console
+  instead.** crackers, 1997, laid a keypad out like a telephone — *"Press the key once for the number,
+  twice for the first letter, three times for the second letter, and four times for the third
+  letter"*, with `#` as SPACE and `*` as ENTER — and then: *"Or if that's too much button pressing then
+  use the select and reset switches for space and enter"*, over a layout with fewer letters to a key
+  〔`199709/msg00327`〕. Both variants still need the keypad; the second moves two of its jobs onto
+  console switches. **Cited only, not verified.**
 
   ★**The trackball half has a second source from 2015, and a witness against it.** Crispy:
   *"Polling the trackball requires a huge amount of CPU time. In order to get an accurate picture of
@@ -110,6 +141,17 @@ region that has no slack. The joystick spends 0.2%, in the region that does.
 **snapshot the inputs once per frame and compare against the previous frame** — edges, not levels.
 That converts a device read into a fixed per-frame cost and keeps hold-to-repeat bugs out. It is
 also why the joystick's 40–44 cycles is the *whole* cost and not a per-line one.
+
+★**An edge has a cost the level did not: the player cannot see it.** Glenn Saunders, 2003, on *Death
+Derby*, where a joystick on a Y-cable adapter sets the gear alongside a driving controller: *"Tap
+forward to kick the car into forward gear, tap back to go into reverse. A visual cue is important
+since I don't want to force people to hold the joystick forward or back to stay in forward or reverse
+gear. The joystick is just a latched toggle switch. So I need something in the score to indicate
+that. If I had used the difficulty switches, I wouldn't need the indicators as much, at least if you
+were using a six-switcher ;)"*; that build showed the gear by *"toggling the blocks in the corners of
+the screen"* 〔stella-list `200302/msg00212`〕. Held, the state is in the player's hand; latched on an
+edge, it is in RAM and has to be drawn; on a console switch, it is on the machine (our reading). So
+the read shape can cost picture as well as cycles. **Cited only, not verified.**
 
 ## Not measured here (deliberately marked)
 
@@ -167,6 +209,21 @@ also why the joystick's 40–44 cycles is the *whole* cost and not a per-line on
   costs do not transfer. (Corrected 2026-09-04 — helper-1 caught the category error and supplied the
   earlier source: Eckhard Stolberg, 2000-08-14, two years before the wiring diagrams this file
   originally cited.)
+- **The trackball's ⬜ is a third kind.** `controllers/` has no trackball either
+  (`ls Gopher2600/hardware/peripherals/controllers/` → `doc.go gamepad.go keypad.go paddle.go stick.go`):
+  the keypad's ⬜ is a measurement not yet taken on a peripheral the engine has, the trackball's cannot
+  be taken here at all. And *the trackball* is more than one device. Eckhard Stolberg, 1999, reported
+  a CX80 (triangular buttons) working as an Atari ST mouse, *"while the round button versions are not.
+  I wonder why Atari changed the protocol between the two models"* 〔stella-list `199902/msg00012`〕.
+  Bob Colbert's round-button unit had worked under neither the ST nor the Amiga setting of his
+  Stell-A-Sketch, which he wrote before having a trackball: *"It is a simple matter of using a
+  different lookup table to get each device to work"* 〔`199902/msg00009`〕. Asked whether it had been
+  in trak-ball mode: *"Yes, absolutely sure. I used to have a program that I used to determine what
+  the code was for each device and determined that the trackball was indeed different from the ST
+  mouse"* 〔`199902/msg00022`〕. On fitting one into an existing kernel: Oliver Scholz, 2001, having
+  dumped and disassembled Missile Command, patched it for the trackball — *"the kernel is pretty much
+  exhausted, and the few areas where there is space to insert something, are insufficient for smooth
+  motion. It worked though"* 〔`200110/msg00525`〕. **Cited only, not verified.**
 
 
 ---
@@ -214,6 +271,19 @@ button, the beam will require a fraction of a second to recover before it can be
 on the **release** edge, gating the next press. **Cited only, not verified** — the ROM was not run, and
 the thread does not say how it counts the recovery.
 
+★★★★★**Where the counter starts matters as much as its two numbers.** B. Watson posted *Poker
+Solitaire* in 2001 with *"Joystick movement is a little wonky"*; Roger Williams: *"You need to reset
+the debounce counter at the moment the joystick is pushed in a new direction. Right now you're just
+keying in to a slow background counter and the initial reaction could occur immediately or after a
+time interval, depending. (Fire button also seems to have this defect, it should respond immediately
+regardless of the background debounce timer's state.)"* 〔stella-list `200111/msg00224`〕. A week later
+Watson's to-do list still read *"Joystick & trigger debounce, instead of blindly ignoring them for 15
+frames between reads"* 〔`200111/msg00382`〕. `litmus_autorepeat.asm` starts its counter on the press —
+it steps and loads `DELAY` on the edge (read from the source). `autorepeat_test.go` presses at one
+fixed frame, so it does not show that the first step is independent of the counter's phase, which is
+what Williams was pointing at; it has one button, so a counter shared by four directions is not
+exercised either. **Not verified.**
+
 ## The keypad read, as one routine (2026-09-30)
 
 The sections above price the keypad's wait; this is the read itself, from a 2012 routine
@@ -252,6 +322,19 @@ reverse. That is the same looseness this engine shows (`litmus_swacnt` band 5, a
 not verified** — the thread is held here as distilled notes, not its text; the routine was not run, and
 the `SWACNT` setup that makes the nibble an output is not part of it.
 
+**The list's first keypad read was a question, and what stopped it was `VBLANK`.** John Matthews,
+October 1996 — the month the archive held here begins — *"roughly, and I don't know that
+this is right"*: *"Set Port A to output / Put a #$10 in SwchA (checks row 1) / Wait a while (400 usec)
+/ Get values of Inpt0, Input1, Input4 / Draw Screen / Repeat with #$20, #$40, and #$80 to check rows
+2, 3, 4 respectively"* 〔stella-list `199610/msg00035`〕. His row values set one bit; the routine above
+clears one. Three days later he *"can't seem to get the timing right or something"*
+〔`199610/msg00038`〕, and two days after that he had found part of it: borrowed code *"still was
+writing a 1 to D7 of VBlank. This was dumping Inpt0, Inpt1, Inpt2, Inpt3 to ground and thus I
+couldn't read them properly"*; with that fixed, *"I am getting a reaction from columns 1 and 2"*
+〔`199610/msg00039`〕. Two of the keypad's three columns are read on inputs that the paddle's dump bit
+grounds, so a frame that keeps `VBLANK = $82` through blanking (`paddle.md`) cannot read them there —
+derived, Not verified. The rest is **Cited only, not verified.**
+
 ## A port as a serial line (2026-09-30)
 
 `fundamentals-audit.md` records the send side (a dumper that talks serial out of a joystick port). The
@@ -272,6 +355,13 @@ The same ports carry the AtariVox and SaveKey (I2C EEPROMs on a controller port)
 utility drives one on each port at once — the source in the left port, the destination in the right
 〔AtariAge `topic/332726`〕. **Cited only, not verified.**
 
+Here the direction of each line set how many consoles one cable could join. hornpipe2, 2009, linking 2600s
+through the joystick ports, used a protocol for — in theory — up to four consoles both ways,
+demonstrated with two: FIRE cannot take part because it is input-only, which leaves four digital
+lines and so at most four consoles. batari, in the same thread: one-way should work, and a two-way
+link has to watch for contention where one line serves as input and output 〔AtariAge `topic/153150`;
+held here as distilled notes, not the posts' text〕. **Cited only, not verified.**
+
 ## When the players multiply, the cost leaves the read (2026-09-30)
 
 Thomas Jentzsch's *Pac-Line Panic* (2024, 4K) takes up to eight players at once — *"up to 8 players
@@ -285,3 +375,97 @@ are identical for all eight rows"*, animation derived from position instead of s
 position value meaning "not shown" instead of a status bit. So a multi-player design is budgeted first
 in **bytes per player × players**, and only then in cycles per read. **Cited only, not verified** — the
 byte counts are his; nothing here was built.
+
+## The driving controller's read (2026-10-02)
+
+The table has no row for it; *Not measured here* above says why it is cheap — a Gray code in two
+`SWCHA` bits, read once a frame. What it gives up is resolution. Lee Fastenau, 2004, adding it to
+*Reflex*: *"It is not a potentiometer, but a series of switches with a very low resolution (only 16
+updates per full rotation). This was unacceptably slow in my first implementation, so I now detect if
+there was movement in the last frame and then multiply the current movement by two if there was."*
+〔stella-list `200404/msg00426`〕
+
+Decoding the two bits, Thomas Jentzsch, 2001, in three steps 〔`200110/msg00480`〕: let a table hold
+the value expected *next* for a left turn and another for a right turn, and compare the reading with
+both; notice that *"the right table values are the left values EOR %11"*, so one table serves, with
+`eor` in place of `cmp` before `beq`; then drop the table:
+
+```
+        lda SWCHA
+        and #%00000011      ; missing from the post; his correction, 200111/msg00133
+        tay
+        eor last            ; 01 or 10 (else: abrupt twist)
+        sty last
+        dey                 ; -> y = -1..2
+        cpy #2
+        sbc #1              ; -> a = -1, 0, 1
+        beq .right
+.left:
+```
+
+His own caveats: *"very hard to explain"*, *"comes very close to the optimum"*, *"You need some
+additional code here to recognize abrupt twists of the wheel"*, and *"I haven't tested the code"*. On
+8 November he explained it — `cpy #2` is unsigned, so `-1` sets the carry as well as `+2`, and the
+result is 0 on every right-turn step and ±1 on every left-turn step 〔`200111/msg00102`〕 — and on 9
+November he posted the missing mask 〔`200111/msg00133`〕. The 0 / ±1 table was recomputed here in
+Python over his eight transitions (left 00→01→11→10, right 00→10→11→01): the arithmetic, not a run on
+the 6507. The mask keeps the right port's two bits; for the left port, shift `SWCHA` down four first,
+as Eckhard Stolberg's version of the read does 〔`200110/msg00472`; Jentzsch points to it in
+`200110/msg00484`〕. **Cited only, not verified.**
+
+## A second button, and telling pads apart (2026-10-02)
+
+A Sega Genesis (Mega Drive) pad gives the 2600 two buttons with no rewiring: B reads on `INPT4`, where
+the stick's fire button is, and C on `INPT1`; reveng's 2010 proof of concept paints one colour per
+button 〔AtariAge `topic/158597`; held here as distilled notes of the opening post only〕. The engine's
+`Gopher2600/hardware/peripherals/controllers/gamepad.go` models that device: on the left port it
+writes the button to `INPT4` and the second button to `INPT1`, and holds `INPT0` high while plugged
+(read from the source, not run). reveng again, 2011: a Genesis pad *"+ one 10 cent pull-up resistor
+can get you 4 buttons too , maybe even 7"* 〔AtariAge `topic/177790`〕. **Cited only, not verified.**
+
+The Booster Grip's two buttons also sit on the paddle inputs (Omega Race reads them on `INPT0` and
+`INPT1`, `kernel-micro-idioms.md`), and are read far less often than a paddle. Glenn Saunders, 2004,
+arguing that four driving controllers would disturb Indy 500's kernel less than paddles, counted *"the
+booster grip stuff which as Thomas explained a while back only involves polling the pot lines at the
+very top and bottom of the screen which doesn't add much overhead"* 〔stella-list `200402/msg00228`〕 —
+Jentzsch's explanation at second hand. **Cited only, not verified.**
+
+Telling which pad is plugged in can rest on a state a normal stick does not produce. dionoid, 2020: a
+Hyperkin Ranger gamepad, for a short time after power reaches it, shows all four of the left stick's
+direction switches closed, and the check run at start-up is `lda SWCHA / and #%11110000 /
+beq RangerGamepad_detected`. The same state has a side effect: in Pitfall! the timer can start
+counting down at once 〔AtariAge `topic/304283`; held here as distilled notes〕. `paddle.md` (*Paddle or
+joystick, detected at power-on*) makes the same move on the paddle lines, with the Genesis pad as its
+trap. This one cannot be tried here: the engine will not produce opposing directions
+(`known-traps.md`, *Opposing joystick directions cannot be tested here at all*). **Cited only, not
+verified.**
+
+## One device per port (2026-10-02)
+
+The two ports need not hold the same device. Asked by krayt88, 2008, whether one player could use a
+joystick and another a paddle, seagtgruff: *"As long as one type of controller is plugged into one port, and
+the other type of controller is plugged into the other port, and you know which type of controller is
+plugged into which port, you can read each port separately"* — and since paddles come in pairs, *"three
+players-- one player with a joystick, and two players with paddles"* 〔AtariAge `topic/119959`〕. *"You
+know which type"* is the condition; `paddle.md`'s power-on check is one way to meet it. An example in a
+prototype: Starpath's unfinished *Sweat!*, per PatMan, 2001 — *"you use the paddles on the left
+controller input to select the event, and the joystick on the right in the same manner as Activision
+Decathalon"* 〔stella-list `200106/msg00017`〕. By the table above the two reads land in different
+places, the joystick's in VBLANK and the paddle's across the visible lines; neither post says how the
+two were scheduled, or whether *Sweat!* reads both in one frame. **Cited only, not verified.**
+
+## A read that takes the whole picture (2026-10-02)
+
+A light gun prices its read in picture rather than cycles. Colin Hughes, 1999, on how light guns
+work: *"The whole screen flashes white for a frame, and you get a hit when the beam update hits the
+part of the screen that the gun is pointing at. ( If you have a light background you can sometimes get
+away without a flash ) Simply count cycles and scanlines to work out the position... On the VCS you'd
+be better of with the flash option - as you don't need to maintain a screen kernal for that frame -
+allowing better accuracy for the gun."* 〔stella-list `199905/msg00052`〕 That is advice, not a 2600
+build, and the same thread described the NES's Duck Hunt differently: *"The whole screen in Duck Hunt
+(at least the blue background) flashes for a frame, and then the white boxes appear around the ducks
+for a frame or two"* 〔`199905/msg00056`〕. The next day Eckhard Stolberg posted a VCS test program built
+on Sentinel's gun-detection code: *"The Vertical resolution can be extended to 190, but horizontally
+53 positions is all you can do."* 〔`199906/msg00030`〕 `known-traps.md` (*A light gun on an LCD*) has the
+2017 CRT method — a black frame, then a white square per target — and its failure on LCDs. The engine
+has no light gun (`controllers/`, above). **Cited only, not verified.**
