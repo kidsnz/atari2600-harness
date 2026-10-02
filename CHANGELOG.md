@@ -6,6 +6,34 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — the build refuses DASM's silent failures; the generated indexes are rebuilt (2026-10-02)
+
+Each was fixed by one writer and checked by a separate reviewer.
+
+- **`internal/build` now fails four DASM runs that exit 0 with an incomplete result**: an `incbin` it
+  cannot open (a 4096-byte ROM with the data missing), a missing source (0 bytes), a missing include
+  that is never used, and a `SEG.U` left open (0 bytes). `Assemble` and `AssembleWithListing` both
+  check; `AssembleWithListing` also gains the `diagnosedFailure` check `Assemble` already had. The new
+  tests fail all eight bad cases on the old code. No false failure across the harness's 211 sources
+  and the 155 the works' scenarios use. `known-traps.md` and `capability-gap-audit.md` follow.
+- **`docs/mining-digest.md` is regenerated from today's corpus, in English**: 2,219 threads and 155
+  dev-blog entries, with titles from the forum index where the mined title was Japanese or cut short,
+  and feeds mapped to English section names. The generator refuses to write Japanese or an unmapped
+  section.
+- **`docs/provenance.md` lists every technique page (44; `roadmap.md`, the index of them, is left out as before)** and picks each page's line by its origin heading
+  (Source, Hardware basis, ...) before falling back to the first marker, so no row got worse than the
+  committed table. The check mode's output is unchanged.
+- `litmus_jsr_stack.asm` named $0B `REFP1`; it is `REFP0`, as intended. Same bytes.
+- PHP/PLP touches the stack, not "no address" (`known-traps.md`, the oddsleep test, scenario note and
+  litmus comment); only what the test measures is marked measured. `mnemonicstorm_test.go`'s comment
+  now gives both causes of a value in the mnemonic column.
+- The seven `@lines 2` comments now say why each region is allowed two lines (comments only; same
+  bytes and the same prover results).
+
+Found, not fixed here: `hscroll` and `two_line_vdel` are allowed two lines where they take one, so a copy
+that really overflows still passes the prover. `roms/260816_transistor/transistor2x.asm` (outside every
+scenario) was building with two includes missing and now fails.
+
 ### Fixed — the rest of the errors found while landing (2026-10-01)
 
 Each was fixed by one writer and checked by a separate reviewer; the code changes were shown failing
