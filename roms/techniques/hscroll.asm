@@ -42,7 +42,7 @@ NextFrame:
         sta VSYNC
         sta WSYNC
         sta WSYNC
-        sta WSYNC          ; @lines 2 — the region is ONE line on the machine (scroll path 76 cy); the 2 absorbs the prover's 79, which adds a page-cross cycle to each ScrPF load, and so also passes a scroll path 2 cy longer that makes 263-line frames; verified stable 262
+        sta WSYNC          ; @lines 1 — 76 cy on the machine (scroll path), so ONE line. The prover says 79 and refuses it: X comes from RAM on the no-scroll path, so it charges a page-cross cycle to each ScrPFn,x load, and the tables ($F076-$F08D) cross no page. A two-line allowance here also passed a scroll path 2 cy longer, which renders 263-line frames; verified stable 262
         lda #0
         sta VSYNC
         lda #2

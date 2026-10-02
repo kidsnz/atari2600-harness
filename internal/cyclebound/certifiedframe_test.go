@@ -45,7 +45,10 @@ func frameLines(t *testing.T, bin string) int {
 // That is a property of the instrument. The question this test answers is whether anything in the
 // technique catalogue has actually fallen into it. Measured 2026-09-07: **it has not.** Of 31
 // technique ROMs, 15 certify and every one of those renders exactly 262 lines; the other 16 do not
-// certify, which is a separate matter and not this test's business.
+// certify, which is a separate matter and not this test's business. Read that 262 for what it is:
+// twelve frames, no input. `sfx_demo` certifies and renders 263-line frames while a sound effect
+// plays, which this sweep never presses fire to see (knownSlack in twolineregion_test.go); and from
+// 2026-10-02 13 certify, not 15 (TestCertifiedTechniqueKernels).
 //
 // The zero is guarded by the overrun litmus: swept alongside the catalogue it must be counted, or
 // this test is a sweep that cannot find anything. A clean sweep and a broken sweep look identical

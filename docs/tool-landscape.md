@@ -81,7 +81,9 @@ This repository checks per WSYNC interval, not per instruction: `prove_line_budg
 interval's worst case with branch and index page-crossing penalties counted (`internal/cyclebound`),
 `profile_line_budget` measures it, and the comments the prover reads are declarations, not
 expected-cycle stamps: `@lines N` says an interval spans N scanlines (budget N × 76), `@amax N` bounds a
-divide loop's accumulator.
+divide loop's accumulator. A declaration is not trusted: `TestLinesDeclarationIsNotSlack`
+(`internal/cyclebound`) runs every annotated corpus ROM and fails when N is more lines than the
+machine's worst run of that interval occupies, because the spare line lets an overrun certify.
 
 ---
 

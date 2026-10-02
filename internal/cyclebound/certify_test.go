@@ -94,10 +94,16 @@ func TestCertifyHashTiedToROM(t *testing.T) {
 // pass if one ROM regressed and another improved on the same day.
 func TestCertifiedTechniqueKernels(t *testing.T) {
 	want := map[string]bool{
-		"divtable": true, "flicker_multiplex": true, "game_states": true, "hscroll": true,
+		"divtable": true, "flicker_multiplex": true, "game_states": true,
 		"multicolor48": true, "pf_modes": true, "score6": true, "sfx_demo": true,
-		"sprite_anim": true, "tia_pcm": true, "two_line_kernel": true, "two_line_vdel": true,
+		"sprite_anim": true, "tia_pcm": true, "two_line_kernel": true,
 		"venetian": true, "vertical_pos": true, "vertical_pos_dcp": true,
+		// hscroll and two_line_vdel left this list on 2026-10-02. Each certified only through a
+		// two-line declaration on a region the machine runs in one line, and that declaration also
+		// certified a copy that renders 263-line frames (TestLinesDeclarationIsNotSlack,
+		// TestLinesSlackCheckFindsAPaddedDeclaration). Declared at their true one line, the prover
+		// over-estimates both — 79 (page-cross cycles on reads that cross no page) and 78 (a path
+		// the motion never takes) — and refuses them. A false refusal, not a regression.
 	}
 	files, err := filepath.Glob("../../roms/techniques/*.asm")
 	if err != nil || len(files) == 0 {

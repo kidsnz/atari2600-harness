@@ -18,7 +18,8 @@
 ;
 ; Adding a seventh store also buys nothing: the band stays 46 px wide either way. The "6" in
 ; "6-store choreography" is not a cycle budget — it is two players times three NUSIZ copies,
-; and there is no seventh place to put a seventh image.
+; and with each player placed once for the line, as in this kernel, there is no seventh
+; place to put a seventh image.
 ;
 ; score6 — 6桁BCDスコアカーネル（technique: score-kernel, U-M1）
 ; litmus_48px6（VDEL 6-store・実機裏取り済 v0.52.0）の振付を (zp),y フォント参照に拡張した

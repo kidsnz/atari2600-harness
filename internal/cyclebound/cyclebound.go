@@ -107,6 +107,45 @@ func lineAt(sm *srcmap.Map, at site) (int, bool) {
 	return sm.Line(at.addr)
 }
 
+// annotationLines returns the source lines an `@lines` / `@amax` annotation on the region
+// opened by the WSYNC store mapped to 1-based line ln may sit on.
+//
+// DASM maps a labeled WSYNC to its LABEL line, so when the label stands alone the
+// annotation written on the `sta WSYNC` line sits one line below, and that next line is
+// read too. It is read ONLY then. Reading it unconditionally gave every WSYNC the
+// annotation of the instruction AFTER it: measured 2026-10-02, the second of the three
+// VSYNC strobes in hscroll, rpgmap, score6, shared_setxpos, two_line_vdel,
+// zone_multiplex and litmus_store7_overrun was budgeted at 2 or 3 lines because the
+// third strobe, on the next line, carried the declaration. Those regions are 3 cycles
+// long, so no verdict moved — but the same misreading puts a widened budget on a region
+// its author never annotated, and an `@amax` bound on a divide loop it was never proven
+// for.
+func annotationLines(srcLines []string, ln int) []string {
+	if ln < 1 || ln > len(srcLines) {
+		return nil
+	}
+	out := []string{srcLines[ln-1]}
+	if ln < len(srcLines) && holdsNoInstruction(srcLines[ln-1]) {
+		out = append(out, srcLines[ln])
+	}
+	return out
+}
+
+// holdsNoInstruction reports a source line that is empty, a comment, or a label alone in
+// column 0 — the shapes DASM's line map can point at for the instruction that follows.
+func holdsNoInstruction(line string) bool {
+	if i := strings.IndexByte(line, ';'); i >= 0 {
+		line = line[:i]
+	}
+	if strings.TrimSpace(line) == "" {
+		return true
+	}
+	if line[0] == ' ' || line[0] == '\t' {
+		return false // indented text is an instruction or a directive
+	}
+	return !strings.ContainsAny(strings.TrimRight(line, " \t\r"), " \t")
+}
+
 // siteDesc renders a code site for a human. On a banked image the bank is part of
 // the identity and must be printed; on a flat image there is only one, so printing
 // "bank 0" would be noise — and would change the text of every existing report.
@@ -3781,13 +3820,8 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		if !ok {
 			return 1
 		}
-		// Scan the mapped line and the next: DASM maps a labeled WSYNC to its LABEL
-		// line, so `@lines N` written on the `sta WSYNC` line sits one line below.
-		for i := ln - 1; i <= ln && i < len(srcLines); i++ {
-			if i < 0 {
-				continue
-			}
-			if g := atLinesRe.FindStringSubmatch(srcLines[i]); g != nil {
+		for _, text := range annotationLines(srcLines, ln) {
+			if g := atLinesRe.FindStringSubmatch(text); g != nil {
 				if n, e := strconv.Atoi(g[1]); e == nil && n >= 1 {
 					return n
 				}
@@ -3804,11 +3838,8 @@ func Prove(asmPath string, budget int) (*Report, error) {
 		if !ok {
 			return 0
 		}
-		for i := ln - 1; i <= ln && i < len(srcLines); i++ {
-			if i < 0 {
-				continue
-			}
-			if g := atAmaxRe.FindStringSubmatch(srcLines[i]); g != nil {
+		for _, text := range annotationLines(srcLines, ln) {
+			if g := atAmaxRe.FindStringSubmatch(text); g != nil {
 				if n, e := strconv.Atoi(g[1]); e == nil && n >= 1 {
 					return n
 				}

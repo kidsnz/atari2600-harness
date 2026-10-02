@@ -52,7 +52,7 @@ VB:     sta WSYNC
         lda #0
         sta VBLANK
         ldx #192
-Vis:    sta WSYNC          ; @lines 3 — last visible line + overscan SFX processing span 3 scanlines; verified stable 262
+Vis:    sta WSYNC          ; @lines 3 — last visible line + overscan SFX processing. NOT stable: 262 lines with no effect playing, 263 while one plays (this region then takes 2 lines, worst 145 cy, in a frame that gives it 1; the prover's 159 is why 3 is declared). See knownSlack in internal/cyclebound/twolineregion_test.go
         dex
         bne Vis
         lda #2

@@ -62,7 +62,7 @@ NextFrame:
         sta VSYNC
         sta WSYNC
         sta WSYNC
-        sta WSYNC          ; @lines 2 — the region is ONE line in this demo (worst 76 cy, once per 12960 frames; 262 lines over 13000 frames); the 2 absorbs the prover's 78, both sprites reversing at the bottom in the same frame, which this motion never does and which costs a 263-line frame when it does; verified stable 262
+        sta WSYNC          ; @lines 1 — ONE line in this demo (worst 76 cy, once per 12960 frames; 262 lines over 13000 frames). The prover says 78 and refuses it: that path has both sprites reversing at the bottom in the same frame, which this motion never does and which costs a 263-line frame when it does; verified stable 262
         lda #0
         sta VSYNC
         lda #2
