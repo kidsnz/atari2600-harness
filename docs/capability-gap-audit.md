@@ -4426,6 +4426,12 @@ Found by the mailing-list distillation (helper-3, thread *games using unofficial
 **Gap:** fail in `Assemble` on `Unable to open` and on an empty output, and name the third reason beside the
 rename. Size: S.
 
+**✅ Closed 2026-10-02 by commit `9749c4f`:** `Assemble` and `AssembleWithListing` now refuse, after an exit
+of 0, DASM's `Warning: Unable to open '…'` (a missing source or include), its `incbin` line
+`unable to open <file>` (a 4096-byte image without the data — a fourth case found while fixing), a 0-byte
+image, and no image at all (`quietlyIncomplete` in `internal/build/build.go`;
+`TestAssembleRejectsQuietlyIncompleteImages`).
+
 ### The asymmetric-PF rewrite windows are cited, not swept (2026-09-30)
 
 `fundamentals-audit.md` §4 holds woodgrain's window table as 📖 and leaves a disagreement open (SpiceWare's

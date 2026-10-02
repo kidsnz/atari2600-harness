@@ -135,7 +135,8 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 //     topic/318210 (DASM 2.20.14) shows `--- 1 Unresolved Symbol` followed by `Complete. (0)`,
 //     and the ROM ran in an emulator. The one symbol was NO_ILLEGAL_OPCODES, which macro.h only
 //     tests with IFNCONST (internal/emu/oddsleep_test.go), so that list was harmless; a symbol
-//     used as an operand ends in `Source is not resolvable` and exit 3 (unopenedIncludeHint). An unresolved list is therefore not a failure mark by itself.
+//     used as an operand ends in `Source is not resolvable` and exit 3 (unopenedIncludeHint). An
+//     unresolved list is therefore not a failure mark by itself.
 func diagnosedFailure(out string) error {
 	for _, ln := range strings.Split(out, "\n") {
 		if strings.Contains(ln, "error:") {
