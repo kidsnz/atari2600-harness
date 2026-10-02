@@ -37,6 +37,9 @@ func Assemble(asmPath, binPath string) (output string, err error) {
 	if err == nil {
 		err = diagnosedFailure(string(out))
 	}
+	if err == nil {
+		err = quietlyIncomplete(string(out), tmp)
+	}
 	if err != nil {
 		os.Remove(tmp)
 		return string(out), err
@@ -72,6 +75,13 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 	lstPath := scratchPath(binPath, "lst")
 	symPath := scratchPath(binPath, "sym")
 	out, err := exec.Command("dasm", asmPath, "-f3", "-o"+tmpBin, "-l"+lstPath, "-s"+symPath, "-I"+filepath.Dir(asmPath)).CombinedOutput()
+	// The same two checks as Assemble: an exit status of zero is not taken on its own.
+	if err == nil {
+		err = diagnosedFailure(string(out))
+	}
+	if err == nil {
+		err = quietlyIncomplete(string(out), tmpBin)
+	}
 	if err != nil {
 		os.Remove(tmpBin)
 		os.Remove(lstPath)
@@ -114,18 +124,18 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 // Found by the mailing-list distillation (helper-2), who could not run DASM and so reported it as a
 // question with the command to settle it rather than as a defect.
 //
-// Two quiet outputs this guard does not see, both reported on AtariAge and neither run here (Cited
-// only, not verified):
+// Two quiet outputs this guard does not see:
 //
-//   - A SOURCE that could not be opened. The whole output pasted in topic/246976 is a
+//   - A SOURCE that could not be opened. The whole output pasted in AtariAge topic/246976 is a
 //     `Warning: Unable to open 'kernel.asm'`, an empty symbol list and `Complete.` -- no `error:`
-//     line. What marks it is the empty symbol table, not a message. (The DASM version is not given;
-//     a warning is deliberately not an error here -- diagnosed_test.go.)
-//   - UNRESOLVED symbols. topic/318210 (DASM 2.20.14) shows `--- 1 Unresolved Symbol` followed by
-//     `Complete. (0)`, and the ROM ran in an emulator. The one symbol was NO_ILLEGAL_OPCODES,
-//     which macro.h only tests with IFNCONST (internal/emu/oddsleep_test.go), so that list was
-//     harmless; a symbol used as an operand ends in `Source is not resolvable` and exit 3
-//     (unopenedIncludeHint). An unresolved list is therefore not a failure mark by itself.
+//     line (the DASM version is not given). A warning is deliberately not an error here
+//     (diagnosed_test.go), so quietlyIncomplete catches this one by its own wording, measured on
+//     DASM 2.20.14.1.
+//   - UNRESOLVED symbols (reported on AtariAge, not run here: Cited only, not verified).
+//     topic/318210 (DASM 2.20.14) shows `--- 1 Unresolved Symbol` followed by `Complete. (0)`,
+//     and the ROM ran in an emulator. The one symbol was NO_ILLEGAL_OPCODES, which macro.h only
+//     tests with IFNCONST (internal/emu/oddsleep_test.go), so that list was harmless; a symbol
+//     used as an operand ends in `Source is not resolvable` and exit 3 (unopenedIncludeHint). An unresolved list is therefore not a failure mark by itself.
 func diagnosedFailure(out string) error {
 	for _, ln := range strings.Split(out, "\n") {
 		if strings.Contains(ln, "error:") {
@@ -134,6 +144,61 @@ func diagnosedFailure(out string) error {
 	}
 	return nil
 }
+
+// quietlyIncomplete reports an image DASM did not finish although it exited zero.
+//
+// Measured on DASM 2.20.14.1 (2026-10-02, scratch builds outside this repository, the same flags as
+// Assemble; everything goes to stdout, and `-v0` to `-v2` add only pass and segment tables). Each
+// of these ends `Complete. (0)` with exit 0:
+//
+//	incbin "gfx.dat" that cannot be opened -> `unable to open gfx.dat`, a 4096-byte image without
+//	                                          the table (lower case, no quotes, no "Warning:")
+//	a source file that does not exist      -> `Warning: Unable to open 'x.asm'`, a 0-byte image
+//	an include nothing uses, missing       -> `Warning: Unable to open 'x.h'`, a 4096-byte image
+//	`SEG.U` left open into the code        -> no message at all, a 0-byte image
+//
+// The first three are refused by DASM's own wording, the last by the size. An include that IS used
+// also prints the warning but ends in exit 3 (unopenedIncludeHint), so this only adds the case where
+// nothing went unresolved -- and a header holding code rather than equates would be missing from the
+// image just as quietly, so a missing include is refused whether or not anything refers to it.
+//
+// Two messages that look alike are left alone. `Warning: Unable to [re]open 'x.bin'` is the OUTPUT
+// file, and DASM already exits 2 on it. `Warning: Unable to open Symbol Dump file 'x.sym'` exits 0
+// with a complete image; only the symbol table is missing.
+//
+// A 0-byte image is refused whatever the output says: it is not a cartridge. Smaller-than-a-cartridge
+// images are not refused, because -f3 of a fragment is legitimately short. No image at all is named
+// here too: an old DASM exited 0 and wrote nothing (AtariAge topic/111264, cured by moving to 2.20.07;
+// Cited only, not verified). The rename after this would fail on it anyway, but with an error that
+// names the scratch file rather than DASM.
+//
+// No false refusals, measured the same day with DASM directly: all 211 `.asm` files in this
+// repository outside Gopher2600/ exit 0 with a non-empty image and none of these messages, and so do
+// the 155 `.asm` files that the author's works name in their scenarios.
+func quietlyIncomplete(out, binPath string) error {
+	for _, re := range []*regexp.Regexp{unopenedIncludeRe, unopenedIncbinRe} {
+		if m := re.FindStringSubmatch(out); m != nil {
+			return fmt.Errorf("dasm exited 0 but could not open %q, so the image is missing what that "+
+				"file holds: %s", strings.TrimSpace(m[1]), strings.TrimSpace(m[0]))
+		}
+	}
+	fi, err := os.Stat(binPath)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("dasm exited 0 but wrote no image at all")
+	}
+	if err != nil {
+		return err
+	}
+	if fi.Size() == 0 {
+		return fmt.Errorf("dasm exited 0 but wrote an image of 0 bytes. One cause that prints no " +
+			"message is a `SEG.U` left open into the code: end the header that opens it with a plain `SEG`")
+	}
+	return nil
+}
+
+// unopenedIncbinRe matches the line DASM prints for an `incbin` it cannot open. It is a different
+// message from an include's: lower case, the name unquoted, and no "Warning:" (DASM 2.20.14.1).
+var unopenedIncbinRe = regexp.MustCompile(`(?m)^unable to open (.+)$`)
 
 // mnemonicStormHint names the cause when DASM rejects the whole instruction set at once.
 //
@@ -252,7 +317,8 @@ var unknownMnemonicRe = regexp.MustCompile(`Unknown Mnemonic '([^']+)'`)
 // letter-led tokens, but not 6502 instructions, so mnemonicStormHint stays quiet. When the
 // `processor` line is missing as well, both hints speak.
 // The negative control: a source that merely uses an undefined symbol prints the same list with
-// nothing above it, and gets no hint. (An include nothing uses fails silently: exit 0.)
+// nothing above it, and gets no hint. (An include nothing uses gives the same warning and exit 0;
+// quietlyIncomplete refuses that build, and on AssembleWithListing this hint then names the file.)
 //
 // The shape -- the list is the consequence, the cause is above it -- is AtariAge topic/72751 (the
 // real error sat above "12 references to unknown symbols") and topic/287020.
