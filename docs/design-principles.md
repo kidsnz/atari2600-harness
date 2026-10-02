@@ -36,6 +36,22 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     detection."* 〔mining 263219 ntsc-vs-pal-detection〕 The PAL readings are about 1.009 times the
     NTSC ones, the ratio of the two colour clocks quoted at the top of the thread (3.546894 and
     3.579545 MHz) (our arithmetic). **Cited only, not verified** — none of the readings was taken here.
+  - **Keep colours in their own table, and the colour half of a PAL/NTSC conversion stays a table edit
+    (our reading).** Thomas Jentzsch,
+    2002, after 21 PAL→NTSC conversions in which he *"changed all the colors too"*: *"The name "Ikari
+    Warriors" still raises some bad memories, because they stored graphic data and colors interleaved!.
+    That really was a painful conversion."* 〔`200202/msg00056`〕 The masked-sprite rule under Sprites
+    already reads colour from its own pointer (`lda (color),y`); this is a reason to keep it there.
+    **Cited only, not verified.**
+  - **What the hue nibble selects (NTSC): one tap of a delay line on the colour clock.** Chris Wilkson,
+    2003: *"The pot adjusts the control voltage going into a digital delay line. ... The input to the
+    delay line is the color clock. ... Each stage delay is the same. One of the 15 outputs is chosen by
+    (COLU & $f0) to be sent to the output pin. Color 1 has no delay...it is the same as the color
+    burst."* So the hues are evenly spaced and hue 1 is the burst's phase. The spacing is the pot's, not
+    the chip's: the pot sets the delay for colour 15, divided by 14, and *"Most 2600s are calibrated
+    initially so that color 15 and color 1 are the *same*"*, so *"a better number for the inter-color
+    delay would be (360/14) instead of 24 degrees"* 〔`200312/msg00123`〕. On such a console hue 15
+    repeats hue 1. **Cited only, not verified.**
 - **Add colours VERTICALLY = rewrite COLUPx per scanline** (one colour horizontally). **Horizontal multi-colour is expensive** (only the fakes: PF score / Chronocolour / flicker / stacking). 〔Hugg, Davie S21〕
   - **Minimum width of a horizontal colour band = store-instruction cycles × 3 colour clocks**. An arbitrary
     colour costs ~6cy per band (about 8 bands per line is the ceiling). There is also the trick of borrowing SP
@@ -157,8 +173,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   meant no bits were changed"*; `$87` held *"$FF in color mode, or $0F in B&W mode"*, so in B&W *"all
   the bits that controlled hue were stripped, leaving a grayscale version of the original color"*
   〔`199707/msg00023`〕. Both modes are data, so the store costs the same whatever the mode, and the
-  B&W result is the hue-free picture the rule above asks to look at. Combat's attract colour cycle is
-  in the Minimal-UI rule below. **Cited only, not verified** — he gives the code as *"something like
+  B&W result is the hue-free picture the rule above asks to look at. nukey-shay gave the same recipe on
+  AtariAge in 2007, with the updated timer as the `EOR` operand: the table colour, `EOR` the timer, then
+  `AND` by the B&W switch state (`AND #$FF` colour; `AND #$0F` for B&W is our reading, since the note's
+  quote breaks off at *"AND #$0F ="*) 〔mining 108824
+  code-for-screen-color-changing; only the distillation notes are held here〕. Combat's attract colour cycle is
+  in the Minimal-UI rule below. **Cited only, not verified** — Bensema gives the code as *"something like
   this"* (so perhaps recalled rather than copied — our guess), and nothing here builds it.
 - **A whole screen in ONE hue is a style, and can be offered as an option.** The craft section has the
   single-object case (8 px monochrome → spend it on the silhouette); this is the screen-wide one. One hue
@@ -357,6 +377,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     7, and the late strobe's +8 makes it left 1 — what `$10`, his instruction for a normal HMOVE in the
     same post, gives — and a three-cycle `sta HMOVE` started on 70 or 71 completes on 73 or 74, where
     band D counts it. **Cited only, not verified** — a strobe started on 70 has not been run.
+  - **The price: an emulating console may not honour it.** Karl G, 2020, from making a version of his
+    game for the Atari Flashback Portable — a machine that runs games by emulation, which nukey-shay in
+    the same thread calls *"a flaky emulator"* — says kernels that use an early HMOVE to hide the HMOVE
+    bar break there; all three he names come from one kernel library for homebrew — a
+    score routine (*"to avoid repeated digits in the score"* it needs a fix, the early HMOVE being
+    something *"the AFP doesn't support"*), a 96-pixel title-screen kernel (*"will not work, since it
+    relies on an early HMOVE"*), and a multisprite kernel, which *"could be modified to use standard
+    HMOVEs"* 〔mining 300586 collection-of-fixes-and-best-practices-for-flashback-portable〕. Band D
+    above is graded in the bundled engine only. **Cited only, not verified.**
   - **The opposite use: HMOVE on EVERY line turns the comb from a blemish into a border.** Dennis Debro,
     2002: *"I am also doing HMOVE on each scanline so I remove the comb effect"* 〔`200208/msg00235`〕.
     Glenn Saunders, 2001, answering Pete Holland's question of how Activision got the black border
@@ -507,6 +536,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   the same format 〔mining 305503 reading-byte-tables; only the distillation notes are held here, not
   the thread〕. The sample assembles (`8bitworkshop-crosscheck.md`, 26/26); **Not verified** — the
   scanlines it draws were not measured here.
+  - **The kernel can skip the writes too, on a symmetric playfield.** vdub_bobby, 2005, after a nested
+    loop that draws 192 lines in blocks of 8: the best is to write the PF only when it changes, since
+    unless told otherwise the TIA keeps drawing the same thing every line 〔mining 66378
+    padawan-seeks-jedi-master; only the distillation notes are held here〕. That holds only while no
+    register is rewritten mid-line: with an asymmetric PF each register ends the line holding the right
+    half, and a skipped line inherits that. `cmd/framegen` drops a left-half write only together with
+    its right-half one for this reason (its playfield-pruning comment). **Cited only, not verified** —
+    the cycles freed were not counted.
 - **A scrolling PF background is 3 layers — board RAM + display buffer + delta update** — plus tile-granular scrolling (avoids tearing). Iron rule = **keep the total scanline count constant from frame to frame** — the legal totals and the PAL parity constraint are the rule
   immediately below, stated once rather than twice. The scroll band is 10–16 lines top and bottom. 〔200972 tile-scrolling-engines, Boulder Dash style〕 `→ design.ScrollScanlinesConstant` **and `design.ScrollBackgroundFitsRAM`**. **Corrected 2026-09-03:** this line prescribed three layers and pointed only at the scanline check, which looks at line counts and PAL evenness and nothing else — so nothing asked whether the three fit. The same source says they usually do not: **a world you rewrite at run time needs SuperChip/CBS RAM, because the internal 128 bytes only hold a 120-byte-class malleable world** 〔200972:14〕. Budget the three layers plus the stack against `design.RAM2600` before choosing this structure. Found by auditing harness claims against the sources harness itself cites.
 - **PAL frames must have an even scanline count** — an odd total is not a legal PAL frame, so a
@@ -538,6 +575,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   condition that *"no row had more than one transition, because the kernel didn't have time to check 2
   list entries"* 〔mining 326419 new-homebrew-kick-ice〕. The board-RAM layer of the scrolling-background
   rule above is where this choice is made. **Cited only, not verified.**
+  - **A sparse playfield can cost a fixed RAM budget at any resolution.** Manuel Polik, 2001, for 32
+    tombstones: two 32-byte RAM tables, one holding *"the absolute number of the PF value that contains
+    one or more tombstones"* and one *"the actual PF value to set"*; the kernel counts the PF values it
+    draws, and *"if the current location is next in the location tab -> ... draw the according value
+    from the value tab -> and if no draw $00"* — *"You could do any resolution you want, without
+    increasing the RAM usage of constant 64 bytes!"* The cost was left open: *"You'd need more counters
+    in the kernel than you'd have as registers, but I'm sure that can be handled"* 〔`200108/msg00433`〕.
+    The location table has to be in drawing order (our reading of "next"). **Not verified** — the
+    kernel was proposed, not written, there or here.
 - **For HUD/text the character COUNT picks the technique**: 48px = 12 characters / venetian blinds = 32 characters (but only at 3px width). Either split the HUD into its own screen mode, or isolate it in a zone and reuse the score area for several purposes. 〔197162 text-hud〕 ⚠ **The 32-at-3px figure is the source's, not this repository's, checked 2026-09-07.** `roms/techniques/venetian.asm` demonstrates the mechanism — one player drawing figure A on even rows and figure B on odd, zero flicker, half the vertical density — and it draws **shapes, not characters**: measured, an 8-px band at clock 80..87 with runs of 1, 2, 4, 6 and 8 px. **Nothing here has ever rendered 32 characters this way**, so 3 px is the width the technique would require rather than a width anything has been read at. ★For comparison the text kernels ARE measured: 4 px a character at every rung of their ladder 〔`techniques/text12.md`〕, so venetian's 3 px would be **narrower than the narrowest thing this repository has drawn a letter at** — worth knowing before designing to it. `→ design.MaxChars` `→ design.MaxChars/FitsText`
   - **The rungs around 12, from Robert M:** PF alone *"gives you 40 pixels / 4 per character giving you
     10 characters across"*; the 6-digit score trick, 48/4 = **12** at low res 3×5 or 3×7; Stellar
@@ -601,6 +647,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     full asymmetric line, above). In a 2018 thread he put dropping PF0 at *"10 cycles per scanline"*
     〔mining 276058〕, not the 12 above. **Not verified** — `fundamentals-audit.md` lists DPC+ as not
     verified here, and neither figure has been counted.
+  - **What the two-register ceiling left out, and which resource ran out.** SpiceWare, asked whether an
+    asymmetric reflected PF in PF1/PF2 plus a sprite and colour changes was possible, answered that Stay
+    Frosty does it with two sprites (one reused and repositioned) and colour changes on a sprite and the
+    PF; the melted trail is one missile, and the other missile and the ball are unused. Two things were
+    dropped for different reasons: the snowman's carrot nose, planned for the other missile, for want of
+    **CPU time**, and a level number because the snowman and fireball graphics used up the **ROM**
+    〔mining 136387 the-2600-is-truly-challenging; only the distillation notes are held here〕.
+    **Cited only, not verified.**
 - **The wall can be the background.** iesposta, 2017, looking at Starpath's *Escape from the
   Mindmaster* in Stella's debug colours: *"Wow that means the background color is the walls and the
   Playfield is the ceiling, floor and side passages."* The day before he had described it as using
@@ -666,6 +720,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   to latch — that arithmetic is ours. The day before, he had declined to alternate frames on the
   shields: *"that'll really cause problems with the collision detection"* 〔`199704/msg00190`〕.
   **Cited only, not verified**, including what Atari's version did.
+  - **A commercial collision handler: record in the kernel, decide outside it.** nukey-shay, 2019,
+    reading *Defender II* for a hacker: *"When you collide with any sprite, it gets recorded in an ARRAY
+    starting at ram $B0. This is later checked OUTSIDE THE KERNEL to decide what to do"*. In the routine
+    he quotes, the code walks that array and compares each hit object's tag with the humanoid's: lower
+    is an enemy, equal is a caught humanoid, and a second compare picks out the stargate (our reading of
+    the quoted code) 〔mining 289892 defender-ii-hack-attempt-trying-to-find-2-portions-of-code; only the
+    distillation notes are held here〕. **Cited only, not verified.**
 - **The object budget is counted per scanline, not per screen.** Living Room Arcade (2024) asked how
   *Star Wars: The Arcade Game* is possible with *"two players, two missiles and a ball"*. Verdant: *"It's
   doesn't become simple, but it does become less difficult, when you stop thinking so much in two
@@ -710,6 +771,10 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   have a certain minimum height (9) to ensure that, at some point, all conditions for the
   reconfiguration are met"* 〔mining 386678 fate-of-a-bait-finished-homebrew〕. A gap band's height can
   be the guarantee that an opportunity occurs, not only the cost of one. **Cited only, not verified.**
+  The same author had priced a third row in an earlier reply (2026-03-06): *"There won't be a third fish row without
+  cutting down the worm's length or resolution (for RAM) and/or the sprite's height (for screen
+  space)"*, having just said *"everything is huge (which I like)"*. Each way to buy the row is paid in
+  the picture, so the drawing decides whether it is bought. **Cited only, not verified.**
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
 - **A console switch can choose the TV standard, and the price is one switch.** A PAL frame needs
   more scanlines than an NTSC one, and that is a number the ROM decides — so a single build can serve
@@ -761,6 +826,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   a constant. What looks like randomness is *when a person pressed*. ★★★★**And the middle row is the
   one to remember — it is MORE uniform than the irregular case and completely deterministic.** A flat
   histogram is not evidence of unpredictability, and an auto-fire button is exactly a fixed period.
+  - **A range that is not a power of two costs time somewhere; one draw per frame moves the cost into
+    frames.** TROGDOR, 2010: for 1–6, draw 0–7 and redraw on 6 or 7, but *"it requires an indeterminate
+    number of cycles"*, so *"adjust the game requirements so that only powers of two are needed"*.
+    batari, answering: an LFSR's sequence is fixed, so the worst number of tries can be computed
+    offline; or *"simply get one random number per frame and only use it if it's within a valid range.
+    It might be perfectly fine for a certain action to be delayed a few frames."* groovybee: *"Or use a
+    modulo look up table if you have the ROM space."* 〔mining 159268 random-numbers〕 **Cited only, not
+    verified.**
+  - **Re-randomising every frame can be the waste.** Manuel Polik, 2002, on a crash scene adapted from
+    Battlezone's: *"I think it was a little over-randomized in the original and I didn't see the need of
+    repositioning the *noise* every frame, as the positions turned out to be already pretty random
+    anyway..."*. In the same post he had adapted the code *"in numerous ways"* and reduced *"the
+    required ROM space to some 20%-30% of the original code"* 〔`200211/msg00018`〕; how much of that the
+    skipped repositioning saved, he does not say. **Cited only, not verified.**
 - **An odd width is a power of two PLUS ONE, and the join is free.** A ball is 1, 2, 4 or 8 pixels
   and nothing else, so a shape that must be an odd number of pixels wide has no ball that fits it.
   Thomas Jentzsch, 2001: *"all cursors are **7 pixels wide** (has to be an **odd number** to make the
@@ -948,6 +1027,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     says not to trust alone — `prove_line_budget` proves the totals over all paths and `beam_intervals`
     where each write lands, and an `@xx-yy` window is the claim to hold their answers against (our
     reading). **Cited only, not verified.**
+  - **In a hand count, `sta WSYNC` belongs to the line it ends.** wickeycolumbus, 2013, giving the same
+    habit (a cycle count on every instruction, and *"the total cycle count for the line every few lines
+    of code, especially where you store to TIA registers"*): *"when you hit WSYNC in your kernel (ie STA
+    WSYNC), the 3 cycles from the STA (zeropage) count for the previous line, and the processor is
+    halted until the beginning of the next line, cycle 0."* 〔mining 220213 how-do-you-keep-in-sync〕 The
+    engine's per-instruction counts put the stall on the instruction AFTER the strobe
+    (`integration-density-playbook.md`, the `sta WSYNC` note), so a figure read off them for that
+    instruction is not its share of the new line (our reading). **Cited only, not verified.**
 - **★RIOT 6532 timer wrap-around bug (the "Stella passes / real hardware rolls" trap)**: write `TIM64T`/`TIM1024T` on **exactly the cycle** the timer wraps around and the divider silently degenerates to **1T**, wrecking the frame length so the picture rolls on hardware. **The fix = a double write (double-write TIM64T).** Easy to miss because it is emulator-dependent = a direct hit on the harness's core mission (gap B). Diagnosed in that thread by Gopher2600's author (JetSetIlly). 〔mining 303277 "To Roll or not to Roll"〕 (harness-hardening candidate = an assert that detects a timer write on the wrap-around cycle)
 - **Hard lower bounds on the vertical budget, and asymmetric failure modes**: given that the total scanline count is held constant, the lower bound of each region = VSYNC ≥ 3 / Overscan ≥ 3 / VBLANK ≥ 15 (even for PAL). **Why this is yours to do at all** (added 2026-09-04): the designers removed it on purpose —
   *"They also eliminated any provision for vertical synchronization and gave that task to the
@@ -1061,6 +1148,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     the `#`, `LAX 0` is a zero-page read of address `$00`, which on a read is the TIA's `CXM0P`.
     **Cited only, not verified.**
 - **The resource triangle + a register convention**: RAM (128B) / CPU (76cy) / ROM are mutually exclusive = growing one shrinks the others (plus the human cost). The Thomas Jentzsch convention = inside the kernel, pin the roles to **Y = scanline and sprite index, X = PF, A = everything else** and it runs faster. Use subroutines for code reuse only (the call cost is high). 〔mining 146817〕 The same convention, older and with its reasons, from Thomas Jentzsch on the list in 2003: *"I usually use Y for graphics (lda (ind),y) and in parallel for scanline counting, X for the PF (normally also having a vertical lower resolution) or other things (like stack manipulation or to store temporary results, A is for multi purposes."* 〔`200303/msg00381`〕 Y is the register the graphics read needs — the 6502's post-indexed indirect mode exists only as `(zp),Y` — so it is also the line counter; X goes to the playfield because the playfield usually changes on fewer lines (our reading of his parenthesis). **Cited only, not verified.**
+  - **The three sides are not equally for sale.** Kirk Israel, 2003: *"given my simple game concept, RAM and ROM are cheap compared to
+    kernal time, but that might be true everywhere. (which is funny, because while a supercharger
+    multiload might give you effectively more RAM and more ROM, I don't think anything ever gives you
+    more time for your kernal.)"* 〔`200309/msg00067`; "kernal" is his spelling〕 The line stays 76
+    cycles whatever the cartridge; what later hardware sells is fewer cycles per job inside it — the
+    DoDraw → DPC → DPC+ → bus-stuffing ladder under Sprites. **Cited only, not verified.**
+  - **Plan the cuts before the ROM runs out.** Andrew Davie, 2001, on *Qb*: conditional-compilation
+    switches added for *"Feature-reduction (for later tweaking)"* — rising player, the player's hair,
+    hat, score protection, attract mode — because *"I'm just about completely out of ROM. ... it will be
+    a matter of picking features and deciding which need to stay and which go."* In the same build the
+    player became coloured, and *"of course it came down to a single cycle being available"* 〔`200102/msg00235`〕.
+    `integration-density-playbook.md` rejects compile-time "feature modules" because they yield N
+    binaries; here the switches are a cut list for one build (our reading). **Cited only, not verified.**
   - **"RAM is faster than ROM" is true of one addressing mode.** Thomas Jentzsch, 2023: *"Loading from
     zeropage RAM is faster, not RAM in general. But only for non-indexed loads."* and *"There is no
     opcode for lda zp,y. Instead the assembler creates lda abs,y, which requires 1 extra byte. But
@@ -1088,6 +1188,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     first two select a table (reveng counted 310 pairs in the 10k list, *"So no one table is larger
     than your bank size"*). When the encoding is a function, the lookup never runs the decoder above
     (our reading). **Cited only, not verified** — he reports no timing.
+  - **One saving can foreclose the next.** Paul Slocum, 2001, to Erik Eid, out of ROM on *Euchre*:
+    *"you can combine a few letter graphics like "U" and "H", or "I" and "T"."* Eid: *"I'm not sure I can
+    use this since the offsets into the letter image table are calculated as multiples of six. I
+    wouldn't be able to do this without creating a table of offsets. (I used to have one but took it out
+    earlier to free up space. :) )"* 〔`200111/msg00344`〕 Overlapping glyphs need arbitrary start
+    offsets; a fixed stride gives the offset table up, and with it the overlap. The exerciser's score
+    font, `nibble×16` into a 16-byte-stride font (`exerciser.md`), is the same choice (our reading).
+    **Cited only, not verified.**
 - **Adventure's 255-room ceiling is the width of a byte, not of the machine.** On a 2011 thread about a
   multi-load RPG, syntaxerror999 took Adventure's rooms to be capped *"(255 I think)"*. e1will: *"the
   255-room limit in Adventure is fairly easy to overcome. I'm currently working on a 300+ room
@@ -1104,6 +1212,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     breaks in the other: the variable could hold 9 and one digit table could not. Size a counter's
     display table with the counter. **Cited only, not verified** — his reading of the two ROMs;
     neither was looked at here.
+  - **The ceiling can sit in how a table is laid out.** bogax, 2020, suggesting a shorter playfield
+    routine for *Polarium*: *"this needs an extra byte per for the x 11 table and assumes col0 data is
+    all in one page so 256/11 = 23 levels max"* 〔mining 307123
+    need-some-help-with-getting-rid-of-excess-code; only the distillation notes are held here〕. 256/11
+    is 23.3, so 23 (our arithmetic). The score kernels keep a font in one page for speed (no page-cross
+    penalty, `techniques/score-kernel.md`); here the same choice sets how many levels the game can
+    have. **Cited only, not verified.**
 - **Bits outside the 128 bytes exist, and most cost more than they store.** A 2018 thread listed them
   after a claim that games kept data in offscreen scanlines — they cannot: the TIA's registers are
   either read-only or write-only (nanochess, Thomas Jentzsch), and nothing drawn comes back. reveng, to
@@ -1186,6 +1301,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     **Cited only, not verified** — no sine table is generated here.
 - **×2^n on a small signed value = repeated `asl` (no multiply, sign preserved)**: in two's complement `asl` is exactly ×2, so a signed velocity such as BallDY becomes ×2^n with n `asl`s (e.g. the lookahead target = BallRow + 4×BallDY = two `asl`s + one `adc`). But (a) **the result's range widens → bit7 can no longer serve as the sign test** = do clamp/wrap tests on the value range instead (if the extrapolated target maxes out around ~190 the threshold is `cmp #220`; an application of known-traps' "bit7 clamping is not usable"), and (b) an input that overflows into bit7 during the shift (|value| × 2^n ≥ 128) destroys the sign = check the input range first. 〔in-house: PONG ai-variants v3 lookahead 2026-07〕
 - **A BCD score can be compared with `cmp` without decoding**: for a valid packed BCD byte, binary ordering = decimal ordering (the upper nibble dominates) → both `cmp #$11` (first to 11 points) and a ScoreR vs ScoreL comparison are correct as written. But **a binary difference is not a decimal difference** (it inflates by +6 across a digit boundary: $10−$09 = 7) → when the difference is used as a QUANTITY, bucket it with saturation so the coarseness is harmless (v4 rubberband's score difference → error-width modulation). The bit7 sign of a subtraction is valid only while |binary difference| < 128. 〔in-house: PONG ai-variants v4 2026-07〕
+  - **Read the encoding before applying a peephole: only `ADC`/`SBC` count in decimal.** Thomas
+    Jentzsch, 2002, reviewing *Space Treat* for bytes, asked why `LDA LevelCounter+1` / `CLC` / `ADC #1` /
+    `STA LevelCounter+1` did not use X or Y (*"That would save you two bytes."*). Manuel Polik: *"Uhm...
+    maybe because it's BCD?"*, adding that from the snippet alone *"I'd otherwise even dare suggesting
+    INC LevelCounter+1"* 〔`200212/msg00349`, `200212/msg00352`〕. On a BCD byte the rewrite is wrong: the
+    bundled engine's `INX`/`INY`/`INC` are a plain binary add, while its `ADC` takes a decimal path when
+    D is set (`Gopher2600/hardware/cpu/cpu.go`), so `$09` steps to `$0A` (our reading of the engine, not
+    run). Here the guess was wrong — the author wrote that BCD math was something *"I'm currently not using"*
+    〔`200212/msg00359`〕, and his code that Thomas quotes next resets the same counter at `CMP #10` —
+    so the peephole would have been fine. **Cited only, not verified.**
 - **★TIA revision differences are a trap when cross-checking against hardware**: HMOVE's "extra clock" effect (the Cosmic Ark stars) **reverses behaviour on post-1989 TIAs**, among others — **the same ROM produces a different picture per revision**. The harness's pixel comparison must **pin the TIA revision / emulator** before comparing (and record which revision the verification used). 〔mining 191061 Cosmic Ark stars〕
   - **The shift is 17 px a line, not the 15 usually quoted, and that is on an ordinary TIA.** Crispy,
     who re-implemented the TIA on an FPGA: *"the NTSC TIA produces 68 pixel clocks of horizontal
@@ -1195,6 +1320,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     cosmic-ark-star-field-revisited〕 This is the base effect, a different layer from the revision
     difference above. **Cited only, not verified.**
 - **Minimum-byte initialisation + hotspot placement**: in a tight 2K/4K, Omegamatrix's 8-byte self-modifying init (`bne .loop+1` jumps between operator and operand → `#$0A` executes as an ASL) yields A=0 / X=0 / SP=$FF / carry clear. Put bank hotspots **at the highest addresses (near the already-used interrupt vectors)** and the free chunk is maximised (a ZP hotspot = Tigervision 3F saves 1 ROM byte + 1cy per switch). 〔mining blog 12061, 11811〕
+  - **The RIOT's `$02xx` addresses give the same trick a table.** omegamatrix, on AtariAge: *"The $2xx
+    registers (TIM64T, INTIM, etc...) can be jumped between operator and operand in some cases for new
+    instructions"* — the low address byte runs as an opcode and the `$02` after it as its operand:
+    `SWCHA`/`SWCHB` → `nop #$02` (*"waste 2 cycles"*), `SWBCNT` → `sax (WSYNC,X)`, `INTIM` → `sty WSYNC`,
+    `TIMINT` → `sta WSYNC`, `TIM1T` → `sty WSYNC,X`, `TIM8T` → `sta WSYNC,X`, `TIM64T` → `stx WSYNC,Y`,
+    `T1024T` → `sax WSYNC,Y`; *"Very limited use, but interesting."* He also noted that `jmp (INTIM)`
+    always lands in zero page or a mirror, since the high byte read is `TIMINT` — an idea he *"wanted to
+    try at one point"* 〔mining 215833 the-mysterious-bit-instruction〕. Each decode matches the bundled engine's opcode
+    table (`Gopher2600/hardware/cpu/instructions/definitions.json`: `$80`/`$82` nop immediate,
+    `$83`/`$97` sax, `$84`/`$94` sty, `$85`/`$95` sta, `$96` stx,Y) against the register map in
+    `cpubus.go` (our check, by reading). **Not verified** — none of these jumps was run.
 - **Code that changes the memory map must run from memory that every map contains.** Atari's 7800 BIOS,
   in the routine that starts a 2600 cartridge, quoted on AtariAge by GroovyBee in 2011: *"This code must
   all run out of 6532 RAM since the memory map will change as we change mode. The 6532 RAM exists in all
@@ -1452,6 +1588,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 ## Judgement rules no machine can decide (doc-only — deliberately not landed in `pkg/design`)
 These cannot be quantified and need a judgement from Claude, a person, or an image, so they are deliberately left uncoded and collected here (= every rule is given a disposition, which is what guarantees coverage).
 - **Thumbnail legibility**: whether it is still identifiable when shrunk = needs an image and a human eye. Judge from `get_screen_annotated`'s reduced preview. 〔326595, 106110〕
+- **Whether the screen says what the rules are**: a capacity check measures that a picture is drawn,
+  not that a player can read it. In one 2018 thread, a tester's questions on three unfinished games were
+  mostly of that kind — what the area at the top of the screen is, whether the player holds a stick or a
+  sword, whether the ghosts can be hit at all, why the score rises going down the screen and falls
+  going up — and the author's answers explained intent that the screen did not show 〔mining 273513
+  games-that-one-day-will-end; only the distillation notes are held here〕. One thread; a first-time
+  player is the check. **Cited only, not verified.**
 - **Misread letter pairs** (L/I/T · U/W · M/H/N · O/0/D): an author cannot notice their own misreadings = verify with another person or by reading aloud. Hard to mechanise. 〔294306, 326595〕
 - **In 8px monochrome, spend the entire budget on the silhouette**: which part carries the identity is a subject-dependent aesthetic judgement. 〔106110〕
 - **The role split missile/ball = lines, player = areas**: which stack of objects builds one apparent shape is a composition judgement. 〔Davie〕
