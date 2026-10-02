@@ -4383,7 +4383,10 @@ Every `.asm` here declares its own TIA equates; there is no shared header. `litm
 capture showed M0 at 2 and M1 at 25 before the fix, M1 at 2 after). Its test still passed, because the overlap
 happened anyway. **Gap:** nothing compares each ROM's equates against the standard TIA map. A scan of the 209
 `.asm` files, treating TIA mirrors (`INPT4 = $3C`) as valid, finds one more, not yet examined:
-`litmus_jsr_stack.asm` has `REFP1 = $0B`, which is `REFP0`, and its header reads `$010B = REFP1`. Size: S.
+`litmus_jsr_stack.asm` has `REFP1 = $0B`, which is `REFP0`, and its header reads `$010B = REFP1`.
+Examined 2026-10-02: the name was wrong, not the address. The JSR's return address lands on `$010B` and the
+ROM then clears that register, so `$0B` is intended; the equate is now `REFP0`, and the assembled bytes are
+unchanged (same SHA-256 as the binary its Stella capture records). Size: S.
 
 ### `dissect` cannot find interleaved graphics (2026-09-30)
 

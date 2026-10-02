@@ -11,7 +11,7 @@
 ;
 ;  2. THE JSR'S OWN WRITE. A JSR stores two bytes of memory, and on the 2600 page 1
 ;     is the same address space the console decodes. With SP aimed at the TIA the
-;     return address IS a pair of register writes ($010B = REFP1, $010A = CTRLPF),
+;     return address IS a pair of register writes ($010B = REFP0, $010A = CTRLPF),
 ;     and the PHA that follows inside the callee writes $0109 = COLUBK. The
 ;     background goes green halfway down the frame, so the picture arbitrates: a
 ;     tool that reports no COLUBK write here is contradicted by the screen.
@@ -29,7 +29,7 @@ VBLANK  = $01
 WSYNC   = $02
 COLUBK  = $09
 CTRLPF  = $0A
-REFP1   = $0B
+REFP0   = $0B
 
         org $F000
 
@@ -123,7 +123,7 @@ Green:
         txs
         lda #0
         sta CTRLPF
-        sta REFP1
+        sta REFP0
         jmp AfterGreen
 
 ; --- vectors ---
