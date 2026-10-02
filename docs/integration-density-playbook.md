@@ -69,6 +69,48 @@ allocated for each section"* 〔stella-list `200102/msg00024`〕. Both are left 
 repository's `.asm` files declare RAM with equates and contain no `org`-back overlay. Cited only, not
 verified (not assembled here).
 
+**Start with one overlay block.** Davie, 2001, on the same system: it *"doesn't require you to remember
+what's used where"* 〔stella-list `200108/msg00040`〕. Thomas Jentzsch, answering, had used *"several
+(mini) blocks of renamed variables"* in *Thrust*, and shared variables bit by bit, because RAM was too
+short for one block (his account of what that cost is quoted in `techniques/README.md`) — and still
+concluded: *"using a single overlay area (as long as possible) is CLEARLY the best way to start!"*
+〔`200108/msg00042`〕. RAM-byte duty (§D) counts purposes per byte and does not tell these forms apart.
+**Cited only, not verified.**
+
+**Two names for one byte need no overlay section.** just-jeff, 2016, asked whether a routine's
+`.`-prefixed equates (`.lenLo = $96`) were *"so you can use different names for the same RAM"*. Thomas
+Jentzsch: *"Yup. Quite useful if you have to use the same ZP-variable for different purposes. But you
+could do that without . too. The . just prevents you from using that variable accidentally somewhere
+else."* — `var1 = $96` / `var2 = $96`, *"All labels are just aliases for values."* A `.` name is visible
+only *"until the next SUBROUTINE marker"* (`known-traps.md` has the assembler's side of that rule).
+just-jeff had met the same thing as `G48 EQU pfMasks`, for a 48-pixel graphic and a 2×6-digit score that
+*"use a fair amount of RAM, but never at the same time"* 〔AtariAge `topic/257563`〕; SpiceWare's
+Medieval Mayhem menu, `EQU`'d onto the castle walls, is the larger example in `design-principles.md`
+("Across game states the same bytes can be different variables"). **Cited only, not
+verified.**
+
+**Two fields in one byte, and two counters.** Asked whether the unused bits of a byte holding a small
+value can hold something else, SpiceWare: *"yes, that's common practice"* (his bit-testing half is in
+`techniques/kernel-micro-idioms.md`). The asker closed by wondering whether one could *"have multiple
+timers going on the same byte to count different things"*, and the thread ends there; nobody said how
+〔AtariAge `topic/344945`〕. A count in the low field that overflows carries into the high one unless the
+code stops it (our reading; neither the thread nor this repository addresses it). **Not verified.**
+
+**Run-length coding of state in RAM.** Andrew Davie, 2020, on a snake whose body is a list of moves held
+in RAM: *"Use '0' bit to indicate no change, and follow that by (say) 4 bits indicating a counter. So,
+'no change for 10 moves' for example. In that case, 5 bits for 10 moves total, compared to 10 bits."* The
+thread ends without saying whether this was built; what the author did build was the step before it —
+two bits per segment, *"storing movement values instead of locations"*, which took the snake from about
+75 segments to *"200+"* 〔AtariAge `topic/308519` wip-2600-snakes; only the distillation notes are held
+here〕. **Cited only, not verified.**
+
+**Where a table lives decides what it can do.** Manuel Rotschkar, 2004, on *Crazy Balloon*: *"I was also
+forced to switch the display of the level layout from RAM to ROM, as I just didn't get the "rest" of the
+game working with 22 Bytes... This also means that I have to find some new way for those levels where
+parts of the background move and - yet another kernel rewrite..."* 〔stella-list `200412/msg00089`〕 The
+move bought RAM and put the moving backgrounds in doubt, because a layout in ROM cannot be rewritten (our
+reading of his "this also means"). **Cited only, not verified.**
+
 ### 3. Generate from a seed — but only with a CHEAP generator. ★★★★ (conditional)
 *(procedural-from-seed, adversarially bounded)*
 Trade storage for a *tiny* amount of compute. Pitfall! synthesises all 255 screens from a
@@ -86,6 +128,31 @@ is a function" reflex (64 kB runtime mesh synthesis, `bytebeat` audio = *f(t)*) 
 compute the 2600 does not have. The rule: **the generator must fit the per-line/per-frame cycle
 slack, or be precomputed offline.** LFSR/tiny-table = yes; heavy synthesis = no.
 *Source: David Crane on Pitfall! (Hackaday 2013); Aycock & Copplestone, Entombed (arXiv 1811.02035).*
+
+**Offline precompute covers decisions too.** Zach Matley, 2003, on Tank AI, his computer-controlled tank
+for *Combat*: *"with only about 16 bytes of RAM free, the idea of searching in real time was basically
+hopeless. As a few of you have probably guessed, I do the searches at compile time and store the results
+in lookup tables. I made a C++ program to search through the maze for all the possible tank positions
+(with the playfield divided into 108 sectors)."* The search is A* 〔stella-list `200305/msg00094`〕.
+**Cited only, not verified.**
+
+**The same choice at the size of one shape.** Pre-shifted copies in ROM, or one copy buffered in RAM and
+shifted at run time: cybergoth listed both among four ways to bring a sprite in at the left edge
+〔AtariAge `topic/104777`〕, and a beginner reached the RAM form on his own, so that each animation frame
+would not cost ROM, and was told `ASL`/`LSR`/`ROL`/`ROR` do the shifting 〔`topic/112533`; only the
+distillation notes of both are held here〕. Neither thread prices the two; the one place this repository
+prices a pre-shifted copy against shifting is the font in `techniques/text12.md`. **Cited only, not
+verified.**
+
+**A union and a mask, between storing and computing.** Manuel Polik, 2002, on playfield shots that travel
+to the centre of the screen: *"(PF1 + PF2) * 64 lines * 8 frames = 1024 bytes data only, without any
+source code overhead"* — a quarter of a 4K cartridge (our arithmetic) 〔stella-list `200210/msg00030`〕.
+Shifting did not work either: *"The problem with pure shifting is the crosshair, I didn't find a general
+rule to compute the whole PF appearance in a reasonable # of cycles on the fly."* His alternative: *"I
+could draw one big "X" in the ROM, and just mask the lines that are invisible on the particular frame.
+This'd reduce the data somewhat, but I'd still need 16 tables with the mask data. It'd shrink the data by
+40%+ though."* 〔`200210/msg00050`〕 In the thread it stayed a proposal: two days later he liked
+*"the current solution"* and did not *"consider the PF one a big improvement"* 〔`200210/msg00068`〕. **Not verified.**
 
 ### 4. Runtime parametric variability from a compact config table. ★★★★
 *(software product lines — CORRECTED for 8-bit)*
@@ -114,6 +181,40 @@ register clobber); **shared tables** — overlap sound envelopes across effects 
 distortion (24 B recovered in *Dominant Amber*), share glyph bytes (0/6/8/9); **init↔frame-loop
 fusion** (17 B vs 60–80 B). These are the atoms every other principle is built from.
 *Source: "Dominant Amber" 1KB byte-saving log (Hackaday.io); 8bitworkshop tiny kernels; sizecoding.org.*
+
+**Clearing by wrapping the stack.** Andrew Davie's tutorial, 2003, takes the power-on clear from 258 bytes
+(one store per address) to an 11-byte loop, then to a 9-byte `sta 0,x / inx / bne` loop that clears TIA
+and RAM together, and closes with a *"magical"* 9-byte version that also sets the stack pointer:
+`LDX #0 / TXS / PHA / TXA / CLEAR PHA / DEX / BNE CLEAR`, commented *"DOES THIS BY "WRAPPING" THE STACK -
+UNUSUAL"* and *"STACK POINTER NOW $FF, A=X==0"*. It was not his last: later in the thread he gave *"an
+EIGHT byte solution"*, `ldx #0 / txa / Clear dex / txs / pha / bne Clear`, after which *"X=A=0, and all of
+RAM and the TIA has been initialised to 0, and the stack pointer is initialised to $FF"* — the loop that
+DASM 2.20.14.1's `macro.h` puts at the core of `CLEAN_START` (`.CLEAR_STACK dex` / `txs` / `pha` / `bne`,
+after `sei`, `cld`, `lxa #0` — `ldx #0` / `txa` under `NO_ILLEGAL_OPCODES` — and `tay`; `known-traps.md`
+notes that it writes every TIA register). Neither of Davie's versions runs `CLD`: Thomas Jentzsch, in the same thread, *"SEI isn't necessary, but CLD should be done"* (the
+`missing CLD` row of `known-traps.md`). ericball, replying to the 9-byte version: *"in my experience is
+it's not always necessary to clear all of the TIA registers & RAM"* 〔AtariAge `topic/27405`〕. **Cited
+only, not verified** — not assembled here.
+
+**Three hints from one byte review.** Thomas Jentzsch, 2001, to Erik Eid, whose 4K *Euchre* had run 276
+bytes past an `org` 〔stella-list `200109/msg00043`〕: *"use bxx instead of jmp where possible"*; *"avoid
+all subroutines that are only called once. (yes, the result will be spaghetti code, but you're always
+wasting 4 bytes here, and sometimes you will discover unoptimized code easier)"*; and, in one of his
+worked examples, `cpx`/`cpy` in place of `txa`/`tya` and `cmp` — *"Another two bytes saved here."*
+〔`200109/msg00046`〕. The 4 bytes are the `JSR` and its `RTS` (our arithmetic). **Cited only, not
+verified.**
+
+**When not to take a saving yet.** Thomas Jentzsch, reading a DiStella listing of Davie's *Qb*, pointed
+at two places to save bytes — one a caller's `LDA #$08` / `JSR LFA60` where the instruction just before
+`LFA60` is that same `LDA #$08` (*"And this happens more than once :)"*), the other `LDX #$00` followed by
+`LDA #$00` 〔stella-list `200102/msg00346`〕. Davie: *"These are interesting byte-level optimisations which
+I will hold-back on for now. They both create a dependency between the code and values used for creature types.
+Not a serious dependency, but these things are to be avoided until the last possible moment."*
+〔`200102/msg00349`〕 Jentzsch drew the line for RAM differently, early in Glenn Saunders' *DD*: asked
+whether *"save 11 bytes"* meant RAM or ROM, *"RAM of course. It's far too early to optimize for just 11
+bytes of ROM."* — and *"I think the whole game can be done with only about 6 bytes of stack"*
+〔`200301/msg00392`〕. That is his estimate for one game; the 16 bytes in
+`internal/emu/stackbudget_test.go` is this repository's guard. **Cited only, not verified.**
 
 ### 7. Tight, VALID numeric feedback is the master training lever. ★★★★★
 *(deliberate practice / feedback loops — HOW to get better)*
@@ -226,6 +327,34 @@ every other frame"* 〔`199708/msg00129`, Lee Seitz〕. `FlickerArea` returns ho
 how they are arranged — and "every other character" and "one contiguous block" of the same area do not
 look alike. **That is a gap in the instrument, stated by someone who separated the two by eye in 1997.**
 
+**ROM priced by the feature.** `size` in the table counts a whole image. Erik Eid, 2001, with *"only about
+another 130 bytes or so to work with"* in a 4K *Euchre*, priced one feature — the message line — in three
+parts: letter images *"29 (all letters, a space, a 2, and a 4) * 6 = 174 bytes"*, the messages *"25 * 6 =
+150 bytes"*, and *"code sprinkled throughout the game regarding deciding what message to show; I make a
+conservative estimate of it at 120 bytes. All this together is 444 bytes, or at least 10.8% of the
+available space!"* The routines he would keep anyway for a couple of fixed messages he left out
+〔stella-list `200111/msg00336`〕. Only the third part is an estimate. Manuel Polik, replying: *"I
+somehow can't believe that 444 bytes of data are really a problem"* 〔`200111/msg00339`〕. **Cited only, not
+verified.**
+
+**ROM counted gap by gap, during assembly.** Thomas Jentzsch's free-space macros: `OUT_FREE` wraps an
+`ALIGN` or `RORG`, measures the gap it opened, adds it to a bank sum (`FREE_BANK`, *"has to be set to 0
+for each bank"*) and a total, and ECHOes the address, the gap, the bank sum and the total;
+`COND_ALIGN_FREE` aligns only when the next given number of bytes would run onto the next page
+〔AtariAge `topic/267367`〕. This repository reads the built image instead (`internal/build.ROMBytesUsed`:
+a lower bound on the bytes used, and the `$FF` run at the end), and reports neither gap by gap nor bank by
+bank. **Cited only, not verified** — the macros have not been assembled here.
+
+**What the shortage put on screen.** Andrew Davie, 2001, releasing *Qb*'s first alpha: *"I ran out of ROM
+long ago, and since then its been a matter of shaving, shaving, installing something, running out of
+memory, shaving shaving, etc."* and *"Memory is very tight. I have none left! From now, to get extra
+memory I have to drop features/capabilities."* Two things in that build he put down to memory: *"If you
+lose your last life, the background changes red (yes, I'm that short of memory)"*, and *"a
+flash/corruption of the top/bottom border of the target area display. This is due to the scarcity of
+RAM"*. A title screen he estimated at *"about 160 bytes.... that's about 155 bytes more than I have right
+now"* 〔stella-list `200102/msg00334`〕. His cut list from the same month is in `design-principles.md`.
+**Cited only, not verified.**
+
 The scorecard is a *criterion-referenced* instrument (per the deliberate-practice measurement
 literature), not a vanity number: each row is an objective, reproducible target, and progress =
 moving a chosen row toward its target **without regressing** the others (the interlock).
@@ -293,6 +422,25 @@ Re-verifying them is the first practice task (§E rung 1). Status:
   a call is `BRK` + one skipped byte — **1 byte shorter than `JSR`, not 2** — and since RTI restores the pushed status the
   result comes back in A, never in flags; 13 cycles against JSR/RTS's 12. Shipped: Video Olympics' BRK vector is
   `$F438` = `0A 69 00` ×4 + `40` (a nibble swap), called as `00 EA` from `$F262`, `$F2C8`, `$F453` (the 2K image runs in the $F000 mirror).
+- ☐ **The skipped byte as an argument (Cited only, not verified).** Paul Slocum, 2003, writing up a trick
+  Thomas Jentzsch found in Mark Lesser's *Lord of the Rings* prototype: calls of the form `brk` /
+  `.byte $0e ; id-byte`, and a BRK handler `plp` (*"remove flags from stack (not needed)"*) / `tsx` / `inx` /
+  `dec $00,x` (*"adjust return address"*) / `lda ($00,x)` (*"read break-id..."*) / `tay`, falling into a
+  subroutine that ends in `rts`. Against `ldy #value` / `jsr Subroutine`, *"it saves 3 bytes with each call
+  and the overhead is only 8 bytes. After only 3 subroutine calls (Lord of the Rings has about 20) you are
+  saving ROM space."* There the subroutine *"selected the sound effect to be played based on a priority
+  system"* 〔stella-list `200302/msg00037`〕. Asked whether, without pulling the flags, the handler would
+  need `rti`, Slocum: *"Yeah"* 〔`200302/msg00039`〕.
+- ☐ **What BRK does to B and I (Cited only, not verified).** B. Watson, 2005, quoting Stella's CPU core:
+  `B = true` before the three pushes, `I = true` after them, then the vector from `$FFFE`/`$FFFF`; z26's
+  core does the same, so *"the I flag gets set after the PC and status are pushed, so an RTI restores
+  its original state"* (his emphasis on "after" dropped) 〔stella-list `200507/msg00169`〕. Why B is set the thread did not settle: Eckhard
+  Stolberg's account is that B is wired to the interrupt input, held high on the 6507, so *"on the VCS the
+  B flag should always be set"* — *"the theory I think is most plausible"* 〔`200507/msg00172`,
+  `200507/msg00180`〕; Dennis Debro, *"IIRC"*, has it set by BRK and cleared on IRQ/NMI
+  〔`200507/msg00174`〕. Watson's and Stolberg's accounts both leave B set in the byte a BRK pushes here.
+  The bundled engine sets I after pushing the status, and `Status.Load` sets B on every load, reset
+  included (`Gopher2600/hardware/cpu/cpu.go` BRK case, `registers/status.go`; read, not run).
 - ☐ **Still to verify** (lower priority, deferred): the
   **shared envelope/glyph table** 24-byte saving (*Dominant Amber*) — reproduce with `assemble_and_load`
   + byte count when a build actually reaches for it.
