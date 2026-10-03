@@ -85,6 +85,13 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   it only produces rolling pictures on PAL VCSs"* (`199703/msg00171`). The ≥2 above is the Guide's
   threshold and the engine's input; "exactly three, untouched" is his account of what a few TVs need.
   **Cited only, not verified.**
+  📖 **Only D1 of `VSYNC` is read, so the value loaded for `VBLANK` can be stored to it unchanged.**
+  Thomas Jentzsch, 2001, shortening a frame routine that loads `#D1+D6` for `VBLANK`, commented out
+  the `lda #D1` before `sta VSYNC`: *"just use the old contents D1+D6, VSYNC doesn't have a valid bit
+  6"*; the routine's author was *"glad to get your confirmation that this is OK to do"* 〔stella-list
+  `200103/msg00003`, `200103/msg00015`〕. The engine reads the same one bit —
+  `tia.sig.VSync = reg.Value&0x02 == 0x02` in `Gopher2600/hardware/tia/tia.go` (read from the source,
+  not run). **Cited only, not verified** on hardware.
 - ✅ **RIOT timers TIM1T/8T/64T/1024T ($294–7)** — verified `litmus_timer` (v0.47.0),
   regression-locked `roms/litmus/scenarios/timer.json`, table row `docs/verified-coverage.md:26`.
   Write 1–255; the counter decrements 1/cycle; **after underflow it continues from $FF, still
@@ -156,6 +163,24 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   and still had frame three relatively empty. If you go more than 3 frames the game response
   suffered."* 〔stella-list `200101/msg00079`〕 **Cited only, not verified** — the limit is his
   experience with one game, and nothing here measures response.
+  Two months later he described the split differently: *"You can double or triple your overscan
+  cycles by dividing your code among frames. I did it with my code across 3 frames. I found that even
+  reading the joystick every 3 frames was still very responsive!"*, and the next day, *"The screen gets
+  drawn every frame, and the objects get moved every frame, but some of the logic doesn't get called
+  every frame. My example of the joystick was one of them. I even had my collision detection routines
+  running every 3rd frame"* 〔`200103/msg00248`, `200103/msg00274`〕 — movement every frame, where the
+  January post, about the *Sabotage* clone, put object movement in one frame of three; the March posts
+  do not name a game. Thomas Jentzsch, 2002, to a
+  programmer running out of CPU time in his object handler: *"you could call some subroutines only in
+  odd and other only in even frames. This is what I'm doing (though a bit more complicated) in Thrust
+  too"*; Christopher Tumber, replying: *"you often don't really need to do all collision detections
+  every frame (unless things are moving REALLY quickly and/or objects are REALLY small)"*, and *"In
+  Tsunami, only half the shots (players and enemies - there can be a lot of them) are
+  drawn/moved/collision detected every frame (odd numbered shots are handled on odd numbered frames,
+  even numbered shots on even frames...)"* 〔`200211/msg00064`, `200211/msg00070`〕. The same post
+  gives the price of the other extreme: BIG DIG runs its block-removal chain one step per frame,
+  *"Which is why "gameplay" is so "start and stop""*, which he expected to improve *"now that I know
+  to put code in the Overscan"*. **Cited only, not verified** — none of these games was run here.
   ⬜ **Exact first-decrement offset.** The countdown band pins three successive reads at
   $3C/$35/$2E from TIM1T=$40 — that fixes the rate (−7 per `lda abs`+`sta zp` iteration) and the
   value 4 ticks after the write **for that instruction sequence**; it does not isolate how many
@@ -185,11 +210,19 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   at once — as this engine's does (20 → 19 above) — also exits about one interval before N × 64 with
   the divider reset (read here, not stated there). **Cited only, not verified.**
 - ⬜ SECAM; real-game variable line counts (we already treat 262 as a range).
-  ⚠ **And one engine field is wrong in a way nothing here notices.** `SpecPAL60.HorizontalScanRate`
+  ⚠ **And two engine fields disagree in a way nothing here notices.** `SpecPAL60.HorizontalScanRate`
   is **15625.00**, but the engine computes that spec's `RefreshRate` from **NTSC's 15734.26** — the
-  only one of the five specs that does not divide its own fields. The arithmetic is right and the
-  literal is wrong: PAL60 is PAL colour on 60 Hz timing, and **PAL-M, the same 262-line geometry,
-  declares 15734.26**. The gap is **0.4170 Hz (0.70%)**. It costs nothing here only because
+  only one of the five specs that does not divide its own fields. The gap is **0.4170 Hz (0.70%)**.
+  **Which of the two is wrong depends on the console the spec describes** (corrected 2026-10-02: this
+  line said the literal, because **PAL-M, the same 262-line geometry, declares 15734.26**). A PAL60
+  game played on a PAL console runs on that console's clock — Eckhard Stolberg: *"a PAL60/NTSC game
+  will run a little slower on a PAL VCS than the same game would on a NTSC VCS"* 〔stella-list
+  `200408/msg00030`〕; Erik Mooney put it at about 0.8 %, from line rates of 15750 and 15625 Hz that he
+  gave as *"IIRC"* (`200408/msg00032`) — so for that console the rate taken from NTSC is the half that
+  does not fit, and PAL-M's figure says nothing about a PAL console's clock (our reading). Neither figure
+  is a 2600's own line rate: the clocks in `pkg/audio` over 228 colour clocks give 15699.8 Hz NTSC and
+  15556.6 Hz PAL, and 262 lines at the PAL figure is 59.38 Hz (computed here, not measured).
+  **Cited only, not verified.** It costs nothing here only because
   `HorizontalScanRate` and `RefreshRate` are read **nowhere** in `internal/`, `pkg/` or `cmd/`;
   timing in this harness comes from scanline counts, not hertz. `internal/ceiling/palette.go`
   resolves `SpecPAL60`, but only to reach its colour generator. That insulation is an accident, not
@@ -218,6 +251,24 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   for games that don't have a "Display.Format" setting in their stella.pro entry, or that aren't
   included in the stella.pro file at all"* (`200201/msg00043`). Both describe 2002 emulators, not the
   engine run here. **Cited only, not verified.**
+  📖 **A program cannot ask the console the same way.** Asked in 2001 why a timer run across two
+  vertical blanks would not tell NTSC from PAL, Manuel Polik: *"That's because the vertical blank is
+  just as long as you make it, totally indepent from the TV system the console is hooked to"*
+  〔stella-list `200108/msg00073`〕. The month before, Christopher Rydberg had written that *"A complete
+  PAL frame uses only 99.23% of the cycles that a complete NTSC frame uses"* (`200107/msg00050`);
+  Eckhard Stolberg: *"Detection routines based on the frame timing won't work, because both consoles
+  should react the same to whatever frame you make them draw"*. What he offered instead was a
+  positioning trick inside the 24 cycles after `HMOVE`, from Kool-Aid Man's score display, which on
+  all his PAL consoles puts the players partly on top of each other where on the NTSC ones the game
+  works — *"But I'm not sure how SECAM consoles would react. And the emulators would also fail this
+  test"* (`200107/msg00063`). Rydberg's figure is 312 × 50 / (262 × 60) = 0.99237 to the digits he
+  gives — a second of 50 frames of 312 lines against 60 of 262 (computed here); on the two clocks in
+  `pkg/audio` the PAL console runs 0.91 % fewer cycles a second (the svolli entry below). Whether a
+  program needs to know, Stolberg again: *"There is no need for this. Most PAL TVs can handle 60 Hz VCS
+  output quite nicely. The picture will be vertically centered with black bars above and below. It's
+  only important that you do 3 uninterrupted scanlines of VSYNC. And it would be better, if you'd turn
+  on VBLANK after the last line of display to make sure that the black bars really are black"*
+  (`200108/msg00081`). **Cited only, not verified.**
 - 📖 **A PAL console is different hardware, not the same console running a different game.** svolli,
   correcting a reply that said only the cartridges differ: *"The chips differ EVEN IN THE PINOUT"* —
   look for AUD1 on the TIA pinout — *"Not only is the TIA different, but the CLOCK of the TIA/CPU is
@@ -265,6 +316,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   in-flight movement (right-8 stayed +8/frame in all three windows). Keep the 24-cycle rule as a
   REAL-HARDWARE portability constraint ("unpredictable" on silicon, Stella PG 5×), but our oracle is
   deterministic and write-inert; the rule costs nothing to follow (HMCLR after SLEEP 24, as score6 does).
+  📖 **The window covers `RESxx` too, and one effect is made inside it.** Eckhard Stolberg, 1999,
+  explaining why River Raid strobes `RESP1` late and corrects it with an extra `HMOVE`: *"If you access
+  RESxx or HMxx within 24 cycles after a HMOVE command, you might get different positions for the
+  objects than normal. Z26 emulates this effect except for most of the variations on the Cosmic Ark
+  starfield effect, which works by doing just this."* 〔stella-list `199908/msg00095`〕 Thomas Jentzsch,
+  replying: *"i didn't know, that there are the same restrictions for RESxx as for HMxx"*
+  (`199908/msg00104`). The measurement above rewrote `HMP0` at three points and found this engine
+  inert there; whether the engine reproduces the starfield, and what a `RESxx` inside the window does
+  here, were not measured. **Cited only, not verified.**
 - ✅ **HMOVE mechanism** (Towers, *TIA Hardware Notes*) — measured 2026-09-03; this line was
   documented-only until then, and `roms/litmus/litmus_hmove_side.asm` had recorded the numbers in its
   header since V2-2 while **nothing graded them** (the ROM was carried only as ceiling corpus).
@@ -378,6 +438,13 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   **Cited only, not verified** — none of the three was run here. The
   position condition matters for reproducing Video Olympics: the original shears there too, so a
   shear in the same place is not by itself a defect of the reproduction.
+  📖 **What a `GRP` write in the middle of a copy looks like, in one report.** B. Watson, 2001, on a
+  six-digit score kernel he had not yet got right: *"one of my STA GRP1's happens in the middle of
+  drawing player 1, so the left half is the old data and the right half is the new"* 〔stella-list
+  `200108/msg00595`〕 — the shape §4 records for a late playfield write (old bits left, new bits right),
+  here on a player. He does not say whether he saw it on a console or an emulator, and no `GRP` write
+  inside a copy was graded at the pixel here (`litmus_48px6` lands its writes in the gaps between
+  copies). **Cited only, not verified.**
 - ⬜ 48px kernel GRP write windows: **no local source documents the cycle map** — derive ourselves (the
   recipe exists in score6.asm: NUSIZ=3-close, RESP0/RESP1 3 cycles apart at ~cycle 26+, HMP1=$10, VDELP both
   on, 6-store choreography, font `align $100`).
@@ -585,6 +652,14 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   (reset/select/color/p0pro/p1pro) + scenario panel inputs.
 - ✅ INPT4/5 fire: D7, 0=pressed; **VBLANK D6=1 latch mode** — verified `litmus_input` (v0.42.0).
   Test with N flag, never Z (bus noise in low bits).
+  📖 **The latch is not a debouncer.** B. Watson, 2001, whose colour-picker ROM's fire button *"still
+  acts wonky on the Atari"* once he had an EPROM cart: *"What's the normal way to debounce the fire
+  button? I had been trying to use latched input mode, but I found this was worse, not better
+  (apparently, when I clear the latch, then set latch mode, it latches the bounce!). This version just
+  checks the raw input line every 16 frames, no latching going on at all."* 〔stella-list
+  `200109/msg00222`〕 Reading the button once a frame and comparing it with the last is in
+  `docs/techniques/game-states.md`. The latch measured above holds a press; no bouncing contact was
+  simulated here, and the cause is his *"apparently"*. **Cited only, not verified.**
 - ✅ **The RIOT data registers decode A0 and A1 and ignore A3 and A4** — verified
   `litmus_riot_mirror` (`internal/emu/riotmirror_test.go`, 2026-09-06). `$0288`, `$0290` and
   `$0298` all read SWCHA, and `$028A` reads SWCHB, in every input state. So an address inside
@@ -652,11 +727,16 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   which pins, and the Star Raiders account below has all eight of port A driven. **Cited only, not
   verified** — no schematic was read here.
   📖 **One use is on the list, for a third cartridge.** Manuel Polik, reverse-engineering Star Ship in
-  2002, found the same `LDA #$10 / STA SWBCNT` at start-up and, later, a value stored to `SWCHB` and
-  read back. Eckhard Stolberg: *"There are three unused bits in SWCHB. If you set these to output you
+  2002, found the same `LDA #$10 / STA SWBCNT` at start-up — commented, across the two lines, *"Useless port
+  direction instructions..."* on the `LDA` and *"...on the 2600 (?)"* on the `STA` — and, later, a value stored to `SWCHB` and read back.
+  Eckhard Stolberg: *"There are three unused bits in SWCHB. If you set these to output you
   can read back whatever you write to SWCHB. So you could consider them as three bits more RAM, if you
   will. In the upper example it seems that the state of "gameOffBool" is stored in bit D4 of SWCHB"*
-  〔stella-list `200208/msg00253`, `200208/msg00269`〕. The three are **D2, D4 and D5** — the bits the
+  〔stella-list `200208/msg00253`, `200208/msg00269`〕; Glenn Saunders, surprised by that answer:
+  *"Wow. I thought you couldn't get away with using any of the VCS registers as general RAM storage. I
+  remember asking about this a long time ago and the general concensus was that it wouldn't work"*
+  (`200208/msg00279`).
+  The three are **D2, D4 and D5** — the bits the
   switch list above leaves out. A 2010 post keeps two flags of its own (a 7800 detected at power-up,
   and the B&W switch's flip state) in those three bit positions of the RAM byte that holds the
   previous switch state, masking with `#$34` and `#$CB`, and adds in one line that *"That could be
@@ -712,6 +792,34 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   (2005-08) is a cartridge dumper in which the 2600 talks serial out of a joystick port at 1200 baud,
   and a third party reports getting it running on hardware. Only the fact that it writes SWACNT was
   taken from that post; no code was (clean-room). Found by the mailing-list distillation (helper-2).
+  📖 **The bit time is counted in scanlines.** A send-only routine posted in 2005 (Glenn Saunders,
+  trimmed from a 7800 dumper's source) waits on `WSYNC` per bit, with the comment *"6.5 lines = approx
+  one 2400 baud bit"* / *"13 lines = approx one 1200 baud bit"*, and makes 2400 by alternating 7 and 6
+  lines 〔stella-list `200508/msg00061`〕. Computed here from `pkg/audio`'s clocks (76 cycles a line, the
+  CPU at colour clock ÷ 3; no emulator): 13 NTSC lines are 828.0 µs, 1207.7 baud, 0.64 % fast; on
+  PAL's clock 835.7 µs, 1196.7 baud, 0.28 % slow. **Cited only, not verified** — no serial line was
+  driven here.
+  📖 **Where the fourth row of the SWACNT table above has been seen to differ: z26.** Alex Herbert,
+  2005, found while working with the AtariVox that MGD's high-score table *"should not show without an AtariVox
+  connected - works fine on the real hardware and in Stella, but it still displays in Z26"*, and gave a
+  detector: `lda #$00 / sta SWCHA / ldx #$ff / stx SWACNT / sta SWACNT / lda SWCHA / beq z26_detected`
+  — *"That's not exactly what I have in my code, but if I understand correctly why it happens that
+  should do the trick"* 〔stella-list `200507/msg00017`〕. Read against the table: a port handed back to
+  the peripheral after its latch was written reads the latch on z26 and not on the console, and the
+  engine gives the console's answer in the fourth row (read here, not stated there). The seven
+  instructions were not run here. **Cited only, not verified.**
+  📖 **A peripheral that cares how fast the pins change.** The AtariVox keeps high scores in an I²C
+  EEPROM that a ROM drives through the RIOT. Bob Montgomery, 2005, could not get a save to stick —
+  every read came back `$FF` or close to it, and nothing he wrote changed it — using the AtariVox driver
+  pack's `i2c.inc` in a kernel of its own with `VBLANK` left on, seven bytes from EEPROM address
+  `$00C0` up, tested on a Cuttle Cart 〔stella-list `200505/msg00203`〕. The driver's author, Alex Herbert:
+  *"It's pretty timing sensitive"* — *"if it goes SCL_1 --> SCL_0 (or SCA_IN --> SCA_OUT) too quickly,
+  the i2c chip doesn't always see it. (The rise time is longer than the fall time because the RIOT only
+  has single-transistor outputs.)"*, and *"I thought we'd found that 12 clock cycles between state
+  changes on each pin was enough, but maybe it needs more"* (`200506/msg00039`). Aaron, whose Fall Down
+  used the same routines: *"it might be that Fall Down works only by some strange coincidence"*
+  (`200506/msg00003`). The thread ends without a confirmed fix, and nothing here measures a pin's rise
+  time. **Cited only, not verified.**
   ⬜ **The power-up value is still the engine's choice, not a measurement.** `Reset` zeroes the RIOT
   memory explicitly; whether a real 6532 clears its DDR on RES is not established here. The table
   above measures what a *write* does, which is a different question from what reset leaves behind.
@@ -726,6 +834,12 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   disputed — the ⬜ stays. Stolberg's advice for a binary that
   may start after a 7800 BIOS, a Supercharger or a Cuttle Cart loader has already run is the same in
   general form: initialise everything your code depends on 〔`200409/msg00070`〕.
+  📖 **On a 7800 the RAM is not random at power-up either.** Eckhard Stolberg, 2002: *"On the 7800 you
+  always go through the BIOS before the cart gets access to the machine. And all 7800 BIOS versions I
+  have seen use the same code in RIOT RAM to switch the 7800 into 2600 mode. So on a 7800 you can't get
+  random values from RIOT RAM."* 〔stella-list `200211/msg00183`〕 This engine starts RAM at zero
+  unless its `RandomState` preference is set (`internal/emu/randomstate_test.go`). **Cited only, not
+  verified.**
 
 ## 8. 6502/6507 precision
 - ✅ cycle accounting (76/line; WSYNC-stall exclusion).
@@ -916,24 +1030,55 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   offers it with its own caveat (*"But then you have to be carefully* [sic] *about which temp
   variables your subroutines use."* 〔stella-list `200401/msg00013`〕); `known-traps.md` covers a variable at `$FF` being clobbered by a `JSR` push and says
   nothing about going the other way.
+  The move the same thread makes first costs no scratch at all: Paul Slocum, *"a lot of times you can
+  use JMP's instead of JSR's. In Marble Craze I only have 2 bytes for the stack"*, and *"Usually I start
+  off programs using more JSR's since it's a little easier, then convert them to JMP's as the program
+  gets better defined and memory gets tight"* 〔stella-list `200401/msg00003`〕. **Cited only, not
+  verified.**
   (Stella PG). Real-game RAM budgets: Pitfall ≈ all 128 bytes (world = 1 byte!), Random-Dungeon ≈45 with
   aliased overlays, za2600 overflows into cart RAM. ⬜ a RAM-map audit feature (symbols → read/write
   coverage) would catch dead variables (Pitfall's `cxHarry` is stored, never read).
+  📖 **Where the 128 bytes go, by one author's rule of thumb.** Paul Slocum, 2004, on how large an
+  AtariVox save file needs to be: *"I doubt many programs are going to need to store more than 117
+  bytes considering there are only 128 bytes in the Atari. Most programs that use the file system will
+  probably have text routines which generally require at least 20 bytes of temp RAM. Plus there's
+  stack, controller handling variables, generic temp variables, etc."* 〔stella-list `200411/msg00068`,
+  quoted in `200411/msg00071`, where Eckhard Stolberg's reply disputes the 117 for saved levels, not
+  the RAM〕. **Cited only, not verified** — no text routine's RAM was counted here.
 
 ## 10. Bank switching
 - 📖 Scheme landscape (Horton's doc + woodgrain + threads): F8 8K ($1FF8/9) → F6 16K ($1FF6–9) → F4 32K
   ($1FF4–B), +SC 128B RAM variants; 3F/3E(+) for big data; DPC+/CDFJ need ARM (Melody/Harmony).
   **Community recommendation: F8 first** (max compatibility, cheapest PCBs, identical idiom scaling to
   F6/F4) — notably thread 338980 was started by DaveC himself.
-- 📖 Best practices: vectors in **every** bank; identical reset stub per bank; same-address trampoline;
-  each bank's RORG at an **odd** 4K segment ($1000/$3000/…) — TJ's reason is that otherwise *"you might
-  access the TIA, RAM etc."*, and he adds that *"some standard is to use the last possible addresses, so
-  you should use $d000 and $f000 for 8K games"* 〔stella-list `200306/msg00095`, quoting him〕; a
-  different origin per bank is also how *"Many bank-switched games"* were made debuggable *"on an
-  ICE-based development system with a full 6502 and RAM"* 〔AtariAge `topic/174668`, Bruce Tomlin〕
-  (both **Cited only, not verified**); don't put code/data in the last bytes
-  before vectors (accidental hotspot hits); SC RAM has separate write/read ports (no RMW; phantom reads on
-  page-crossing indexed stores corrupt it).
+- ✅ **The same-address trampoline runs here** (corrected 2026-10-02; this line had it documented-only).
+  `roms/litmus/litmus_bank.asm` calls into the other bank and back through a hotspot read every frame
+  (`roms/litmus/scenarios/bank.json`: `$80` = `$B1`, the counters `$81`/`$82` ≥ 4), and
+  `roms/techniques/banked_game.asm` loads its level data through the `$FF80` trampoline
+  (`roms/techniques/scenarios/banked_game.json`; `docs/techniques/bankswitching.md`).
+- 📖 Best practices: vectors in **every** bank; identical reset stub per bank — both ROMs above carry
+  them, but that is read from their source, not run. `TestEveryBankCanBeBootedInto`
+  (`internal/emu/bootbank_test.go`) checks from the bytes that a bank's reset path selects a bank and
+  passes when **at most one** bank omits it, so on a two-bank F8 a missing or broken stub in one bank
+  still passes; nothing compares the stubs for being identical. With `RandomState` off the engine
+  starts in bank 0 (`mapper_atari.go` `SetBank`: the first bank whose reset vector points into
+  cartridge space below the vectors), so the other bank's stub and vectors never run; with it on
+  (`internal/emu/randomstate_test.go`) the starting bank is one draw from a generator
+  `internal/emu/emu.go` seeds with 0, and which bank that draw gives was not read here. **Not
+  verified.**
+  Each bank's RORG at an **odd** 4K segment ($1000/$3000/…) — TJ's reason is that
+  otherwise *"you might access the TIA, RAM etc."*, and he adds that *"some standard is to use the last
+  possible addresses, so you should use $d000 and $f000 for 8K games"* 〔stella-list `200306/msg00095`,
+  quoting him〕; a different origin per bank is also how *"Many bank-switched games"* were made
+  debuggable *"on an ICE-based development system with a full 6502 and RAM"* 〔AtariAge `topic/174668`,
+  Bruce Tomlin〕 (both **Cited only, not verified**); why it is `RORG` and not `ORG`, in Jentzsch's own
+  post: the plain-`ORG` version *"would create 12K instead of 8K files, because you skip the $2000 or $e000
+  bank and the assembler will fill that with $FF"*, while `RORG` is *"only a logical origin and not a
+  also physical one"* — *"Note that you \*always\* must use ORG and RORG then"* 〔stella-list
+  `200306/msg00093`; **Cited only, not verified**〕, the same physical/logical split that leaves DASM's
+  listing column on physical offsets (`capability-gap-audit.md`, `srcmap`; our reading); don't put
+  code/data in the last bytes before vectors (accidental hotspot hits); SC RAM has separate write/read
+  ports (no RMW; phantom reads on page-crossing indexed stores corrupt it).
 - ✅(infra) **Gopher2600 supports all schemes we'd use** (F8/F6/F4±SC, FA, FE, E0, E7, 3F, 3E+, DPC(+),
   CDF*; not 0840) and **AUTO fingerprints a plain 8K dasm binary as F8** — our harness can verify
   bankswitching *today* with zero code changes. Bonus: `Cartridge.GetBank()` exposes the live bank →
@@ -972,6 +1117,21 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   different, so Carol needs some extra RAM to store the previous random number, which is necessary to
   restart a scene when the player dies."* 〔stella-list `200109/msg00030`〕 **Cited only, not verified**
   — his *"seems"*; River Raid was not examined here.
+  📖 **His question in the same post — *"if somebody knows a good bidirectional two byte LFSR, please
+  let me know"* — has no reply in the thread, and the answer is any maximal-length one** (computed
+  here, 2026-10-02, no emulator). A step that puts every non-zero value on one cycle is a permutation,
+  so it has an inverse, and for a shift register the inverse is the opposite shift with the lost bit
+  solved from the others — a register whose feedback polynomial is the forward one's **reciprocal**.
+  Pitfall's pair above is exactly that: `x^8+x^4+x^3+x^2+1` for the "right" step and
+  `x^8+x^6+x^5+x^4+1` for the "left" (exponents {0,2,3,4,8} and {0,4,5,6,8}, each 8 − the other), and
+  deriving the backward taps from the forward ones gives `bit0⊕4⊕5⊕6` — with `bit1` in place of `bit0`
+  it does not invert (the disassembly's error above). Over all 16 maximal-length 8-bit tap sets (every
+  left-shift tap set containing bit 7, each run from seed 1 for its period) and the first 12
+  maximal-length four-tap 16-bit ones (tap sets containing bit 15, taken in lexical order), each
+  checked at all 2^8 or 2^16 states, the derived backward step undoes the forward one at every
+  state, so it walks the same single cycle backwards; the 8-bit ones were also run to their period of
+  255. The reciprocal relation beyond the cases counted is the textbook one, **Not verified** here; and
+  whether River Raid's generator is such a shift register was not examined.
 - 📖 **DaveC's Random-Dungeon** (read in full): 2-byte room codes (walls/interior indices into ROM strip
   libraries); **exit-wall code spliced into the next room's entry wall** = infinite consistent dungeon with
   zero map storage; curated room-code tables (validity by construction); 8-bit Galois LFSR `eor #$8E`
