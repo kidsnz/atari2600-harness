@@ -63,6 +63,16 @@ might be worth a try"*, and the same thread later traced that bug to the value r
 above — and its fast-load puts the load block's own config byte at `$80`, so a ROM that zeroes the bits
 runs the same here and cannot be caught by it. Read from the code; **Not verified**.
 
+**The memory that sequence writes is three 2K banks, shown two at a time.** Chris Salomon, adding Starpath
+support to Stella in 1997 from the documents he had: *"StarPath 6K cartridge, 4 banks possible, 3 banks
+(RAM-Module) used,"* *"1 bank Starpath ROM (4th bank), 2 K each bank!"*, with bits D4–D2 of the control byte
+choosing which bank appears at `$F000` and which at `$F800` — eight combinations, the ROM only ever in the
+`$F800` slot — and of whether all 6K is RAM, *"dunno for sure, since some documents try to tell us
+otherwise"* 〔stella-list `199703/msg00213`〕. **Cited only, not verified.** The engine has the same shape:
+`supercharger/state.go` holds `ram [3][]uint8`, each `bankSize = 2048` (`supercharger.go`: *"supercharger
+has 6k of RAM in total"*), and `GetBank` maps the eight values of `BankingMode` (`(v >> 2) & 0x07`) to the
+same pairs as his table, the BIOS only ever in the `$F800` half. Read from the code; **Not verified**.
+
 **A scheme can also have an input with no defined result.** A Rentacom 2-in-1 cartridge that no
 emulator ran was worked out from its board — two 74LS10s forming a NAND SR latch — by alex_79 on
 AtariAge `topic/293883`: any address with A12=0, A9=1, A6=0, A5=1 selects bank 0; A12=0, A9=1, A6=1,
@@ -73,6 +83,18 @@ decodes the same four lines — `mapper_ua.go` `AccessPassive`: `switch addr & 0
 only on `$0220` (bank 0) and `$0240` (bank 1), so the third combination (`$0260`) never switches there:
 the engine picks one answer to a question the latch leaves open. Read from the code; **Not verified**.
 
+**F8's two hotspots, `$1FF8` and `$1FF9`, are Kevin Horton's, and a dumper's builder doubted them.** Horton's `sizes.txt`
+(V6.00, 1997-04-18): *"Accessing 1FF8 switches in the first 4K, and accessing 1FF9 switches in the last 4K."*
+The engine decodes exactly those two (`mapper_atari.go`, `atari8k.bankswitch`:
+`if addr >= 0x0ff8 && addr <= 0x0ff9 {`, `$0FF8` to bank 0 and `$0FF9` to bank 1; read from the code).
+In 2003 Adam Wozniak, building a cartridge dumper, wrote that *"$1FF8 and $1FF9 do not seem to be the only hot spots on F8 carts; $1FF7 also
+seems to be active (and many others). I don't think the hardware looks at the whole address bus to switch
+banks"* 〔stella-list `200301/msg00118`〕. Eckhard Stolberg replied: *"In F8 bankswitching only $1FF8 and
+$1FF9 are supposed to be hotspots. But for some carts the timing is a bit sensitive"* — on his 7800-based
+reader some F8 carts *"would switch banks at random addresses"* at 7800 speed, until he read them with a
+routine running at 2600 speed 〔`200301/msg00121`〕. **Cited only, not verified**; how a cart decodes its
+hotspots is not something this engine can show.
+
 **The FE row replaced a documented mechanism, and stephena said its unpicturable hardware should have been the first clue.**
 tomson's FE cart crashed Decathlon and Space Shuttle on real consoles until he set aside the
 documentation he had read — opcodes detected on the bus, the previous or next cycle's address — for
@@ -82,6 +104,28 @@ called Kevin Horton's canonical document *"just plain wrong on this one"*, and s
 rewrote Stella's FE, said of it: *"While I understand what it is saying, I couldn't picture how the
 hardware was actually implementing it. And that should have been the first clue that docs are
 incorrect."* (AtariAge `topic/268780`, 2017). **Cited only, not verified.**
+
+**FE as the list described it in 2002, and the cases it worried about.** Eckhard Stolberg: *"Games that use
+FE bankswitching have one 4K bank compiled for $F000 and one 4K bank compiled for $D000"*, so from the
+`$F000` bank *"you could do a "JSR $D123""*, and get back with a `JSR $F456` or an `RTS` 〔stella-list
+`200212/msg00185`〕. The engine's rule in the row above agrees: `$D1` is `%110`, bank 1, and `$F4` is `%111`,
+bank 0 (read from the code). His cart-side account then was not the row's: wait for an address in the
+stack area `$0100-$01FF`, check that the next is there too, then read D5 〔`200212/msg00182`〕. Christopher
+Tumber named two other ways a JSR/RTS pair turns up — *"to waste 12 cycles"*, and a subroutine built in RAM
+that ends up as nothing but an `RTS` — and Thomas Jentzsch added *"that BRK-to-subroutine trick used at
+least in several Parker games"* 〔`200212/msg00184`, `200212/msg00183`〕. Stolberg's answer was that in an
+FE image every `JSR` and `RTS` is meant to switch, and that FE games use no `BRK` or `RTI`
+〔`200212/msg00185`〕. **Cited only, not verified.** Read here, not stated there: the RAM case is the one the
+row above flags, a JSR or RTS whose address lies below `$C000`.
+
+**Some 7800s break FE.** Eckhard Stolberg, 2002: early 7800s had problems with some SuperChip games, so
+*"Atari added a little circuit to the later models of the 7800 that changes the signal timing on the bus.
+This made the superchip games more reliable, but broke the Activision games with FE bankswitching for
+example"* 〔stella-list `200211/msg00187`〕. In 2004 he said the fix *"broke compatibility with Activision's
+FE bankswitching and the Supercharger"*, and that *"some people disabled the extra hardware (only requires
+removing a certain capacitor)"* 〔`200409/msg00115`〕. Neither
+gives a year or a model, so "later" is known only by this behaviour; tomson's FE cart above ran on his 7800,
+model not stated. **Cited only, not verified.**
 
 **Above A12 there is nothing at all, and that is a resource.** The 6507 has thirteen address lines,
 so A13–A15 of a 16-bit pointer are **never emitted** — measured 2026-09-04, the same ROM byte reads
@@ -219,6 +263,43 @@ the ROM sat in a reboot loop (symptoms: 350-line TV frames, RAM cyclically re-cl
 level stuck at 0). Diagnosed in minutes with `watch_ram` (the buffer's writer PC alternated
 between the loader and the boot-time `Clr` loop). Trampoline at $FF80 keeps a safe distance.
 
+**Not on the hotspot, and not just before it either, on F6.** Eckhard Stolberg, against a plan to put `BRK` on the
+hotspots: *"Remember that the 6502 always reads at least two bytes for every instruction. So a BRK at $FFF8
+will trigger both $FFF8 and $FFF9 with a one cycle gap"* 〔stella-list `200212/msg00000`〕. One byte lower
+helps only while that byte is not a hotspot too: one `BRK` *"at $FFF7"* would do on F8, he went on, but not
+if the game moves to F6 — where `$FFF7` is itself a hotspot (the engine's F6 switches on `$0FF6`-`$0FF9`).
+**Cited only, not verified.** The engine makes the same read: an implied-mode instruction reads the byte
+after its opcode (`cpu.go`, the `// phantom read` under `case instructions.Implied:`; `BRK` reads it as its
+padding byte), and that read reaches the mapper like any other. `internal/cyclebound` refuses an instruction
+whose own bytes cover a hotspot, and `rts`, `rti` and `brk` are one byte in `definitions.json`, so the byte
+such an instruction reads after itself is not among the ones it checks. Both read from the code; **Not
+verified**.
+
+**The same read, used on purpose.** Fred Quimby, 2005, for F8: an `RTS` at `$FFF8` in bank 0 and at `$FFF7`
+in bank 1; push the target minus one and `JMP $FFF8` (or `JMP $FFF7` to come back). Kroko's account:
+fetching the `RTS` at `$FFF8` selects bank 0, where the code already is; *"After RTS is fetched, a dummy
+fetch takes place which brings FFF9 to the bus, which then causes the bankswitching logic to switch to bank
+1. The RTS then returns to the location you pushed on the stack, but after the switch to bank 1"*
+〔stella-list `200503/msg00036`, `200503/msg00041`〕. It removes the fixed landing address the trampoline
+above has to keep aligned. Quimby pushes `#>ROUTINE1` and `#<ROUTINE1-1` separately and notes that this
+fails when the low byte of the address is zero; Manuel Rotschkar's form takes the target from a table
+〔`200503/msg00038`〕 — `docs/techniques/rts-dispatch.md` does the table half and never mentions banks:
+```
+LDA JumpTable+1,Y
+PHA
+LDA JumpTable,Y
+PHA
+JMP $FFF8
+Jumptable
+	.word ROUTINE1-1, ROUTINE2-1, ROUTINE3-1
+```
+Quimby reported it working in Stella, z26 and on real hardware on a Kroko cart. Thomas Jentzsch was *"not
+100% sure it works on real hardware"*: a similar trick in his first Battlezone TC hack *"worked on CC and
+emulators, but not on real hardware"*. Quimby suspected the 0.1 µF capacitor on the boards he had seen,
+Kroko argued that one cycle is all any hotspot access gets, and the thread ends with no test on such a board
+〔`200503/msg00037`, `200503/msg00040`, `200503/msg00042`〕. **Cited only, not verified.** In the engine it
+follows from the implied-mode read above (read from the code; **Not verified**); nothing here runs it.
+
 **Placement bugs show up outside this repo too, and this engine has caught one.** Flap Ninja reset to
 its title screen on real consoles (Harmony and PlusCart, PAL and NTSC) but not in Stella, even in
 developer mode; the author called it *"some bug with the bank switching that Stella doesn't
@@ -304,6 +385,26 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
   sprites, tables and positioning routines in both. ben_larson's 16K *Panky* puts kernel, main loop,
   in-game logic and graphics in one bank, room set-up and room data in a second, title/ending kernels
   in a third and music in a fourth, so no graphics are duplicated. **Cited only, not verified.**
+- **Or by screen — the opposite of the bullet above, in two plans from the list.** Erik Mooney's 16K RPG
+  engine (1997): *"the world maps and their display kernel"* in one bank, text messages in a second, *"the
+  monster graphics and code for battles"* in a third, and everything else — *"status bar display kernel,
+  processing player movement/console switches, etc"* — in the last 〔stella-list `199707/msg00036`〕.
+  Manuel Rotschkar's Beach Head (2005): title, map and high-score screens / torpedo run / naval battle and
+  tank finale / tank movement, and *"I can probably create Banks 2-3 as separate solo 4K games"*, with room
+  for another programmer to *"contribute 1 or 2 of the banks"* 〔stella-list `200507/msg00162`〕. Both
+  were plans when posted. **Cited only, not verified.**
+- **Or by calculation and drawing.** Nick Bensema, 1997, on how he would use 8K *"if I ever did need that
+  much space"*: *"The first bank would have all the game calculation bits, the second bank would have all the
+  screen drawing bits"* 〔stella-list `199703/msg00113`〕. Panky above keeps logic and kernel in one bank,
+  and this page's demo splits data from code. A plan, not a game: **Cited only, not verified.**
+- **Or put the code in both banks.** BiiggerBoing26 (2003) is an F8 image whose *"Code is mirrored in first
+  1K of both banks"*, so *"this is effectively a 7K cart. It's like having two 3K 'banks' of unique data"*;
+  its author called the switching *"'el cheapo'"* 〔stella-list `200307/msg00008`, `200307/msg00010`〕. The
+  posted code switches with `BIT $1FF9` or `BIT $1FF8` to reach the bank that holds an animation frame and
+  carries straight on — read here: the next instruction is the same in either bank, the next-fetch rule of
+  the trampoline with the whole routine as the landing site. He assembled the 1K separately, emitted a byte
+  at `$3FF` *"so that it would come out to 1024 bytes"*, and `incbin`'d it twice. **Cited only, not
+  verified.**
 - **Call a bank like a subfunction** (brpocock, AtariAge `topic/82141`): load a bank ID and a function
   ID into registers and `jmp bank_switch`; the selected bank's common entry reads the function ID. The
   shared RAM area is zeroed during the switch, which happens in VBLANK, and for a short script *"a
@@ -324,6 +425,29 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
 
 ## Choosing the cartridge type
 
+- **From what the game needs — for these two, RAM.** `docs/fundamentals-audit.md` records the community
+  recommendation *"F8 first"*, for compatibility. andrew-davie, in a 2019 thread on F6: the scheme
+  *"depends on the NEEDS of the game you want to write"*, and *"my games these days like having lots of RAM
+  to play with. So I choose a bankswitch scheme that allows that"* (AtariAge `topic/294463`). grafixbmp's
+  Beyond Castlevania began hoping that *"extra RAM wouldn't be necessary"*, found as the design grew that
+  *"this didn't seem possible"*, and chose F4SC for *"the extra 128 bytes"* as a frame buffer for sprite
+  data (AtariAge `topic/143390`). **Cited only, not verified.**
+- **What each scheme adds in RAM.** Asked about 256 bytes, a 2022 thread pointed to an external table of
+  the schemes with the ROM and RAM each provides, and added that most games with extra RAM used the
+  SuperChip, *"which provided 128 bytes of RAM"*; svolli: it combines with 4K, F8, F6 and F4, and *"it
+  "only" costs you 256 bytes of ROM per bank"* (AtariAge `topic/340856`; **Cited only, not verified**).
+  The engine's mappers give:
+
+  | scheme | ROM | extra RAM | where |
+  |---|---|---|---|
+  | F8SC / F6SC / F4SC | 8K / 16K / 32K | 128 bytes | `mapper_atari.go`, `superchipSize = 128` |
+  | FA (CBS RAM+) | 12K | 256 bytes | `mapper_cbs.go`, `cbsRAMsize = 256` |
+  | E7 (M-Network) | 8K / 16K | 1K plus four 256-byte banks | `mapper_mnetwork.go`; `fingerprint8k` and `fingerprint16k` both return `"E7"` |
+  | CV (CommaVid) | 2K | 1K | `mapper_commavid.go`, `commavidRAMsize = 1024` |
+  | 3E | from the file | up to 32 banks of 1K | `mapper_3e.go`, `ram [32][]uint8`, `ramSize = 1024` |
+  | Supercharger | 2K BIOS | 6K | `supercharger/state.go`, above |
+
+  Read from the code; **Not verified**.
 - **The type is part of the budget.** svolli's 512-byte plasma demo runs on CommaVid *"so I can
   pre-calculate some data"*; the Supercharger version is over 512 bytes *"since RAM access there
   requires more effort"* (AtariAge `topic/354722`). The same picture costs different code on different
@@ -344,6 +468,28 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
   for the resulting soft lock, from the same thread (no result is reported): put `JMP ($FFFC)` in the second image at the address
   right after the `LDA $1FFx`, so the second game starts from its own reset vector — a hand-off that
   does not return, unlike the trampoline. **Cited only, not verified.**
+- **Where each bank is assembled.** `docs/fundamentals-audit.md` records each bank's origin at an odd 4K
+  segment and `$D000`/`$F000` for 8K. For 16K, Thomas Jentzsch moved Thrust's banks so that they *"now start
+  at the adresses $9000, $b000, $d000 and $f000, like all later 16k atari games do. (This should help to
+  check the ROM with real hardware)"* 〔stella-list `200007/msg00055`〕. Read here, not stated there: the
+  eight odd windows measured above return the same byte, so the 6507 cannot tell these origins apart; they
+  differ only to something that sees more address lines. **Cited only, not verified.**
+- **On a 7800 RAM cart, only the odd 4K segments.** Eckhard Stolberg, to an F8 game prepared for one: *"In
+  2600 mode the 7800 maps in the TIA and RIOT in all even 4K segments of the 6502 memory map. Therefore you
+  can only use the odd 4K segments for a game. You have to double the segments in the ROM and compile the
+  later halves for $D000 and $F000"* 〔stella-list `200304/msg00244`〕. The rebuilt image came back with
+  *"This may not have been a fair test though"* and no result 〔`200304/msg00246`〕. In 2004 he answered a
+  question about mirroring with *"In 2600 mode the memory map is exactly like on a real VCS"*
+  〔`200409/msg00115`〕; read here, the two fit if what differs is only what a cart that sees all sixteen
+  lines is handed — the kind of difference the portability caveat in the A13–A15 section names.
+  **Cited only, not verified.**
+- **A flash cart can assume a layout the scheme leaves open.** Eckhard Stolberg, to a 3F demo: copy *"the
+  last 2K bank in the ROM (which is fixed at $1800-$1FFF)"* to *"the 4th 2K bank in the ROM"*, so that it
+  runs on a Cuttle Cart, which *"is set up for the normal 8K versions of 3F bankswitching, so it always uses
+  the 4th bank for the fixed area"* 〔stella-list `200301/msg00151`〕. **Cited only, not verified.** The
+  engine fixes the last 2K of the image whatever its size (`mapper_tigervision.go`: *"the last 2K always
+  points to the last 2K of the image"*; read from the code, **Not verified**), so for an image larger than
+  8K it and such a cart disagree — read here.
 - **Recognising the scheme from outside.** A dumper sees 4K at first, so it cannot fingerprint the
   whole image as Stella does and has to trigger hotspots and look (Thomas Jentzsch, AtariAge
   `topic/354336`). The Retron 77 dumper touches `$1FF6-$1FF9` one at a time and compares checksums of
