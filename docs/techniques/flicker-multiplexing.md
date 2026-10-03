@@ -30,6 +30,14 @@ limit to return here — this is a judgement — but the number exists so the ju
 one, and `HardwareCollisionUsable` is the other half of it: past two subsets the TIA's collision
 latches stop being trustworthy, so a high N costs more than looks.
 
+**The table is NTSC only, and so is `FlickerRateHz`.** A PAL 2600 runs at 49.86 Hz (3546894/228/312;
+`subpixel-velocity.md`, where the PAL colour clock itself is **Cited only, not verified**), so two
+subsets are drawn at 24.93 Hz, not 29.96. Eckhard Stolberg, on his own TV, about a demo of two large
+sprites interlaced over time: *"The 60Hz NTSC flicker is a borderline decission at best, but the 50Hz
+PAL flicker is unbearable. It is too noticable with such large objects."* 〔`200302/msg00246`〕 Two
+variables, then, the rate and the size of what flickers; `design-principles.md`'s *"Never over a large
+area"* is the size half. **Cited only, not verified** — one viewer, one demo.
+
 ★**Does a longer cycle flicker less? The two sources disagree, and the number this repository gates on
 cannot see the difference either way.** Andrew
 Davie, 2003, proposing a three-frame Fuji over a two-frame one: *"**three frames**, first frame with
@@ -84,6 +92,13 @@ as this harness's harshest blind spot — the numbers above say which colours ar
 of reach, not which ones look right. Pick the pair here; judge it on a screen. Found by the
 mailing-list distillation (helper-2).
 
+One answer from the forums on how far the eye forgives, which is a claim about perception and not a
+measurement: RevEng, advising on a sprite flickered over a coloured background, *"don't get too caught
+up on the absolute purity of the color of the guy's shirt and pants. When you flicker with a colored
+background, color constancy kicks in and people perceive the colors as relatively pure even though they
+aren't in the absolute sense."* (AtariAge `topic/172888`). **Cited only, not verified** — read through
+our distillation note; the thread itself is not on disk here.
+
 ★**A third use: flicker that mixes depth order.** Thomas Jentzsch, 2022, to the author of *Raptor*:
 *"you are using the same PF priority flicker trick for the shield which I came up with for the clouds
 in Aardvark. And in your game it is a key element."* (AtariAge `topic/332187`). The post names the
@@ -114,10 +129,11 @@ core; sort + dynamic 2-of-N allocation + fairness rotation is the documented ext
 (`multisprite.inc` family).
 
 > **★A full sort is not what the technique costs.** Roger Williams, stella-list 2002-04, describing
-> what he named *FlickerSort*: it is a **single bubble pass per displayed frame**, not a sort —
+> Manuel Polik's *FlickerSort* 〔`200204/msg00010`〕: it is a **single bubble pass per displayed frame**, not a sort —
 > **O(n)**, and run **outside the kernel**. Over successive frames the list converges toward Y order
 > and stays there while objects move slowly, which is all the technique needs. He also withdrew the
-> obvious extension himself: doing it **inside** the kernel *"increases flicker and gains little."*
+> obvious extension himself, doing it **inside** the kernel: *"My idea would have made the sprites
+> flicker a lot more, to not much overall benefit"* 〔`200204/msg00011`〕.
 > The distinction is not cosmetic for anything using `prove_line_budget` — one pass is a fixed,
 > provable cost; a sort is not.
 >
@@ -125,6 +141,47 @@ core; sort + dynamic 2-of-N allocation + fairness rotation is the documented ext
 > 2002 thread is where the name was coined (Manuel Polik). Recorded because `pkg/design/multiplex.go`
 > already carries a post-mortem on the opposite failure — *a citation that does not support the claim
 > is worse than none*. Found by the mailing-list distillation (helper-1).
+>
+> **What the withdrawn version would have cost, from the proposal itself** (Roger Williams,
+> 2002-04-16, 〔`200204/msg00008`〕, with *"about half the code half-written"*). A state machine spreads
+> the move to the next sprite over several lines, which *"will make each multiplex sprite several lines
+> higher than it 'really is' for flicker purposes"* — his estimate, *"about four extra (2-scanline) lines,
+> making the typical square player about double-height for flicker purposes."* The list is sorted
+> indirectly, so *"2 of those bytes are X and Y positions which can double as game position data, since
+> objects don't have to move around in the list."* RAM: about 10 bytes for the sorting code, about 18 for
+> the non-multiplexed objects, and 5 per multiplexed copy of P0, leaving *"at least 2000 cycles free
+> between frames"*. Polik's FlickerSort demo answered it, and the withdrawal quoted above came the
+> next day. Later that same day he argued part of it back: a sort run outside the kernel can count a sprite as drawn when its RESPx/HMPx setup
+> carried the kernel past it, and the sprite *"disappears completely"*, whereas in the kernel *"you know
+> for sure whether a sprite was actually displayed"* 〔`200204/msg00022`〕. **Cited only, not verified** —
+> none of these programs has been run here.
+
+**The rotation can come out of the sort.** Thomas Jentzsch, 2002, on the "intelligent flicker" in
+JtzBall 〔`200203/msg00079`〕: his bubble sort *"stops when all elements are sorted"*, which comes early
+because each element moves one row a frame, and *"keeps the order of rows which have the same Y-value.
+That is very important for intelligent flicker."* Duplicates on a row go to the end of the array and
+out of the displayed count: *"By removing those duplicates with the lowest indexes, I'm getting
+automatically the intelligent flicker I need."* His worked example, three atoms on one row moving the
+same way, shows each displayed once in three frames. Our reading: nothing in it counts turns — the
+stable sort does the job the rotation counter does above. He had not yet checked it *"for elements
+which are moving in opposite Y-directions"*. **Cited only, not verified.**
+
+**Or keep the order instead of restoring it.** Erik Mooney, 2002, in a thread on which sort to use:
+*"Couldn't you just insert the object at the beginning of the list if it's entering at the top of the
+screen, and insert it at the end of the list if it's entering at the bottom of the screen?"* — and, for
+the general case, an insert routine that walks the list: *"That can't take more than n time. That almost
+changes the paradigm from a sorted array to a priority queue, which when you think about it is what your
+2600 display kernel really is..."* 〔`200203/msg00102`〕. Adam Wozniak, on finding the place: *"log2(n)
+if you binary search"* 〔`200203/msg00109`〕. `dynamic-multisprite.md` goes the other way for its five
+objects (a fixed sorting network, not insertion sort); this is the case of objects entering at the
+screen's edges. **Cited only, not verified.**
+
+**Heights feed the overlap test.** Bob Colbert, 1997, on his multi-sprite engine: *"I just eliminated a
+nasty bug that sometimes caused a sprite to mysteriously disappear. It turns out that when I modified my
+code to allow for variable height sprites, I neglected to modify a portion of the conflict detection
+routine."* 〔`199710/msg00111`〕 Our reading: in the full form above that is the routine deciding which
+objects "actually collide on the same lines" (this page's words), so whatever changes how heights are stored has to reach it too.
+**Cited only, not verified.**
 
 **Which form to build: supercat's ladder** (AtariAge `topic/78021`, 2005). The axis underneath is
 memory against sorting.
@@ -180,7 +237,7 @@ the thing to write down.
 
 ## Choosing what flickers, how often, and how evenly (added 2026-09-30)
 
-Everything above decides *how many* subsets. Six threads decide the rest, and none of them was
+Everything above decides *how many* subsets. The threads below decide the rest, and none of them was
 measured; each is **Cited only, not verified**, and none of the ROMs named has been run here.
 
 **How often is set by the motion, not only by the count.** `SubsetsFor` takes the number of objects
@@ -190,6 +247,24 @@ electron shares scanlines with the others is fairly limited. It probably wouldn'
 intelligent flicker routine."* Karl G's answer was to ask for uranium's 92 (AtariAge `topic/302929`,
 2020).
 
+**Small objects that rarely meet are a different claim from many objects.** Glenn Saunders, on Manuel
+Polik's demo of bullets driven by Bob Colbert's multiplexer: *"Vertical separation is pretty easy on
+missiles because they are so small. Even with six they rarely overlap, at least in that demo where they
+are going in a diagonal trajectory."* 〔`200103/msg00208`〕 Manuel answered with a challenge: *"Name just
+one game, that's having eight totally independent moving, nearly non flickering bullets/stars/whatever"*,
+and *"The Stars in Stargate, Solaris, Starmaster & Star Voyager are definitely not capable to
+overlap..."* 〔`200103/msg00211`〕. Our reading: before a commercial ROM is cited as many objects with
+little flicker, check whether its objects can share a line at all.
+
+**Starfields, as one programmer read them in 2002.** Manuel Polik, after *"two hours analyzing how
+other Starfields are made"* 〔`200207/msg00331`〕: SW-TAG re-uses *"two particles à four times -> 15Hz
+flicker"*; Gyruss draws the field *"using only 1 particle most of the time and should flicker extrem. I
+wonder why it doesn't seem to be too annoying..."*; Star Voyager, *"Just like Starmaster"*, uses the
+ball, *"wasting a complete scannline to reposition it"*; Star Raiders uses all three particles and
+splits the screen in two with a mid-screen repositioning, so it *"can display six particles at once,
+which is resulting in 12 stars with only 30Hz flicker"*. The Gyruss question is left open in the post.
+**Cited only, not verified** — his reading of those ROMs, not ours.
+
 **But flicker that comes and goes has its own cost.** The full form above flickers only the objects
 that collide on the same lines, which makes the flicker intermittent. Thomas Jentzsch: *"Personally I
 find on and off flicker more noticeable and annoying than high frequency, constant flicker"*
@@ -197,6 +272,20 @@ find on and off flicker more noticeable and annoying than high frequency, consta
 the gate reads it backwards: an on-and-off pattern has the same worst pair as a constant one and
 more unchanged pairs, so `max_flicker_area` ties them and the mean prefers the one he finds worse.
 That reading follows from the duty table's definitions; **Not verified** by a ROM.
+
+**Thomas Jentzsch had said it in 2002, in a thread that drew the conclusion for multiplexers.** Clay Halliwell,
+watching a Star Fire beta: *"when a sprite goes from solid to flickering, it catches your eye more than
+when it goes from flickering to flickering more. So I wonder if it would be a good idea if multiplexing
+routines were written so that, even if they have the opportunity to display a sprite solid, they flicker
+it anyway."* 〔`200210/msg00025`〕 That is the reverse of the full form above. Thomas Jentzsch agreed —
+*"constant rate flicker is less annoying than often changing on and off flicker (e.g compare Pac-Man
+flicker with Robot City flicker)"* 〔`200210/msg00028`〕 — said it *"should be also tested on a TV"* and
+that *"If you add constant flicker, the difference between the various flicker rates get's reduced
+drastically"* 〔`200210/msg00029`〕, and later *"I think constant 50% flicker is hardly noticable, the
+objects only get a bit darker"* 〔`200210/msg00031`〕. Manuel Polik, who had just cut his own flicker
+down to visible vertical collisions, was not persuaded: *"Right now I'd prefer reducing flicker
+situations at best, instead of going the SW-TAG way."* 〔`200210/msg00030`〕 The thread did not settle
+it. **Cited only, not verified.**
 
 **The duty need not be the same for every object.** Kirk Israel, 2004, planning a pterodactyl
 ("Pterry") between the two JoustPong players: alternate `[1 2]`, `[1 P]`, `[1 2]`, `[P 2]`, so
@@ -207,12 +296,39 @@ gap that the 2021 CRT comparison above ranked worst. Glenn Saunders answered by 
 draw Pterry with one missile 〔`200402/msg00069`〕, which Thomas Jentzsch said needs only relative
 repositioning — `HMMx` and `HMOVE`, no timed `RESMx` 〔`200402/msg00073`〕.
 
+The opposite choice is the even share. grafixbmp, to the author of *Taxi Panic*, about three player
+sprites on the screen: *"instead of one on 60 frames and the other on 30 they could share the load and be
+on 40 frames by being off every 3rd frame. Just a passing thought..."* (AtariAge `topic/249398`).
+johnnywc's *"all 3 at 40hz"* below is the same split. **Cited only, not verified.**
+
+**One object, three jobs.** Greg Troutman, 1997, planned to *"duplex one missile register at 30fps,
+alternating the bad guy missiles with the player's shots"* 〔`199709/msg00195`〕; asked for retro-rocket
+fire as well, he answered *"I should be able to split up one missile between the two player shots, and
+the retro rockets, but divvying up the frames three ways gives me a priority problem. I'll try and make
+that happen and just see how it ends up looking, I guess."* 〔`199709/msg00200`〕 He does not say what the
+priority problem is. **Cited only, not verified.**
+
+**The mean hides the longest gap.** Manuel Polik, 2001, four objects through two slots, cycling all six
+pairs (`0011 0101 1010 0110 1001 1100`): *"No matter how you arrange it, you'd always have sprites
+blanked for two frames, but the average display time is still 50% of the time..."* 〔`200102/msg00261`〕
+The arithmetic is ours: inside a cycle that shows every pair, each object is on three frames of six, and
+never being off twice running would put it on every other frame, which forces one pair onto all the odd
+frames — so the claim holds for that cycle. Fixed pairs (this page's demo) never blank an object twice
+running, at the price of never drawing some pairs together. No column of the duty table above reads the
+longest gap; `never_for` (`scenarios.md`) can state "not off for N consecutive frames" over a RAM field,
+and the demo's scenario does not use it.
+
 **Which object flickers is a choice, and the threads choose by different rules.**
 - *Never the hero.* johnnywc on a *Bruce Lee* mock-up: *"My recommendation would be to have Bruce
   never flicker and have the enemies flicker at 30hz, or you could flicker all 3 at 40hz. Of course
   they would only flicker when all 3 are on the same line"* (AtariAge `topic/347106`, 2023-01-27).
   His 40 Hz counts frames shown, two in three; the gap still recurs at 20 Hz. splendidnut's prototype
   two weeks later puts the two enemies on one player object, and they flicker.
+  The rule is older. Bob Colbert in 1997 wanted to mark one sprite as never flickering, *"even if
+  others fall on the same line ... (for the player controlled sprite of course)"*, as a plan rather
+  than a feature 〔`199709/msg00146`〕, and Thomas Jentzsch gave the reason in 1999 while planning
+  *Thrust*: *"I don't want the ship to flicker, because this is the point where the human player is
+  most focussed at. So i'll better let some of the other players flicker."* 〔`199911/msg00039`〕
 - *By what lies underneath.* Thomas Jentzsch on *Pac-Line*: *"maybe it is better to flicker ghosts
   and player. Because the player will never move over white playfield pellets. These make flicker
   very obvious. For ghosts this is fine, but not for fruits."* The author found his own eyes were on
@@ -224,6 +340,28 @@ repositioning — `HMMx` and `HMOVE`, no timed `RESMx` 〔`200402/msg00073`〕.
   back: the pellet was eaten by hardware collision, so it could not be eaten while not drawn; and,
   Thomas Jentzsch, it is drawn with the ball and the playfield, so it *"cannot be used for drawing
   complex sprites"*.
+
+**Whether to flicker at all depends on where the eye is held.** Glenn Saunders, 2001, on a two-player
+gunfight: *"I am NOT against flicker, but when your eye is focused primarily on the two gunfighters
+facing eachother off, flicker is going to be really obvious. Flicker is better for games that have fast
+moving sprites filling up the screen, constantly overlapping and often becoming solid when vertically
+separated. Stargate and Solaris are good examples. You don't mind so much that it flickers if the payoff
+is a screen full of activity."* 〔`200102/msg00329`〕 **Cited only, not verified.**
+
+**What alternates need not be an object.** *Hellway 2 Players Edition* alternates whole views: *"I am
+doing this by drawing 2 screens, alternating between left and right side each frame. From all my tests,
+the game is perfectly playable and a constant 30hz flicker totally ok."* The author ties it to the game
+state being deterministic — *"the screen is just a view of a world"* — and keeps control at full rate:
+*"I draw the game at 30Hz (one side per frame), but most of the physics run at 60hz"*. A dark
+background was the default from the start (*"Since the screen is flickering and the colors have less
+intensity, dark mode became the default"*), and then the only mode (*"Due to the flickering, all non
+dark backgrounds looked bad"*); when he later restored the other mode, dark stayed the default, because
+*"when I tried in other monitor, the effect was much more noticeable"* (AtariAge `topic/331474`). In a thread on
+hacking *Defender II*, the suggestion for adding a scrolling city alternates kernels instead: low on the
+screen, *"decide if to branch out of the existing kernel IF THE FRAME COUNT IS ODD OR EVEN. That is only
+a few cycles"*, with a new kernel drawing the city on its frames, where *"you can IGNORE PF COLLISION of
+sprites"* (AtariAge `topic/289892`; read through our distillation note, the thread is not on disk here,
+and it is a suggestion, not a built kernel). **Cited only, not verified.**
 
 **Brighten what flickers.** SpiceWare, who flickers the player's character "when needed" in Space Rocks,
 Draconian, Frantic and Timmy: *"One thing that does help is to LumaBoost flickering objects - basically increase the color
@@ -241,3 +379,21 @@ flicker, after Ed Fries's Rally-X, with each kind of object in its own colour. T
 players, so the six-digit score routine cannot share that part of the screen, and the score and lives
 are drawn in the playfield, the older way. Read from distilled notes, not the blog post (AtariAge blog
 entry `10896`); **Cited only, not verified**.
+
+**None was once the selling point.** Piero Cavina, 2000, answering a description of games that keep
+sprites on horizontal rails as copies: *"Most Activision games follow these concepts, and don't have
+flicker at all (peraphs Commando is the only one with a little flicker.. anyone can confirm this?).. one
+side-effect is that many Activision games look the same :-)"*, and *"I think that this explains a part
+of the succes of Activision games over Atari when they first came out; Atari programmers used a lot of
+flicker without too much shame at the time, while the beauty of Activision graphics was easily
+recognizable."* 〔`200005/msg00161`〕 An opinion on how the games were received, with its own cost
+named. **Cited only, not verified.**
+
+**Not every viewer is a television.** Glenn Saunders, 1999, on 2600 output through a video editing
+system: *"the end result of going through the time base corrector is pretty strobey and removes
+flickering sprites that are updated on particular field numbers, so the motion doesn't look quite
+right."* 〔`199907/msg00166`〕 The same thread found a VCR's record circuit stricter than the TV:
+Edtris and TPS would not tape, Oystron and Submarine Commander did 〔`199907/msg00149`〕, and Eckhard
+Stolberg's explanation was the sync, not the flicker — TPS skips the WSYNC before VSYNC, so it *"might
+actually generate the vertical sync signal only for two and a half scanlines or so"* 〔`199907/msg00162`〕.
+Nothing in this repository models a recorder. **Cited only, not verified.**
