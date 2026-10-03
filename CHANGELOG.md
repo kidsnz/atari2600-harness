@@ -6,6 +6,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — 240 more cited-only review rows; five standing errors corrected (2026-10-03)
+
+Each was written by one writer and checked by a separate reviewer before commit.
+
+- **240 rows the review judged worth adding but had only cited (confidence B)** land in
+  `design-principles.md`, `known-traps.md`, `capability-gap-audit.md`, `kernel-micro-idioms.md`,
+  `fundamentals-audit.md`, `integration-density-playbook.md`, `bankswitching.md` and
+  `flicker-multiplexing.md`. Every claim not measured here is marked Cited only, not verified or Not
+  verified, and each row was re-read against its source; where the review's summary disagreed with the
+  source, the source is what was written.
+- Corrections to what the harness already said:
+  - `design-principles.md`: an odd line total loses the frame's colour on PAL (Stolberg, 1999) rather
+    than being "not a legal PAL frame"; whether NTSC is affected is left open. The `CMP #$C9` slide is
+    measured, not arithmetic only: `jmptabledelay_test` gives entries 2-6 as 6, 5, 4, 3, 2.
+  - `fundamentals-audit.md`: the PAL60 entry no longer calls one line-rate literal wrong; which field is
+    wrong depends on the console. Section 10 marks only the same-address trampoline as run here; vectors
+    in every bank and identical reset stubs are read from source.
+  - `flicker-multiplexing.md`: FlickerSort is Manuel Polik's name, and a paraphrase that sat in quotation
+    marks is replaced by his words.
+  - `integration-density-playbook.md`: a paragraph that 83e20e3 had placed inside a sentence is moved
+    after its Source line, unchanged.
+- `capability-gap-audit.md` records a prover gap found by reading the code: `internal/cyclebound` assumes
+  a branch cannot change bank, while the engine's page-crossing branch performs a phantom read that a
+  hotspot could see.
+
+Found, not fixed here: 169 of the 172 litmus sources write VSYNC with no WSYNC right before it and an
+`lda #0` inside the window (`known-traps.md`'s VSYNC row); the engine and Stella accept it, and the
+effect on hardware is not measured. `bootbank_test` passes when one bank of a two-bank image omits its
+reset stub. The comments in `internal/emu/pal60rate_test.go` and `internal/emu/emu.go` still carry
+claims the documents above have narrowed.
+
 ### Added — the first cited-only review rows land; the prover stops over-allowing @lines (2026-10-02)
 
 Each was written by one writer and checked by a separate reviewer before commit.
