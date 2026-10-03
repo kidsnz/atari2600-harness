@@ -133,6 +133,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     channels down to monochrome"*, Banker on each — and got illegal instructions or *"an image that
     bears no obvious relation to what I wanted"* 〔`200303/msg00093`〕; no answer to that is in the thread
     as held here. **Cited only, not verified.**
+  - **Or tell the states apart without colour.** Andrew Davie's 1998 *PUSH* demo, a Sokoban-like
+    puzzle drawn wholly in the playfield, used his four-colour playfield (*"I CANNOT choose any colours
+    I want"*). Eckhard Stolberg, on a PAL console: *"the light green and the dark purple are very hard to
+    distinguish from the normal green and purple"* and *"For an action type of game it would be OK, but
+    if I'm trying to concentrate on a level in a puzzle game, the flicker would annoy me quite a bit."*
+    His alternative: *"Maybe you could use animated monochrome playfield graphics for this game. Use
+    checkered blocks for the walls, full blocks for the boxes, blocks, that flip left and right for
+    empty goals and blocks that flip up and down for filled goals."* 〔`199805/msg00214`,
+    `199805/msg00216`〕 Four states in one colour, two of them told apart by the direction of their
+    animation (our reading). It stayed a suggestion: Davie, a day or two later, *"Reaction to
+    PUSH has convinced me to abandon that particular project."* 〔`199805/msg00236`〕 **Cited only, not
+    verified** — never built, there or here.
 - **There is no "one correct RGB"**: Stella generates the palette from YIQ dynamically, so the same register value differs by a dozen up to 0x20 between emulators and settings.
   For us the running table `internal/ingest/palette_stella.go` is authoritative (100% match against Stella). 〔rgb-color-values, 118495〕
 - **hue ↔ colour map**: hue1 = yellow / hue4 = red / hue8 = blue / hue12 = green (hue15 ≈ hue1). hue1 is the standard choice for yellow. 〔132561〕
@@ -295,6 +307,30 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     counter, so I just used playfield graphics"* 〔`200110/msg00010`〕. Here the two stages are the
     playfield's 4-pixel grid and the sprite's shape, not ÷15 and `HMOVE` (our reading). **Cited only,
     not verified** — no bar has been built here.
+  - **Steps of mixed sizes are one symptom of a positioning routine that is not working.** Chris Cracknell, 1998, asking
+    how to move several copies of a sprite independently, on the routine he took from *SoundX*: *"I
+    couldn't even get it to move ONE sprite the way I wanted it to. It would move three or four big
+    chunks, then two little chunks, then pixel by pixel for awhile and repeat the process in reverse on
+    the way back."* 〔`199804/msg00171`〕 The thread held here gives no diagnosis and no answer to his
+    question. That the big chunks are coarse steps and the single pixels `HMOVE` is our reading.
+    Earlier the same day, in another thread, Eckhard Stolberg had diagnosed a different symptom of
+    Cracknell's non-`HMOVE` version — sprites pausing on the left: *"your delay loop is too short with
+    low values. The STA RESP0 ends within the horizontal blanking time. In that case the sprite gets
+    positioned on the left side of the screen. If you have several values, that are too low, the sprite
+    stays there for several moving rounds."* 〔`199804/msg00166`〕 **Cited only, not verified** —
+    nothing was reproduced here.
+  - **The coarse strobes can go in the VSYNC lines.** Thomas Jentzsch, 2001: *"I'm positioning (except
+    HMOVE) during VSYNC in Thrust and Jammed. Nobody reported any problems with that so far."*, adding
+    that during development he *"mostly had to rely on the nearly perfect emulation"* of z26.
+    〔`200109/msg00371`〕 The replies are cautions about positioning in general, not about VSYNC. John
+    Saeger: *"I've never thought much about what happens during VSYNC"* — his worry was *"the dreaded
+    24 cycles at the start of a scanline"* and the multi-sprite effect, which he said differs between a
+    classic 2600, the rainbow model and a 7800 — *"I'd be careful about doing positioning at any time."* (his emphasis on "any")
+    〔`200109/msg00373`〕 Eckhard Stolberg: *"while you can access the positioning registers at any time,
+    you should be carefull with doing any too fancy stuff, or your program might not display properly on
+    some of the consoles out there"* 〔`200109/msg00374`〕. `cmd/framegen` and
+    `techniques/sprite-animation.md` both put positioning on lines of their own after VSYNC; this would
+    move it into lines the frame spends anyway (our reading). **Cited only, not verified.**
 - **Vertical position has no register at all.** SpiceWare: *"TIA's a scanline based video chip, as such
   it has no concept of Y. Therefore it's up to your program to keep track of which row of the screen is
   currently being drawn, and whether or not the sprite shows up on that row."* 〔mining 246500
@@ -452,6 +488,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   `techniques/multicolor48.md` calls a "clockslide" (our reading; the source does not use the word).
   The disassembler warning applies to `cmd/dissect` too: the
   bytes are code at every offset. **Not verified** — no ROM here uses one.
+  - **A table read as code misleads the disassembler past the table.** nukey-shay, in a 2005–06
+    thread, to someone whose two 4K halves of an 8K ROM would not fit back together: *"that's not the
+    problem. The problem is that the 2 disassemblies were made without a configuration file that had the DATA SEPARATED FROM
+    THE CODE correctly. If data tables are misinterpreted to be program lines, the values in those
+    tables will be treated as code...and even worse, data misinterpreted as BRANCHES will cause the
+    disassembler to misinter[pret more]"* — the bracket is how the distillation notes end the quote
+    〔mining 66892 how-to-disassembler-a-8k-bin; only the notes are held here, not the thread〕. That a
+    misread branch carries the error to the code it points at is our reading of that sentence. The `LAX`
+    rule further down names the machinery here that separates code from data by following flow
+    (`Gopher2600/disassembly`, `cmd/dissect`). **Cited only, not verified.**
 - **48px** = NUSIZ $03 (3 copies) + P1 shifted 8px right + VDEL double-buffering to swap GRP with a time offset. Reuse score/bitmap48. 〔48px-positioning〕 `→ pkg/sprite.SplitWide/NUSIZ / design.MaxChars(Text48px)`
   - **When a picture's proportions do not fit the pixel, the technique and the layout are derived
     backwards from it.** Thomas Jentzsch, 2026, on drawing the American flag: *"For a reasonable star,
@@ -533,6 +579,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     (`techniques/missiles-bullets.md`), so a player recoloured line by line recolours its missile on
     those lines (our reading); a one-colour subject removed that, and he changed what the picture was
     rather than the objects or the layout. **Cited only, not verified.**
+  - **Or pick the first game for the objects the machine has.** kisrael, on why his first game was
+    *Joust Pong*: *"I chose it because I knew from prior experience it was pretty easy, and within the
+    2600's 2-PLAYERS-AND-A-BALL capability."* cybergoth: *"Same here for choosing Gunfight as my first
+    project."* 〔mining 65309 newbie-seeks-assistance; only the distillation notes are held here, not
+    the thread〕 The order above works inside one screen; this is the same order one level up, at the
+    choice of game, where a subject that fits two players and a ball has nothing to multiplex (our
+    reading). **Cited only, not verified.**
+  - **One object's job can take another object away.** Piero Cavina, 1998, assigning the objects for
+    Ruffin Bailey's game: *"Sprite0 = player / Sprite1, reused, with varius NUSIZes = prizes (simple
+    rectangular blocks, obviously) / Missile0 = first dot / Ball = second dot / Missile1 = probably
+    useless in the kernel, because it's influenced by the prizes"* 〔`199803/msg00086`; one line per
+    object in the post〕. A missile follows its player's NUSIZ copies (`techniques/sprite-placement.md`,
+    rule 4) and draws in its player's `COLUPx` (`techniques/missiles-bullets.md`), which is presumably
+    the influence (our reading). So an assignment table fills `Missile1` only after deciding what
+    `Sprite1` does. **Cited only, not verified.**
 - missile/ball = lines, edges, vertical frames; player = area via double width / multiple copies / 4x. Build one apparent shape by stacking several objects.
   - **The playfield can be the body and an object the outline.** Sohl, on a screen of his *Immunity*,
     where he *"used the playfield bitmap and color to fill in part of my viruses in a non-play portion
@@ -590,13 +651,30 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     register is rewritten mid-line: with an asymmetric PF each register ends the line holding the right
     half, and a skipped line inherits that. `cmd/framegen` drops a left-half write only together with
     its right-half one for this reason (its playfield-pruning comment). **Cited only, not verified** —
-    the cycles freed were not counted.
+    the cycles freed were not counted. glurk, to a kernel that changes `COLUPF` along each line of a
+    still playfield of coloured beans: *"you also do not need to set PF0 PF1 and PF2 on every line.
+    Once you set them once, they stay set that way...  So you really only need to set them once at the
+    top, and maybe clear them at the bottom."* and *"I didn't test it, but the extra cycles may allow
+    you to do all the COLUPF changes on each line without using up a player sprite..."* (the asker had
+    covered one bean with a player because the colour writes would not line up). The asker's reply puts
+    the limit elsewhere: *"There's actually enough CPU time to make all ten COLUPF changes on each line,
+    but my problem was how they lined up with the playfield beans."* 〔mining 346865
+    help-with-optimizing-state-and-palette-lookup-code〕 So in that kernel the freed cycles did not
+    buy the player back (our reading). **Cited only, not verified.**
 - **A scrolling PF background is 3 layers — board RAM + display buffer + delta update** — plus tile-granular scrolling (avoids tearing). Iron rule = **keep the total scanline count constant from frame to frame** — the legal totals and the PAL parity constraint are the rule
   immediately below, stated once rather than twice. The scroll band is 10–16 lines top and bottom. 〔200972 tile-scrolling-engines, Boulder Dash style〕 `→ design.ScrollScanlinesConstant` **and `design.ScrollBackgroundFitsRAM`**. **Corrected 2026-09-03:** this line prescribed three layers and pointed only at the scanline check, which looks at line counts and PAL evenness and nothing else — so nothing asked whether the three fit. The same source says they usually do not: **a world you rewrite at run time needs SuperChip/CBS RAM, because the internal 128 bytes only hold a 120-byte-class malleable world** 〔200972:14〕. Budget the three layers plus the stack against `design.RAM2600` before choosing this structure. Found by auditing harness claims against the sources harness itself cites.
-- **PAL frames must have an even scanline count** — an odd total is not a legal PAL frame, so a
-  kernel that varies its line count must vary it in twos. Safe zone 262 (NTSC) / 264 (PAL).
+- **PAL frames must have an even scanline count** — an odd total loses the colour in that frame, so a
+  kernel that varies its line count must vary it in twos. The count is the whole frame's, not only the
+  visible lines. Eckhard Stolberg, 1999: *"The major difference between PAL and NTSC is the colour
+  encoding and not the frequency. A VCS game has to display an even number of lines in every frame or
+  it would loose the colour in the frame with the odd number of lines. That is the overall number of
+  lines per frame and not just the visible ones."* 〔`199903/msg00086`〕 His sentence names no standard,
+  but it answers a question about a PAL conversion, and in 2000 he gave the rule for PAL mode
+  (`200006/msg00040`, in the NTSC/PAL rules); whether an odd NTSC frame loses colour is not settled
+  here (our reading). **Cited only, not verified** — no odd frame was looked at on a set here.
+  Safe zone 262 (NTSC) / 264 (PAL).
   `→ design.ScrollScanlinesConstant`, which carries **two** checks under one name: the count is
-  constant frame to frame, **and** it is even when `pal` is set (`pkg/design/pf.go:60`).
+  constant frame to frame, **and** it is even when `pal` is set (`pkg/design/pf.go`, `ScrollScanlinesConstant`: `if pal && n%2 != 0 {`).
   ★**The rule says what is illegal and not what to do about it, so here is the fix, from the person
   who caught it happening.** Eckhard Stolberg, reviewing Andrew Davie's Qb in 2001: *"now you are
   doing **three lines less per frame** than you should, which is **an odd number and therefore results
@@ -631,12 +709,32 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     in the kernel than you'd have as registers, but I'm sure that can be handled"* 〔`200108/msg00433`〕.
     The location table has to be in drawing order (our reading of "next"). **Not verified** — the
     kernel was proposed, not written, there or here.
+  - **Or hold the board in the kernel's own bytes and edit it there.** Thomas Jentzsch, 2001, having
+    just started disassembling *Surround*: *"I've just started disassembling Surround, which has a
+    20x20 field: Alan uses 100 bytes for this, 5 bytes for each row (1*PF0, 2*PF1+PF2), which is the
+    most compact format if you can't calculate the data during the display kernel. So ALL
+    manipulations of the field are done directly on the data that is needed in the kernel."* And:
+    *"I found a similar solution in River Raid, where Carol doesn't have any score variables, but is
+    doing all calculations directly on the score _pointers_. But I'm not sure if she did this because
+    of RAM (I doubt this) or cycle optimization (has to be compared)."* 〔`200108/msg00335`〕 Manuel
+    Polik, for Arkanoid in the same exchange: *"you could do just 2*PF1+PF2 and you'd certainly not
+    have 20 lines of bricks, but maybe only 8, reducing the data to 32 bytes. Decoding 4 different
+    states of bricks would then cost 96 bytes, doing it the easy way."* 〔`200108/msg00336`〕 This is
+    the other answer to the bullet's question — the board at the kernel's resolution, when the kernel
+    has no time to convert — and a board that does not scroll then has one layer where the scrolling
+    rule above has three (our reading). **Cited only, not verified** — his reading of a disassembly
+    he had just begun.
 - **For HUD/text the character COUNT picks the technique**: 48px = 12 characters / venetian blinds = 32 characters (but only at 3px width). Either split the HUD into its own screen mode, or isolate it in a zone and reuse the score area for several purposes. 〔197162 text-hud〕 ⚠ **The 32-at-3px figure is the source's, not this repository's, checked 2026-09-07.** `roms/techniques/venetian.asm` demonstrates the mechanism — one player drawing figure A on even rows and figure B on odd, zero flicker, half the vertical density — and it draws **shapes, not characters**: measured, an 8-px band at clock 80..87 with runs of 1, 2, 4, 6 and 8 px. **Nothing here has ever rendered 32 characters this way**, so 3 px is the width the technique would require rather than a width anything has been read at. ★For comparison the text kernels ARE measured: 4 px a character at every rung of their ladder 〔`techniques/text12.md`〕, so venetian's 3 px would be **narrower than the narrowest thing this repository has drawn a letter at** — worth knowing before designing to it. `→ design.MaxChars` `→ design.MaxChars/FitsText`
   - **The rungs around 12, from Robert M:** PF alone *"gives you 40 pixels / 4 per character giving you
     10 characters across"*; the 6-digit score trick, 48/4 = **12** at low res 3×5 or 3×7; Stellar
     Track's flicker, **12 hi-res** at 30 Hz; and **13 without flicker** — 3×5 letters in the PF with
     *"the missles, ball and sprites to superimpose lines between the characters which would otherwise be
-    touching at their sides"* 〔mining 62722 couple-of-design-questions〕. **Cited only, not verified** —
+    touching at their sides"* 〔mining 62722 couple-of-design-questions〕. A 2009 thread gives the same 10
+    with the rows: for nukey-shay's asymmetric-PF kernel there, 24 rows of 8 scanlines (192 lines), the
+    estimate recorded is 10 characters across (3 points wide plus a space) by 4 lines of 5-point-high
+    letters, each line followed by a blank row 〔mining 148751 hello-world; only the distillation notes
+    are held here, and they do not say who made the estimate〕 — 4 × (5 + 1) = 24 rows (our arithmetic).
+    **Cited only, not verified** —
     the 10 and the 13 have not been built here.
     Two larger counts are named without a description: ZackAttack, sketching 8bitPoet's game, *"The
     score and lives remaining can use the 18 characters kernel (36 character with double width
@@ -688,6 +786,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     give up width or height; this one gives up the asymmetric rewrite on some lines (our reading).
     **Cited only, not verified** — his account of the three commercial ROMs was not checked against
     them.
+  - **Or run the line from RAM, where every load is an immediate.** Christopher Tumber, 2003: five
+    table-fed TIA writes (`lda table,x` / `sta`) cost 35 cycles and the same five with `lda #` cost 25;
+    the second form *"could be used now if you have enough ROM to predetermine all possible routines
+    (like Galaxian). However, the number of combinations can quickly get out of hand unless you do it as
+    a RAM routine and have your program just preset the values to be LDAed during the RAM routine."* In
+    the 128 bytes this is already done, at a price: *"Space Instigators uses a RAM routine to draw the
+    Instigators. However, since I can only have one copy of the routine in RAM, the kernal has to
+    re-seed the RAM routine after each row of Instigators. This leads to a couple blank lines between
+    rows of Instigators"*. Of a kernel built wholly in RAM: *"we could be writing to the TIA registers 15
+    times per scanline"*, and lines chained by `JMP` cost *"only a sacrifice of 3 cycles per
+    scanline"*, or by `JMP (table)` so that lines *"can be re-used"*. 〔`200305/msg00006`〕 15 writes at 5
+    cycles are 75 of the line's 76, so the 15 and the 3-cycle `JMP` do not both fit one line (our
+    arithmetic; his count adds that writes needing no load, such as `STA RESPn`, come on top). The
+    whole-screen version he sized needs cartridge RAM, not the console's. **Cited only, not
+    verified.**
 - **Write deadlines for an asymmetric PF (measured cycles)**: when you display the left half and rewrite the right half on the same scanline, aim each write at the moment that PF is **no longer visible**. The classic kernel's actual values =
   first pass PF0[cy7] / PF1[cy14] / PF2[cy21] (for the left half — in time before it becomes visible) → then for the right half
   **PF0 rewritten at cy31 / PF1 at cy38 / PF2 at "exactly cy45"** (too early or too late and it breaks — adding a single nop destroys it).
@@ -1113,6 +1226,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     (`integration-density-playbook.md`, the `sta WSYNC` note), so a figure read off them for that
     instruction is not its share of the new line (our reading). **Cited only, not verified.**
 - **★RIOT 6532 timer wrap-around bug (the "Stella passes / real hardware rolls" trap)**: write `TIM64T`/`TIM1024T` on **exactly the cycle** the timer wraps around and the divider silently degenerates to **1T**, wrecking the frame length so the picture rolls on hardware. **The fix = a double write (double-write TIM64T).** Easy to miss because it is emulator-dependent = a direct hit on the harness's core mission (gap B). Diagnosed in that thread by Gopher2600's author (JetSetIlly). 〔mining 303277 "To Roll or not to Roll"〕 (harness-hardening candidate = an assert that detects a timer write on the wrap-around cycle)
+  - **The longest the timer counts in one run is about a fifth of a second.** Erik Mooney, 2001, asked
+    for a timer of roughly one second that does not depend on the frame rate: *"Can't really do that on
+    the VCS.  The TIM1024T timer counts down every 1024 machine cycles, and can be initialized with a
+    value up to 255.  So the longest hardware timer you can get is only about 0.2 seconds."*
+    〔`200107/msg00035`〕 1024 × 255 = 261,120 cycles, 0.219 s at the NTSC CPU clock of 3579545/3 Hz
+    (our arithmetic). **Cited only, not verified** — the largest interval was not run here.
 - **Hard lower bounds on the vertical budget, and asymmetric failure modes**: given that the total scanline count is held constant, the lower bound of each region = VSYNC ≥ 3 / Overscan ≥ 3 / VBLANK ≥ 15 (even for PAL). **Why this is yours to do at all** (added 2026-09-04): the designers removed it on purpose —
   *"They also eliminated any provision for vertical synchronization and gave that task to the
   programmer."* Of a piece with the rest of the machine: *"making the software do as much of the
@@ -1188,7 +1307,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     is applied once with `AND` and `SAX` is gone from it. 〔mining 233300 tricky-graphics-suggestions〕
     X has to be free to hold the mask, and saving it there cost part of the gain (our reading). `SAX`
     is in the stability map below. **Cited only, not verified.**
-- **Stability map for illegal (unofficial) opcodes**: **the ones that are stable on real hardware are the LAX/SAX/SBX/DCP family**. ★**"Real hardware" here means original NMOS silicon.** A 2600 cartridge also runs on machines that are not 6507s at all, and AtariAge `113732-clean-assembly` reports **`SBX` and `ARR` failing on the Flashback 2** — a chip-level reimplementation. ★★We cannot check that (no Flashback 2 here, and the engine models a 6507), so it is the source's claim, not ours; but the map should not be read as "safe everywhere". ★★★The `ASR` row in `known-traps.md` already carries this kind of scope (*late Taiwanese Atari Jr*) and this one did not. Found by the mailing-list distillation 2026-09-05, cross-checking the two corpora against each other for the first time. **LXA/XAA are unstable = do not use** (they depend on the individual chip and on temperature). **`ASR`/`ALR` is NOT in the stable set** — the very source this line cites reports it **failing on official hardware**: late Taiwanese-built Atari Jr units, with Thunderground's score corrupting, and a second independent report (omegamatrix, on real hardware) says the same. The one byte and two cycles it saves are not worth a unit-dependent failure. Gate opcode-level code generation on this allow/deny table.
+- **Stability map for illegal (unofficial) opcodes**: **the ones that are stable on real hardware are the LAX/SAX/SBX/DCP family**. ★**"Real hardware" here means original NMOS silicon.** A 2600 cartridge also runs on machines that are not 6507s at all, and AtariAge `113732-clean-assembly` reports **`SBX` and `ARR` failing on the Flashback 2** — a chip-level reimplementation. ★★We cannot check that (no Flashback 2 here, and the engine models a 6507), so it is the source's claim, not ours; but the map should not be read as "safe everywhere". ★★★The `ASR` row in `known-traps.md` already carries this kind of scope (*late Taiwanese Atari Jr*) and this one did not. Found by the mailing-list distillation 2026-09-05, cross-checking the two corpora against each other for the first time. **LXA/XAA are unstable = do not use** (they depend on the individual chip and on temperature). **`ASR`/`ALR` is NOT in the stable set** — the very source this line cites reports it **failing on official hardware**: late Taiwanese-built Atari Jr units, with Thunderground's score corrupting, and a second independent report (omegamatrix, on real hardware) says the same. The one byte and two cycles it saves are not worth a unit-dependent failure. Gate opcode-level code generation on this allow/deny table. That `cmd/cpucheck` finds the engine and the perfect6502 netlist agreeing on `$AB` (LXA) is agreement with one netlist, not with every chip (`capability-gap-audit.md`, VV-7).
   **Extended 2026-09-04 — the map was right and incomplete.** `definitions.json` carries a
   `stability` field on exactly 8 of 256 opcodes (it is `omitempty`, so an absent field means
   stable): **magic** on `$8B ane` and `$AB lax #imm` — the two this line already names as XAA/LXA —
@@ -1272,6 +1391,26 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     for indexed reads (our note from the 6502's addressing, not the thread's): `zp,X` wraps inside page
     zero and never pays the page-cross cycle that `abs,X` can — the `abs,X` side is machine-locked by
     `TestPageCrossPenaltyRules`. **Cited only, not verified** for the zero-page counts.
+    The store has the same gap, and Jentzsch gave it as a habit in 2001, reviewing *Qb*: *"the 6502 has
+    no opcode for sta ZP,y, so the compiler uses sta ABS,y instead, which costs one byte. I'm always
+    trying to use x for zero-page RAM access and y for reading ROM tables. Look at the DASM listing file
+    (just search for 00 in the 3rd opcode column) and you might spot other places"* 〔`200103/msg00260`〕.
+    The engine's instruction table agrees: `STA` has `$95` zero-page,X (2 bytes, 4 cycles) and only
+    `$99` absolute,Y (3 bytes, 5 cycles); of the documented stores, only `STX` has a zero-page,Y form
+    (`$96`), and the undocumented `SAX` has `$97` (`Gopher2600/hardware/cpu/instructions/definitions.json`,
+    read 2026-10-02). It is the same
+    division as the kernel roles above — Y for the graphics read, X elsewhere — with the byte as the
+    reason (our reading). **Cited only, not verified** for the habit and the listing search.
+  - **A table can be traded back.** David Galloway, at the turn of 2005, on Manuel Rotschkar's *Crazy
+    Balloon*: *"when you are done and have any cycles plus a couple of bytes of RAM you can replace
+    this `LDX divideby3,Y` with `LDX div3`"*, plus a down-counter that decrements `div3` on every third
+    pass of the loop, and *"I know I'm going to get dinged by Thomas for optimizing too soon, but
+    that 156 byte divideby3 (actually by 6) table was pretty tempting."* 〔`200501/msg00000`〕 Rotschkar: *"what you
+    suggest is more or less where I came from"*, with his original counter, `INC`/`LDA`/`EOR #3`/`BNE`/
+    `STA`/`DEX` 〔`200501/msg00001`〕. So the table had replaced a counter, and the counter was offered
+    back for the table's 156 bytes. The positioning rule's *"turn the ÷15 into a lookup
+    table"* is one direction of this trade; the price of the table is ROM (our reading). **Cited only,
+    not verified** — no cycles or bytes were counted here.
 - **Packing a table pays only when the table dominates.** Ed Fries fitted a 26-letter 3×4 font into 28
   bytes — letters overlapped vertically, three to a byte horizontally, unpacked by mask-and-shift — and
   answered his own question: *"Is it useful? Not really because you probably waste more code space
@@ -1296,6 +1435,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     offsets; a fixed stride gives the offset table up, and with it the overlap. The exerciser's score
     font, `nibble×16` into a 16-byte-stride font (`exerciser.md`), is the same choice (our reading).
     **Cited only, not verified.**
+  - **The range of the values can be read off the table once it is written.** walaber, on *Ninja Wall
+    Jump*, out of ROM again, on movement tables indexed by a 0–3 frame counter: *"I arranged it in
+    4-byte sections in order to understand visually how things will move. But looking at the data I
+    realized I never move something more than 3 pixels in a given frame. This means I could combine all
+    4 values for a single row into just 1 byte, by using 2 bits per value"*. *"I was worried that the
+    additional code I'd need to unpack the data would offset the savings, but it was actually a new gain
+    both on the data side and also on the code side."* *"In total this saved me ~50 bytes"* 〔mining
+    232200 ninja-wall-jump-game-wip〕. Against Fries's font above, the decoder here was cheaper than
+    the code it replaced; the width came from the largest value in the data, measured after the table
+    was laid out for reading (our reading). **Cited only, not verified.**
 - **Adventure's 255-room ceiling is the width of a byte, not of the machine.** On a 2011 thread about a
   multi-load RPG, syntaxerror999 took Adventure's rooms to be capped *"(255 I think)"*. e1will: *"the
   255-room limit in Adventure is fairly easy to overcome. I'm currently working on a 300+ room
@@ -1439,6 +1588,24 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     breaking where a pixel straddles blanking and active video. 〔mining 261596
     cosmic-ark-star-field-revisited〕 This is the base effect, a different layer from the revision
     difference above. **Cited only, not verified.**
+  - **The mechanism of the revision difference, as Eckhard Stolberg recalled it, and which objects it
+    moves.** Stolberg, 2004, answering a test Thomas Jentzsch posted for "Kool-Aid-Man-compatible"
+    consoles: *"It's about triggering HMOVE in such a way that some of the positioning clock pulses for
+    the players get generated during the visible part of the screen. This creates the extra shifts for
+    the player graphics on the China-TIA but not on the normal TIA."* *"I don't think that there were
+    different designs for the TIA. It seems to be more of a manufacturing difference for a certain
+    production run of the TIA chip that led to a slight timing difference on some of the clock lines.
+    AFAIK only the very last 2600 Jrs and 7800s, that were produced in China after late 1989, are
+    affected by this."* *"IIRC the problem is that some of the clock lines are used for different
+    purposes during the visible part of the screen and during the horizontal blank. The HMOVE
+    positioning clock pulses are supposed to happen only during the horizontal blank."* On a normal
+    TIA the extra pulses have no effect, *"but on the China-TIA they seem to be delayed enough to
+    overlap with the pixel counter pulses"*, the two pulses are seen as one, and *"therefore the players
+    will be shifted to the right by one pixel"*. *"AFAIK only the player graphics are affected by this.
+    The missiles and the ball are positioned the same on all TIAs."* 〔`200410/msg00080`〕 He describes a
+    one-pixel shift of the players, narrower than the parent line's "reverses behaviour", and the
+    one-pixel difference between consoles in `techniques/restrobe-copies.md` has the same size (our
+    reading). **Cited only, not verified** — his own "IIRC" and "AFAIK"; nothing was run here.
 - **Minimum-byte initialisation + hotspot placement**: in a tight 2K/4K, Omegamatrix's 8-byte self-modifying init (`bne .loop+1` jumps between operator and operand → `#$0A` executes as an ASL) yields A=0 / X=0 / SP=$FF / carry clear. Put bank hotspots **at the highest addresses (near the already-used interrupt vectors)** and the free chunk is maximised (a ZP hotspot = Tigervision 3F saves 1 ROM byte + 1cy per switch). 〔mining blog 12061, 11811〕
   - **The RIOT's `$02xx` addresses give the same trick a table.** omegamatrix, on AtariAge: *"The $2xx
     registers (TIM64T, INTIM, etc...) can be jumped between operator and operand in some cases for new
@@ -1530,6 +1697,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     shows a standard kernel can carry professional-grade pictures, and this says full use of the machine
     is a kernel made for the game — a picture that needs the most needs a kernel written for it (our
     reading). **Cited only, not verified** — an opinion in a four-post thread.
+  - **A regular grid can show spots that are not there.** Manuel Rotschkar, 2004, posted a kernel
+    for a 7x7 board of squares, each with its own colour 〔`200404/msg00229`〕. Erik Mooney: *"It's got
+    that optical-illusion thing going, where one's brain sees light spots at the intersection of the
+    dark lines between the squares. :) Might be a bit visually distracting for an actual game."*
+    〔`200404/msg00230`〕 (the Hermann grid, our naming). A window rhythm laid out as squares in a
+    grid of dark lines would have the same shape; whether Pizza Boy's windows do was not looked at
+    here (our reading). **Cited only, not verified** — one viewer, one board; the ROM was not run.
 - Verify feasibility with a mockup before building (colour budget + scanline count + multiplexing on paper).
   **A mockup only checks the constraints you believed when you drew it.** Kurt Woloch, stella-list
   `199805/msg00187` era post in `new-members`, on the 2600 conversions he drew in 1984: *"I tried to
@@ -1697,6 +1871,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     2^n"*. 〔mining 267100 pal-50-conversions〕 So a walk cycle keyed on a counter bit runs at the
     frame rate, and changes speed with the TV standard unless the counter is compensated (our
     reading). **Cited only, not verified.**
+  - **A cycle that is not a power of two needs a reset or a table.** Manuel Polik's 2001 summary of a
+    thread he had started on the list: for powers of two, `INC FrameCounter` / `LDA FrameCounter` /
+    `AND` / `TAX`; for three values, `LDY frameCounter` / `LDX framecountertab,Y` / `STX frameCounter` with `framecountertab .byte
+    $01,$02,$00`; for other lengths, `dec FrameCounter` / `bpl .skipReset` / `lda #MAXVAL` / `sta
+    FrameCounter` / `.skipReset ldx FrameCounter`. Of the three-value table: *"You don't have to preload
+    anything, when zeroing out the machine on startup anyway."* He also gave a form with no table,
+    turning a shifting idea from Russ Perry Jr around: preload `x10x01x00`, then `ror` three times,
+    store, `and #$03` — *"Which is 10 bytes and 16 cycles I think."* 〔`200103/msg00084`〕 The
+    three-value table had come from Andrew Davie: *"That's just about the quickest I know...   10
+    cycles"* 〔`200103/msg00071`〕. `design.WalkFrame` returns one counter bit (0 or 1), so it covers
+    the first form only. **Cited only, not verified.**
 - **Landscape gradients hold one hue and step only the luminance** (never mix hues). Depth from two layers: BG = far, PF = near. 〔160655〕 (consistent with the colour section's "high luminance → low saturation" rule)
   - **Steps of luminance can also draw relief.** MarcoJ, on *Bloxudoku*: *"I also like the subtle use
     of colour intensities to emboss the pieces when drawn on the board."* 〔mining 345854
