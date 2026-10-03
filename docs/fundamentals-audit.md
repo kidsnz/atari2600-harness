@@ -26,6 +26,20 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   `design-principles.md`'s aspect-ratio note is exactly such a place. Marked 📖: this is what Atari
   specified, not what we measured, and the two are different claims. Found by the mailing-list
   distillation (helper-1), from a 2003 post pointing at page 16 of the Guide.
+  📖 **Where 192 came from, and what drawing more lines costs.** Glenn Saunders, 2002: *"When the VCS
+  was first being designed, Larry Wagner studied TVs that were on the market at the time to measure how
+  much they displayed"*, and *"That's where the magic 192 scanlines count comes in. This has nothing to
+  do with the NTSC spec. It's just a best-practice"*; his own rule is 200 (*"This is of course a matter
+  of debate"*), and *"You can probably go all the way to 204 or so depending on how bold you want to
+  be"* 〔stella-list `200212/msg00083`〕. Eric Ball, the same day: *"it is possible to have up to 240
+  active lines"*, with 4 VBLANK lines before and 15 after the 3 of VSYNC — *"This is for NTSC, of
+  course"* (`200212/msg00089`). The cost was put in 1997 by Eckhard Stolberg: *"You can take a couple of
+  lines from overscan to display graphics, but not all TVs might be able to show that many. But usually
+  you wouldn't want that, because the VBLANK and the Overscan lines are the only time, where you can use
+  the processor fully for gamelogic"* (`199709/msg00229`); in the same thread Erik Mooney: *"some games
+  do display more than 192 lines. Missile Command draws 222"* (`199709/msg00226`). The size of those two
+  rooms is measured in the work-placement ✅ below. **Cited only, not verified** — no picture taller
+  than 192 lines was built here.
 - 📖 **VSYNC procedure: set D1, wait ≥2 lines, clear** (Stella PG ~§3). **Split by measurability
   2026-09-03** — the procedure and the threshold are different claims and only one of them is ours
   to measure. The *shape* (set D1, hold, clear, and the frame is accepted) is measurable here. The
@@ -58,6 +72,19 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   vintage game that generates fewer than three 〔AtariAge `topic/382726`〕.
   The symptom and the fix, with more cases, are in `known-traps.md`'s VSYNC row. **Cited only, not
   verified.**
+  📖 **The oldest form of the rule on the list has two conditions.** Eckhard Stolberg, 1997, on a demo
+  that *"looks good on the emulator, but produces a rolling picture on my PAL TV"*: *"This is a problem,
+  that a small number of TVs seems to have, when the vertical syncronisation isn't done like"*
+  `STA WSYNC / STA VSYNC / STA WSYNC / STA WSYNC / STA WSYNC` — *"If you don't wait for exacly three
+  scanlines or access any of the VCSs registers during those three lines, the TV can't sync correctly"*
+  — adding that a recent RGVC discussion had NTSC TVs with the same problem 〔stella-list
+  `199710/msg00081`〕. His own listing writes `WSYNC` inside those lines, so his "any" leaves that one
+  out (read here, not stated there). Seven months earlier, in his NTSC-to-PAL guide, the oldest reason
+  to break it: *"Do a Vsync in every frame. … Early games only did the Vsync once and then went on
+  counting 262 lines for each frame. While this works on NTSC systems and saves 3 lines for game logic,
+  it only produces rolling pictures on PAL VCSs"* (`199703/msg00171`). The ≥2 above is the Guide's
+  threshold and the engine's input; "exactly three, untouched" is his account of what a few TVs need.
+  **Cited only, not verified.**
 - ✅ **RIOT timers TIM1T/8T/64T/1024T ($294–7)** — verified `litmus_timer` (v0.47.0),
   regression-locked `roms/litmus/scenarios/timer.json`, table row `docs/verified-coverage.md:26`.
   Write 1–255; the counter decrements 1/cycle; **after underflow it continues from $FF, still
@@ -75,6 +102,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   `ram.0x93 == 192` and `ram.0x95 == 0`, so the clear is a regression, not an observation.
   📖 Still documented-only (Stella PG PIA §2.3): **"INTIM holds 0 for one interval before the
   $FF wrap"** — the ROM steps straight through expiry and never samples the 0 interval.
+  📖 **What the 0 interval does to a wait loop, and the fix the list gave.** Dennis Debro, 2002, timed a
+  192-line kernel with `TIM64T` 228 and got 262 lines in z26, then with `T1024T` 14 and got 246. Eckhard
+  Stolberg: *"I suppose you are checking if INTIM has reached zero, when you want to know if the timer
+  has expired, right? The T1024T timer will be in this state for 1024 cycles, so your "waiting to
+  expire" loop might catch it way too early. This would explain the 16 lines difference. You just need
+  to increase your timer value by one"* 〔stella-list `200209/msg00149`, `200210/msg00003`〕. Only the
+  reaching-zero side is measured here, for `TIM64T`: written 43, INTIM first reads zero 2692 cycles
+  later — about 42 intervals, not 43 (`internal/emu/tim64tzero_test.go`). How long the zero then holds
+  is the documented-only line above. **Cited only, not verified.**
   ✅ **The other way to use the timer — ask without waiting — measured 2026-09-04.** Every INTIM site
   in this repository *waits* (`lda INTIM / bne loop`). ⚠ **That said "five of them" until 2026-09-07 and the count was stale** — re-measured, the tree reads INTIM at **55 sites across 25 files**, of which **18, in 18 different files, are the waiting shape**; the conclusion held while the number rotted. Re-count with `git grep -n 'lda INTIM' -- roms/` and look at the line after each, since it is the branch that makes it a wait. stella-list 2002 polls instead:
   `lda #$FC / and INTIM / beq NoTime / <work> / jmp back` — ask whether there is room for one more
@@ -112,6 +148,14 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   `→ roms/litmus/litmus_workplacement.asm` / `internal/emu/workplacement_test.go`, regression-locked
   `roms/litmus/scenarios/workplacement.json`. Hypothesis proposed — and marked as unmeasured — by the
   mailing-list distillation (helper-3).
+  📖 **Spreading the work over frames, with a limit one author reported.** Bob Colbert, 2001, among
+  hints from his unfinished *Sabotage* clone: *"You can get a TON of extra program time by multiplexing
+  the overscan area. By this I mean counting the frames... Lets say you have 3 sections of code, on
+  frame 1 you call section 1, frame 2 you call section 2, and frame 3 you call section 3. I was able to
+  put, for instance, collision detection and joystick reading in frame 1, object movement in frame 2,
+  and still had frame three relatively empty. If you go more than 3 frames the game response
+  suffered."* 〔stella-list `200101/msg00079`〕 **Cited only, not verified** — the limit is his
+  experience with one game, and nothing here measures response.
   ⬜ **Exact first-decrement offset.** The countdown band pins three successive reads at
   $3C/$35/$2E from TIM1T=$40 — that fixes the rate (−7 per `lda abs`+`sta zp` iteration) and the
   value 4 ticks after the write **for that instruction sequence**; it does not isolate how many
@@ -156,6 +200,24 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   this effect"* — he *"could swear that every other line is green in the cap of the bouncing Mario"*,
   and saw *"occasional red flashes directly to the right of both Marios"* 〔stella-list
   `200303/msg00059`〕. The post does not say what he ran it on. **Cited only, not verified.**
+  📖 **What PAL games actually do, by one author's count.** Thomas Jentzsch, 2002, suggesting that one
+  cartridge might carry NTSC, PAL60 and, with some blank lines added, PAL: *"You must not do exactly 312
+  lines then"* (read here as *need not*) — *"The Atari PAL library ranges from ~284..342 (Acid Drop)
+  lines, so ~300 should be enough"* 〔stella-list
+  `200211/msg00097`〕. What he had shipped: *"Thrust: NTSC/PAL60 (270 lines)"*, *"Jammed: NTSC (270
+  lines)/PAL(300 lines)"*, *"Both switchable with right difficulty"* (`200211/msg00109`); asked about
+  Thrust's 262, *"The public binary does, but the cart owners get 8 extra lines"* (`200211/msg00124`).
+  **Cited only, not verified** — the range is his count, not one made here.
+  📖 **How an emulator decided which region a ROM was, in 2002.** Eckhard Stolberg: *"The only thing we
+  do is that we try to autodetect the TV type. But for that we only check the number of scanlines
+  during the first couple of frames. If the game does a stable line number of more than 285 lines or
+  so, we assume that the game is meant to be PAL. But something like that could probably be added to
+  Stella too quite easyly"* 〔stella-list `200201/msg00068`〕 — the "we" reads as z26, which the
+  sentences before it set against Stella (our reading). Stella took the format from its `stella.pro`
+  properties file, whose entries are made per binary by MD5 checksum: *"NTSC is only the default setting
+  for games that don't have a "Display.Format" setting in their stella.pro entry, or that aren't
+  included in the stella.pro file at all"* (`200201/msg00043`). Both describe 2002 emulators, not the
+  engine run here. **Cited only, not verified.**
 - 📖 **A PAL console is different hardware, not the same console running a different game.** svolli,
   correcting a reply that said only the cartridges differ: *"The chips differ EVEN IN THE PINOUT"* —
   look for AUD1 on the TIA pinout — *"Not only is the TIA different, but the CLOCK of the TIA/CPU is
@@ -164,6 +226,13 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   and `BaseClockPAL` divide **3579545** and **3546894** Hz, so the PAL CPU (colour clock / 3) runs
   **0.91 % slower**. That moves pitch (§6, 15.9 cents) and anything counted in seconds; nothing counted
   in scanlines or cycles moves.
+  📖 **What sets that clock is a crystal, and nothing on the power side.** Asked in 1998 whether supply
+  voltage, current, RF on the power line or 50/60 Hz mains could move the console's timing, Bob Colbert
+  answered *"No, no, no, no!"*, that a *"crystal"* controls it, and that *"the only thing that will make
+  a difference is the accuracy of the rating on the crystal that controls the clock of the 6507. I think
+  they are pretty accurate"* 〔stella-list `199809/msg00015`〕. Eckhard Stolberg, of one console: *"There
+  were two quartz crystals in the PAL VCS, that I sent to Chris Wilkson"* (`199809/msg00016`).
+  **Cited only, not verified** — no console was opened here.
 - 📖 **One source, two regions: a numeric flag and `IF/ELSE/ENDIF`.** Medieval Mayhem's DASM source
   (`NTSC = 0`, `PAL = 1`, `COMPILE_VERSION = NTSC`, then `IF COMPILE_VERSION = NTSC … ELSE … ENDIF`)
   keeps **every colour constant twice** (red `$44` NTSC / `$64` PAL) and **rescales every frame-counted
@@ -171,6 +240,13 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   〔AtariAge `topic/156147`〕. **Cited only, not verified** — the thread was distilled, not kept, and no
   value was assembled here. The consequence for PAL60 follows from the ⚠ above, not from the thread:
   PAL60 keeps 60 Hz timing, so a PAL60 build swaps the colours and **no** frame-counted delay.
+  📖 **Write the PAL build so it still fits NTSC.** Eckhard Stolberg's 1997 conversion guide, on going
+  from PAL to NTSC: *"NTSC systems can only display a smaller number of lines. Therefore you should
+  limit yourself to 192 lines of displayed graphics in PAL mode too. Or you should create your graphics
+  in a way that allows you to remove enough lines to fit on a NTSC screen"*, and *"Also the number of
+  lines that can be used for gamelogic is smaller on NTSC systems. That is why you should do cycle
+  counting for the worst case, if you are using any timeconsuming calculation loops"* 〔stella-list
+  `199703/msg00171`〕. **Cited only, not verified.**
 
 ## 2. Horizontal positioning & HMOVE
 - ✅ X(N)=3N−55 (missile/ball), player +1px; slope 3 px/cycle; divide-by-15 coarse; **no leftmost-X constant** (retracted 2026-07-30; it is kernel-specific) /
@@ -218,6 +294,22 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   so it cannot usefully be struck more than once a line — which is why a ball re-struck with `RESBL` for
   a second copy on the same line cannot be moved separately 〔AtariAge `topic/257405`, tschak909〕.
   **Cited only, not verified.**
+- 📖 **The Cosmic Ark starfield moves its missile 17 pixels a line, and its glitch repeats every four
+  lines.** Eckhard Stolberg, 2005, correcting the 15 of his own 1997 post 〔stella-list
+  `199705/msg00061`〕: *"I later found out that the shift actually is 17 pixels to the left in each
+  scanline"*; the HMOVE logic *"will continue to send a shifting pulse every 4 pixels. During the
+  horizontal blank this will result in a 17 pixel shift to the left"*, while in the visible part *"on
+  most VCSs the extra HMOVE pulses have no effect"* (`200503/msg00062`). Andrew Towers, replying, on
+  the doubled and missing pixels: *"the effect repeats itself every four lines"* — *"There are 68
+  clocks of HBLANK time, and each HMOVE moves the missile 17 pixels left. If I were to do this four
+  times, I would have used up 68 clocks (17*4=68) so I'm back where I started. The position counter
+  counts once for every four clocks, and each line I add 17 -- so I actually add 4 and 1/4 counts to the
+  position counter each line. This puts the position counter 1/4 out of phase with the previous line
+  each time"*, and *"This does not explain the doubling/missing effect, but it lays the groundwork"*
+  (`200503/msg00064`). The 17 has a second source in `design-principles.md` (crispy, 2017); the doubled
+  and missing pixels are `known-traps.md`'s Cosmic Ark row. Nothing here measures the starfield, and
+  the engine's TIA-revision flags are all off by default (`known-traps.md`'s TIA-revision row), so
+  **Cited only, not verified.**
 - ✅ **missile-locked-to-player (RESMP D1)** — the ⬜ was stale: `roms/litmus/litmus_resmp.asm` +
   `scenarios/resmp.json` already lock the offset at **+4** (player0.hmoved_pixel 24, missile0 28) and
   confirm it follows an HMOVE'd player. What that fixture could not answer is the word **"centered"**,
@@ -246,6 +338,12 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   controls). The fixture latches every old copy to zero on entry: without that, the ball's old copy
   survives from an earlier frame and band B passes on stale state — measured, and the reason the
   first negative control did not fire.
+  📖 **"New" and "old" are Atari's own words.** Kevin Horton, 2001, after a first look at five sheets
+  of the TIA schematics: *"I saw the player graphics registers, specifically the "new" and "old" copies
+  (their term)"*; how they are built he only guessed and left open — *"I \*think\* they use a 2 level
+  deep \* 8 bit shift register for this (will need to do more reading later)"* 〔stella-list
+  `200109/msg00291`〕. So the names used above are the schematic's. **Cited only, not
+  verified** — no schematic was read here.
   📖 **What that costs a kernel that writes each GRP only on its own player's lines.** Roger
   Williams, 2001, of such a kernel: *"If you turn on VDEL for a player in this kernal, it doesn't
   appear at all if it's not positioned within the other player 's and it bleeds down to the bottom of
@@ -261,6 +359,14 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   register and no new/old pair for a missile, which is why in a 2LK it starts on the line it is enabled.
   〔Stella PG; pairs with `litmus_vdel_cross`〕 `→ roms/litmus/litmus_missile_novdel.asm` /
   `internal/emu/missilenovdel_test.go` (3 gradings, 2 negative controls)
+  📖 **What it costs a kernel with flickering missiles.** Thomas Jentzsch, January 2003, on the Death
+  Derby kernel he was writing, asked whether the HMOVE comb could be kept to every other line so the
+  sprites under it show: *"Since there is no VDEL for the missiles, I have to do the HMOVE exactly in
+  sync with the missile pattern. With flickering missiles you still would get up and down jittering
+  HMOVE blanks, which IMO would look quite bad. Hm, maybe by replacing one missile with the ball (using
+  VDELBL)? Must think about that...."* 〔stella-list `200301/msg00222`; the question is
+  `200301/msg00217`〕. The comb is measured (§2, HMOVE mechanism); the jitter and the ball idea are his,
+  for that kernel. **Cited only, not verified.**
 - ✅ Moveable-object writes are shear-safe at CPU cycles 0–22 of the line — closed by derivation from
   verified constants (any write completing by cy 22 precedes every draw start: (X+68)/3 ≥ 22.67 even at
   X=0) plus litmus_48px6's measured mid-line GRP choreography (writes landing in copy gaps).
@@ -296,6 +402,17 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   Stay Frosty's kernel, `stx PF2 ; 3 48 <- must be at 48` — *"Any sooner or later and the display will be
   incorrect"*. spiceware moved that game from repeated to reflected asymmetric **to save cycles and RAM**
   〔AtariAge `topic/254684`〕. **Cited only, not verified.**
+  📖 **The other two reflected-mode rewrites, from one console.** Glenn Saunders, 2001: a posted kernel
+  switched to reflected mode *"didn't work for me on a real VCS by just doing that"* — he added NOPs to
+  find the PF2 point and moved the PF0 and PF1 rewrites ahead of it — where Roger Williams had seen the
+  unmodified code come out right, on StellaX as his reply makes clear (`200109/msg00331`,
+  `200109/msg00368`). Saunders: *"According to my math, in an asymmetrical reflected playfield: The STA
+  PF2b had to start exactly on cycle 45, done by cycle 47. STA PF0b can be rewritten as early as cycle
+  23. In my mod it's at 31. STA PF1b can be rewritten as early as cycle 29. In my mod it's at 38."*
+  〔stella-list `200109/msg00333`〕 His PF2 point is the table's 48 if his 47 is the store's last cycle
+  and the table's 48 the cycle after it (our reading); for PF0 and PF1 he does not say whether the cycle
+  is where the store starts or ends, the ambiguity he raises himself in the same post. **Cited only,
+  not verified.**
   📖 **What a late write costs, in pixels, cycle by cycle.** Brad Mott, 1998: *"The delay is either 2,
   3, 4 or 5 pixels depending on when the register is hit. Looks like the delay can be calculated as
   delay[cycle mod 4], where the delay array is given as delay[4] = {4, 5, 2, 3}"*, with one row per
@@ -440,8 +557,12 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   〔`200311/msg00207`〕. **Those two lists are the same cycles as the shapes measured above for AUDC 1
   and AUDC 7**, differing only in where they start (`internal/emu/audioshape_test.go`), and his mode-3
   construction, computed here over one cycle (no emulator), gives period 465 with 128 runs — AUDC 3's
-  D and run count in the table. That is agreement with this engine, not with hardware; the rest of the
-  decomposition is **Cited only, not verified**.
+  D and run count in the table. His mode-15 post the same day keeps the 5-bit polynomial, which he
+  writes as `[5 3]` (the 4-bit one is `[4 3]`), and swaps the 4-bit polynomial for *"the divide by 6
+  thing"* 〔`200311/msg00208`〕; computed the same way it gives period 93 with 16 runs, and the runs are
+  AUDC 15's row in the table up to rotation (a divide-by-4 in place of the divide-by-6, or the 4-bit
+  polynomial in place of the 5-bit one, does not match). Both are agreement with this engine, not with
+  hardware; the rest of the decomposition is **Cited only, not verified**.
 - ⚠️ **`audio.MeasurePeriod` is square-like only, and fails silently.** Mean transition interval × 2 is the
   period only with two transitions per cycle — AUDC 4 and 12, nothing else. On the poly waveforms it returns
   a clean fraction — exactly (runs per cycle)/2, i.e. 4× for saw, 8× for rumble/pitfall/buzz, 64× for engine — that looks like an ordinary number.
@@ -488,6 +609,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   edge). `litmus_riot_mirror` measured the port-register reads (A3 and A4 ignored, above), and the
   timer addresses used in this file — `$0284` INTIM, `$0285` TIMINT, `$0294`–`$0297` — fit the table;
   the rest is **Cited only, not verified**.
+  📖 **The two timer read addresses are also written, and the flag behind one of them reaches no pin.**
+  Chris Wilkson's 2002 memory map: `$0284` is *"INTIM (read), edge detect control (write)"* and `$0285`
+  *"read interrupt flag (read), edge detect control (write)"* — the write side being what the table
+  above gives for A4 = 0 — and *"PA7 of the RIOT can be used to generate an interrupt. Unfortunately,
+  the 6507 has no interrupt inputs. So the /INT pin of the RIOT is left unconnected. But an internal
+  flag is still generated and can be read and cleared normally"* 〔stella-list `200207/msg00178`〕. That
+  flag is the D6 that §1 reads at power-on; no ROM in this repository writes `$0284` or `$0285`
+  (`rg -i '(st[axy]|sax)\s+(\$0?28[45]|INTIM|TIMINT)\b' --glob '*.asm'` → 0 on 2026-10-02).
+  **Cited only, not verified.**
 - ✅ Paddles INPT0–3 dump/charge — verified `litmus_paddle` (v0.54.0; transfer curve measured).
 - 📖 **SWACNT/SWBCNT DDRs** — documented only. **"Rarely game-relevant" was withdrawn 2026-09-03:**
   it was true of *our* ROMs and not of the games. A commercial title writes one: Combat stores
@@ -516,6 +646,11 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   SWBCNT has any use?"* — went unanswered, and the same post reports Combat's own comment claiming
   the write stops joystick response **when it does not**. So we know two commercial titles do it and
   we do not know why, which is a sharper open question than the one this line started with.
+  📖 **One reason given for input-only bits is the board, not the chip.** Mark De Smet, 2000,
+  describing the PIA: *"2  8-bit input/output ports(all configureable in/out, but the 2600 circuit board
+  requires some to be input to prevent contention)"* 〔stella-list `200006/msg00086`〕. He does not say
+  which pins, and the Star Raiders account below has all eight of port A driven. **Cited only, not
+  verified** — no schematic was read here.
   📖 **One use is on the list, for a third cartridge.** Manuel Polik, reverse-engineering Star Ship in
   2002, found the same `LDA #$10 / STA SWBCNT` at start-up and, later, a value stored to `SWCHB` and
   read back. Eckhard Stolberg: *"There are three unused bits in SWCHB. If you set these to output you
@@ -594,6 +729,23 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
 
 ## 8. 6502/6507 precision
 - ✅ cycle accounting (76/line; WSYNC-stall exclusion).
+  📖 **The write to `WSYNC` has to end by cycle 76.** C. Bond, 2003, asked for the last cycle at which
+  a `WSYNC` is still honoured on the current line; Thomas Jentzsch: *"The write to WSYNC must \*end\* at
+  cycle 76."* Bond: *"a STA Z.P. (3 cycles) should start at cycle 74, but a STA Z.P.,X should start at
+  cycle 73. Correct?"* — Jentzsch: *"Yes, yes and yes. :-)"* 〔stella-list `200309/msg00188`,
+  `200309/msg00192`, `200309/msg00196`〕. Their numbers count where the store starts and where it ends;
+  they are not converted to any convention used elsewhere in this file, and no late `WSYNC` was run
+  here. **Cited only, not verified.**
+- 📖 **Why 6502 tables are used for the 6507.** Asked in 2002 whether the cores are *"100% identical
+  including any non documented opcodes"*, Chris Wilkson: *"I believe the silicon is the same, just some
+  of the pads are not bonded out to the IC package pins"* 〔stella-list `200212/msg00192`〕; Roger
+  Williams: *"Yes, they are identical. The 6507 package was created strictly to save space on the PCB,
+  in those days it did not make sense to create a new die and mask for such an "improvement" since this
+  was much more expensive than the package design"* (`200212/msg00216`). Mark Graybill corrected one
+  detail of that reply — the C64's chip is a 6510, so the comparison is with the 6502 *"in an AppleII,
+  Atari 800, or Vic-20"* (`200212/msg00217`). That is the ground this section stands on when it takes
+  6502.org's numbers for the 6507. **Cited only, not verified** — `cmd/cpucheck` compares the engine with
+  a 6502 netlist, not with a 6507.
 - 📖 Page-cross +1 applies to **reads** (abs,X / abs,Y / (ind),Y); **stores are fixed** (STA abs,X
   always 5, (ind),Y always 6); RMW abs,X fixed 7. Branches: 2, +1 taken, +1 page-cross **measured
   from the next instruction's address**. (6502.org.)
@@ -727,6 +879,21 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   and **one TIA mirror**, $0049 → COLUBK, checked by rendering ($84 blue at `read_row(100)`).
   📖 **Not measured by us**: the TIA template as a rule ($xyz0 for x even, z∈{0,4}) — one mirror is
   not the pattern — and the ROM mirroring of $1000–$1FFF at every odd $x000.
+  📖 **The chip-select wiring behind those mirrors.** Eric Ball, 2004, answering what `$029E` is: *"The
+  TIA !CS0 and !CS3 are connected to A12 and A7, and it fully decodes A0-5. So the TIA is mapped to
+  address %0xxxx0x?????? The RIOT CS1, !CS2 and !RS (RAM select) are connected to A7, A12 and A9
+  respectively and it fully decodes A0-6. So the RIOT is mapped to addresses %0xxRx1???????"* — so
+  `$029E`, with A7 and A9 high, is a RIOT register, which he reads from the 6532 data sheet as `TIM8T`
+  with the timer interrupt enabled 〔stella-list `200412/msg00028`〕. That `TIM8T` does not fit the §7
+  table: `$1E` is A4 = 1, A3 = 1, A1A0 = `10`, which is **64T** with the interrupt enabled, and the
+  engine folds a write to `$029E` onto `$0296`, `TIM64T` (`0x29E & 0x297`, the write mask in
+  `memorymap.MapAddress`; read from the source, not run); Alex Herbert, later in the thread, also sets
+  `$29e` against `$296` (`200412/msg00035`). The engine's
+  `memorymap.MapAddress` sorts addresses the same way — A12 for the cartridge, then A9 with A7 for the
+  RIOT's registers, A7 alone for RAM, everything else TIA (read from the source, not run). Inside the
+  RIOT's register window the port registers still ignore A3 and A4 (§7, measured), so his "fully
+  decodes A0-6" is about which lines reach the chip, not about every combination being a different
+  register (our reading). **Cited only, not verified.**
 - ✅ **Convention: stack from $FF down (`LDX #$FF/TXS`), variables from $80 up — and the gap is now
   measured rather than hoped for.** `internal/ramtrace`'s activity report prints the stack
   low-water mark and the observed SP range, and it had never been run for this. Our own technique
