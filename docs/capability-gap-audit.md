@@ -520,6 +520,14 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   vote carries it, as in `known-traps.md`'s "Emulators can agree with each other and disagree with the
   machine"), and the dissenters can scatter so that no majority exists. **Cited only, not verified**: Stella 4 is
   obsolete, and whether today's MAME still shares that error has not been measured here.
+  **Nor per cartridge type (added 2026-10-02).** `oracle.Mame` starts `mame a2600 -cart <rom>` and names no
+  cartridge type, so MAME chooses the mapper itself, and `cmd/oraclevote` counts its dump whatever it chose;
+  the only difference the vote explains away is the sampling-phase shift. deater78, 2022, on an E7 ROM: it ran in Stella;
+  in MAME the 1K bank switching worked but the 256-byte RAM did not, because MAME ignored `-cartslot a26_e7`
+  and auto-detected, until E7's signature bytes were put in the image; javatari ran for a while and then
+  corrupted memory (AtariAge `topic/340351`; only the distillation notes are held here; Cited only, not
+  verified). **Gap:** record which mapper each oracle ran, and do not count a vote from one whose mapper does
+  not match the image. Size: S.
 - **VV-7 ✅ DONE (v1.91.0):** perfect6502 (mist64, the visual6502 transistor netlist) as a hardware-grade
   **CPU differential**. It is CPU-only (no TIA/RIOT) so it is **NOT** a member of the full-system RAM vote
   (`cmd/oraclevote`) — forcing it in would mean hand-writing a 2600 around it, defeating the point. Instead it
@@ -543,6 +551,14 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   is safe to use: `design-principles.md` keeps LXA in the do-not-use set (*"they depend on the individual chip
   and on temperature"*). Glenn Saunders proposed in 2000 a test program using most of the undocumented instructions,
   run *"on as many 2600 variants as possible"* 〔stella-list `200006/msg00059`〕; nothing here has run one.
+  Inside the engine, the undocumented opcodes a litmus ROM runs are `DCP` (`litmus_6502`, timed at 5 cycles
+  in `verified-coverage.md`; also `litmus_switchdraw`) and the `NOP zp` form `.byte $04,$00`
+  (`litmus_oddsleep`). `LAX`, `SAX`, `SBX` and the other `NOP` forms are checked here only one instruction at
+  a time, and `docs/techniques/divtable.md` stays off `SBX` for want of a litmus (added 2026-10-02). Nukey
+  Shay's 2008 table gives each undocumented opcode its DASM form, opcode, size and cycles, and in the same
+  thread hornpipe2 relays batari's finding that `ARR` and `SBX` *"(at least) don't work"* on the
+  Flashback 2, as `known-traps.md` also records (AtariAge `topic/124320`; Cited only, not verified).
+  **Gap:** one litmus ROM that runs each of those forms, checked against Stella. Size: S.
   Main build stays **CGO-free** (perfect6502 is an external binary, shelled out;
   `scripts/install_perfect6502.sh` fetches the pinned clone + builds `bin/p6502step`). Self-tests: always-on
   differ-logic (planted-mutant, no binary) + gated silicon differential. FPGA/real-2600 = manual escalation only.
@@ -820,7 +836,7 @@ Three harness-capability candidates surfaced by an efficiency/structure comparis
 Four more harness-capability candidates from a 5-lens deep read of the original Wagner Combat.asm (game-design / 6502-craft / audio / anti-patterns / clone-novelties), surfacing gaps the round-1 efficiency/structure comparison structurally could not see (esp. **audio** and **memory-layout traps**). Distinct from CMB-1/2/3 above. **Registration only — each implementation is a separate approval.**
 
 - **CMB-4 (CMB-AUDIO) — temporal-audio assertion: the audio analog of `assert_line_budget`.** `read_audio_trace` (v1.104.0) *reads* AUDC/AUDF/AUDV per-frame over N frames, but there is **no executable assertion over an audio trace**. Combat's key sound behaviors are all **temporal invariants** a linter could check numerically: (1) AUDF descends monotonically across successive rally bounces (rising pitch — a gameplay counter aliased into AUDF); (2) AUDV decays monotonically after an explosion trigger (a physics countdown `LSR`×3 → AUDV, half-way delayed-onset gate); (3) engine AUDF is a pure function of (craft, velocity, player) matching the pitch curve + fixed +2-per-player detune; (4) channel-owner uniqueness (one-object-per-channel, last-writer-wins). Capability: `assert_audio_envelope(channel, direction, over=N)` + `assert_channel_owner`, over the existing `read_audio_trace` substrate. **Distinct from VV-13** (`audiospec`, two-run spectral/RMS compare) **and G3** (PCM fidelity) — this is a single-ROM temporal-invariant assertion. Planted-discrepancy self-test (VV discipline). Size: S-M. 〔Combat `BounceCount`→AUDF (MOTORS ~1022), `BoomSnd` StirTimer `LSR`×3→AUDV (~812-818), `SNDP` 3×12 + per-player detune, MisFly/MotMis/BoomSnd last-writer dispatch; `read_audio_trace` exists; deep-read harvest 2026-07-23〕
-- **CMB-5 — gap-fill model for finalize-step MD5 / byte-diff.** A byte-faithful disassembly **could fail MD5** against the original cart when the assembler zero-fills: the unwritten bytes between end-of-data and the startup vectors are **$FF** on real hardware (unprogrammed PROM), and the annotator's DASM zero-filled them ($00), so a "perfect" reassembly mismatched the reference MD5 purely on gap/pad fill, not code. **Corrected 2026-09-28: the DASM used here (2.20.14.1) already fills with $FF** — measured: a 4K image with code only at $F000 reads `ff` at $F010, as `internal/build/romsize.go` also records — so the mismatch needs an assembler that zero-fills (Williams' DASM, 2002, did), and `ORG $F7FC, $FF` names the fill byte explicitly 〔stella-list `200203/msg00004`〕. It would be a live trap only with such an assembler, because **finalize-step registers MD5s in Stella** — a correct reconstruction would be flagged wrong. Capability: a gap-fill-aware byte/MD5 differ that (a) models the **$FF-for-PROM** fill before trusting an MD5, and (b) treats a nonzero diff **confined to unwritten regions** as *expected*. Size: S. 〔Combat intro annotation (Williams: recompiled image "differs… only in the few unwritten bytes… DASM sets these to zero… in the cart they are $FF"); ties to finalize-step MD5 registration; deep-read harvest 2026-07-23〕
+- **CMB-5 — gap-fill model for finalize-step MD5 / byte-diff.** A byte-faithful disassembly **could fail MD5** against the original cart when the assembler zero-fills: the unwritten bytes between end-of-data and the startup vectors are **$FF** on real hardware (unprogrammed PROM), and the annotator's DASM zero-filled them ($00), so a "perfect" reassembly mismatched the reference MD5 purely on gap/pad fill, not code. **Corrected 2026-09-28: the DASM used here (2.20.14.1) already fills with $FF** — measured: a 4K image with code only at $F000 reads `ff` at $F010, as `internal/build/romsize.go` also records — so the mismatch needs an assembler that zero-fills (Williams' DASM, 2002, did), and `ORG $F7FC, $FF` names the fill byte explicitly 〔stella-list `200203/msg00004`〕. It would be a live trap only with such an assembler, because **finalize-step registers MD5s in Stella** — a correct reconstruction would be flagged wrong. Capability: a gap-fill-aware byte/MD5 differ that (a) models the **$FF-for-PROM** fill before trusting an MD5, and (b) treats a nonzero diff **confined to unwritten regions** as *expected*. Size: S. 〔Combat intro annotation (Williams: recompiled image "differs… only in the few unwritten bytes… DASM sets these to zero… in the cart they are $FF"); ties to finalize-step MD5 registration; deep-read harvest 2026-07-23〕 **A second cause, of another kind (added 2026-10-02):** a difference in the instruction bytes themselves, which (b) must not excuse. Manuel Rotschkar (the name Manuel Polik's posts carry from 2003-11), 2003, proposing to split the common `vcs.h`'s single `TIA_BASE_ADDRESS` into a read and a write base: *"There's many distella'd games that'd actualy require"* `TIA_BASE_WRITE_ADDRESS = $00` / `TIA_BASE_READ_ADDRESS = $30` *"in order to recompile into a bit-perfect original."* 〔stella-list `200311/msg00087`〕 `vcs.h` 1.04 is dated the same day and adds the split (its changelog, as shipped with DASM 2.20.14.1), and `known-traps.md` has the rebuild side ("Old source against today's `vcs.h`"). Cited only, not verified.
 - **CMB-6 — assembler/linter WARN: table or data bytes placed over the $FFFA-$FFFF vector region.** Combat squats **live game data on the CPU IRQ/BRK vector slot**: it `ORG`s vectors at $F7FC (a 2K cart mirrors $F000-$F7FF into $F800-$FFFF, so $F7FE/$F7FF *are* the $FFFE/$FFFF vector) and reads its own vector bytes as a data table (`LDA AudPitch,X`). It survives only because the code never takes BRK — `SEI` would not help, since BRK ignores the I flag. This booby-traps a 2K→4K port. Capability: a harness assembler/linter **WARN** when an `ORG`/data directive lands bytes over $FFFA-$FFFF (accounting for the 2K/4K mirror). Zero false positives on the known-good corpus (AT-1 discipline). Size: S. 〔Combat `ORG $F7FC` / `AudPitch` at $F7FE (annotator: "move AudPitch out of the interrupt vector"); deep-read harvest 2026-07-23〕
 - **CMB-7 (negative / boundary fact) — Combat has ZERO self-modifying code; all mutable state in ~26 zero-page bytes.** A whole-file scan finds no classic SMC (no writes into instruction operands, no code from RAM; single `ORG $F000`, never rewritten). Nearest analogues are pure **data** ops (`MVadjA`/`MVadjB` rotated in-place via the `ROL`-MSB-in-carry idiom; `SCROFF` `INC`). Recorded as a **calibration boundary** so a future SMC-lint does not false-positive Combat — this era's density came from packing/aliasing/branchless masks, **not** SMC. Not a capability to build; a truth one must respect. 〔whole-file scan; `MVadjA`/`MVadjB`, `SCROFF` INC, single `ORG $F000`; deep-read harvest 2026-07-23〕
 
@@ -2964,7 +2980,12 @@ VSYNC without also raising VBLANK. The prover's `displayOff()` is `VSync || VBla
 `emu.DisplayOff()`, read **only** `sig.VBlank`. VSYNC blanks the picture as surely as VBLANK does, so the
 oracle was short a term — fixed, and the error direction was false ALARMS rather than missed detections, so
 nothing unsound had shipped. What it had done instead was silently cap this grading to ROMs that happen to
-raise VBLANK during VSYNC, a property nobody chose.
+raise VBLANK during VSYNC, a property nobody here chose as a criterion for the grading. **Corrected
+2026-10-02: the property itself is not arbitrary.** Eckhard Stolberg, 2002, on certain NTSC games
+that would not hold sync on his old PAL TV: *"Also not having VBLANK active during the VSYNC causes the
+problem"*, and the VSYNC code he suggested stores VBLANK before VSYNC. He was *"not sure what exactly causes
+the problem"*, had cured it for most games with the TV's VHOLD knob, and later named the 2600 Jr as the
+console he had mostly used 〔stella-list `200202/msg00097`, `200202/msg00107`〕. Cited only, not verified.
 
 **RESOLVED (next tick, measured): both residual groups were defects in the GRADING, not the prover, and
 the corpus is now shipped at 128 ROMs.** The 776 split cleanly once probed at the exact failing PCs:
@@ -4349,6 +4370,16 @@ it: four 16-bit phase accumulators, a `ROL` after each add to collect the carry 
 cycles per line are **Not verified** here, so whether it moves the trade above is open. It is still a demo
 with no game beside it.
 
+**The table prices cycles; the cost in the sound is not in it (added 2026-10-02).** Andrew Schwerin, 1999,
+describing his own engine — a 256-byte page-aligned wavetable, a 16-bit fixed-point frequency whose low 8
+bits are the fraction: *"The fractional math has the benefit of a greater choice of pitches, but the drawback
+is that extra noise is introduced when you have a fractional frequency. The reason for this is that wave
+"samples" are stretched exactly the same number of times for frequencies like 256,512,768 etc and have a nice
+symmetry. For fractional frequencies the stretching alternates from long to short, more noticable in high
+tones."* 〔stella-list `199904/msg00006`〕 Nothing here measures it; `cmd/audiospec` compares two ROMs'
+spectra, so a whole-step and a fractional-step build of one prototype could be put side by side. Cited only,
+not verified.
+
 
 ## Questions the list asked and nobody answered — a measurement backlog (2026-09-06)
 
@@ -4394,6 +4425,15 @@ check them is a list of experiments somebody already designed. Found by the mail
 (helper-3, who drew the distinction). Three of the six above are one litmus ROM each. **When reading the archive, record
 the unanswered questions separately from the answers**; they are the cheapest measurement work in this
 repository, and they come with their own provenance. Found by the mailing-list distillation (helper-1).
+
+**One more of the same kind (added 2026-10-02).** When a `STA WSYNC` starts at the end of a line and its
+write lands at the start of the next, is that next line lost too? Eckhard Stolberg, 2001: z26 *"doesn't always
+skip the extra scanline as it should"*, a bug he tied to the jitter dispute over the demo John Saeger had named as the
+worm war demo; after a Cuttle Cart test he was *"not so sure anymore that the screen should jitter"*
+〔stella-list `200111/msg00096`; the demo named in `200111/msg00090`〕.
+`fundamentals-audit.md` §8 has the 2003 rule that the write must end by cycle 76, also cited only. What would
+answer it: a litmus that moves the store's last cycle across the end of the line one cycle at a time and
+counts the lines per frame. Cited only, not verified.
 
 ### TIA names are declared per ROM, and one was wrong for weeks (2026-09-29)
 
@@ -4541,6 +4581,18 @@ watch — and *"Each emulated CPU cycle you check PC first, then test the rest o
 〔`200507/msg00095`〕. **Gap:** an *op* and a value on `watch_ram`, and the same on registers. Cited only, not
 verified. Size: S.
 
+Two more from the same month (added 2026-10-02). Stella 2.0 Alpha 4 shipped conditional breakpoints on
+2005-07-17: *"Conditional breaks! Use "breakif condition", then "run". The condition syntax is very
+C-like"*, with examples that combine a PC range and a register value (`breakif {pc >= mySubroutine && pc <= mySubroutineEnd && a == $7f}`) and test a RAM
+byte (`breakif {*$aa == $00}`) 〔stella-list `200507/msg00129`, B. Watson〕; Cited only, not verified. Our `breakif` has the same name
+and stops on a beam position only; `docs/mcp-tools.md` leaves *"stopping on RAM value or collision"* as a
+later extension. And the same-value blind spot is in `WatchRAM`'s code: it compares a peek after each
+instruction with the value before (`internal/emu/emu.go`). Stella's RAM tracking had it too, two weeks
+earlier: *"For now, we don't detect when the same value gets written to an address as was already there:
+this will need changes to the core"* 〔`200507/msg00002`, B. Watson〕; Cited only, not verified. `defuse` lists the instructions that
+write an address from the code, without values, so a store of an unchanged value is still in its list (our
+reading; Not verified).
+
 ### No way in for a song made in another tool (2026-10-02)
 
 What exists: `cmd/jingle` takes a note notation (two voices), `cmd/audioingest` a recording, and
@@ -4552,6 +4604,13 @@ Mac, and a reply suggested converting `.mid` files, while noting that two channe
 musician who would enter notes on an on-screen keyboard (`topic/208829`). Only the distillation notes of
 both threads are held here, so both are paraphrased; Cited only, not verified. **Gap:** a MIDI reader feeding
 the existing two-voice path. Size: M.
+
+One converter from another format took its time step as a setting (added 2026-10-02). Manuel Polik's SID2TIA,
+first public release, dated 2003-08-31 or 2003-09-01 depending on the time zone: *"You can choose a SID file, specify a subtune and the resolution from
+highest (1 TIA frame = 1 SID frame) to lowest (1 TIA frame = 16 SID frames)."* 〔stella-list
+`200308/msg00143`〕 `cmd/audioingest` reads a recording onto a sixteenth-note grid set by its tempo (`-bpm`,
+or estimated), and none of its flags sets a step in frames. **Gap:** a frames-per-step setting beside the tempo
+grid, for any source that already has its own frame clock. Cited only, not verified. Size: S.
 
 ### No way to audition a sound by ear (2026-10-02)
 
@@ -4672,3 +4731,113 @@ this value 99.99 percent of the times"*), arithmetic mean 127.4993, Monte Carlo 
 correlation 0.500001 〔stella-list `200110/msg00128`〕. Thomas Jentzsch's order: count the period first, then
 check that *"each distance should have about same possibility"* 〔`200110/msg00123`〕. **Gap:** those five
 statistics and the distance check, over outputs read back from RAM. Cited only, not verified. Size: S.
+
+### Nothing makes our own assembly stop on a page crossing (2026-10-02)
+
+`known-traps.md` ("A taken branch onto another page costs a fourth cycle, and DASM can be made to say so")
+carries B. Watson's 2004 check — `align 256` before the kernel, then `if (>kernel != >end_kernel)` /
+`echo "WARNING: Kernel crosses a page boundary!"` / `endif` — and his sample run still ends `Complete.`: it
+warns and the build goes on 〔stella-list `200402/msg00049`〕. `design-principles.md` carries the form that
+stops, a `CHECK_PAGE` macro that runs DASM's `ERR` (AtariAge `topic/345618`). The distillation reported that
+`ERR` ends the assembly with exit status 17, run outside this repository (Not verified here), and `build.Assemble`
+already refuses a non-zero exit. The `.asm`, `.inc` and `.h` files here outside the vendored engines have 15
+`align` lines and no `err`, `echo` or `if` line (`rg` for each directive at the start of a line, 2026-10-02).
+`prove_line_budget` charges a crossing when it is run; this is about the build failing by itself. **Gap:** a
+page assertion that ends in `ERR` after each timed block of our own kernels. Size: S.
+
+### Every bank crossing here is written by hand (2026-10-02)
+
+`docs/techniques/bankswitching.md` keeps cross-bank calls as code an author writes — the trampoline at
+`$FF80`, the `BRK`-driven switch — and records one compiler, K65, that generates the stubs for a `far` call
+while the bank of each function is still chosen by hand. Adam Thornton, 2004, replying to Kroko's proposal for
+a flash cartridge whose 128K of SRAM could be mapped in: *"this would perhaps give me the ability to write a
+macro assembler that let me write code as if I had a fairly large address space available, and then handled
+all the paging for me."* He wanted the space for text-adventure interpreters 〔stella-list `200402/msg00093`〕.
+**Gap:** a build step that places routines in banks and generates the crossings, so that a program can be
+written as one address space. Cited only, not verified. Size: M.
+
+### Nothing finds what a byte does by taking it away (2026-10-02)
+
+`probe_ram_semantics` answers "what is $XX?" by adding: it pokes each RAM byte with probe values and
+classifies how the frame changes. A 2019 thread on hacking Defender II gives the other direction: remove a
+variable from the routines it appears in, to tell which code does what, and do it in Stella's debugger rather
+than reassembling each time (AtariAge `topic/289892`; the advice is nukey-shay's according to the distillation
+notes, which are all that is held here, so it is paraphrased; Cited only, not verified). Taking a write or a
+read away asks which code depends on the byte, which a poke at the byte does not ask (our reading). **Gap:** a
+probe that disables, one at a time, the writes to an address that `defuse` lists, and reports what changes on
+screen and in RAM. Not verified. Size: M.
+
+### A kernel with no WSYNC at all is outside the prover's unit (2026-10-02)
+
+Two kernels on the list drew without `WSYNC`. Glenn Saunders, November 2001: *"I think I managed to get a 2
+line kernel working completely without the use of WSYNCs at all! Boy was it a lot of work."* 〔stella-list
+`200111/msg00156`〕 Cited only, not verified. Fabrizio Zavagli, 2002, on the tile game he then named Bounce!: the tiles are players
+shown on odd and even lines in alternate frames so that a line is always free for the ball, the ball changes
+size and horizontal position on each line, and *"The above features require an exact cycle counting, so I've
+had several nightmares due to complete lack of WSYNC :("* 〔`200209/msg00107`, `200209/msg00110`〕.
+Cited only, not verified. `cyclebound` cuts the program *"at every `STA WSYNC` ($02 store) into WSYNC-to-WSYNC regions"* (its package
+comment), so a kernel loop with no strobe falls inside whatever region the last `STA WSYNC` before it opened,
+many lines long, and `prove_line_budget` would refuse it or report it over budget rather than prove each line
+(our reading; Not verified — no such kernel has been run through it). The HMOVE lint's own test lists a loop
+with no WSYNC among the shapes it reports nothing for (`internal/cyclebound/hmovelintreach_test.go`). **Gap:**
+a per-line budget for a loop timed by counting, read as 76-cycle slices of the loop body, and a WSYNC-free
+fixture to check it on. Size: M.
+
+### Nothing predicts an overflow from the code (2026-10-02)
+
+Wabbit (Apollo, 1982) becomes unplayable as the score rises. glurk, hacking it in 2022, read the rabbits'
+speed as seven plus three times the score's hundreds, with 8 subtracted whenever it is greater than 8; the known bug is
+that from 1,100 points the rabbits move too erratically to clear the rows and at 1,300 they disappear. Thomas
+Jentzsch, from the code alone, expected a further overflow at about 5,200 points, depending on the game
+selection (AtariAge `topic/338373`; only the distillation notes are held here, so all of this is paraphrased;
+Cited only, not verified). The tools here that see values are dynamic: `cmd/mine-invariants` finds likely
+invariants *"from a driven run"*, and `read_ram_trace` follows bytes over frames, so an overflow is found only
+if a run reaches the score that causes it. **Gap:** a static pass that follows the arithmetic from a score
+byte and reports where its range leaves eight bits. Not verified. Size: M.
+
+### `dissect` does not hand DiStella what the trace learnt (2026-10-02)
+
+`cmd/dissect` runs DiStella as `distella -a <rom>` and nothing more, so DiStella separates code from data on
+its own while the trace beside it already knows which bytes were stored to which TIA register. Stella's
+disassembler takes directives that name a range as `CODE`, `DATA`, `GFX` (player graphics) or `PGFX`
+(playfield graphics) — `PGFX $F800 $F81F` — typed at the debugger prompt or kept in a DiStella configuration
+file (AtariAge `topic/256141`, pointing to Stella's debugger documentation, which was not read here; only the
+distillation notes are held; Cited only, not verified). Whether the DiStella build `dissect` calls reads such a
+file is not checked. **Gap:** write the tables the trace matched as `GFX`/`PGFX` directives and give them to
+the disassembler. Size: S.
+
+### No map of where a ROM's bytes sit (2026-10-02)
+
+`cmd/rammap` maps RAM use, and `build.ROMBytesUsed` counts a ROM's bytes used and its trailing fill; nothing
+shows where in the ROM each table and routine sits, page by page. grafixbmp, 2008, kept ROM layout on a grid
+of 16 rows by 256 bytes — high byte down, low byte across — and coloured the bytes in use, so free space
+spread over pages, and two indexed tables reaching the same address, could be seen at once; tokumaru's
+alternative was a text list of ranges and their uses (AtariAge `topic/133720`; only the distillation notes
+are held here, paraphrased; Cited only, not verified). Placement is a cost here: a crossing adds cycles, and
+`ALIGN 256` costs ROM in a step (`known-traps.md`, the bank-move row). **Gap:** a page map of an assembled
+image from its listing — each 256-byte page, the label that owns each byte, and every table that crosses a
+page. Size: S.
+
+### Pitch fitting weighs every cent alike (2026-10-02)
+
+`internal/keyfit` reports each degree's error in cents and keeps the tonic whose worst degree is smallest,
+and prints beside it `Spread` (flattest to sharpest degree) and `Mean`, because *"a listener hears intervals,
+not absolute pitch"* (its `Fit` comment) — so how a key sounds as a whole is already an axis here;
+`SweepDetuned` already lets the reference move off A440, and just intonation was tried there and refuted for
+this machine. reveng, 2015, proposed "Perceptual Tuning" for the TIA: search the TIA's frequencies and choose,
+with weights, the values a listener hears as in tune rather than those nearest A440, written up on the 7800
+Development Wiki (AtariAge `topic/247042`; only the distillation notes are held here, and the wiki was not
+read; Cited only, not verified). Moving off A440 is what `SweepDetuned` does, and hearing intervals rather than
+pitches is what `Spread` measures; a weight per note is what nothing here has. **Gap:** a per-note weighted
+error beside `Worst` and `Spread`, once the weights are known. Size: S.
+
+### A colour value can also be a number the code tests (2026-10-02)
+
+`cmd/dissect` already finds colour tables: it records the values stored to `COLUP0`, `COLUP1`, `COLUPF` and
+`COLUBK` and searches the ROM for them, and reports an unchanging value as an immediate. Nothing warns that
+changing one can change the game. davyk's 2012 thread on making PAL60 versions of NTSC ROMs names games where
+it does: in Keystone Kapers an escalator colour changed from `$C0` to `$50` crashed the game, because the code
+branches on the value's sign (`LDA #$C0` / `BMI`; the fix was `BPL`); changing Breakout's brick colours broke
+the paddle; Gravitar's ship colour is used in its logic too (AtariAge `topic/202970`; only the distillation
+notes are held here, paraphrased; Cited only, not verified). **Gap:** for each colour value `dissect` matches,
+list the other instructions that read the same bytes, or branch on the value after loading it. Size: S.
