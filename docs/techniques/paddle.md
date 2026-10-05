@@ -44,8 +44,53 @@ VBLANK timer constant moved).
   cover the whole screen (most of the knob's travel) or about 20 scanlines (perhaps 15–20 degrees of
   it) 〔stella-list `200006/msg00098`〕. The per-line count above is the one-read-per-line case. A
   two-line kernel that reads every other line halves the steps — Eric Ball's figure is 120 positions
-  instead of 240 〔stella-list `200505/msg00102`〕. **Cited only, not verified.**
+  instead of 240 〔stella-list `200505/msg00102`〕. Fewer values need fewer reads: *"If you only need
+  e.g. 10 different values, you only have to check 10 times"*, against ~160 a frame for Kaboom!'s
+  single-pixel positioning (Thomas Jentzsch 〔stella-list `200402/msg00230`〕). Erik J. Eid's card game,
+  with at most five choices, needed *"about a dozen times or so"*; he took a paddle over a joystick for
+  the menu because an absolute position does not need the current choice kept track of
+  〔stella-list `200107/msg00016`〕. **Cited only, not verified.**
+- **A short polling window narrows the arc and pins it.** Thomas Jentzsch: possible in VBLANK
+  *"only if you need only very few different values and are able to poll the hardware registers in
+  constant intervalls"* — uneven spacing makes the control "strange", which is why the reads usually
+  live in the kernel. 50 polls in 500 cycles give 50 values *"(unless there are some hardware
+  limitations I am unaware of)"*, but within a very small turn, *"and this
+  area is on a fixed position, so left or right of that small angle the paddle won't react at all"*
+  〔stella-list `200402/msg00230`〕. Christopher Tumber's Quadraside read all four in overscan: it writes
+  `VBLANK = 2` at the top of overscan (his comment: blank *"and charge paddles"*), then makes 23 passes
+  over INPT0-3, each read padded so both branch paths cost 10 cycles (`bne` not taken + `dec` + `jmp`,
+  or `bne` taken + `nop` `nop` + a 3-cycle `sta` to an address the TIA does not use — our count and
+  reading). The result was *"something like 13 paddle positions"*: not enough for Kaboom!, perhaps
+  enough for a driving game's hard left … hard right 〔stella-list `200402/msg00238`〕. **Cited only, not
+  verified.**
 - Four paddles = INPT0-3 with the same pattern; pairs share a port.
+- **Four paddles from one line count** (Erik Mooney 〔stella-list `199710/msg00006`〕): load the count
+  into A once, then per paddle `bit INPTn / bmi chargedN / sta PotN`. `sta` is two cycles cheaper than
+  `inc`, the count stays in A, and a skipped store costs 3 cycles instead of 5, so the line varies less.
+  One branch per paddle and no "already latched" test: once D7 is set the branch skips the store, so
+  `PotN` keeps the last line on which the cap was still charging — one less than this file's
+  first-line-set count (our reading). He ended by asking for a time-invariant way to read all four;
+  supercat's form below is branch-free. **Cited only, not verified.**
+- **Not every paddle every frame.** With several paddles you can *"check the paddles only every 4th
+  frame. This should work for almost all games, except maybe ... for very fast games like Kaboom! or
+  SCSIcide"* — but the read then takes an index (`INPT0,x`), so it needs X or Y and A, and `bit` is no
+  longer usable (Thomas Jentzsch 〔stella-list `200402/msg00230`〕; of the paddle games he had analysed,
+  some polled the same paddle always, some each paddle every nth frame, one all paddles in one frame).
+  Jim Nitchals' earlier version, quoted by Piero Cavina: alternating one paddle per frame gives new
+  values only every 30th of a second, and alternating every 2 lines costs resolution instead
+  〔stella-list `199710/msg00005`, where he is "Jim"; the surname from `199612/msg00025`〕. **Cited only,
+  not verified.**
+- **Equal paths with one skipped byte** (Thomas Jentzsch 〔stella-list `200301/msg00187`〕):
+  `lda INPT0 / bmi p1 / .byte $2c / p1: sty padVal1`. Not taken, `$2C` makes the 2-byte `sty` the
+  operand of a `bit` absolute (4 cycles); taken, the branch lands on the `sty` (3); 9 cycles either way
+  (our count; the `$2C` skip itself is measured in `integration-density-playbook.md`, "BIT-absolute
+  skip-next"). It replaced Paul Slocum's version that leaves the loop and branches back, which he could
+  not use in Marble Craze because his kernel loops were so large the branch went out of range; he had
+  evened the paths with `WSYNC` every few lines instead 〔stella-list `200301/msg00181`〕. Thomas's own
+  2002 branch-out form hit the same range limit for Paul 〔stella-list `200301/msg00190`,
+  `200301/msg00191`〕. As posted, the taken `bmi` lands on the store, so it stores on lines where D7 is
+  set, while Paul's three-line `lda INPT0 / bmi paddles1 / sty padVal1` skips the store on those lines —
+  choose the branch for the sense you need (our reading). **Cited only, not verified.**
 - **All four in 26 or 32 cycles, without a branch** 〔supercat, AtariAge blog `entry/1073`〕. With X
   holding any value 64–127, `cpx INPTn` compares the whole byte and `ror` shifts the carry into A:
   `lda INPT0 / cpx INPT1 / ror / cpx INPT2 / ror / cpx INPT3 / ror`, then `eor pscratch+k /
@@ -80,6 +125,12 @@ VBLANK timer constant moved).
   was easier — and pots of different value (1M against 500K) complicate it. **Cited only, not
   verified.** This file's own measurement is the other face of the same freedom: the count moved
   7 lines when the VBLANK timer constant moved (Verified numbers, above).
+- **Where the release falls also picks the usable part of the turn.** Reviewing a paddle demo, Eckhard
+  Stolberg advised: *"you should stop grounding the paddles after the three lines of VSYNC. That way the
+  usable part of the paddle will be about in the middle of the full possible turn"* 〔stella-list
+  `200106/msg00098`〕. Releasing there lets the cap charge through VBLANK first, so the visible-line
+  count starts partway along the turn; this file's pattern releases at visible start (our reading).
+  **Cited only, not verified.**
 
 ## Jitter (cited, not measured)
 - **A median of three "might be a better choice" than an average** (reveng's words): a one-frame
@@ -104,7 +155,34 @@ VBLANK timer constant moved).
   a paddle charged it. Astroblast does the same in its `DetermineControllerType`, per the same thread.
   Trap: a Sega Genesis/Mega Drive pad reads as a paddle, because its pull-up on pin 5 keeps
   recharging the cap; the Harmony menu lets the player force joystick mode by holding the fire button
-  at power-on. **Cited only, not verified.**
+  at power-on. The same test was given in 1999 from the other side: with no paddle the line is an
+  open circuit, *"infinite resistance being higher than any resistance a paddle can provide"*, so it
+  reads higher than any paddle can; Erik Mooney guessed that Astroblast checks only at power-up, or
+  maybe at game start 〔stella-list `199905/msg00018`〕. **Cited only, not verified.**
+- **The paddle buttons are joystick bits.** *"the paddle buttons map to the same bits as joystick
+  left/right"*, so one routine takes either controller — Jake Patterson used left/right (Game Select
+  cycles the choices) to enter a mode for that reason 〔stella-list `200109/msg00224`〕. Paddle 0's
+  button is PA7, the pin shared with joystick 0 right, and the RIOT's edge detector watches it: the
+  interrupt pin is unconnected, but the flag can still be polled (TIMINT D6; the edge-control writes
+  are in `fundamentals-audit.md`). Mark De Smet proposed using it *"in the same way as the latches on
+  the joystick trigger buttons"*, to catch the fastest presses or only the release 〔stella-list
+  `200005/msg00045`, `200005/msg00068`〕. In this engine the flag is set at power-on and the first
+  TIMINT read clears it (`litmus_timint_pa7`). **Cited only, not verified.**
+- **Booster Grip: two more buttons on the paddle lines.** Eckhard Stolberg, replying to a post on
+  wiring a NES pad as a Booster Grip: *"the Booster Grip connects the two paddle lines with the joystick
+  button line"* 〔stella-list `200103/msg00325`〕. Omega Race uses one extra button (Chris Pepin
+  〔stella-list `200103/msg00316`〕), Thrust two (Thomas Jentzsch 〔stella-list `200103/msg00318`〕). A
+  button only has to read as on or off, so it is *"nowhere near as processor-intensive as regular paddle
+  reads"* (Glenn Saunders 〔stella-list `200301/msg00192`〕); Omega Race, as disassembled on the list,
+  reads INPT0/INPT1 just before VSYNC 〔stella-list `200202/msg00146`〕. The dump still matters: asked
+  whether bit 7 of VBLANK never has to be set, Thomas Jentzsch answered *"you have to set the bit
+  sometimes, else (on some consoles) the condensators of the paddle controllers (which are used here)
+  will charge even without input"*, and suggested setting it for some time right after reading —
+  *"only a suggestion"* 〔stella-list `200202/msg00145`〕; Omega Race sets it through VSYNC and clears it
+  at the end of VBLANK 〔stella-list `200202/msg00146`〕. He added that
+  Thrust's support was still a bit buggy and z26 did not yet emulate it exactly 〔stella-list
+  `200202/msg00145`〕. **Cited only, not
+  verified.**
 - **More digital inputs through one paddle pin** 〔AtariAge `topic/77034`, a proposal for four
   joysticks〕: wire each direction and the fire button through its own resistor on base-2 values
   (8k/16k/32k/64k/128k, sum under 1 MΩ), so each combination gives a distinct paddle value, e.g.
