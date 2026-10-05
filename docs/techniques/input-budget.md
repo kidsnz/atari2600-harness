@@ -64,6 +64,15 @@ direction, and Erik Mooney's correction was `bcs` past each direction's code, *"
 without changing A"* 〔stella-list `200207/msg00264`, `200207/msg00268`〕. `rpgmap.asm`'s `inc`/`dec` on
 memory satisfy it.
 
+The same thread took one more byte off. Thomas Jentzsch: *"You can save one more byte (the first ASL)
+if you use BPL instead of BCC."* Andrew Davie: *"If up dropped the first ASL, then ALL of the BCC lines
+should then be changed to BPL"* 〔`200207/msg00266`, `200207/msg00267`〕. After the load, N already
+holds D7, and each later `asl` puts the next bit in N one shift before that bit reaches carry.
+`rpgmap.asm` still opens with `asl` (read from the source). In its `bcs` polarity the trimmed form
+branches on `bmi` throughout, which is 3 + 2 + 3 × (1+2) = 14 bytes against 15. The `inc`/`dec` between the
+branches do not matter, because each `asl` sets N again before the next branch. That is our sum, and it
+was not assembled. **Not verified.**
+
 **The ratio is the point.** Over 192 visible lines the paddle costs **1,536–3,072 cycles a frame**
 against the joystick's 40–44 — **35× to 77×** — and an NTSC frame holds 262 × 76 = 19,912
 cycles in total. So the paddle spends **8–15% of the whole frame**, and it spends it in the one
@@ -93,11 +102,21 @@ trackball entry. **Cited only, not verified.**
   thread Christopher Tumber read four paddles in overscan for Quadraside with *"something like 13
   paddle positions"* 〔stella-list `200402/msg00230`, `200402/msg00238`〕. The trackball paragraph below
   records the opposite finding for the trackball. **Cited only, not verified.**
+  Jentzsch's post also prices the read by resolution. How often to check: *"Depends on the resolution you need.
+  If you only need e.g. 10 different values, you only have to check 10 times. For a game like Kaboom!
+  with single precision horizontal positioning, you have to poll ~160 times each frame."* Packing the
+  polls together has its own cost: 50 polls in 500 cycles give 50 values (*"unless there are some
+  hardware limitations I am unaware of"*), *"but it takes only a very small turn on the paddle to get from 0 to 50"* 〔`200402/msg00230`〕. A 2015 multicart menu made the
+  trade at the low end: *"the menu reads the value of the cap only once in very 9 scanlines. Thats why I
+  only have a range on 0 to 15"* (DrWho198) 〔AtariAge `topic/242625`〕. **Cited only, not verified.**
 - **Devices that need continuous sampling do not fit.** The list said so in 1997 with a consequence
   rather than an argument: *"there are no perportional trakball games. It's too hard to constantly
-  read a trakball, which is why the Atari trakballs have a joystick emulation mode"* — the trackball
-  ships a fallback because software could not keep up, not because the hardware could not sense.
-  Same source on the keypad: *"Other controllers like the keypad require an insane amount of time
+  read a trakball, which is why the Atari trakballs have a joystick emulation mode"*. On our reading
+  of the 1997 message, the trackball ships a fallback because software could not keep up, not because
+  the hardware could not sense. That reading has not been settled: Thomas Jentzsch's Trak-Ball hacks
+  keep up with a poll on every 8th scanline or at irregular gaps (the second trackball paragraph
+  below). **Cited only, not verified.**
+  The 1997 message on the keypad: *"Other controllers like the keypad require an insane amount of time
   to read. Play Star Raiders and FEEL the delay between a keypress and a response."*
   〔Stella list, `controllers`, 1997-09, Glenn Saunders〕
 
@@ -122,6 +141,10 @@ trackball entry. **Cited only, not verified.**
   use the select and reset switches for space and enter"*, over a layout with fewer letters to a key
   〔`199709/msg00327`〕. Both variants still need the keypad; the second moves two of its jobs onto
   console switches. **Cited only, not verified.**
+  The same month Nick S Bensema proposed text entry with no keypad, for a crypto cart: *"two joystick
+  movements, "typed" with the fire button, could yield 8 * 8 == 64 possible "keystrokes". If you
+  utilize a fire-button press with no movement, you could get 72 or 81 possibilities"*
+  〔`199709/msg00279`〕. **Cited only, not verified.**
 
   ★**The trackball half has a second source from 2015, and a witness against it.** Crispy:
   *"Polling the trackball requires a huge amount of CPU time. In order to get an accurate picture of
@@ -134,6 +157,13 @@ trackball entry. **Cited only, not verified.**
   and put it down to the trackball being relative to the previous read, where a paddle starts from
   scratch every frame 〔AtariAge `topic/245239`〕. So "too hard to constantly read" holds for a
   *continuous* read; how sparse a read still works is an open number. **Cited only, not verified.**
+  In the same thread Jentzsch wondered whether one model was built to make the read cheaper: *"Unlike
+  CX80 or Amiga Mouse (which use Gray Code), the CX22 provides a direction bit. Usually it is sufficient
+  to check that bit once per frame (outside kernel). So that you only have to count changes of the other
+  bit inside the kernel."* He asked this as a question about why the CX22 was designed that way. A 2006
+  thread describes the Gray-code side (AtariAge `topic/88663`; held here as distilled notes). The CX80
+  steps through the same 00→01→11→10 sequence as the driving controller below, on two axes, and a routine
+  written for it serves the CX22 when only its table is swapped. **Cited only, not verified.**
 
 ## Reading the shape, not the value
 
@@ -153,14 +183,34 @@ the screen"* 〔stella-list `200302/msg00212`〕. Held, the state is in the play
 edge, it is in RAM and has to be drawn; on a console switch, it is on the machine (our reading). So
 the read shape can cost picture as well as cycles. **Cited only, not verified.**
 
+**The 2001 `debounce` thread's two routines both act on this edge.** Asked how to debounce a fire button
+that *"acts wonky on the Atari"*, Andrew Davie offered Qb's console-switch routine. It is one subroutine
+that takes the switch's bit in `A` and answers in carry, and it keeps state in a RAM byte between calls
+(read from the post's code). He wrote *"The above code will debounce any console switch, passed in A"*,
+and of his own code, *"Buggered if I can figure out how it works, now ;)"* 〔stella-list
+`200109/msg00228`〕. Thomas Jentzsch posted Thrust's, where *"The debounced states of the switches and the
+fire button are stored in the "Joystick" variable (the upper 4 bits are used for the joystick
+direction)"*. Its `bcc .skipButton` falls through only when the button is down and was not down
+before 〔`200109/msg00229`〕. Both keep the previous state and act on the change. A switch that is physically
+unreliable is a different case. In 2004 a tester's console had a Select switch that was *"jumpy,
+getting too many selects per press"* and, on further testing, *"twitchy"*, as Kirk Israel relayed it.
+Chris Wilkson's reply asked *"Are you debouncing the switches properly?"* and suggested *"extending the
+switch debounce time"* 〔`200403/msg00156`〕. That is one console, and the thread does not show that the
+fault is common. The same reply also shortened the switch read. It loads `SWCHB` once, then does `ror` /
+`bcs` past RESET's code and `ror` / `bcs` past SELECT's: the shift form from *Where the cost lands*,
+taken from the low end. Wilkson wrote *"looks like you save 5 bytes too"*, and the instruction sizes
+agree (2 × (3+2+2) = 14 against 3 + 2 × (1+2) = 9). **Cited only, not verified.**
+
 ## Not measured here (deliberately marked)
 
-- **Keypad and trackball have no numbers in this repository.** The ledger names three untapped
-  threads that would supply them, and nothing has been mined from any of them:
+- **Keypad and trackball have no numbers in this repository.** The ledger names three
+  threads that would supply them:
   - `docs/mining-digest.md` — `| [301035](…) | keypad-read-delay | Keypad read delay | reference/atariage/ |`
   - `docs/mining-digest.md` — `| [88663](…) | reading-trackball | Reading the Trackball | reference/atariage/ |`
   - `docs/mining-digest.md` — `| [119919](…) | keypad-joystick | Keypad + Joystick Together; Is it Possible? | reference/atariage/ |`
   **Mine those three and this table can be completed.** Until then the two ⬜ rows stay ⬜.
+  (`88663` and `119919` are now cited above, from distilled notes. `119919` gives a wait of about seven
+  scanlines per row, but neither gives a count for a whole read, so the ⬜ rows stay.)
 - `paddle.md` says its per-line kernel is "~12 cycles when already latched". Summing the same code
   from the instruction table gives **8** on the early-exit path and **16** with every branch falling
   through. The doc's figure sits between the two; **which variant it counted has not been checked
@@ -322,6 +372,23 @@ reverse. That is the same looseness this engine shows (`litmus_swacnt` band 5, a
 not verified** — the thread is held here as distilled notes, not its text; the routine was not run, and
 the `SWACNT` setup that makes the nibble an output is not part of it.
 
+**Which lines, for which port.** Dan Boris, 1997: *"the 4 stick signals where programmed as outputs and
+used to select the row to scan, and the coloumns where read through the paddle inputs and trigger"*
+〔stella-list `199703/msg00073`〕. The Programmer's Guide's table gives the rows, as wickeycolumbus
+quoted it in 2010. For the left player `D7` drives the bottom row, `D6` the third, `D5` the second and
+`D4` the top, and `D3`..`D0` do the same for the right player. The Guide names only `INPT0`, `INPT1` and
+`INPT4` for the columns 〔AtariAge `topic/165365`〕. The routine above clears `D7` first, so by that table
+it scans the bottom row first (derived, not run). A keypad in the right port reads its columns on `INPT2`,
+`INPT3` and `INPT5`. Eckhard Stolberg, 1999: *"I think Steve Wright just forgot to mention that you have
+to read the button state from INPT2, 3 and 5 if you connect the keyboard controller to the right
+connector"* 〔stella-list `199907/msg00163`〕. doppel made the same point in 2010 and called it *"One
+important detail that keeps getting glossed over"* 〔`topic/165365`〕. A 2008 thread (AtariAge
+`topic/119919`; held here as distilled notes) adds two points. A keypad and a joystick can be read
+together, and Star Raiders is the thread's example of a game that does. The thread's example for a
+left-port keypad writes `$F0` to `SWACNT`, so only that port's nibble is an output and `D3`..`D0` stay
+inputs for a joystick. And the 400 µs (6.288 lines) wait is rounded up
+to about seven scanlines per row. **Cited only, not verified** — no keypad was driven here.
+
 **The list's first keypad read was a question, and what stopped it was `VBLANK`.** John Matthews,
 October 1996 — the month the archive held here begins — *"roughly, and I don't know that
 this is right"*: *"Set Port A to output / Put a #$10 in SwchA (checks row 1) / Wait a while (400 usec)
@@ -330,7 +397,8 @@ this is right"*: *"Set Port A to output / Put a #$10 in SwchA (checks row 1) / W
 clears one. Three days later he *"can't seem to get the timing right or something"*
 〔`199610/msg00038`〕, and two days after that he had found part of it: borrowed code *"still was
 writing a 1 to D7 of VBlank. This was dumping Inpt0, Inpt1, Inpt2, Inpt3 to ground and thus I
-couldn't read them properly"*; with that fixed, *"I am getting a reaction from columns 1 and 2"*
+couldn't read them properly"*; with that fixed, *"I am getting a reaction from columns 1 and 2"*, and
+his moral was *"don't forget that Inpt0 through Inpt3 are not the same as Inpt4 through Inpt5"*
 〔`199610/msg00039`〕. Two of the keypad's three columns are read on inputs that the paddle's dump bit
 grounds, so a frame that keeps `VBLANK = $82` through blanking (`paddle.md`) cannot read them there —
 derived, Not verified. The rest is **Cited only, not verified.**
@@ -354,6 +422,11 @@ verified** — not run here.
 The same ports carry the AtariVox and SaveKey (I2C EEPROMs on a controller port), and a 2022 copy
 utility drives one on each port at once — the source in the left port, the destination in the right
 〔AtariAge `topic/332726`〕. **Cited only, not verified.**
+A 2021 thread (AtariAge `topic/322109`; held here as distilled notes) gives the conventions. The devices
+work electrically in either port, but the standard driver assumes the right one, so the left port needs
+the bit-banging part edited. Two can in theory be attached at once, but they are accessed in turn and
+not in the same instant. With both ports taken, only the console switches are left for input. **Cited only, not
+verified.**
 
 Here the direction of each line set how many consoles one cable could join. hornpipe2, 2009, linking 2600s
 through the joystick ports, used a protocol for — in theory — up to four consoles both ways,
@@ -361,6 +434,13 @@ demonstrated with two: FIRE cannot take part because it is input-only, which lea
 lines and so at most four consoles. batari, in the same thread: one-way should work, and a two-way
 link has to watch for contention where one line serves as input and output 〔AtariAge `topic/153150`;
 held here as distilled notes, not the posts' text〕. **Cited only, not verified.**
+
+A NES pad puts the serial line inside the controller. Its shift register needs a latch and a
+clock driven out of the port, and it returns one data bit per clock. A thread started by
+wickeycolumbus records a working proof of concept on the 2600. It also says a SNES pad extends the same
+way, and that a Flashback 1 controller reads without an adapter: data on pin 2 (`SWCHA` D5), latch on
+pin 3 (D6), clock on pin 4 (D7), which are the left port's lines 〔AtariAge `topic/159334`; held here as
+distilled notes〕. **Cited only, not verified.**
 
 ## When the players multiply, the cost leaves the read (2026-09-30)
 
@@ -375,6 +455,9 @@ are identical for all eight rows"*, animation derived from position instead of s
 position value meaning "not shown" instead of a status bit. So a multi-player design is budgeted first
 in **bytes per player × players**, and only then in cycles per read. **Cited only, not verified** — the
 byte counts are his; nothing here was built.
+On the QuadTari itself, johnnywc, 2020, described how it works: *"In short, we use multiplexers and the
+select line is D7 on VBLANK. 2 joysticks can be hooked up to each port."* 〔AtariAge `topic/313174`〕
+**Cited only, not verified.**
 
 ## The driving controller's read (2026-10-02)
 
@@ -413,6 +496,32 @@ the 6507. The mask keeps the right port's two bits; for the left port, shift `SW
 as Eckhard Stolberg's version of the read does 〔`200110/msg00472`; Jentzsch points to it in
 `200110/msg00484`〕. **Cited only, not verified.**
 
+The resolution and the once-a-frame read limit each other. Glenn Saunders, 2001, with his first working
+routine: *"The drivng controller changes state 16 times in a full rotation, which matches perfectly the
+default 16 (well 15 unique) angles that are typical of 2600 rotation sequences. Any more and it's
+impossible to resolve the shape in an 8x8 square."* And: *"if you bang on the knob hard enough to twist it
+abruptly, you will unfortunately trigger a change of more than one step in less than 1/60th of a second.
+When this happens it's impossible for this routine to determine the direction of travel"*. He noticed
+the same in Indy 500 〔stella-list `200110/msg00464`〕. In 2004, on reading four controllers, he noted
+that *"Only two pins are necessary to read for each driving controller, the other two can be masked
+out"* 〔`200402/msg00212`〕. Answering a proposal to read one controller per frame in turn, he wrote: *"I
+think you have to sample all controllers every 60th of a second to avoid missing any transient signals.
+This is especially a concern for the driving controller that already messes up if you twist it too
+fast."* 〔`200402/msg00271`〕 In 2005 Lee Fastenau wrote
+*"I think Reflex actually has code in there to compensate"* for this *"fast spin"* ambiguity, using
+the last rotation value multiplied by two. He had never thoroughly tested it and had *"always suspected
+that it wasn't working"* 〔`200508/msg00179`〕.
+Jentzsch's answer to the two-step ambiguity uses memory, not speed: *"All you have to do is, to detect
+the initial movement direction. If you know the DC was moving left (+1), then an ambigious value of +/-2
+can be interpreted correctly"*. He added *"I wouldn't expect too much from it. The resolution is just too
+low"* 〔`200508/msg00184`〕. In 2023 he put a number on that: *"a paddle needs ~60° wheel turn for 150 pixel
+movement, while a DC would need 3375°! Which means, the resolution is by a factor of ~ 55 lower."* He
+also warned that his Astroblast hack *"checks the controller only every 2nd frame. That increases the
+chance of missed turn steps. You will notice these, when turning the wheel rapidly, especially when
+changing direction"*. That hack starts on paddles and switches to the driving controller as soon as its
+wheel turns 〔AtariAge `topic/346697`; the copy held here has five of the thread's six posts〕. None of
+this was run here, because the engine has no driving controller. **Cited only, not verified.**
+
 ## A second button, and telling pads apart (2026-10-02)
 
 A Sega Genesis (Mega Drive) pad gives the 2600 two buttons with no rewiring: B reads on `INPT4`, where
@@ -421,14 +530,27 @@ button 〔AtariAge `topic/158597`; held here as distilled notes of the opening p
 `Gopher2600/hardware/peripherals/controllers/gamepad.go` models that device: on the left port it
 writes the button to `INPT4` and the second button to `INPT1`, and holds `INPT0` high while plugged
 (read from the source, not run). reveng again, 2011: a Genesis pad *"+ one 10 cent pull-up resistor
-can get you 4 buttons too , maybe even 7"* 〔AtariAge `topic/177790`〕. **Cited only, not verified.**
+can get you 4 buttons too , maybe even 7. A cheap adapter consisting of nothing more than a DE9
+male+female and the resistor could also be made so the Genesis controllers could remain stock"*
+〔AtariAge `topic/177790`〕. **Cited only, not verified.**
+SpiceWare's 2015 DPC+ tutorial (AtariAge blog `entry/11988`; held here as distilled notes) reads the
+second button on `INPT1` for the left port and on `INPT3` for the right. It tells a pad from a joystick at
+power-on from those two inputs, and the test fails if the second button is held while the console
+starts. **Cited only, not verified.**
 
 The Booster Grip's two buttons also sit on the paddle inputs (Omega Race reads them on `INPT0` and
 `INPT1`, `kernel-micro-idioms.md`), and are read far less often than a paddle. Glenn Saunders, 2004,
 arguing that four driving controllers would disturb Indy 500's kernel less than paddles, counted *"the
 booster grip stuff which as Thomas explained a while back only involves polling the pot lines at the
 very top and bottom of the screen which doesn't add much overhead"* 〔stella-list `200402/msg00228`〕 —
-Jentzsch's explanation at second hand. **Cited only, not verified.**
+Jentzsch's explanation at second hand. The paddle-line wiring was stated on the list in 1999 by
+Bradford Mott: *"The Booster Grip uses the paddle lines for the additional buttons"*
+〔`199908/msg00078`〕. In the same thread a hint list was relayed, by a poster who did not own the game,
+saying that a ColecoVision controller in the left jack gives Omega Race its regular fire button and,
+in his words, *"the extra I guess the Booster Grip has"* 〔`199908/msg00060`〕. The extra buttons also have their own polarity. danjovic's 2022 joystick and
+keypad tester supports the booster, and its graphical display *"considers the FIRE button ACTIVE LOW
+while the THUMB and TRIGGER buttons are ACTIVE HIGH"* 〔AtariAge `topic/332201`; held here as distilled
+notes〕. **Cited only, not verified.**
 
 Telling which pad is plugged in can rest on a state a normal stick does not produce. dionoid, 2020: a
 Hyperkin Ranger gamepad, for a short time after power reaches it, shows all four of the left stick's
