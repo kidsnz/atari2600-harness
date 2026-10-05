@@ -7,6 +7,15 @@ of objects, line B the other. Each job now has a whole 76-cycle line to itself. 
 backbone of most real games (combined with #1/#10 multiplexing). The price: vertical resolution
 halves — positions move in 2-line steps.
 
+The price is not always paid. Rob, 2003, answering Thomas Jentzsch's *"I assume a 2LK kernel is a better
+idea"* for an Odyssey² port: most or all Odyssey² games appear to *"have only about 96 lines of vertical
+resolution"*, so the 2LK *"seems like a reasonable solution"* 〔stella-list `200307/msg00115`〕 — a source
+drawn at about 96 lines has nothing to lose to 96 pairs (our reading). And the doubled rows can be the
+look you want: Kirk Israel, 2002, moved JoustPong to a 2LK when his kernel overran 76 cycles and found
+that *"the two line kernal actually looks better than the single version did"* 〔stella-list
+`200209/msg00108`〕 — held in full in `design-principles.md`, which also has the rule that a 2600
+pixel is wide. **Cited only, not verified.**
+
 Learned from (clean-room): Darrell Spice Jr. *Let's Make a Game* Step 4; `multisprite.inc`
 discussions. Demo: `roms/techniques/two_line_kernel.asm`, locked in CI by
 `scenarios/two_line_kernel.json`.
@@ -19,6 +28,15 @@ discussions. Demo: `roms/techniques/two_line_kernel.asm`, locked in CI by
   gradient `COLUBK` update (~14 cy) — two jobs, still half the budget free.
 - **Line B:** vertical-compare + GRP1 store for P1, loop control. In a real game this is where
   game logic or the missile/ball updates go.
+
+A budget from the list, for comparison: Thomas Jentzsch, 2001, on Glenn Saunders' 2LK (Death Derby,
+152 cycles per pair, a playfield of tombstones), put *"PF + HMOVE + loop = max. 55"*, the rest of the
+pair being for the objects, and *"the optimal player drawing routine need 18 cycles"* — 20 *"when you
+need SEC"*, while *"the illegal opcode version takes 18 cycles too (and doesn't depend on the carry
+state)"* 〔stella-list `200111/msg00158`, `200111/msg00162`〕. Those are his figures for that kernel. His
+18-cycle code is not in the posts, so whether it counts the same paths is not written; the skipdraw
+measured here (`fundamentals-audit.md`, `vertical_pos_dcp.asm`) costs 20 on the lines that draw and 17 on
+the lines that skip, not a constant 18. **Cited only, not verified.**
 
 ### Positioning two players: one shared HMOVE
 Set `HMP0+RESP0` on one line, `HMP1+RESP1` on the next, then strobe **HMOVE once** after the
@@ -76,6 +94,23 @@ missiles), then `sta GRP1` again — *"yep, twice - this makes sure GRP0 and ENA
 on"* 〔AtariAge `topic/253441`〕. The first GRP1 write copies whatever GRP0 and ENABL held before they
 were zeroed; only the second copies the zeros. `litmus_vdel_cross.asm`'s entry latch is the same
 sequence (`sta GRP1 ; latch old := 0 (ball + P0)`); the score symptom is **Cited only, not verified**.
+P1's mirror is a third store: the Combat code discussed on the list clears with `STA GRP0 / STA GRP1 /
+STA GRP0`, and Erik Mooney, 2002, explained the last one — *"VDELP1 might still be set, so another write
+(of anything) to GRP0 is needed to make sure the zero in GRP1 is displayed"* 〔stella-list
+`200203/msg00008`〕. The same entry latch's next line is that store (`sta GRP0 ; latch old := 0 (P1)`),
+and `multicolor48.asm` blanks its players with the same three stores; Mooney's reading of Combat is
+**Cited only, not verified**.
+
+**Under VDEL, write both GRPx on every pass of the kernel, even where only one player is shown.**
+Glenn Saunders, 2001: in his 2LK, with the two players at different starting Y, *"neither displays at
+all"*, and *"When I comment out either the P1Loop or P0Loop code, it makes the other sprite not show
+up."* Thomas Jentzsch: *"You are using VDELPx to position your sprites in a two line kernel with single
+line resolution. So you *must* write to both GRPx registers, even when only one of the sprites is
+displayed. The easiest way to do so, is to *always* write both registers during kernel."* — his rewrite
+stores 0 when a player is out of range, for two more cycles. Manuel Polik's alternative in the same
+thread was to drop VDEL: *"Why not just throw out all the VDELX stuff? Worked fine for me"*
+〔stella-list `200110/msg00464`, `200110/msg00466`, `200110/msg00470`〕. It follows from the mechanism
+above, where a parked GRP0 is shown only by a GRP1 write (our reading). **Cited only, not verified.**
 
 **A 1-line kernel can keep VDEL on for the whole display.** spiceware's Frantic kernel writes GRP1
 before cycle 22 on every line and stages GRP0 and ENABL later in the line — its cycle notes put them
@@ -93,6 +128,18 @@ original 2LK uses one set of Y values and the cloned 2LK uses the other"* — su
 spiceware's Medieval Mayhem converts a subpixel Y into those per-row values 〔AtariAge `topic/253441`〕.
 **Cited only, not verified** — no 4LK was built here.
 
+### When 1-line vertical steps are worth buying
+VDEL and the even/odd Y values above buy back 1-line steps; a 2002 thread answered whether they are
+worth it by the kind of motion. Glenn Saunders needed them *"beause the cars will accelerate and
+decelerate so coarse vertical movement will be easily detectable as jerky, especially when cars
+initially start moving vertically"*, and agreed *"it's okay for more constant animation where you are
+moving 2+ scanlines to reach a certain minimum speed anyway."* Ruffin Bailey, the other way: his objects
+moved two lines a frame, and at one line a frame *"things looked like molassas"*, so 2-line steps were
+the way to go for his demo. Thomas Jentzsch for precision: Thrust's graphics are 2LK but *"the ship and
+the pod move with single line precision. That looks *much* better."* Manuel Polik: *"depends on the
+game"* 〔stella-list `200204/msg00063`, `200204/msg00065`, `200204/msg00066`, `200204/msg00068`〕.
+**Cited only, not verified** — nothing here measured how 2-line steps look at low speed.
+
 ### Sprite thickness under 2-line — a symmetric centre feature is 2× too thick unless the row count is ODD
 A 2-line kernel fetches one shape byte per **two** scanlines, so every feature is an even number of
 scanlines. A top/bottom-**symmetric** sprite (e.g. an East/West tank whose gun barrel lies on the axis
@@ -109,6 +156,13 @@ the shape to 7 content rows + 1 blank, still 2-line-paired (no parity shimmer). 
   → the **graphics-pointer 1-line kernel** (flip the line counter to Y, `LDA (Pxptr),Y` so X can stay
   pinned to `$1E` → missile reset becomes a 2-cy `TXS` instead of `PLA;PLA`). Researched, not yet built —
   memory `project-technique-candidates`. — in-house: Combat 2026-07-19/20.
+- A built 1-line kernel from the forum, for scale: karl-g, 2020, writes GRP0, GRP1, ENAM0, ENAM1, ENABL,
+  PF0, PF1 and PF2 on every line in 76 cycles — each through its own `(ptr),Y` pointer with one shared Y,
+  the tables padded with zeros so no line branches, `LAX (P1Ptr),Y` loading X for the next pass's
+  `stx GRP1`; a symmetric playfield, no colour changes, and the loop page-aligned and split into two
+  83-line loops with their own pointers to keep page crossings out 〔AtariAge `topic/308505`〕.
+  **Cited only, not verified** (held here from the distillation note; the thread itself is not on disk
+  here).
 
 ### Every object of a line is written in the same loop
 spiceware, 2019, to a beginner planning `JSR Kernel` for the playfield followed by `JSR DrawSprites`
@@ -117,6 +171,18 @@ playfield loop has run, those lines are already on the screen. Players, playfiel
 line go into one kernel loop, and adding a sprite means weaving its GRP writes into that loop
 〔AtariAge `topic/291513`〕. **Cited only, not verified** (held here from the distillation note; the
 thread itself is not on disk here).
+
+### An asymmetric playfield shown on both lines of the pair is rewritten on both
+The A/B split does not reach an asymmetric playfield where it shows on both lines (Aaron's 6-line kernel
+below has its asymmetric playfield on lines 3 and 6 only). J Parlee, 2003, porting K.C. Munchkin with a 2LK,
+asked how *"to keep the second playfield writes from bleeding onto the first on the second line"*; with
+his right-half writes moved into Thomas Jentzsch's timing windows it still failed, and he asked whether
+writing the playfield only every other line was the problem. Dennis Debro: *"If you only draw the
+playfield every other line the right PF data will still be resident in the PF registers for the next
+scanline. ... For an asymetrical playfield you're going to have to update the PF registers each
+scanline."* 〔stella-list `200301/msg00478`, `200301/msg00486`, `200301/msg00487`〕 So both lines of
+the pair carry the playfield writes and only the object work is left to split (our reading).
+**Cited only, not verified.**
 
 ### Advancing a table slower than the line counter, without dividing
 The pair index above already does this for one ratio (Y counts pairs, so a 2-line row needs no
@@ -132,6 +198,38 @@ forms appear in one 2021 thread 〔AtariAge `topic/317058`〕:
 table index as counter `lsr` 1. **Cited only, not verified** — none of the three was built here, and
 both threads are held from distillation notes (neither is on disk here).
 
+### Deciding less often than once per line
+The A/B split moves work between lines; three posts make a per-line job run on fewer lines instead.
+- **Split the tables by parity** (Manuel Rotschkar — `cybergoth`, the Manuel Polik of the
+  2001–03 posts above — 2005, Crazy Balloon): his 2LK drew the balloon on both lines at 1-line
+  precision and ran the skipdraw test (`LDA #H-1 / DCP / BCC`) every scanline. He split the sprite and
+  HMOVE tables into pairs — odd entries in one, even in the other (`1,3,5` / `2,4,6`), with two pointers —
+  so the draw/no-draw decision runs once every two lines and the counter counts every other line. A
+  binary that *"looks precisely like"* the previous one went from 10 free kernel cycles to 17. The cost
+  was positioning precision, which he won back by padding the tables with zeros and shifting and
+  swapping the two pointers (he describes it frame by frame and asks *"anyone following me?"*); the
+  divide table halved, so it *"Didn't even cost much ROM"* 〔stella-list `200501/msg00014`〕.
+- **Choose a pointer per band** (Aaron, 2004): in a 6-line kernel with an asymmetric playfield on lines
+  3 and 6, a skipdraw variant (built on `ISB`) *"isn't used to actually draw the sprites, rather it
+  selects which sprite pointer is to be used for the next 6 lines"*; every line then loads and stores
+  both GRPx with no test, VDELP1 on 〔stella-list `200411/msg00005`, `200411/msg00015`〕.
+- **Compute once, replay from RAM** (kylearan, 2017, Air Taxi): asked by cd-w about a masked playfield
+  fetch (cd-w's reading: `lda (ptr),Y / and mask,X / sta PF2`, 12 cycles), he does it *"only once every four
+  scanlines"* — a four-line kernel that stores the result in RAM, so the other three lines only do
+  `lda tmp_pf1; sta PF1` 〔AtariAge `topic/261776`〕 (held here from the distillation note; the thread
+  itself is not on disk here).
+
+**Cited only, not verified** — none of the three was built here.
+
+### A band drawn by the pair loop has an even height
+davem, on Crossbeam: the aliens move down by growing a blank area above them and shrinking the one below
+(`BottomArea`), and *"BottomArea must be an even number of lines. Since the missile objects alternate
+lines on which they are drawn, the BottomArea loops in pairs of scanlines. So, any time the BottomArea is
+an odd number, the logic will reduce it by 1, and add 1 to the bottom gap area between the rows of
+aliens to compensate."* 〔AtariAge `topic/381984`〕 The frame total stays fixed because the odd line moves
+to another band rather than being dropped (our reading). The extra scanlines he was chasing in that post
+came from a repositioning loop that overran 76 cycles, not from this. **Cited only, not verified.**
+
 ### A variant: a blank "logic" line instead of a second drawing line
 Both lines of the A/B split above draw. ScumSoft, 2011, alternates a **draw** line with a **logic**
 line that blanks the graphics and spends its 76 cycles on computation — *"96 Scanlines of visible
@@ -141,6 +239,16 @@ flicker"*, and later reported a much better way to interlace the frames (not sho
 〔AtariAge `topic/178066`〕.
 It pays the same halved vertical resolution as the 2LK and adds 30 Hz on every line (our reading of
 the frame swap). **Cited only, not verified.**
+
+### A variant: only some registers every other line
+Thomas Jentzsch, 2003, in a brainstorm on porting the Odyssey² game Smithereens (Paul Slocum's proposed
+layout put the two small figures on the missiles), answered Manuel Polik's count of *"4 GRPX reads and
+writes, Plus 2 * (NUSIZX + HMMX) reads and writes"* with *"How about updating NUSIZX and HMMX every
+second line."* In the same post he counted a different plan, the castles in the playfield with NUSIZx
+and HMMx still written on the line (~32 cycles of it), at 75 cycles, and came down for a 2LK — the reply
+quoted at the top of this page 〔stella-list `200307/msg00106`, `200307/msg00110`, `200307/msg00111`〕.
+Our reading of the suggestion: the graphics writes stay on every line and only NUSIZx and HMMx drop to
+every other line. **Cited only, not verified.**
 
 ## Verified here (Gopher2600, locked in CI)
 - P0 (diamond, X=60) and P1 (frame, X=100) bounce independently in pair units over a striped
