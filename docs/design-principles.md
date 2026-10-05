@@ -25,6 +25,11 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     exist on PAL; compare the palette-side measurement in `visual-ceiling.md` (four of sixteen PAL hues
     are one grey). **Cited only, not verified** — his values have not been checked against the PAL
     table here.
+  - **Dark luminances can be lost on PAL.** mr-sql, 2019, on the PAL version of his *Breakout 2002 Laserbeams*, as the
+    distillation notes record it: in an earlier revision the low-luminance rows were lost on PAL, most
+    visibly on a PAL console modded for composite, and the next revision raised the PAL luminances
+    〔mining 298799 breakout-2002-laserbeams-pal; only the distillation notes are held here, and they do
+    not say whether the rows are the palette's or the screen's〕. **Cited only, not verified.**
   - **Which set to use can be measured instead of switched, given an ARM on the cartridge.** SpiceWare,
     2017, timing one frame with a Harmony/Melody timer, after ZackAttack's idea of telling the consoles
     apart by their clocks: the-maxx's NTSC 2600 read `11d32A`, `11d32E` and `11d326`; Thomas
@@ -56,6 +61,27 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   - **Minimum width of a horizontal colour band = store-instruction cycles × 3 colour clocks**. An arbitrary
     colour costs ~6cy per band (about 8 bands per line is the ceiling). There is also the trick of borrowing SP
     (`txs`/`tsx`) as a 4th colour register. 〔170018 multiple-colors-per-scanline〕 `→ design.MinColorBandWidthPx/CheckColorBands`
+    - **An immediate load makes a band one cycle narrower, but the RAM-routine guess behind it was
+      withdrawn.** Christopher Tumber, 2002, guessing how a *Rubik's Cube 3D* prototype shows 7 colours
+      on a line: *Big Dig*'s block kernel is `lda $c0` / `STA COLUPF` repeated (3 + 3 = 6 cycles a
+      band), but *"the Rubik's blocks look a little smaller so they may be putting the routine into RAM
+      and presetting the Immediate Mode address"* — `lda #$10` / `STA COLUPF` …, 2 + 3 = 5 cycles, 15
+      colour clocks a band instead of 18 — primed for the next line *"between the end of drawing the
+      right edge of the cube and the end of the horizontal blank"*: *"LDA $ZeroPage/STA $ZeroPage x 7 =
+      42 + JSR/RTS = 54 cycles. Yeh, should be possible...."* 〔`200212/msg00272`〕 Eight 5-cycle bands
+      and that priming come to 94 cycles, more than one line (our arithmetic); his later plan changes
+      the colours only every fourth line — *"5x8=40 cycles. But again, this can be done during any of
+      the four scanlines"* — and the demo posted with that plan *"doesn't load into RAM"* 〔`200212/msg00282`;
+      a later demo, `msg00284`〕. Thomas Jentzsch's version *"doesn't require selfmodifying code and runs completely
+      in ROM"* 〔`msg00301`〕, and he found Tumber's cubes *"only 15 pixel wide"* 〔`msg00327`〕. Tumber
+      then withdrew the premise: *"I was sure the proto's square's were smaller, the size of LDA
+      #$Absolute/STA COLUPF. Which is what had me thinking they'd done a RAM routine. But they're not,
+      they're the size of LDA #$ZeroPage/STA COLUPF."* 〔`msg00335`〕 So the 5-cycle band is 6502
+      arithmetic and Tumber's own demo, not how the prototype was drawn (our reading). The
+      2013-challenge entry below calls the parent line's 8 an `LDA #`/`STA` count; by these figures
+      `LDA #`/`STA` is the 5-cycle form and the parent's ~6 is the zero-page one (our arithmetic). The
+      RAM-routine mechanism and its costs are under the asymmetric playfield (Tumber 2003, MarcoJ).
+      **Cited only, not verified.**
   - **Turning the screen 90 degrees was proposed once and rejected; among the reasons Polik gave is that "the colors are shifted 90° too".**
     Andrew Davie, 2001, in a brainstorm about a Gunfight game, said to *"turn the actual TV on its side"*
     — *"It has been known for games to require you to rotate your TV, and I don't think it's a real sin"*
@@ -132,6 +158,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
       aren't displayed. So, unfortunately this routine won't be usable, if the individual sprites need to
       have more than two states."* 〔`200103/msg00204`〕 **Cited only, not verified** — the ROM was not
       run here.
+    - **In 2002 he used black players again, with twelve shapes and flicker.** Which demo his "old
+      RESPx example" is, the post does not say. Jentzsch, 2002, on a Boulder
+      Dash idea: *"Like in my old RESPx example, I'm showing the PF and BK color and use black players
+      to produce the graphics. But this time I'm displaying 2*6 (flickering) players that can have
+      different shapes. Each player can use one of the two colors (plus black), but only with the lower
+      PF resolution (4 pixel/color)."* His snippet runs with `COLUPx = 0`; the final code *"will require
+      to run in RAM (selfmodifying code!)"*, and he had not checked what changing it for a new line
+      would cost 〔`200212/msg00108`〕. He made the first build dark *"to avoid too heavy flicker"* and
+      then sent a brighter one 〔`200212/msg00114`〕. **Cited only, not verified** — the demo was not
+      run here.
   - **Chronocolour need not rotate, and then it does not flicker.**
     Andrew Davie, 2004: Interleaved Chronocolour (ICC) shows each line's red, green and blue pixels in
     three successive frames; the variant he proposed keeps *"a single colour per line, with each
@@ -152,6 +188,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     line Chronocolour is a fake of horizontal colour but not necessarily a flickering one (our reading).
     **Cited only, not verified** — the single-field triad was described, not posted as a ROM, and
     nothing here was run.
+  - **An ICC picture fades without a second image.** Davie, 2003, posting a fade of an Interleaved
+    Chronocolour full-screen bitmap: *"This is just one image, by the way - the colours used to create
+    the interleaved chronoblahblah (TM) thingy are being changed on the fly to give the fading
+    effect."* 〔`200306/msg00074`〕 Manuel Polik and Dennis Debro saw it run on z26 〔`msg00081`,
+    `msg00084`〕. So the fade is paid in colour values per frame, not in ROM for more pictures (our
+    reading). **Cited only, not verified** — it was posted only as a ROM, which was not run here.
   - **A Chronocolour picture is made before the converter: split the colours, then dither each to one
     bit.** Davie, in the same 2004 post: ICC *"actually managed to look OK by preprocessing of the
     image -- separating an image into separate colour planes and then (and this is the REALLY important
@@ -176,6 +218,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     animation (our reading). It stayed a suggestion: Davie, a day or two later, *"Reaction to
     PUSH has convinced me to abandon that particular project."* 〔`199805/msg00236`〕 **Cited only, not
     verified** — never built, there or here.
+  - **On a blue ground, light red and red are hard to tell apart — as in 2600 *Pac-Man*.** Kurt Woloch, 1998, on
+    Davie's four-colour playfield demo (posted as the "final R&D demo"), seen on the PCAE emulator: *"The border is somewhat
+    orange, and some other objects are displayed in light red, or red. On a blue background, which
+    yours is, it's hard to tell the difference between these two colors, especially if they're
+    flashing. (It's the same with the monsters in 2600 Pac-Man, appearing in light red against a blue
+    background) Maybe you should try to use colors that are more different from each other, or a
+    darker blue background"* 〔`199805/msg00191`〕. What his advice changes is the distance between the
+    colours and from the ground, not their number (our reading). **Cited only, not verified** — seen
+    on an emulator, and *Pac-Man* was not looked at here.
 - **There is no "one correct RGB"**: Stella generates the palette from YIQ dynamically, so the same register value differs by a dozen up to 0x20 between emulators and settings.
   For us the running table `internal/ingest/palette_stella.go` is authoritative (100% match against Stella). 〔rgb-color-values, 118495〕
 - **hue ↔ colour map**: hue1 = yellow / hue4 = red / hue8 = blue / hue12 = green (hue15 ≈ hue1). hue1 is the standard choice for yellow. 〔132561〕
@@ -964,6 +1015,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     Atari's F8SC, F6SC and F4SC schemes 〔mining 352846 faster-to-load-from-ram-or-rom〕. So the RAM has
     to be RAM the CPU can execute from (our reading). **Cited only, not verified** — the demo was not
     run here.
+    A RAM routine can be patched in its operand or in its opcode, and both 2003 kernels below do both.
+    Erik Mooney patches an operand: *"The self-modifying code changes the STA RESPx to STA
+    another-location to not-draw a sprite."* (His opcode patch, zero page to zero page,X for a
+    one-cycle delay, is in `techniques/sprite-placement.md`.) For a line where one player has no copy at all he would
+    instead zero GRPx through the data, not the code: *"changing the pointer-to-invader-graphics
+    (indirect indexed loading) to point to memory holding zeroes instead. I never coded that in but
+    it's quite doable."* 〔`200311/msg00198`〕 Thomas Jentzsch, for that case: *"instead of changing
+    the target address, I am changing the opcode into bit GRPx"*, and where Mooney stores to a scratch
+    location he uses *"lda/bit RESPx"*. His reason is that
+    the two patches stay apart: *"To dis/enable the first four RESPx (and HMOVE, see below) I am
+    patching the targetaddress here. This makes the patching code much easier, because I can patch the
+    kernel for the overall position and en/disabled invaders indepently now."* 〔`200311/msg00201`〕 A
+    `BIT` reads and does not write, so the slot keeps its cycles and loses its effect (our reading).
+    **Cited only, not verified.**
   - **Single-line sprites do not forbid a busy playfield; the two are paid for separately (our reading).** Glenn
     Saunders, 2000: *"I think most games released that had single line res tended to have relatively
     simple or nonexistent playfields.  For instance, Demon Attack."* 〔`200006/msg00090`〕 Erik Mooney
@@ -997,6 +1062,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   locks part of the left and right windows, as above, and which of the three tables it agrees with at each edge was not checked here.
 - **A free 2-colour PF = CTRLPF D1 (the score bit)**: set bit1 and **the left half of the PF takes COLUP0, the right half COLUP1**, independently coloured (no asymmetric write timing needed). The staple for score display, but also a cheap way to colour the left and right of a background differently. 〔w11/Asym2scrol〕 `→ design.ScoreModeTwoColor`
 - **The saving trade of giving up PF0**: not drawing PF0 (on top platforms and the like) forces PF2 to be written at **exactly cycle 48** instead, but it frees **12cy per line + 18 bytes of RAM**, and lets the player fall off both edges of the screen (an advantage of the reflected PF). 〔mining blog SpiceWare Stay Frosty〕
+  - **Reflect or repeat also sets the shape of the playfield's RAM.** Glenn Saunders, 2001, moving an
+    asymmetric kernel to a reflected playfield: *"then I could set PF0 to a constant for the borders and
+    only have to rewrite PF1 and PF2, so I could have 4 8-bit wide strips of RAM. By doing PF0PF1PF2
+    PF0PF1PF2, both the 2nd PF0 and PF2 would need to be 4-bits wide and I'd have to do bitmasking
+    operations on them. Messy. Of course, the advantage being that you could get all your 2nd
+    playfield writes done before mid-screen."* 〔`200109/msg00327`〕 Erik Mooney put the masking
+    elsewhere: *"You'd do that offscreen. You can just do normal load/store operations during the
+    kernel, though it'd take a bit more RAM. My INV is PF 012012 and uses lots of RAM for the
+    playfield."* 〔`200109/msg00329`〕 So in repeat mode the mask is paid off-screen or in RAM, not in
+    the kernel (our reading). Saunders' reflected version was not yet working when he wrote; Mooney's
+    guess was a cycle-counting error. **Cited only, not verified.**
   - **The PF0 trade is one rung of a ladder counted in registers rewritten per line.** SpiceWare,
     2015, on showing different images left and right: *"Takes a lot of cycles per scanline though ... In
     Stay Frosty I mirrored the screen and only updated PF1 and PF2. In Stay Frosty 2 I used the time
@@ -1071,6 +1147,31 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   (The dangling "at line 38" this sentence used to carry is resolved 2026-08-06: it was a line number into an
   earlier revision of THIS file, and the rule it pointed at is the cy45 one now cited by name. Line numbers do
   not survive editing; a reference has to name the rule.)
+  - **The picture can give that deadline slack.** Manuel Polik, 2001, wanting shootable obstacles in
+    *Gunfight 2600*'s reflected playfield, asked whether anyone had timed the second PF2 write so that
+    *"it's value changes at the very pixel both PF2s touch"* 〔`200104/msg00074`〕. Erik Mooney: *"IIRC,
+    you have a four-color-clock margin; you can change PF2 while it is scanning out the last
+    playfield-pixel (4 clocks wide). You could be sneaky and never have an obstacle occupying the last
+    pixel of PF2 and the first pixel of Reflected-PF2, and that gives you some flexibility in timing the
+    write."* 〔`200104/msg00077`〕 Polik, three days later, quoting only the four-clock-margin
+    paragraph and not saying he kept those pixels empty: *"It works!"* and *"the magic cycle # is:
+    -->44<--"* 〔`200104/msg00078`〕. His 44 is one below the cy45 above, and he does not say whether it
+    counts the store's start or end, or from where (our reading). **Cited only, not verified.**
+  - **Trimming the art can hide a timing fringe, and a broken kernel with it (our reading).** Glenn Saunders, 2005,
+    hid a 1-pixel fringe on a 3x2 multicolour score by narrowing the font a pixel (*"So now the display
+    is rock solid and the font still looks okay"*), and Thomas Jentzsch found that the reorder had
+    dropped a `GRP0` write the `VDELPx` chain needs, so two digits always matched 〔`200508/msg00174`,
+    `msg00177`; the suggestions he was given and the fix are in `techniques/kernel-micro-idioms.md`〕.
+    So change the art only once the kernel's output has been checked against a design with a distinct
+    value in every position, as `litmus_48px6` does (our reading). **Cited only, not verified.**
+  - **When no cycle is right, alternate the two wrong ones between frames.** Manuel Rotschkar, 2004, on
+    Paul Slocum's RPG demo: *"On the very right edge, the last two pixels are missing every other
+    scannline"* 〔`200402/msg00089`〕. Slocum: *"I think the issue was the way the processor cycles line
+    up with the graphics. Turning off the playfield either ends up coming early or late, and I ended
+    up compromising by alternating doing it early one frame and late the next frame. I usually don't
+    notice it anymore (especially on the TV)."* 〔`200402/msg00090`〕 `techniques/pitch-dither.md`
+    does the same with pitch; here it is a write deadline (our reading). **Cited only, not verified**
+    — how it looks on a television was not seen here.
 
 ## Multiplexing and flicker
 - **★Flicker multiplexing DISABLES the TIA's hardware collision detection, and the reason is a miss rather than
@@ -1306,7 +1407,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     It is much safer left as it is (though less elegant). ESPECIALLY when using a dodgy random number
     routine which isn't really nearly random at all."* 〔`200102/msg00122`〕 The walk's worst case is
     the length of the row or column it steps along (our reading), which is what makes the routine's
-    time boundable at all. **Cited only, not verified** — the two versions were not run here.
+    time boundable at all. Polik answered with a probability: *"Depends on the quality of the random
+    generator, you're right. Since the maximum number of cubes is 7, your chance of hitting a free
+    square is always > 50%. After just 10 tries with totally random numbers the possibility of not
+    having a vacant position is lower than 1:1024. The case that it isn't vacant after 20 tries is lower
+    than one in a million. So, how random are you're random numbers? :-)"* 〔`200102/msg00126`〕 His
+    odds hold only for independent draws, which is the condition Davie doubted. A reviewer, outside
+    this repository, ran a retry loop of this shape between two `WSYNC`s through `cyclebound -asm`: it
+    reported *"loop bound unknown (need a
+    counted dex/dey or sbc-divide idiom with a proven range)"*, with a conditional bound whose
+    `max_iterations` is the largest trip count that fits the budget — 2 against a `budget` of 76 there
+    (`Obligation` in `internal/cyclebound/cyclebound.go`). So the prover can say how many redraws fit
+    the region's 76-cycle (or `@lines`) budget, not that the loop ever ends. **Cited only, not verified** — Davie's and Polik's versions were not run
+    here.
 - **An odd width is a power of two PLUS ONE, and the join is free.** A ball is 1, 2, 4 or 8 pixels
   and nothing else, so a shape that must be an odd number of pixels wide has no ball that fits it.
   Thomas Jentzsch, 2001: *"all cursors are **7 pixels wide** (has to be an **odd number** to make the
@@ -1563,6 +1676,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   an over-long VBLANK alike. What this harness can see is the frame's line count, which is a different
   quantity, gated by `frame_lines_stable` and `TestNoRomBreathesAcrossFrames`. Cited to 〔mining 171270〕 and
   left there.)
+  - **Stretching Overscan buys CPU time, and the frame rate pays.** reveng, 2020: *"Somewhat related to
+    all of this is the common practise of 2600 homebrew authors to extend the number of scanlines spent
+    in overscan, to obtain more non-beam-chasing CPU time, without taking lines away elsewhere - this
+    one does carry some risk. It slows down the overall framerate and risks rolling issues, depending on
+    the TV and how much the framerate deviates from the standard."* 〔mining 305397 newbie-question-1〕
+    Two shipped cases with their counts, and the rule to write a long count into the scenario, are in
+    `known-traps.md`'s row *"A constant count is half the rule"*. **Cited only, not verified** — no long
+    frame was put on a television here.
   - **"Overscan" and "VBLANK" are the programmers' names, not the television's.** seagtgruff, 2016:
     *"What Atari 2600 programmers refer to as the "overscan" is actually the "vertical front porch.""*,
     and "vblank", as the community uses it, is not technically the vertical blank, *"because
@@ -1631,6 +1752,11 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   missile-help-im-trying-to-keep-my-missile-4-scanlines-tall〕. A picture that looks right shows the
   writes landed in time on the paths that ran, not that they always will; `beam_intervals` gives where
   each write can land over all paths. **Cited only, not verified.**
+  - **Only the CPU stops; the timer keeps counting.** John K. Harvey, 2001, asked whether a `STA WSYNC`
+    while a timer runs affects its count. Eckhard Stolberg: *"Triggering WSYNC just halts the processor
+    until the start of the next scanline. Everything else (including the timers) works just as
+    normal."* 〔`200104/msg00096`, `msg00109`〕 So `WSYNC` lines inside a span timed with `TIM64T` do
+    not move the moment the timer expires (our reading). **Cited only, not verified.**
 - State = one GameState variable + a kernel per state. A title picture is padding top and bottom + a central PF table, clearing GRP/PF at the end. 〔title-to-game-transition〕
   - **Clearing at the end is for the lines after the loop, not for the loop.** Andrew Davie, 2019, asked
     whether PF must be cleared at the end of the loop: *"Just make sure the PF registers (PF0, PF1, PF2)
@@ -1723,6 +1849,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     more time for your kernal.)"* 〔`200309/msg00067`; "kernal" is his spelling〕 The line stays 76
     cycles whatever the cartridge; what later hardware sells is fewer cycles per job inside it — the
     DoDraw → DPC → DPC+ → bus-stuffing ladder under Sprites. **Cited only, not verified.**
+  - **Price RAM per instance first, and let it set the order of the work.** Manuel Polik, 2001, on
+    *Gunfight 2600*: *"Continuing with the playfield right now doesn't make sense, since I just don't now
+    how many RAM is left after I'm done with the weapons. (I need at least need 2 bytes of X/Y
+    coordinates, plus one byte direction + one byte lifetime per bullet, so handling 12 bullets for
+    example would eat up a minimum of 48 bytes RAM...)"* 〔`200103/msg00034`; spelling as posted〕 48 is
+    three eighths of the 128 bytes, before the stack (our arithmetic). **Cited only, not verified.**
   - **Plan the cuts before the ROM runs out.** Andrew Davie, 2001, on *Qb*: conditional-compilation
     switches added for *"Feature-reduction (for later tweaking)"* — rising player, the player's hair,
     hat, score protection, attract mode — because *"I'm just about completely out of ROM. ... it will be
@@ -1766,6 +1898,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     read 2026-10-02). It is the same
     division as the kernel roles above — Y for the graphics read, X elsewhere — with the byte as the
     reason (our reading). **Cited only, not verified** for the habit and the listing search.
+  - **Making a constant tunable costs a cycle wherever it is read.** Adam Thornton, 2003, finding Kirk
+    Israel's game more playable with other flap-strength and ceiling-rebound values, suggested putting
+    them on the difficulty or select switches, *"although that would probably screw up your timing
+    since you'd have to load them from the zero page rather than simply defining them as constants, and
+    that's an extra cycle each time you need the value"* 〔`200308/msg00119`〕 — `LDA #` is 2 cycles and
+    `LDA zp` 3. Israel: *"my gameplay and playfied is so simple, I haven't felt squeezed for cycles. So
+    there is some room to play with. I think."* 〔`200308/msg00120`〕 **Cited only, not verified.**
   - **A table can be traded back.** David Galloway, at the turn of 2005, on Manuel Rotschkar's *Crazy
     Balloon*: *"when you are done and have any cycles plus a couple of bytes of RAM you can replace
     this `LDX divideby3,Y` with `LDX div3`"*, plus a down-counter that decrements `div3` on every third
@@ -2264,7 +2403,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     an emulator picture does not judge it. 〔mining 200603 interlace-smooth-scrolling-demo〕 The ceiling
     it works against: *"If you count interlace, 525 is the maximum number of scanlines in NTSC … the
     maximum usable number of scanlines is 482, i.e. 241 noninterlaced"* (Glenn Saunders
-    〔`200106/msg00092`〕). **Cited only, not verified** — nothing here emits a half line.
+    〔`200106/msg00092`〕). What z26 counted, in the same 2012 thread: the author's PAL build
+    alternated 311 and 313 lines, his NTSC build 262 and 263, and Glenn Saunders' example 267 and 269;
+    he then made a second NTSC build that, by his description, switches between 261 and 263. seagtgruff: fields *"should be 312.5 and 312.5 for PAL,
+    or 262.5 and 262.5 for NTSC. Assuming the emulators add the two half-lines together and count them
+    as an extra full line for one of the fields, the counts should be 312 and 313 for PAL, or 262 and
+    263 for NTSC."* 〔mining 200603 interlace-smooth-scrolling-demo〕 So an interlaced ROM's two counts
+    differ by design, and if this engine counts the way z26 did, `frame_lines_stable`, which wants one
+    count in every frame, fails it (our reading). **Cited only, not verified** — nothing here emits a half line.
     People did attempt the real thing on this machine, and the way that
     thread went is the sharper illustration: the method was described on the list in **2000**; two
     other people built a working version in **2002** having *searched the archive first and missed
@@ -2396,6 +2542,15 @@ These cannot be quantified and need a judgement from Claude, a person, or an ima
 - **GameState = one variable + a kernel per state**: a structural pattern, not a numeric test. 〔title-to-game-transition〕
 - **The ISC/ISB illegal opcodes + borrowing SP as a line counter**: a cycle-saving trick. Whether it is usable is backed by litmus measurement (guaranteed by verification, not by code). 〔illegal-opcodes〕
 - **Symbolic naming / the two PAL-NTSC sets (N_xx/P_xx)**: a convention for how colour is held. `design.Hue/Luminance` can decompose the value, but the practice of "holding it under a symbolic name" is a convention, not something to check. 〔symbolic-color-names〕
+  - **The reason is older than colour: an address written as digits goes stale.** Greg Troutman,
+    1998, to Ruffin Bailey, who had stored a sprite table's address as hand-written hex digits: those
+    digits *"could change if you add, remove or relocate a single byte of the program and you don't
+    want to constantly change those numbers, hence the symbolic method"*; the `#` of DASM's `#<` / `#>`
+    *"is standard across all 6502 assemblers I've seen"*, while the `<` / `>` part *"is handled
+    differently from one assembler to the next"* 〔`199801/msg00040`〕. Piero Cavina, the same day:
+    with `LDA #>TABLE` / `STA DATA+1` / `LDA #<TABLE` / `STA DATA`, *"you can change the code before
+    "TABLE", and the compiler may give to this symbol another value, but you don't have to worry about
+    it"* 〔`199801/msg00042`〕. **Cited only, not verified.**
 - **Tool-implementation knowledge (the spritemate data model, implementing a per-scanline colour UI, and so on) is NOT absorbed**: it does not help authoring (writing asm). Preserving it in the frozen `tia-studio/` repo and the research notes is enough.
 
 ## Landing this in the implementation (`pkg/design` / the frozen TIA Studio)
@@ -2541,6 +2696,14 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     is not copied: `litmus_timer` measures the opposite. The routine waits on `TIMINT` only after a
     positive, non-zero count, before any expiry, so the clearing does not change its result (our
     reading). **Cited only, not verified** — the routine was not assembled here.
+  - **Or stop aiming at the zero: wait one line short and draw that line yourself.** Eric Ball, 2002,
+    releasing *Skeleton* v1.1, on its title screen: *"I wasn't paying attention to one of the TIM64T
+    value for the title screen and I tried to wait for 32 lines and ended up with a bunch of extra lines
+    because I missed the INTIM=0. I have now fixed this by only waiting for 31 lines and putting the
+    extra line at the bottom (and fixing that value too)."* 〔`200209/msg00064`〕 The timer then expires
+    with a line still to go, and that line is paid outside the wait (our reading). He
+    also corrected the timer value, so the post does not separate which change cured it, and he does
+    not say how his wait loop missed the zero. **Cited only, not verified.**
 - **One wrap-around clear loop, reused with 4 seed values for 4 clear extents**: `ClearMem` is a single loop whose start index (X seed) is set 4 ways to wipe 4 regions — one routine, four callers, vs four clear loops. Cheap ROM-thrift for init/reset paths that wipe several ranges. 〔Combat `ClearMem`; comparison §2.8/§7〕
 - **Audit your OWN hand-tuned code for cargo-cult — hand-tuned ≠ optimal, even in a 2K master ROM**: the annotated Combat disassembly honestly inventories its own cruft (a redundant double `STA GRP0`, a stray `WSYNC`, a self-flagged "why not `LDA MVtable+1,Y`?" 2-cycle miss). Model this: keep a written inventory of your ROM's own redundancy rather than assuming your tuned code is tight. (Applied to our clone, this surfaced ~250–400 B of recoverable duplication unrelated to its provability trade.) 〔Combat — Williams' annotations; comparison §7〕
   - **Shipped is not correct either: a real defect can sit where nothing visibly reads it.** ChildOfCv,
@@ -2572,6 +2735,13 @@ A second pass over Combat (1977) through 5 lenses BEYOND round-1's efficiency/st
 - **Force composition — how MANY and how BIG each side's units are — is a distinct handicap axis (~2 NUSIZ bytes).** A widths table turns the plane games into 1v1 / 2v2 / 1-vs-3 / one quad-width "Bomber" vs three planes almost for free (formation units all fire on one trigger). Quantity/size asymmetry is a curated difficulty knob separate from stat tuning. 〔Combat `WIDTHS` / `LDSTEL` NUSIZ setup; manual games 19-27; deep-read harvest 2026-07-23〕
 - **Input deliberately throttled for "heft" — spend real effort on feel nobody consciously sees.** Three governors make vehicles feel weighty, not twitchy: a turn-rate governor (N frames between each 22.5° rotate), a whipsaw-reversal inhibitor (block instant flips), and forward-speed dithered over 16 frames so momentum is "just barely noticeable." Rate-limit raw input to express a vehicle's mass. (Round-1 has the FwdTimer momentum; new here: the rotational governor + whipsaw inhibitor + the invisible-polish philosophy.) 〔Combat `CHKSW` (TurnTimer/LastTurn) + `FwdTimer`; deep-read harvest 2026-07-23〕
 - **A scoring event earns a consequence beat that ALSO resets board geometry (anti-camping).** A hit doesn't just respawn: the loser's tank spins, explosion volume ramps down, the loser is knocked to a NEW position (direction off the winner's missile bearing), and the winner's engine is silenced. Re-orienting and shoving the loser prevents play resuming in the same lethal geometry = anti-instant-re-hit fairness. Give scoring events a consequence beat that also resets state. 〔Combat `COLDET` / `CHKSW` stir branch / `RushTank`·`BumpTank`; deep-read harvest 2026-07-23〕
+  - **A beat can also come before a result.** Thomas Jentzsch, 2022, on jab's memory game *LioLa*
+    (five objects are shown, then one appears at a random place and is carried back to its spot):
+    *"you could pretty easily animate each screen by shuffling the symbols before you display the
+    final screen. IMO that would make the game a bit more immersive."* 〔mining 338710
+    liola-homebrew-game; only the distillation notes are held here〕 The symbols are already drawn,
+    so what it costs is frames, not new graphics (our reading). **Cited only, not verified** — a
+    suggestion; nothing was built.
 - **Overload one control with a contextual second meaning (control economy on a 1-button machine).** In guided-missile variants, rotating your body continuously copies your CURRENT bearing into the missile's — so after firing you steer the missile by continuing to turn, no separate control. Trades aim for vulnerability (the same stick turns your body). Depth without extra buttons. 〔Combat `ROT` (BIT GUIDED / STY DIRECTN+2,X); manual Fig E; deep-read harvest 2026-07-23〕
 - **Fixed short match + a diegetic end-game telegraph rendered THROUGH the score itself — no separate UI.** A ~2-minute timer ticks ~1/sec; the last ~1/8 is telegraphed by BLINKING the score (no timer widget). Short fixed sessions keep 2-player play snappy; communicate urgent state by animating an element you already draw. 〔Combat `GSGRCK` (GameTimer / CMP #$F0 / CLOCK&$30 flash / KLskip=$0E); deep-read harvest 2026-07-23〕
 - **Minimal-UI: attract == menu == play, and the score doubles as the variation selector.** No separate menu — in attract, Select increments the variation number straight into SCORE, shown by the normal score kernel (right score hidden so only the game number reads); the idle match-timer drives a color-cycle anti-burn-in. Reuse gameplay display elements as menu/attract UI. 〔Combat `SelGO` (STA SCORE / SHOWSCR) / `LDSTEL` color cycle; deep-read harvest 2026-07-23〕
@@ -2598,4 +2768,14 @@ A second pass over Combat (1977) through 5 lenses BEYOND round-1's efficiency/st
     heading by compares; his ends in a table read, and how the index is formed is not in the thread.
     **Cited only, not verified.**
 - **Shortest-arc turn on a power-of-two direction ring.** To rotate toward a target heading the short way on a 16-step wrap ring: diff = (target − current) & $0F; if 0 done; CMP #9 → 1..8 turn CW (INC), 9..15 turn CCW (DEC). One compare picks the correct rotation sense across the wrap with no signed distance and no table. Generalizes via CMP #(N/2+1); rate-limit the turn. 〔clone `AiMove`/`AiCW`/`AiTe`; deep-read harvest 2026-07-23〕
+  - **Without a target heading on the ring, the sign of a cross product picks the side.** Kirk Israel,
+    2005, wanting a heat-seeking missile in a game like *Combat*'s biplanes, asked how it knows whether
+    to turn left or right. Aaron: *"Take the missile velocity, that's one vector. Then take the
+    distance from the missile to its target, that's another vector. Take their cross product, i.e.
+    y1*x2 - y2*x1. If it's negative, you turn one way, if it's positive you turn the other (I forget
+    which is which, but it should be easy to figure out)."* 〔`200507/msg00161`〕 Thomas Jentzsch:
+    *"You only need the signs here."* 〔`200507/msg00167`〕 Aaron: *"as Thomas pointed out, you don't
+    really need to be exact."* 〔`200507/msg00170`〕 The ring rule above needs the target's heading as a
+    ring index; this needs only the two vectors (our reading). Which sign means which turn is left open
+    in the thread. **Cited only, not verified.**
 - **Map-free navigation primitives (four independently-testable behaviors on a bare greedy seeker).** (1) Stall→180° reversal: every 32 frames sample horizontal headway; |Δ|<2px = wedged → about-face (gate OFF where an axis is intentionally frozen, else a legit vertical climb reads as "stuck"). (2) Reactive wall-slide: on wall-contact (CXP1FB) skip accel + rotate one notch + snap velocity to zero, so the heading sweeps off the wall — no normal, no map. (3) Ammo-gate fire-when-aligned: fire only when off-axis error < half a tank height; a hold sets a quick re-check WITHOUT charging the post-shot cooldown (hold ≠ fired). (4) Scatter-decoy target-swap: inside a concave pocket substitute hard-coded exit waypoints for the target (seek core unchanged) with the escape direction LATCHED against mid-corridor oscillation. Grow AI as named, separately-verifiable layers over "walk toward target." 〔clone `AiStk`/`P1Snap`/`AimOK`/`TgtEsc`; deep-read harvest 2026-07-23〕
