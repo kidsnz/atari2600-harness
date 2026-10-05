@@ -80,6 +80,26 @@ anyway so I'd use the PositionObject() routine each frame"* 〔AtariAge `topic/2
 to add is the copy pitch of the mode in use: the medium modes he named are 32 apart (`$26` below), and
 16 is the close modes' pitch. **Cited only, not verified** for all three — none was run here.
 
+**Some early games strobe once and only ever nudge.** Dennis Debro, 2004, from his disassembly of Indy
+500: *"It repositions the players once (at game start) and just shifts the players the desired
+number of pixels during vertical blank."* The game still keeps the positions, because it *"needs to
+know when the player has reached the playfield limits"*, and *"this is the same way positioning is
+done in Combat and I've also noticed it in Surround"*; *"Later with games like Air-Sea Battle they
+started repositioning the players in the kernel."* 〔stella-list `200409/msg00240`, `msg00261`〕
+**Cited only, not verified** — none of the three was run here.
+
+**Which positioning routine — the families and their prices.** Erik Mooney, 2004, called it *"a
+classic trade-off"*: the Battlezone routine (an `SBC #15` / `BCS` loop) is *"compact, but getting the fine/coarse coordinate is intertwined with the delay loop
+and hard to explain"*; the older Air-Sea Battle conversion *"goes through an incomprehensible block of
+code but at least gets a visible understandable byte with the fine/coarse numbers"*; a lookup table is
+*"still faster (at the cost of ROM, of course); it fits entirely into one scanline plus an HMOVE
+afterwards"*. R. Mundschau's version, whose advantage over Battlezone he puts in taking the HMxx value
+from a table instead of four shifts, *"fits (almost) entirely into one scanline"*, and *"the ultimately fastest way is to
+simply calculate the fine/coarse value outside the kernel and store it separately"*. He also found
+that version, as posted, strobes at cycle 21 for an x of 15 or less, *"which is too early"* — on this
+file's measurement, the floor of rule 7 〔stella-list `200404/msg00298`, `msg00305`〕. Eric Ball's third Battlezone idea is the back-to-back pair under rule 3
+below 〔`200404/msg00307`〕. **Cited only, not verified.**
+
 ## The rules
 
 | | rule | band |
@@ -101,8 +121,18 @@ to add is the copy pitch of the mode in use: the medium modes he named are 32 ap
 Rule 9 is from the same session's probes rather than from this litmus, which grades normal width.
 Its wrap was measured later by a reviewer on the engine, outside this repository (2026-09-29): a
 double or quad player written at cycle 73 wraps, `3c − 59` = 160 → **x = 0**. No litmus here holds it.
-Width itself is free: double and quad are the same single NUSIZ write and the same landing place;
-what they cost is screen area.
+Width is a single NUSIZ write, but it does not keep the landing place, and screen area is not all it
+costs: a double or quad player lands one clock right of a normal one from the same cycle (rule 9;
+`nusiz-shaping.md` measures the same +1 on `litmus_nusiz_all`: double and quad ink from clock 25 where 1x inks from 24),
+it cannot sit left of x = 4 except by a wrap, and being wider it reaches 160, and rule 12's wrap,
+sooner (see "At the side edges").
+
+A missile's width is said not to move its start. Andrew Towers, 2003: *"the TIA does not take
+missile width into account, so the start of the missile will always be the same pixel regardless of
+its size (1x, 2x, 4x or 8x)."* 〔stella-list `200309/msg00252`〕 Here rule 2 is measured at two
+widths: 1x in bands 2 and 3 and 4x in band 4 (`NUSIZ0 = $20`, M0 at 38 = 3c − 61), both graded in
+`spriteplace_test.go`. 2x and 8x are **Cited only, not verified** (`litmus_objsizes` draws every
+width at a fixed x, and a golden hash pins that frame, but no assert reads the start).
 
 **A counter model behind these offsets, from another emulator.** DirtyHairy, 2017, describing
 6502.ts's TIA core: there is *"a four color clock delay between RESx and the actual reset of the sprite
@@ -116,11 +146,31 @@ here by arithmetic: missile/ball +4 (`design-principles.md`) and rule 10's x=2 a
 one clock more (+5, rule 7's x=3), which the model as quoted does not cover. The counter internals are
 **Not verified.**
 
+**The floor stops the strobe, not the fine motion.** Eckhard Stolberg, 2002, on a positioning routine
+whose strobe can come too early: hitting RESPx during horizontal blank *"will always be treated as if
+the hit happened at the start of the screen, which is at cycle 22"*, so *"the players will be
+positioned on the left side of the screen, and only the HMPx shifting value will change the position
+a little for each value"* 〔stella-list `200211/msg00215`〕. His boundary is stated as cycle 22; this
+file measures write cycles 17 and 21 on the floor (band 8) and 22 already on the formula (x = 6), and the two
+counting conventions are not reconciled here. That HMPx still moves an object from the floor is
+**Cited only, not verified**, and `plan_sprite_placement` plans no HMOVE, so it does not offer it.
+
+**On a line that also strobes HMOVE the floor is not measured.** Every floor number here was taken
+with no HMOVE at all (`gen_litmus_sprite_place.py`: *"nothing here ever strobes HMOVE"*). Andrew
+Towers, 2003, to someone whose strobe failed at cycle 24 on an HMOVE line: *"cycle 24 *is*
+technically inside the extended HBlank, so I'd say this is the root of your problem"*; cycle 25
+*"seems to be safe but only by the barest of margins (it's still 1 pixel inside the extended
+HBlank.)"* 〔stella-list `200303/msg00052`〕. **Cited only, not verified.**
+
 ## What rule 3 buys
 
-Two strobes on one line are at least three cycles apart, because that is the shortest store, and
-three cycles is nine colour clocks. **Two players can therefore never sit 8 px apart** — the gap is
-nine or more. Nor can the glyph be shifted inside its byte to close it: split a 12 px shape into a
+Two strobes made by stores are at least three cycles apart, because that is the shortest store, and
+three cycles is nine colour clocks. **Two normal-width players strobed by stores can therefore
+never sit 8 px apart** — the gap is nine or more. (Mixed widths differ: a double or quad player lands
+one clock right, rule 9, so one strobed three cycles before a normal one is 8 apart — arithmetic,
+**Not verified**.) A stack push is not a store and is reported to strobe closer (see "Strobes closer than
+a store" below); for two normal-width players it does not reach 8 either, since both land on rule 1's
+3-clock grid — derived, **Not verified**. Nor can the glyph be shifted inside its byte to close it: split a 12 px shape into a
 w-bit head and a (12−w)-bit tail and the head can move at most 8−w px inside its byte, so the
 reachable gap tops out at w + (8 − w) = 8, one short, whatever the split.
 
@@ -139,7 +189,28 @@ second table spends one HMOVE step to close it. The source and rule 1 are the sa
 two sides, and his fix is the one this project already ships: `litmus_p0p1` corrects the identical
 +9 with `HMP1=$10`.
 
-`litmus_resp_pair` puts that on the screen rather than leaving it as arithmetic (`resp_pair.json`,
+**Eight months later he dropped the tables.** Polik, 2002-11, from his Star Fire source: both players
+repositioned on one scanline by calculation. After the Battlezone `SBC #$0F` / `BCS` loop, the
+remainder indexes a 16-byte table for `HMP1`, then `SBC #$0F` again — *"carry is clear, so subtract
+$0F instead of $10"* — gives `HMP0` one HMOVE step to the right of it, and `STA RESP0` / `STA RESP1`
+follow back to back. *"For me it saved 2*160 bytes of tables"*. He chose the table over EOR/ASL
+because he *"desperately needed the cycles gained from using the table and the reliable carry
+state"*. Eric Ball: *"There's an implied CLC or equivalent before the first STA WSYNC"*, and it places
+*"a single 16 bit sprite (P0 left, P1 right?) rather than 2 independent 8 bit sprites"* — Polik:
+*"Yes, exactly"*, and *"You only lose a few pixels left and right"* 〔stella-list `200211/msg00165`,
+`msg00168`, `msg00177`, `msg00180`, `msg00201`〕. **Cited only, not verified**: not assembled here and
+its worst case not counted; the one-step +9 → +8 is what `litmus_p0p1` and `litmus_resp_pair`
+measure. Against `shared-setxpos.md`'s one or two lines per object, it is one line for the pair.
+
+**Two strobes from one position have a window, and it has a top.** Polik again, 2002-10, on
+repositioning both sprites in one line: *"With the HMP0/Y table values having Y < 2, it's getting
+scrambled on the left border, with Y values getting > A the second RESP is coming to late fot that
+line. I know, because I tried that more than once"* 〔stella-list `200210/msg00114`〕. The 2 and the A
+are his kernel's; what carries over, on our reading, is that such a window has an upper end — the
+second strobe must still land on the line — as well as the left-edge lower one. **Cited only, not
+verified.**
+
+`litmus_resp_pair` puts the raw +9 and its one-step correction on the screen rather than leaving it as arithmetic (`resp_pair.json`,
 `internal/emu/resppair_test.go`). Four bands, identical prelude, only the HMOVE nibble differs, P0
 white and P1 red so the run boundary answers:
 
@@ -167,6 +238,47 @@ With rule 4 on top, `NUSIZ0 = $26` (three copies 32 apart, missile 4 px wide) dr
 no HMOVE at all. The missile is solid, so the 4 px tail is all-on or all-off: a shape whose last
 four pixels are not uniform cannot use it.
 
+## Strobes closer than a store — the stack as a strobe pointer (cited, nothing measured here)
+
+The three-cycle floor above is a property of the store, not of the TIA. Page 1 mirrors the TIA
+(`missiles-bullets.md`'s ENAM stack trick uses the same fact), and an instruction that pushes writes
+wherever the stack pointer points. Erik Mooney, 2004: *"If the stack pointer is set to RESP1, then JSR
+would write to RESP1 and then RESP0 very quickly"*:
+
+    ldx #RESP1
+    txs
+    jsr nextinstruction
+    nextinstruction
+
+Kroko's cycle table for JSR (offered as *"I think is like this"*) has the two pushes on cycles 4 and
+5. Mooney's PCAEWin *"seemed to ignore the RESPx writes completely"*; on z26 *"player 1 ends up 3
+pixels before player 0"*. Lee Fastenau: *"the RESP0/1 strobes are 1 cycle (3 pixels) apart, in
+reverse order"*. Christopher Tumber posted a demo of *"11 pixel wide sprites"* and *"Works fine on my
+Supercharger"*; it repeats `txs` / `jsr` to the next instruction, eight cycles a pair, `txs` putting
+the stack pointer back on `RESP1` before each JSR, and reloads it (`ldx #$fd` / `txs`, his routine
+having been entered by a JSR with SP at `$FF`) before its own RTS. RTS cannot strobe: Thomas Jentzsch,
+*"RTS *reads* from the stack"*, and Mooney adds that it would take its return address from the
+collision registers 〔stella-list `200404/msg00149`, `msg00150`, `msg00155`, `msg00157`, `msg00159`,
+`msg00160`, `msg00163`〕.
+
+**The spacing is remembered two ways.** Jentzsch had posted the idea in 2002, pointing the stack at
+`RESM0` so that the pair was M0 and P1 — *"only three pixel gap"*, and *"If you use BRK, you can do this for *three* objects"* 〔`200203/msg00077`〕 — and in 2004
+wrote *"IIRC it worked perfectly with a three pixel delay"* 〔`200404/msg00158`〕. In 2003, asked
+whether the two strobes were *"2 cyles"* apart giving *"14 pixel wide sprites"*, he answered *"IIRC
+yes"* and *"Yup"*, and said, IIRC, he had tested it in his TomInv demo 〔`200307/msg00118`, `msg00119`〕. The
+cycle table, the z26 result and Tumber's 11 px (8 + 3, our reading) agree on one cycle.
+
+**BRK writes three.** Eckhard Stolberg, 2001: Pole Position *"puts the stack pointer over the RESxx
+registers and then does a BRK. There are three write cycles in a BRK instruction, so the three
+position registers for the objects that make up the road in PP, get accessed in three consecutive
+cycles"* 〔`200111/msg00014`〕. In 2004 he said Pole Position *"uses the JSR trick too to position the
+curbs"* and *"I think Pole Position uses the missiles for the curbs"* 〔`200404/msg00162`〕 — two
+accounts of one game that name different instructions.
+
+**Cited only, not verified** — no litmus here strobes through the stack, and how this engine places
+an object struck by a push is not measured. `plan_sprite_placement` models stores only: it keeps
+every two strobes at least three cycles apart.
+
 ## What rule 4 decides — which missile carries a shot
 
 Rule 4 holds on every line the missile crosses, so a missile is multiplied wherever its player is in a
@@ -184,6 +296,21 @@ copy mode; only its width is its own. Two designs on record are shaped by it:
 So the free missile belongs to the player that is never copied on the lines the shot can reach, and
 the price is that player's colour (`invisible-probe.md` tabulates which register each missile takes
 its colour from). **Cited only, not verified** — neither game was run here.
+
+**What a wide player leaves for small things on its line.** Eckhard Stolberg, 2002, on ships built
+from players in copy modes: *"This also affects the missile graphics, so for 32-pixel ships you could
+only use the ball for torpedos. For 24-pixel ships you would have the ball and one missile, but if you
+need to display three torpedos in the same row, you can only have 16-pixel ships."* In the same post,
+for that design: *"depending on where on the screen the ship is positioned, the display of your
+topedos might be off by one scanline"* 〔stella-list `200209/msg00074`〕. **Cited only, not verified.**
+
+**A copied missile can still be shown once — by its enable.** omegamatrix, 2014, on side highlights
+next to a three-copy score: *"They will be in triplicate mode because they follow the players # of
+copies. You will need to enable and disable them at the right times to avoid drawing more then one."*
+〔AtariAge `topic/221811`〕 Andrew Towers, 2003, offered another route *"in theory"*: *"No copies of the
+missile will ever be drawn while RESMP0 is set"*, and turning it off again before the main player is
+drawn *"will not reset the missile position at all"* 〔stella-list `200309/msg00252`〕. Both **Cited
+only, not verified**.
 
 ## Rule 6, and why the number matters
 
@@ -257,6 +384,18 @@ cheap in cycles and expensive in slots; it must not be struck in the first three
 HMOVE (`restrobe-copies.md`'s traps); and it can only land on the 3 px grid, so HMOVE remains the
 only way to move by a fraction of it. Source: measured in a piece in the private `roms/` repository,
 2026-08-26; that work's ledger names this file.
+
+**The OBJECT, that is — the picture can move inside its byte.** Erik Mooney, 2003, on the strobe-drawn
+11-invader row of his kernel, positions in three layers (his *"(I think)"* prefaces the drawing
+scheme earlier in the post, not this part). The kernel draws 15 columns and self-modifying code between rows picks the 11 that draw:
+*"This means I only need to start my kernel at any one of 9 pixel positions"*; *"I delay the formation by 0, 3,
+or 6 pixels by self-modifying none, one, or both GRPx writes to take one extra cycle, by changing the
+opcode from zeropage to zeropage,X (X is always zero.)"*; and *"for single-pixel positioning, I just
+have three separate ROM copies of the 6-pixel-wide invader sprites, at different positions within the
+8-pixel-wide GRP register"* 〔stella-list `200311/msg00198`〕. Thomas Jentzsch corrected the span the
+15 columns cover — *"15*9 - 3 = 132"* — and warned that *"IIRC there is a big problem with hitting
+RESPx every 3 cycles, because gaps in the formation cause the preceding (following) invader to be
+shifted by one pixel. And AFAIK nobody has found a solution for that problem yet."* 〔`200311/msg00201`〕 **Cited only, not verified.**
 
 ## What a re-strobe does to the OTHER objects — the three disagree
 
@@ -339,6 +478,19 @@ values given in stella.txt, etc generally assume a standard HMOVE. IE: When the 
 done in the scanline."* 〔AtariAge `topic/152403`〕 Every other row of the table above is a strobe those
 tables do not describe. **Cited only, not verified** for stella.txt's assumption; the table is measured.
 
+**A line-end HMOVE proposed as a way to buy back a strobe cycle — and its direction.** Manuel Polik,
+2004, sketching one unrolled kernel per strobe position, found that around a `PF2` write at cycle 46 (*"what was it again... 46?"*)
+two neighbouring kernels strobe at 43 and 49 — *"the required gap between the RESPs would be 5 cycles
+and this'd require 6"*. Erik
+Mooney: *"In the case where the RESP must be time for cycle 46, time it for cycle 43 instead, and use
+the trick of hitting HMOVE on cycle 74 to get an extra 8 pixels of movement from the HMOVE."*
+〔stella-list `200405/msg00032`, `msg00040`〕 As worded it runs against this catalogue's measurement:
+three cycles early lands the object 9 px to the LEFT, and a line-end HMOVE moves LEFT (`litmus_hmove_side`,
+`verified-coverage.md`: left HM+8 px, no comb; `known-traps.md`: the cycle-73/74 strobe only moves
+left), so the extra eight would add to the error rather than pay it back. The arrangement consistent
+with the measurement is the mirror — strobe late and take the eight back leftward — which is our
+reading. **Not verified.**
+
 ## The three ways to cut a 12-clock shape, and why the cut decides where it can go
 
 A shape twelve colour clocks wide is eight clocks of player and four of something else, and the
@@ -364,10 +516,47 @@ Rule 12 widens it further: a base strobed on the RIGHT of the screen puts a copy
 at positions the strobe grid does not reach — at the price of a write to blank that copy if the
 row does not want it.
 
+## At the side edges — what wraps, and how games hide it (cited)
+
+**The object's own body wraps too, not only a copy.** Rule 12 is phrased for copies, though its own
+example is a quad player's body. Eckhard Stolberg, 2001: *"If you position a player at pixel 159, then
+one pixel will be visible on the right border of the screen and 7 pixels will be visible on the left
+border of the screen."* 〔stella-list `200111/msg00096`〕
+
+**A wrap can be the design.** Paul Slocum, 2004, on Kirk Israel's JoustPong:
+*"You can have a flicker free kernal just by putting P0 in copy mode and positioning it at the right
+side of the screen so it wraps around"*; *"Then you don't ever have to reposition P0 (just use the same
+setup for the score.)"* *"Only drawback is that you may not be able to color the two players
+differently."* 〔stella-list `200402/msg00186`〕
+
+**What a wrap shows has to be hidden, and every way of hiding it costs something.** Thomas Jentzsch,
+2002, to Manuel Polik about ships popping in at the sides: *"some additional AND inside the kernel to
+mask the wrapping bits"*, *"the trick with all HMOVE-blanks on the left side. They would mask 8 bits"*,
+or *"two 8 pixel wide vertical borders using the PF (like a cockpit window)"* 〔`200210/msg00031`〕.
+Polik on the AND in his engine, which places nothing past 127: *"if an object is at the very right
+(127) side, it must already have 15 Pixels blanked out"*, *"So I'm gonna lose 15 Pixels on each
+side"*, and leaving smoothly *"without losing any width would require shifting of the shape data"*
+〔`200210/msg00040`〕. A year later, for a 32 px sprite, his plan was *"two black PF
+pixels at both sides to be able to hide one sprite. When this is completey out of the screen, I'd need
+to jump the thing 8 pixels back and adjust all 4 poiters"* 〔`200309/msg00087`〕. On AtariAge in 2007,
+answering a newcomer who wanted a player to slide in from off screen, cybergoth said a sprite
+cannot be placed off screen and only wraps, and listed four ways round it: shift the shape through a
+RAM buffer, keep pre-shifted copies in ROM, hide it under the left HMOVE blank (the usual one), or
+hide it under a black playfield column with priority 〔AtariAge `topic/104777`, paraphrased from this
+project's notes; the thread text is not archived here〕.
+
+**The comb hides one side only.** Jentzsch, 2003, with an HMOVE on every line: cars *"can disappear
+smoothly on both sides because when they wrap around on the right side they will be also hidden under
+the blanks. But obviously they will be visible a bit further to the right than to the left."* Glenn
+Saunders: *"It looks like the best way to avoid this problem is to just not let the cars pass
+horizontally at all."* 〔stella-list `200301/msg00222`, `msg00241`〕 The comb itself is measured here
+(`litmus_hmove_side`: clock 0–7 black on strobe-after-WSYNC lines); everything else in this section is
+**Cited only, not verified**.
+
 ## Do not work this out by hand — `plan_sprite_placement`
 
 Three grids that do not line up, clamps that are windows, copies that wrap, and a three-cycle floor
-between strobes: this is not arithmetic anyone should do in their head, and the first two attempts
+between strobes made by stores: this is not arithmetic anyone should do in their head, and the first two attempts
 at it here both returned **"impossible"** for a row that places fine. The search is in
 `internal/place`, reachable as the MCP tool **`plan_sprite_placement`** and as **`cmd/place`**:
 
@@ -381,6 +570,20 @@ or more is dropped from the search, and no wide-player NUSIZ code is in it.
 
 It answers PLACEMENT only. Whether the line then has the cycles to write every shape's bytes is a
 different question, and `prove_line_budget` is the one that answers it.
+
+It plans only for **x given in advance**: `Solve` takes one row of shapes at fixed x and returns one
+plan. Nothing in it describes x that changes from line to line or from frame to frame. Roger Williams,
+2001, on a rotating overhead view, about putting more objects on the screen: *"The usual techniques
+can't be used since the rotation ruins any assumptions you might want to make about the horizontal
+positioning."* 〔stella-list `200111/msg00038`〕 Where x is only known at run time, a plan for one x says
+nothing about the next. **Cited only, not verified** for the quote.
+
+"Staggered" in the `place` example above means every other scanline. In someone else's picture a
+stagger is a clue to the mechanism. Chris Cracknell, 1998, on the dots in Alien: *"I think they use
+the player missles for the dots instead of playfield graphics like the 2600 Pac Man. If you look
+closely you'll notice they're staggered, not straight."* 〔stella-list `199801/msg00232`〕 A playfield
+can be staggered too, but only by whole 4-clock columns, so on our reading the clue is firm only when
+the offset is not a multiple of four. **Cited only, not verified.**
 
 ## What this made possible, and where the tool for it lives
 
@@ -433,7 +636,7 @@ lands on a 3-colour-clock grid and the strobe cannot occur before `ClampFirst` �
 the reachable positions are quantised and the gaps show. Far enough right, every residue is reachable.
 
 ★**With two shapes 8 px apart the unplaceable starting positions jump from 24 to 66**, because both
-must satisfy the grid and there is a 3-cycle floor between strobes. A pair is not twice as free as a
+must satisfy the grid and the solver keeps a 3-cycle floor between strobes (it plans stores only). A pair is not twice as free as a
 single; it is markedly less free, and the loss is concentrated where the comb already is.
 
 ★★This is a statement about **the solver**, not the TIA: it is the set of x this package can currently
@@ -441,6 +644,13 @@ produce a plan for. The test's controls hold that meaning — the free middle mu
 comb must stay a comb of 1s and 2s, and if either changes the numbers move and it says so. Found by the
 mailing-list distillation (helper-2), whose note said it plainly: *"作品1（TRANSISTOR DUB）に直に効く
 ——文字の x が穴に落ちるかどうか"*.
+
+**Other routines have other dead zones, and in other places.** Bradford Mott, 1998, sketched a
+one-scanline routine that positions P1 and ends with HMOVE at cycle 74, so its line shows no comb:
+*"there is a deadzone from 121 to 144 where P1 can't be positioned :-("*, and *"It may be possible to
+arrange the code so that the 121 to 144 deadzone is moved to the left and right sides of the
+screen."* He had not run it — *"If I get the time I'll try to figure out the HorzTable and see if this
+routine works or not tomorrow"* 〔stella-list `199804/msg00194`〕. **Cited only, not verified.**
 
 ## Inline or behind a call: twelve cycles, charged unconditionally (2026-09-07)
 
