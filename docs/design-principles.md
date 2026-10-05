@@ -695,11 +695,27 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     PLAYFIELD. Just checked again and forgot about the balloon using a MISSILE to round out its shape."*
     〔mining 328452 sky-jinks; only the distillation notes are held here〕 **Cited only, not verified** —
     the ROM was not looked at here.
+  - **Or change what is drawn, so that a cheap object can draw it.** orange808, on brian-o's mock-up of
+    an *Escape from New York* game, as the distillation notes record it: the health pack could become
+    an "E" drawn with a missile or the ball, and the bullets probably need not be drawn at all — a
+    muzzle flash would do 〔mining 306733 escape-from-new-york-for-the-2600; only the distillation notes
+    are held here, so this is a paraphrase〕. The lines above pick objects for a picture already
+    decided; this changes the picture to fit the objects (our reading). **Cited only, not verified.**
 - **A single irregular shape wider than 8px = "shape ONE player with a per-scanline NUSIZ + HMOVE table" — don't fall back on flicker**: keep GRP small and switch NUSIZ (size 1/2/4/8, copy count) and HMOVE on every scanline, and one player "stretches" into an irregular shape ~40 colour clocks wide (fish / shark / ship / wide creature). Accept a single colour. No extra object, no flicker. Confirmed on a live run. 〔Fishing Derby (David Crane / Debro disassembly) SharkTraveling*NUSIZValues = a shark made of per-line NUSIZ + HMOVE; ~40-clock width confirmed by running build/fishing_derby.bin〕 `→ casebook.md "large irregular shapes"`
 - **A 1px line at an arbitrary slope = missile/ball + fractional-HMOVE accumulation (Bresenham in HMOVE)**: take an M/BL drawn vertically, `adc` the slope held as integer + fraction on every scanline, and on carry apply a ±1px HMOVE through `HMMx`/`HMBL` — that yields the **diagonal lines** of a fishing line / tether / rope / laser (drop the assumption that only vertical and horizontal are possible). 〔Fishing Derby fishingLineSlope (Integer/Fraction) + HMOVE; right line = BL, left line = M1; the right line's slope confirmed on a live run〕 `→ casebook.md "diagonal lines"`
 
 ## Playfield
 - 40px across × 4 clocks per px. Expressive power is earned through vertical rhythm. 〔Davie S13〕
+  - **A full-screen grid of playfield cells is bigger than the console's RAM.** Crackers, 1997,
+    sizing *Life* on the playfield at 4 scanlines a cell, corrected his own figure: *"at 4 scanlines
+    your cell grid would ne 40x48, giving you 1920 bits, or 240 bytes to babysit"* 〔`199706/msg00032`;
+    "ne" is his typo〕 — nearly twice the 128 bytes (our arithmetic: 240/128 = 1.875), so he planned on
+    the Supercharger's RAM. An earlier post in the *Atari Life* thread, which reaches the copies here
+    only inside quotations (Matt Pritchard's `199706/msg00018` carries it quoted, so its author is not
+    certain), had sized a 40×20 board at *"100 of 128 available bytes"*, and since Life *"traditionally
+    requires a copy of the screen"* proposed *"a "floating" update window of 3 or 5 lines"*
+    〔`199706/msg00018`, `199706/msg00019`〕.
+    **Cited only, not verified.**
   - **Animation can cover the 4-pixel step.** Erik Mooney, 1997, on his playfield Space Invaders, told
     that the invaders march in place for two frames on every horizontal move: *"In the arcade, they
     alternate frames every time they move, but they move in single-pixel increments. I'm using
@@ -910,6 +926,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     give up width or height; this one gives up the asymmetric rewrite on some lines (our reading).
     **Cited only, not verified** — his account of the three commercial ROMs was not checked against
     them.
+    Thomas Boutell, 2004, read *Ms. Pac-Man* the same way, with the rest lines spent on objects: *"Ms.
+    Pac Man achieves this by using a symmetrical playfield except on the rows that contain "pellets."
+    Those rows are actually done with asymmetrical playfield code, but the game still has time to
+    reposition and reuse sprites on the non-pellet rows when the playfield doesn't need so much
+    attention."* 〔`200409/msg00000`〕 Asked how its sprites keep single-line vertical resolution as well, Dennis Debro, who
+    had *"only spent a little time in Ms. Pac-man"*, answered: *"In Ms. Pac-man player 0 is VDEL'd to
+    achieve this. So the scan line before doing the positioning GRP0 is loaded with its sprite data.
+    Then when it gets to the positioning code GRP1 is loaded with its sprite data which will also draw
+    GRP0."* 〔`200409/msg00001`〕 That is the VDEL delay of the 48px line under Sprites, used here to move
+    a GRP0 write off the line that positions (our reading). **Cited only, not verified** — Ms. Pac-Man
+    was not disassembled here.
   - **Or run the line from RAM, where every load is an immediate.** Christopher Tumber, 2003: five
     table-fed TIA writes (`lda table,x` / `sta`) cost 35 cycles and the same five with `lda #` cost 25;
     the second form *"could be used now if you have enough ROM to predetermine all possible routines
@@ -927,6 +954,28 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     arithmetic; his count adds that writes needing no load, such as `STA RESPn`, come on top). The
     whole-screen version he sized needs cartridge RAM, not the console's. **Cited only, not
     verified.**
+    MarcoJ, 2023, gave the same mechanism a condition: *"If you make a kernel that runs in RAM, you can
+    update the RAM positions that contain the # argument to LDA instruction and this now changes when
+    the screen is drawn. The downside is that the # arguments have to be updated during the
+    overscan/vblank periods. In my experience, it works effectively for games that only update the
+    screen every 6 or more frames."* His own demo, a 16x12 tile map, keeps its kernels in *"many kB of
+    RAM"* in 128-byte blocks of 16 scanlines and uses an indexed load rather than the immediate; and
+    SpiceWare, in the same thread: *"SARA is not fast enough to run code"*, which Stella now enforces for
+    Atari's F8SC, F6SC and F4SC schemes 〔mining 352846 faster-to-load-from-ram-or-rom〕. So the RAM has
+    to be RAM the CPU can execute from (our reading). **Cited only, not verified** — the demo was not
+    run here.
+  - **Single-line sprites do not forbid a busy playfield; the two are paid for separately.** Glenn
+    Saunders, 2000: *"I think most games released that had single line res tended to have relatively
+    simple or nonexistent playfields.  For instance, Demon Attack."* 〔`200006/msg00090`〕 Erik Mooney
+    answered with both ends: *"What about River Raid?  That's single-line resolution all the way, and a
+    fairly compelx playfield, although it is always simple-reflected, it never does midscreen
+    playfield rewrites."* and *"don't forget Centipede and Millipede, which have a very complex
+    playfield with tons of midline rewrites, but keep all the sprites single-res."* In the same reply,
+    asked whether the background colour reaches past the 160 pixels: *"Nope.  Look at River Raid.
+    Clearly, the blue river is the background and the green part is the playfield (has to be since
+    player-playfield collision detects when the player dies.)  The blue doesn't extend past the edges
+    of the green.  It's not the same as the VGA "background color"."* 〔`200006/msg00098`; "compelx" is
+    his spelling〕 **Cited only, not verified** — none of the four games was looked at here.
 - **Write deadlines for an asymmetric PF (measured cycles; the REFLECTED-mode case)**: when you display the left half and rewrite the right half on the same scanline, aim each write at the moment that PF is **no longer visible**. The classic kernel's actual values =
   first pass PF0[cy7] / PF1[cy14] / PF2[cy21] (for the left half — in time before it becomes visible) → then for the right half
   **PF0 rewritten at cy31 / PF1 at cy38 / PF2 at "exactly cy45"** (too early or too late and it breaks — adding a single nop destroys it).
@@ -939,6 +988,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   timing of code he had submitted earlier) and values he had probably taken from the list 〔`200102/msg00019`〕. The posts do not name the CTRLPF mode; the PF0, PF1, PF2 order and the windows fit
   the repeated mode (our reading). **Cited only, not verified** — Qb was not run here, and `litmus_pf_async` locks only part of the left and right windows
   (the comment on `AsymRightWindow` says so).
+  **Tables of these deadlines disagree by one cycle, and the cycle may be notation (our reading).** Erik Mooney, 1998: *"the second write to PF0 must finish between cycles 28 and 49
+  ... the second write to PF1 must finish between cycles 38 and 54, and the magic numbers for PF2 are 49 and 65 cycles"* 〔`199805/msg00016`〕 — each figure one
+  more than `AsymRightWindow`'s 27–48 / 37–53 / 48–64. Davie's right-half "< 55" and "< 66" are Mooney's 54 and 65 plus one, but his "< 49" for PF0 is Mooney's 49
+  itself (our arithmetic). Mooney's figures and `AsymRightWindow`'s are both the cycle a write ends, so start against end does not explain that one cycle; where
+  each count begins might, and Davie's count, at least, includes the `WSYNC` store (`sta WSYNC ; 3`, then a 2-cycle load, puts his first `sta PF0` at `@5`).
+  Before copying a deadline into a check, settle whether it is a start or an end and where its count begins. **Cited only, not verified** — `litmus_pf_async`
+  locks part of the left and right windows, as above, and which of the three tables it agrees with at each edge was not checked here.
 - **A free 2-colour PF = CTRLPF D1 (the score bit)**: set bit1 and **the left half of the PF takes COLUP0, the right half COLUP1**, independently coloured (no asymmetric write timing needed). The staple for score display, but also a cheap way to colour the left and right of a background differently. 〔w11/Asym2scrol〕 `→ design.ScoreModeTwoColor`
 - **The saving trade of giving up PF0**: not drawing PF0 (on top platforms and the like) forces PF2 to be written at **exactly cycle 48** instead, but it frees **12cy per line + 18 bytes of RAM**, and lets the player fall off both edges of the screen (an advantage of the reflected PF). 〔mining blog SpiceWare Stay Frosty〕
   - **The PF0 trade is one rung of a ladder counted in registers rewritten per line.** SpiceWare,
@@ -1103,6 +1159,27 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   different colour on a PAL console 〔see `internal/emu/palspec_test.go`〕, so this makes a ROM
   *displayable* on both, not *right* on both. ★★★What it costs is a switch the game can no longer use
   for anything else — and on this machine that is a real budget, since there are only three.
+  - **A two-position switch is already set when the program starts.** Dennis Debro, 2002, choosing a
+    pause switch: *"I know Kool-aid Man uses the difficulty switches for a pause feature but I wanted to
+    stay away from that. I want to reserve the difficulty switches for game difficulty or for a
+    NTSC/PAL switch. Also the user could have the switch in the pause position before the game starts.
+    Giving them the impression that the game has lock up. So I decided to use the Select switch as a
+    pause switch. It will only work while the game is in play of course."* 〔`200206/msg00017`〕 Andrew
+    Davie's advice in the 7800 line below, to read a change and not a position, answers the same
+    start-up case.
+    **Cited only, not verified.**
+  - **Or read the switches once, at power-on.** Lee Fastenau, 2005, from the draft manual of his
+    *Reflex*: the TV TYPE switch cycles NTSC, PAL 60Hz and PAL 50Hz (SECAM on the other cartridge), and
+    *"You may also set the video mode while powering on your console.  Simply hold either the "GAME
+    SELECT" switch or the "GAME START" switch while powering on your console."* 〔`200502/msg00118`〕
+    Read this way, SELECT and START are borrowed only at power-on and stay the game's afterwards (our
+    reading). In the replies, *Space Invaders* gives two missiles when Reset is held at power-on
+    (Ruffin Bailey; Fastenau: *"Just found a couple references to it on Google.  It's the Reset
+    switch."*), Fastenau could test such switches on his Supercharger but not yet in an emulator, and
+    Jason Rein got the missiles in an early Stella by tapping Reset while the ROM loaded
+    〔`200502/msg00122`, `msg00123`, `msg00132`〕; Dennis Debro doubted it: *"Really!? I thought you had
+    to fry Space Invaders to get that to happen."* 〔`200502/msg00131`〕 **Cited only, not verified** — no power-on switch
+    state was tried here.
   - **The same switch is a different switch on a 7800.** Andrew Davie, posting a pause routine on the
     colour/B&W switch: *"On the 2600 it's a two-position switch so you choose COLOR or you choose B&W
     and it stays there. On the 7800 it's a momentary switch -- it's only 'pressed' while you're
@@ -1174,9 +1251,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     work. The Kool-Aid Man problem only affects certain TIAs used in the later 2600 JRs and 7800s, and it
     happens on PAL and NTSC consoles alike."* 〔`200211/msg00116`〕 — the same test he had himself
     suggested in 2001 from what his PAL consoles showed (`fundamentals-audit.md`, 〔`200107/msg00063`〕).
-    Paul Slocum: *"The PAL and NTSC system
+    Paul Slocum had raised the NTSC side in the same thread: *"there are NTSC Jr. models that the Kool
+    Aid Man score code doesn't work on.  I would estimate that one in three 2600 Jr's have that problem,
+    but that's based on a VERY small sample."* 〔`200211/msg00099`〕 Tumber: *"Would have to include an
+    over-ride switch (or may even be a serious enough problem to abandon this technique altogether...)"*
+    〔`200211/msg00101`〕. Paul Slocum: *"The PAL and NTSC system
     clocks are slightly different speeds, but I can't think of any way to detect that from software."*
-    〔`200211/msg00103`〕 The ARM-timer reading in the Colour section measures that clock difference, with
+    〔`200211/msg00103`〕 Dionoid, 2022, gave the reason: *"The PAL 2600's clock runs around 1% slower
+    than NTSC, but you can't measure the difference using the RIOT timers and TIA registers, because they
+    both measure time in clocks, not the actual time."* jetsetilly, in the same thread: *"Not possible
+    without additional hardware"* 〔AtariAge `topic/345559`〕. The ARM-timer reading in the Colour section measures that clock difference, with
     an ARM on the cartridge. The same thread's emulator results are the known-traps row *Emulators can
     agree with each other and disagree with the machine*. **Cited only, not verified.**
 - **Two different needs share the word "random", and only one of them is expensive.** A starfield or
@@ -1525,6 +1609,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     through the 160 (our sum). He left PF0 out of the rink (*"it starts 16 pixels in"*) so that *"only
     PF1 and PF2 need to be updated every 4 scanlines"* 〔`200406/msg00031`〕. A plan for a game he was
     still writing, not a shipped layout. **Cited only, not verified.**
+  - **End the VSYNC pulse on a `WSYNC`, not on a polled timer — one poster's rule, and a case it did not
+    explain.** Roger Williams, 2002, on games that set a timer and poll it through VSYNC: *"This
+    absolutely will not work with video hardware that times from the end of VSYNC instead of the
+    beginning.  There will be variations in the timing which are not acceptable.  The point of writing
+    to WSYNC is that the end of the pulse is timed exactly to within one cycle.  When you set up a loop
+    you get at least a 15-cycle, and sometimes more, variation in the length of the pulse."* 〔as quoted
+    in `200202/msg00105`〕 Thomas Jentzsch, in that reply: *"I understand, but Gas Hog does an WSYNC
+    before turning of VSYNC too (see my previous post). So that can't be the reason here."* Williams then
+    suspected a miscounted cycle and said someone with an oscilloscope could settle it
+    〔`200202/msg00106`〕; Eckhard Stolberg, who had met the problem, had mainly been using a 2600 Jr at
+    the time and could not say whether it was model-specific 〔`200202/msg00107`〕. **Cited only, not verified** —
+    no pulse was measured here, and the 15 cycles are his figure.
 - **WSYNC semantics**: `sta WSYNC` halts the CPU until **the start of the next HBLANK** (68 colour clocks = 22⅔ CPU cycles). Choose where to write with the register-update delays in mind (colour = immediate / PF = 2-3 clocks / VBLANK = +1 colour clock / note length = delayed). 〔mining 192183 register-update delay table〕 The VBLANK figure is seagtgruff's, also in an earlier thread: *"Changes to VBLANK are delayed by 1 color clock."* 〔mining 131319 asymmetric-reflected-playfield〕 The bundled Gopher2600 does the same: `tia.futureVblank.Schedule(1, reg.Value)`, so a mid-line write blanks the rest of that line, not the next one. On real hardware: **Cited only, not verified.**
   **`WSYNC` inside a kernel line is spent cycles, not alignment.** Verdant, 2024, to bkumanchik, whose
   kernel strobed `WSYNC` between computing the invaders and the missiles: *"strobing WSYNC literally
@@ -1608,6 +1704,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     whatever the operand, and his "afaik" stands. omegamatrix's first point is a separate trap: without
     the `#`, `LAX 0` is a zero-page read of address `$00`, which on a read is the TIA's `CXM0P`.
     **Cited only, not verified.**
+  - **In an old commercial ROM, an unofficial opcode was expected to be an accident — on two people's
+    experience.** Thomas Jentzsch, 2005: *"AFAIK those opcodes have not been used before modern
+    homebrews. Maybe even my own first game Thrust was the first one to use 'unofficial' opcodes.
+    Others may know better."* 〔`200505/msg00205`〕 Charles Bond offered *AirLock* 〔`200505/msg00206`〕;
+    Dennis Debro, who *"hadn't run across any in the games I've disassembled"*, looked: *"I think it
+    uses one by accident. It does a jmp to LF01F which would cause the sax (opcode $83) instruction to be
+    called. They could have jmp'd to LF021 (which is the Veritcal Sync routine) which would have
+    bypassed this and the game would have worked the same."* 〔`200506/msg00001`〕 The old-game trick he
+    did name was a documented one: Garry Kitchen's `BIT` `$2C`/`$24` skips in *Keystone Kapers*
+    〔`200506/msg00007`, `msg00009`〕. So an unofficial opcode met while decoding an old game is worth
+    checking first as data or a stray entry point (our reading). **Cited only, not verified** — no ROM
+    here was scanned for them.
 - **The resource triangle + a register convention**: RAM (128B) / CPU (76cy) / ROM are mutually exclusive = growing one shrinks the others (plus the human cost). The Thomas Jentzsch convention = inside the kernel, pin the roles to **Y = scanline and sprite index, X = PF, A = everything else** and it runs faster. Use subroutines for code reuse only (the call cost is high). 〔mining 146817〕 The same convention, older and with its reasons, from Thomas Jentzsch on the list in 2003: *"I usually use Y for graphics (lda (ind),y) and in parallel for scanline counting, X for the PF (normally also having a vertical lower resolution) or other things (like stack manipulation or to store temporary results, A is for multi purposes."* 〔`200303/msg00381`〕 Y is the register the graphics read needs — the 6502's post-indexed indirect mode exists only as `(zp),Y` — so it is also the line counter; X goes to the playfield because the playfield usually changes on fewer lines (our reading of his parenthesis). **Cited only, not verified.**
   - **The three sides are not equally for sale.** Kirk Israel, 2003: *"given my simple game concept, RAM and ROM are cheap compared to
     kernal time, but that might be true everywhere. (which is funny, because while a supercharger
@@ -1668,6 +1776,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     back for the table's 156 bytes. The positioning rule's *"turn the ÷15 into a lookup
     table"* is one direction of this trade; the price of the table is ROM (our reading). **Cited only,
     not verified** — no cycles or bytes were counted here.
+  - **The resolution of a picture held in RAM is on the same scale.** Piero Cavina, 1998, in an update
+    on *INV*: *"converted shields to double resolution, now I've all the RAM I need! Thanks Erick!"*
+    〔`199801/msg00151`; Erik Mooney corrected the spelling in `199801/msg00173`〕 The post does not say
+    which axis was doubled or how many bytes it freed; a shield stored at half the resolution needs half
+    the bits (our reading). **Cited only, not verified.**
+  - **Keep an instruction you cannot yet prove away, and count it as removable.** Glenn Saunders,
+    2001, told by Thomas Jentzsch that a missile routine could come down to 26 cycles, partly by
+    removing a `SEC` 〔`200111/msg00157`〕:
+    *"I'm not confident removing the SECs right now.  I don't know what the condition of the carry flag
+    will be in all cases.  So it will have to stay at 28 cycles for now."* 〔`200111/msg00159`〕
+    Jentzsch: *"Just do your kernel(s) with SEC and we will help you removing them. If your timing get's
+    close, imagine them to be not there. I'm quite sure, that we can remove them all."*
+    〔`200111/msg00160`〕 The `SEC` stays until the carry is known on every path, while the budget is
+    planned as if it were gone (our reading). **Cited only, not verified** — no carry analysis was run
+    here.
 - **Packing a table pays only when the table dominates.** Ed Fries fitted a 26-letter 3×4 font into 28
   bytes — letters overlapped vertically, three to a byte horizontally, unpacked by mask-and-shift — and
   answered his own question: *"Is it useful? Not really because you probably waste more code space
@@ -1949,6 +2072,22 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     (the first three pairs; our count from the listing).
     〔mining 292204 states〕 The walls are never on screen with the menu, so the exclusivity is the game
     state itself, the widest form of the lodging above. **Cited only, not verified.**
+- **Objects spent on decoration are objects the game no longer has, and sound can take over one of
+  their jobs.** Rob Kudla, 2001, proposed drawing the column separators of a Tetris well with both
+  players at three copies each, coloured black 〔`200101/msg00041`〕; Erik Mooney: it works *"as long as
+  you don't need the players or missiles for anything else"* 〔`200101/msg00044`〕. Eckhard Stolberg
+  named what it costs: *"you can't generate a two player version with it, and that you can't use the
+  player graphics to highlight the falling piece anymore. Highlighting the falling piece so that you can
+  see how long you have control over it, when it lying on the bottom of the bin and you want to slide it
+  under some other pieces, is a very helpfull feature in Tetris, IMHO."* 〔`200101/msg00045`〕 Mooney:
+  *"Real Tetris (arcade and Gameboy) doesn't highlight the falling pieces, true.  What it does do is give
+  an audio "clunk" when a piece "hits bottom" and the player can't control it anymore.  That'd probably
+  work fine on the 2600, I think."* 〔`200101/msg00048`〕 Stolberg kept a second reason for the highlight
+  — most versions colour the pieces, *"You can't really have that on the VCS. But by highlighting the
+  falling piece, you can at least make this one distinguishable from the pieces already lying in the
+  bin."* 〔`200101/msg00061`〕 — and Andrew Davie suggested his 4-colour playfield demo might colour them
+  〔`200101/msg00066`〕. The clunk carries when control ends, not which piece is falling (our reading).
+  **Cited only, not verified** — nothing was built in the thread.
 - **★Placing a row of shapes and WRITING them are different limits, and the writes bind first.** A line's
   placement capacity is a search over strobe cycles (`plan_sprite_placement`); its write capacity is the
   graphics stores that must fit in the same 76 cycles (`prove_line_budget`). They are not the same number and
@@ -2010,6 +2149,32 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   The two are different targets: a port is measured against the original and a de-make only against
   itself. `reproduce-loop.md`'s tools compare two 2600 ROMs, so they need a 2600 original and serve
   neither a port from another machine nor a de-make. **Cited only, not verified.**
+- **The subject can set the budget before the kernel does.** mayday, 2017, who had drawn a Mortal
+  Kombat mock-up: *"If one could make the sprites look good, I think a beat-em-up could be one of the
+  nicest looking 2600 games as the background could be mostly or entirely static. Since little to no
+  resources for the ball/missiles were needed (and the playfield could be static (at least where the
+  players would be) I thought there might be enough resources for some fancy programming."* The reply
+  he was answering, eshu's, had judged *"the setup you have there would be impossible without
+  flicker"* and thought it *"might be possible (but tricky)"* with a player plus the ball or a missile
+  per fighter — P0 and BL for one, P1 and M0
+  for the other, with `COLUP0` changed at any cycle and P0 and M0 kept at least 3 pixels apart
+  〔AtariAge `topic/260578`〕. So a still background frees resources, and in this case did not by itself
+  make the mock-up fit (our reading). **Cited only, not verified** — nothing was built.
+- **A recording that fills RAM at a rate the game sets has a known size; one the player sets does
+  not — one port's choice.** Manuel Rotschkar,
+  2004, converting a Jumpman level whose followers replay the player's recorded input: *"That effect
+  will use way too much RAM for a proper conversion..."* 〔`200410/msg00101`〕 Of Christopher Tumber's
+  idea, each change of direction stored with a frame count: *"The problem with storing the # of frames
+  extra is, is that you're totally "user" dependent then, unlike more linear storage."* and *"Still if
+  someone wiggles the Joystick like a Decathlon player I'm busted in a second or two..."*
+  〔`200410/msg00105`〕 Paul Slocum offered a snapshot of the position *"every second or so"*, the
+  followers to *"fade and appear in a new location at regular intervals"* 〔`200410/msg00104`〕, and
+  Rotschkar: *"Now, this should work better, using that technique I could have a totally linear
+  buffer, more independent from the players actions!"* 〔`200410/msg00106`〕 He thought the original
+  reserves a page of RAM per follower, which overflows if you move too long before defusing the first
+  bomb 〔`200410/msg00107`〕. A fixed rate fixes the buffer's size before play; a per-change record is
+  small for calm play and overflows on busy play (our reading). **Cited only, not verified** — nothing
+  was built in the thread.
 - **A forum "cannot" is a forecast, and so is a "can".** On tokumaru's 2010 Sonic mock-up, cd-w:
   *"8-way scrolling on the 2600 is a tall order. I'd suggest revisiting the idea of a single screen
   Sonic, or restricting to vertical scrolling only."* Ed Fries, the next day: *"I've got a little demo
@@ -2270,6 +2435,18 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     the logic cannot be sampled by simple bit-masking because it applies to angles $4 through $B."*
     〔`200203/msg00007`〕 Choose the heading origin with the flip bit in mind. **Cited only, not
     verified** — nothing here indexes a rotation table this way.
+    Glenn Saunders, 2005, reading the *Indy 500* disassembly (and Combat, which he took it to come
+    from), reached the same five: *"If it really wanted to save ROM it could have stored only 5 sprite
+    shapes for the top-right quarter-rotation and better utilized REFPx, but it doesn't do this!"*
+    〔`200508/msg00194`〕 His own *Death Derby* stores nine, the right-hand half. Of the cost on the
+    other side: *"The number of instructions it looks like Indy 500 is having to run through to determine
+    whether to turn on REFPx he could have just stored one more frame of graphics"* 〔`200508/msg00198`〕
+    — his reading of the code, and it sits badly with Williams's account above and with the lines
+    Saunders himself quoted, where the direction is written straight to `REFP0,x` (`lda
+    playerDirections,x` / `sta REFP0,x`) with no test; the instructions he counted may be the
+    index arithmetic after it (our reading). Why it was written that way was not settled (Thomas Jentzsch: *"Probably
+    they yet didn't fully understand the hardware back then?"* 〔`200508/msg00196`〕). **Cited only, not
+    verified** — no five-shape table was built and costed against the eight-shape one here.
   - **The reverse copy is one of several vertical flips, and the cheapest is the loop direction.** A
     2014 thread on flipping a sprite vertically, as the distillation notes record it: `REFPx` flips
     left–right only; the cheapest flip, omegamatrix's recommendation, runs the line loop the other way
@@ -2281,6 +2458,32 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
 - **One interleaved HIRES buffer can feed BOTH players (P0 = even bytes / P1 = odd)**: a single 16-byte RAM buffer serves both sprites — pick a player's bytes with `AND #$FE` / `ORA #$01`, no shape math. Halves the RAM vs two separate buffers (~16 B) = a RAM-thrift move to hold in reserve for when 128 B is tight. 〔Combat shared 16B HIRES, P0/P1 interleaved; comparison §2.1/§2.2/§7〕
 - **Fan one byte out to many duties, phase-locked, when RAM is tight**: `CLOCK` serves **5 roles** (frame timer / attract color / debounce pace / score-flash clock …) and `GameTimer` serves **3** (match clock + bit7 in-progress flag + attract period), sub-fields phase-locked so their uses never collide. Master-class RAM economy — but **only pay this when RAM is actually scarce**: packing with 43 B free just spends clarity for nothing (premature optimization). Know it; deploy it only under pressure. 〔Combat `CLOCK` (5-duty) / `GameTimer` (3-duty) / `VCNTRL`; comparison §2.7/§7〕
 - **Load-level VBLANK with `TIM64T`/`INTIM` so the picture starts at a FIXED beam position — don't rely on a fixed WSYNC count + elastic filler**: arm a RIOT timer at VBLANK start, spin on `INTIM` until it expires, then begin the visible kernel = display-start **independent of how long the frame's logic ran**. A fixed WSYNC count + elastic `VBpad` tuned to today's code does NOT auto-absorb logic growth: add work and the picture dips (screen dip — the exact fragility the clone's positioner had to hand-engineer around). Prefer timer load-leveling when VBLANK work is variable or expected to grow. 〔Combat `VCNTRL`/`INTIM`/`TIM64T`; comparison §2.1/§6, diff-gaps (measure the VBLANK length with INTIM)〕 `→ techniques/sound-driver.md · game-states.md`
+  - **Timing the visible kernel itself was proposed in 1997, for zones whose heights move.** Piero
+    Cavina: the screen *"is divided into zones of different height which change according to various
+    game parameters"*, so *"almost every time I improve the program, I lose the color or vertical sync
+    (or both!)"*. His idea: *"start a timer for 192*76 cycles"*, draw no more than 192 lines, then
+    *"wait until the timer is expired, thus drawing the missing lines"*. An idea he was about to try,
+    not a result 〔`199703/msg00225`〕. His fallback for a long span, `TIM1024` followed by `TIM64`, is a
+    trap: there is one timer, so on that row's reading of Erik Mooney the second write starts a new
+    count rather than adding to it, and the premise does not hold for 192 lines either — the
+    known-traps row *`TIM1024T` then `TIM64T` does not
+    add up: there is one timer*. PAL's 228 lines, 17,328 cycles or 271 steps of 64, do exceed one
+    `TIM64T` load (our arithmetic). Nick Bensema answered with the other route: *"One should arrange them so they
+    always add up to 192 lines."* 〔`199703/msg00226`〕 **Cited only, not verified.**
+  - **The sum route holds with the heights as free variables.** Erik Mooney, 1997, listing the bands of
+    his invaders game: 15 lines of score, 1 blank, 6 of saucer, 2 to reposition, *"X lines of checking
+    the player's missile (where X is the distance from the saucer to the top line of the invaders
+    formation), 12*Y lines of invaders (where Y is the number of rows of invaders remaining),
+    74-X+(5-Y)*12 lines of checking the player's missile and the invaders' bombs, eight lines of
+    shields, eight more lines of missiles and bombs, (or if the invaders are low enough, do
+    90-X+(5-Y)*12 lines of missiles and bombs and skip the shields)"*, then 18 lines of players and
+    lives — *"And that always equals 192 lines total. :)"* 〔`199704/msg00202`〕 The X and the 12Y
+    cancel on both routes, and the players start at line 174 on either (our arithmetic: 24 + 134 + 16
+    or 24 + 150, then 18). He does not recompute the sum in the kernel: *"I keep a variable called
+    Scanline that keeps track of what line we're on, so I can just compare that with 174 to see if it's
+    time to draw the players instead of calculating 90-X+(5-Y)*12 lines."* `frame_lines_stable`
+    (`scenarios.md`) checks the frames a run steps through, so it sees the X and Y that run reaches; the
+    algebra covers every pair (our reading). **Cited only, not verified** — the ROM was not run.
   - **A timer step is 64 cycles, so one target line can have two right values, and a coarser timer
     is set early.** Cye Freeman, 2004, timing his kernel with `TIM64T`, found his PAL value too high.
     Lee Fastenau does not time his kernel — he counts its lines (*"my answer is no, I've never used
@@ -2373,7 +2576,7 @@ A second pass over Combat (1977) through 5 lenses BEYOND round-1's efficiency/st
 - **Fixed short match + a diegetic end-game telegraph rendered THROUGH the score itself — no separate UI.** A ~2-minute timer ticks ~1/sec; the last ~1/8 is telegraphed by BLINKING the score (no timer widget). Short fixed sessions keep 2-player play snappy; communicate urgent state by animating an element you already draw. 〔Combat `GSGRCK` (GameTimer / CMP #$F0 / CLOCK&$30 flash / KLskip=$0E); deep-read harvest 2026-07-23〕
 - **Minimal-UI: attract == menu == play, and the score doubles as the variation selector.** No separate menu — in attract, Select increments the variation number straight into SCORE, shown by the normal score kernel (right score hidden so only the game number reads); the idle match-timer drives a color-cycle anti-burn-in. Reuse gameplay display elements as menu/attract UI. 〔Combat `SelGO` (STA SCORE / SHOWSCR) / `LDSTEL` color cycle; deep-read harvest 2026-07-23〕
 - **Rule-layering & productive imprecision as design moves.** (a) Billiard adds a scoring PRECONDITION (must-bounce-first) over the unchanged bounce engine → a bank-shot game with a higher skill ceiling from the same physics. (b) The faked Pong reflection is imprecise ON PURPOSE (guesses the wall normal, jiggers +22.5°) so bounces are never perfectly axis-aligned → livelier, unsolvable. (c) Removing "reverse" from tanks is control-limitation-as-identity. New modes come from preconditions/constraints/omissions, not new systems. 〔Combat `Launch`/`COLIS` billiard gate / `COLMPF` reflection SM / `CTRLTBL` "No reverse"; deep-read harvest 2026-07-23〕
-- **★SOUND PRIORITY = last-writer-wins on a 1-object-per-channel bus — arbitration is BRANCH ORDER, not a mixer.** The core 2600 audio mental model (only 2 channels). Each object owns one channel; precedence (explosion > shot-boom > engine > pong) is decided purely by which routine writes `AUDx0,X` LAST, via the branch order of the sound dispatch. A state flag can "steal" a channel (nonzero → emit the bounce tone INSTEAD of engine). Decide precedence by ORDERING writes, not comparing volumes — zero bytes of priority logic. 〔Combat MisLife dispatch (MisFly/MotMis/BoomSnd order) / `MOTORS` AltSnd hijack; deep-read harvest 2026-07-23〕
+- **★SOUND PRIORITY in Combat = last-writer-wins on a 1-object-per-channel bus — arbitration is BRANCH ORDER, not a mixer.** Combat's audio mental model (only 2 channels). Each object owns one channel; precedence (explosion > shot-boom > engine > pong) is decided purely by which routine writes `AUDx0,X` LAST, via the branch order of the sound dispatch. A state flag can "steal" a channel (nonzero → emit the bounce tone INSTEAD of engine). Combat decides precedence by ORDERING writes, not comparing volumes — zero bytes of priority logic. 〔Combat MisLife dispatch (MisFly/MotMis/BoomSnd order) / `MOTORS` AltSnd hijack; deep-read harvest 2026-07-23〕 **Branch order is one way, not the only one.** Thomas Jentzsch, 2001, disassembling *Lord of the Rings*, found the sound calls going through `BRK` with an id byte; the handler compares the new id with the lower of two held ids, replaces it only when the new one is larger, and loads that sound's table values — *"Each sound has it's own priority and only the highest two are played."* 〔`200112/msg00093`〕 That is precedence held as a number and compared at run time, paid for in bytes and cycles, where Combat's order costs none (our reading). **Cited only, not verified** — LOTR was not disassembled here.
 - **★Live game data overlaid on the CPU IRQ/BRK vector slot = a 2K→4K port booby-trap.** A 2-byte pitch table sits at the IRQ/BRK vector address because a 2K cart mirrors $F000-$F7FF into $F800-$FFFF, so the "vector" bytes ARE read as an ordinary data table (`LDA table,X`). It survives only because the code never takes BRK — `SEI` would not help, since BRK ignores the I flag. A 2K→4K port silently breaks. Never overlay meaningful data on $FFFA-$FFFF unless you fully model the bank mirror. (harness-warn candidate → capgap CMB-6.) 〔Combat ORG $F7FC / AudPitch $0F,$11 at $F7FE; deep-read harvest 2026-07-23〕
   - **The same slot from the other side: four of the six vector bytes are free if nothing needs
     them.** nukey-shay, 2009: *"AFAIK, the NMI vector (at $xFFA-B) is not used by the 2600. You can use
