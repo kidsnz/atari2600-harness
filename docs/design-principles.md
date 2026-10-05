@@ -240,7 +240,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   here. It is the cheapest look at the quantity `pkg/design/color.go` says is *not measured anywhere in
   this tree* — how small a luminance difference still reads. **Cited only, not verified**: nothing here
   has rendered a design with its hue removed.
-  - **Why the console leaves B&W to the game: a hue-only difference has nothing left in B&W.** Mike
+  - **One list answer to why B&W is not done in hardware: a hue-only difference has nothing left in B&W.** Mike
     St. Clair, 1997, answering a poster (quoted inside Matt Pritchard's reply) who had asked whether B&W
     could have been done in hardware, by sending the TIA's chroma signal through the switch: *"If black and white were done in hardware, graphics that were of the same intensity but
     different colors would look exactly the same 'shade', and things could disappear. or not have
@@ -706,7 +706,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 
 ## Playfield
 - 40px across × 4 clocks per px. Expressive power is earned through vertical rhythm. 〔Davie S13〕
-  - **A full-screen grid of playfield cells is bigger than the console's RAM.** Crackers, 1997,
+  - **A full-screen grid of 4-scanline cells (40×48) is bigger than the console's RAM.** Crackers, 1997,
     sizing *Life* on the playfield at 4 scanlines a cell, corrected his own figure: *"at 4 scanlines
     your cell grid would ne 40x48, giving you 1920 bits, or 240 bytes to babysit"* 〔`199706/msg00032`;
     "ne" is his typo〕 — nearly twice the 128 bytes (our arithmetic: 240/128 = 1.875), so he planned on
@@ -964,7 +964,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     Atari's F8SC, F6SC and F4SC schemes 〔mining 352846 faster-to-load-from-ram-or-rom〕. So the RAM has
     to be RAM the CPU can execute from (our reading). **Cited only, not verified** — the demo was not
     run here.
-  - **Single-line sprites do not forbid a busy playfield; the two are paid for separately.** Glenn
+  - **Single-line sprites do not forbid a busy playfield; the two are paid for separately (our reading).** Glenn
     Saunders, 2000: *"I think most games released that had single line res tended to have relatively
     simple or nonexistent playfields.  For instance, Demon Attack."* 〔`200006/msg00090`〕 Erik Mooney
     answered with both ends: *"What about River Raid?  That's single-line resolution all the way, and a
@@ -1018,7 +1018,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     skateboarding game's alpha on AtariAge, said that in his opinion a PF that does not affect the
     gameplay should not be used, citing the *Footbag* stage of *California Games* as very appealing yet
     using no PF at all, and *Space Invaders* as using the PF only for the player's score; for the
-    background he would use a simple colour gradient, and spend the PF on things the skater can land
+    background he would use a simple colour gradient, and, given time to develop it, spend the PF on things the skater can land
     on 〔mining 213904 skateboarder-alpha-v01; only the distillation notes are held here, so this is
     a paraphrase〕. It is the other side of the trade above: what is not
     spent on the PF is left for colour and sprites (our reading). **Cited only, not verified** — it
@@ -1168,7 +1168,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     Davie's advice in the 7800 line below, to read a change and not a position, answers the same
     start-up case.
     **Cited only, not verified.**
-  - **Or read the switches once, at power-on.** Lee Fastenau, 2005, from the draft manual of his
+  - **The switches can also be read once, at power-on.** Lee Fastenau, 2005, from the draft manual of his
     *Reflex*: the TV TYPE switch cycles NTSC, PAL 60Hz and PAL 50Hz (SECAM on the other cartridge), and
     *"You may also set the video mode while powering on your console.  Simply hold either the "GAME
     SELECT" switch or the "GAME START" switch while powering on your console."* 〔`200502/msg00118`〕
@@ -1260,8 +1260,8 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     〔`200211/msg00103`〕 Dionoid, 2022, gave the reason: *"The PAL 2600's clock runs around 1% slower
     than NTSC, but you can't measure the difference using the RIOT timers and TIA registers, because they
     both measure time in clocks, not the actual time."* jetsetilly, in the same thread: *"Not possible
-    without additional hardware"* 〔AtariAge `topic/345559`〕. The ARM-timer reading in the Colour section measures that clock difference, with
-    an ARM on the cartridge. The same thread's emulator results are the known-traps row *Emulators can
+    without additional hardware"* 〔mining 345559 auto-detect-pal-vs-ntsc〕. The ARM-timer reading in the Colour section measures that clock difference, with
+    an ARM on the cartridge. The 2002 thread's emulator results are the known-traps row *Emulators can
     agree with each other and disagree with the machine*. **Cited only, not verified.**
 - **Two different needs share the word "random", and only one of them is expensive.** A starfield or
   a terrain must be **reproducible** — Manuel Polik: *"Total randomness won't work, since you've to
@@ -1827,7 +1827,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     was laid out for reading (our reading). **Cited only, not verified.**
   - **Which resource is short decides whether a tight encoding pays: a 1998 exchange on "fractional
     bits".** Andrew Davie offered storing a value in a fraction of a bit-width by working in another
-    base (a number 0–11 plus one 0–20 in one byte, which whole bits would need 9 bits for), and pulling
+    base (a number 0–11 plus one 0–20 in one byte, which whole bits would need 9 bits for) 〔`199805/msg00205`〕, and pulling
     them out with two 256-byte tables per base, `mod12` and `div12`, 4 cycles each — *"If you could
     save a single bit with this method, meaning that your RAM requirements were one byte less than
     otherwise, well maybe it would be worth the ROM space. Maybe it would even be worth using
@@ -2149,7 +2149,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   The two are different targets: a port is measured against the original and a de-make only against
   itself. `reproduce-loop.md`'s tools compare two 2600 ROMs, so they need a 2600 original and serve
   neither a port from another machine nor a de-make. **Cited only, not verified.**
-- **The subject can set the budget before the kernel does.** mayday, 2017, who had drawn a Mortal
+- **The subject can set the budget before the kernel does (our reading).** mayday, 2017, who had drawn a Mortal
   Kombat mock-up: *"If one could make the sprites look good, I think a beat-em-up could be one of the
   nicest looking 2600 games as the background could be mostly or entirely static. Since little to no
   resources for the ball/missiles were needed (and the playfield could be static (at least where the
@@ -2158,10 +2158,10 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   flicker"* and thought it *"might be possible (but tricky)"* with a player plus the ball or a missile
   per fighter — P0 and BL for one, P1 and M0
   for the other, with `COLUP0` changed at any cycle and P0 and M0 kept at least 3 pixels apart
-  〔AtariAge `topic/260578`〕. So a still background frees resources, and in this case did not by itself
+  〔mining 260578 sprite-flicker-question〕. So a still background frees resources, and in this case did not by itself
   make the mock-up fit (our reading). **Cited only, not verified** — nothing was built.
 - **A recording that fills RAM at a rate the game sets has a known size; one the player sets does
-  not — one port's choice.** Manuel Rotschkar,
+  not — one porter's preference in the thread.** Manuel Rotschkar,
   2004, converting a Jumpman level whose followers replay the player's recorded input: *"That effect
   will use way too much RAM for a proper conversion..."* 〔`200410/msg00101`〕 Of Christopher Tumber's
   idea, each change of direction stored with a frame count: *"The problem with storing the # of frames
