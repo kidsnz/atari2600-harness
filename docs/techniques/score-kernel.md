@@ -20,6 +20,11 @@ where the play area does not reach. That is not decoration, it is what makes the
 invisible to the player — and it is why almost every 2600 game looks the way it does. If the score
 must float over the play area instead, budget a different mechanism (playfield digits at 4-clock
 grain, or a sprite the score borrows only on lines the player cannot reach).
+Mooney's own words, to a layout with its status in triple-copy P0 graphics to the right of the map:
+*"It's very difficult to make the 2600 display different stuff side-by-side"* — make the view wider,
+*"either fullscreen, or narrowed somewhat so you can use a reflected playfield and not use PF0 - so you
+can use all the objects for the game graphics, and putting status and stuff on the top or bottom"*
+〔stella-list `199906/msg00095`〕. Cited only, not verified.
 
 Demo: `roms/techniques/score6.asm` (score auto-increments each frame).
 CI: `scenarios/score6.json` (positions, BCD carry chain at frames 99/150, 262 lines, golden).
@@ -86,6 +91,16 @@ the 3 BCD bytes and the per-frame pointer build below; the price is that one `cm
 digits) becomes one per digit — each pointer is digit×8, so order is kept. Which wins depends on the
 game. Measured in a throwaway ROM: over 1,234 points all six
 pointers stayed equal to a BCD reference's nibble×8; wrapping at 72 instead breaks it.
+The idea came up twice more. Erik Mooney, 2002: River Raid *"stores pointers to each of the score digit
+graphics and never actually stores the score"*, offered as the model for keeping a sprite's position as
+its pointer and HMOVE value and converting to an X position offscreen — or in the kernel, since a sprite
+is repositioned *"more like every eight or so for a useful game"*, not every line 〔stella-list
+`200207/msg00334`〕. Manuel Rotschkar (Manuel Polik in the 2003 post under *Notes / variants*, same
+address), 2004, for a
+5-line font: add 5 to the lowest pointer, at 50 reset it and add 5 to the
+next — *"No decoding, no shifting, no BCD, no table"* (`200405/msg00099`). The asker, happy_dude, had
+tried it: *"the mechanics to add numbers greater than 1 take up more rom than a simple BCD score"*
+(`msg00103`), and Thomas Jentzsch pointed at River Raid again (`msg00104`). Cited only, not verified.
 
 **VBLANK: build 6 font pointers.** Each digit's glyph lives at `Font + digit*8`:
 
@@ -96,6 +111,12 @@ lda score0 / and #$0F / asl ×3     ; lo nibble*8
 sta p1                              ; … same for score1→p2,p3 / score2→p4,p5
 ```
 
+**A 5-line font needs ×5, still without a table** 〔stella-list `200405/msg00097`〕. The low nibble
+climbs — `and #$0F / sta temp / asl / asl / adc temp` (the question's form) — and Lee Fastenau's answer
+for the high nibble descends from its ×16: `and #$F0 / lsr / lsr / sta temp` (×4) `/ lsr / lsr / adc temp`
+(×1 + ×4). Neither shift sequence leaves C set before its `adc`, so neither needs `CLC`, and both need D
+clear (our reading). Cited only, not verified.
+
 The table need not hold only digits. A thread on keeping one digit fixed pairs a counting upper nibble
 with a lower nibble that indexes a non-digit glyph — its example shows `$10` as "0%" (AtariAge
 `topic/301365`; Cited only, not verified). Add `$10`, not 1, and while the lower nibble is 0–9 it never
@@ -103,6 +124,19 @@ moves; a lower nibble above 9 does not survive decimal-mode addition (`$1A` + `$
 
 Pointer high bytes are set once at init (font fits in one page → no page-cross penalty, so
 `lda (p),y` is a fixed 5 cycles — store timing stays deterministic).
+
+The one-page rule also halves a pointer table where one is used: with every target in one page the high
+byte is a constant and the table stores only low bytes — though before that, Thomas Jentzsch advises
+avoiding the table and computing the pointers, as above 〔stella-list `200109/msg00046`〕, advice on
+fitting a game into ROM. A font that does not start on a page boundary needs its base added: Dennis
+Debro put Kirk Israel's unexplained `adc #15` down to the font sitting at `$FF10` (〔stella-list
+`200308/msg00114`〕; 15 rather than 16 fits Erik Mooney's `LDY #5 / DEY / BNE` loop, `msg00107`, which
+never reads Y=0, and Debro's next post, `msg00115`, changes the loop to `BPL` — our reading), and Andrew
+Davie's general form adds `#<Font`, then `lda #>Font / adc #0`, which *"will mostly add nothing"* but
+carries into the next page when the add crossed one (`200308/msg00116`). Cited only, not verified. That
+costs the `adc #0` on every build, and it does not make a glyph that straddles a page safe in this
+kernel: `lda (p),y` across a page takes 6 cycles and moves every store after it (the read +1 rule,
+`TestPageCrossPenaltyRules`; our reading).
 
 **Kernel row (8 lines, Y=7→0):** the litmus_48px6 choreography with `(zp),y` fetches:
 
@@ -120,6 +154,13 @@ Krow:   sta WSYNC
         dec row        ; 69
         bpl Krow       ; 72  (< 76 — fits in one line)
 ```
+
+**A store that looks removable may not be.** Glenn Saunders reworked Thomas Jentzsch's VDEL score
+kernel for a cycle and posted it with one `GRP0` write gone 〔stella-list `200508/msg00174`〕. Jentzsch:
+*"you removed one necessary write to GRP0 (VDELPx!). So the last digit of the 2nd and 3rd number are
+always the same now"*, and he suggested unrolling the loop once for the cycles (`msg00177`). Saunders
+found unrolling the whole loop too costly in ROM and split the kernel into a black-and-white and a colour
+copy *"where all color-register loads are immediate"* (`msg00178`). Cited only, not verified.
 
 ★**There are 4 cycles left and they cannot buy a seventh store — measured 2026-09-07.**
 `roms/litmus/litmus_store7_overrun.asm` is this kernel with one extra `lda (zp),y` + `sta GRPn`,
@@ -147,7 +188,11 @@ slots, set the count. A seven-digit, flicker-free score is reported — omegamat
 to have a score go from 0 to 9,999,999 on the Atari. I wanted to have no flicker in the score, any background
 color, and regular sized digits. This routine accomplishes all these things"* (AtariAge `topic/198217`).
 The routine is an attachment that was not read or run here, so both that it does this and how it places
-its seventh digit (the thread's text does not say) are Cited only, not verified.
+its seventh digit (the thread's text does not say) are Cited only, not verified. Per the same post it
+does not loop, so it uses a lot of ROM (DPC+ could loop it, though looping would be incompatible with a couple of
+its library's fonts, two for the digit 2 and one for 7),
+and it is where omegamatrix first used `TIM1T` as a storage container (the timer note under *Notes*).
+Cited only, not verified.
 Question raised by the mailing-list distillation (helper-2), who asked where the six stores sit inside
 the 76 cycles and whether the remainder admits a seventh.
 
@@ -166,10 +211,34 @@ spent the next write needs a load and lands 1/3 cycle late, trashing the last im
 `199709/msg00317`〕. His own routine of that form put the low bit of the third byte into the first,
 harmless only because his font left that bit 0, and he said he would use the VDEL routine Erik
 Mooney had posted instead (`msg00322`, `msg00323`). Cited only, not verified.
+Eckhard Stolberg put that form at five digits — *"This would only allow you to display five digits, as
+they are so close together that you can't reload the processer registers during the score display"* —
+with VDEL's second register per player giving the sixth 〔stella-list `200007/msg00103`〕. John K.
+Harvey's count the same day: of the four graphics registers
+*"we can only hold data in 3 of these at a time, because a store to GRP0 will copy
+GRP1A into GRP1, and vice versa"*, plus A, X and Y (`msg00104`). The kernel above has that shape: three
+bytes stored before the first digit is drawn, three waiting in A, X and Y. In 2002 Stolberg wrote that
+the attempts he had seen at the six stores without VDEL, the stack pointer holding a byte for `TSX`,
+*"were always off by one or two pixels for one of the writes. This isn't much of a problem for a score
+display, since the digits usually don't use all 8 pixels anyway, but a 48 pixels graphics display
+doesn't seem possible with this trick"* (`200202/msg00196`). Robin Harbron, whose six-character routine
+works without VDEL, remembered it *"only working properly at certain horizontal locations"* and
+suspected *"the unused pixel or two serves as a buffer"* (`200202/msg00202`). Cited only, not verified.
 
 **Font:** 6px glyphs + 2 blank right columns (copies abut at 8px pitch, so inter-digit spacing
 is built into the font). Stored bottom-row-first because the kernel walks Y=7→0.
 Reusable from Go: `pkg/sprite.DigitFont()` (top-down order; reverse when emitting for this kernel).
+
+**Why bottom-row-first.** *"There aren't any registers to flip the screen vertically"*, so the order comes from
+the data or the index: *"flip your graphics data so IT is upside-down"* or *"change the direction of
+your index register"*, and *"It is usually MORE EFFICIENT to store the DATA 'upside down'"* (AtariAge
+`topic/294463`). The reason is the loop — *"it's usually more economical (in terms of CPU usage) to do
+COUNT DOWN loops rather than COUNT UP"* (wickeycolumbus, `topic/167569`). John K. Harvey spelled it out:
+decrement and branch on the sign bit, where counting up adds a compare against the height, and the same
+`BPL` exits early on graphics taller than 127 lines 〔stella-list `200007/msg00098`〕; Rob Kudla put a
+`DEC` loop over an `INC`/`CMP` one at *"like 5 cycles"* a line (`200101/msg00070`). Cited only, not
+verified. Here those cycles are the fit: counting up as `inc row / lda row / cmp #8 / bne` would end the
+row at 77 by the cycle column above, not 72 — Not verified.
 
 ## When the score does not appear
 
@@ -216,6 +285,28 @@ is wrong for this one (87/95). The rest:
   one-digit scores. How the thread read it off the cartridge in Stella's debugger: right-click the
   middle of the score in the TIA display and choose *Fill to scanline*, see "2 copies wide" for both
   players in the TIA tab, then Step through the drawing loop. Cited only, not verified.
+- **Three two-digit scores from the players, no repositioning.** Glenn Saunders asked for a game that
+  draws three 2-digit score chunks with the players without repositioning them in the kernel
+  〔stella-list `200302/msg00212`〕; Manuel Polik pointed to his Gunfight: *"I think it's not timed 100%
+  correct, IIRC all sprites are only 7 pixels wide, but if you can live with that, feel free to use it"*
+  (`msg00264`). Cited only, not verified.
+- **Every digit an 8, masked by the playfield** (omegamatrix's method; his original is a stock 4K ROM,
+  spiceware used it with DPC+ in Space Rocks): spiceware — *"the routine always shows 8 for the digits.
+  The playfield needs to be set with priority over the players, then you need to add logic to figure out
+  which playfield pixels need to be turned on so they hid the segments that should not be displayed.
+  Once you get that working you need to set the playfield to the same color as the background"*
+  (AtariAge `topic/254910`). omegamatrix's twelve-digit display (`topic/255612`, 2016) gives two builds:
+  building the playfield masks takes 447 cycles for the left side and 451 for the right in 776 bytes
+  (kernel 150, data 50, subroutines 576), or 507 and 634 cycles in 583 — an attachment, not read or run
+  here. A 14-digit version, described in the thread as working but not yet released, keeps its masks in
+  14 bytes of RAM, against a six-digit kernel's 12 bytes of `(zp),y` pointers *"and one or two more for a
+  loop counter and a temp register"*, as in this one. Cited only, not verified.
+- **Commas from the ball and a missile** (spiceware, `topic/198217`, a suggestion in the thread): digits
+  5 or 6 pixels wide; the ball, positioned for the comma, on for the last 2 lines of the score, moved
+  1 pixel left with HMOVE after the last line and shown 1 more line. A seven-digit score's second comma
+  uses a missile as well, with a playfield the background's colour on both sides of the score and
+  playfield priority *"to hide the extra copies of the missile"*; with leading-zero blanking the
+  playfield can hide unneeded commas too. Cited only, not verified.
 - **A countdown in seconds** (AtariAge `topic/153968`): `dec frames / bne Done /
   dec seconds / beq Expired / lda #60 / sta frames`, once per frame in vertical blank (60 is NTSC);
   in that thread a check placed in the kernel ran on every scanline and the frame grew to 301 lines.
@@ -227,3 +318,24 @@ is wrong for this one (87/95). The rest:
 - For score + lives/level on one line, SCORE mode (CTRLPF D1, verified litmus_ctrlpf) colors the
   PF halves differently — independent of this sprite-based kernel.
 - Row height ×2: replace `dec row/bpl` with a 2-line repeat (budget allows: 72 cy used).
+- Andrew Davie posted a six-digit double-height score that uses its free cycles to change the background
+  colour 〔stella-list `200102/msg00103`〕 (an attachment, not read here). Cited only, not verified. In
+  the one-line row above, the 4 spare cycles do not hold even `lda #c / sta COLUBK` (5) — our count, Not
+  verified.
+- **Hexadecimal instead of BCD** (the game Hellway, AtariAge `topic/316402`): the score is shown in hex — *"it is
+  an artistic choice. You never need to convert anything, just need to understand how the count works.
+  You never need the decimal value during gameplay."* Then the add is plain binary and the font needs 16
+  glyphs, 128 bytes at 8 a glyph, still one page (our reading). Cited only, not verified.
+- **Vertical text.** Chris Cracknell laid out a hiragana font for traditional right-to-left,
+  top-to-bottom Japanese: *"for the 2600 it would be easier to display japanese writing this way. Using
+  the "six digit score routine" would really work great for printing japanese text"* 〔stella-list
+  `199804/msg00138`〕. Our reading: across, a line is six glyphs; down, a column runs as many rows as the
+  band has. His suggestion; Cited only, not verified.
+- **The timer as a spare byte** (omegamatrix's seven-digit routine, as described in AtariAge
+  `topic/160610`; `design-principles.md` lists other places a byte can hide): one byte short of
+  temporary RAM in the unlooped kernel, it adds 94 to a graphics byte (`adc #94`, carry clear), stores it
+  to `TIM1T`, and `ldy INTIM` 94 cycles later reads the original byte back, the timer having counted down
+  one a cycle. That needs a fixed cycle count between the two — no branch between them. Cited only, not
+  verified.
+- **The score band as a readout.** A joystick and keypad test cartridge shows the logic state of the TIA
+  inputs as 1/0 in its score counter (danjovic, AtariAge `topic/332201`). Cited only, not verified.
