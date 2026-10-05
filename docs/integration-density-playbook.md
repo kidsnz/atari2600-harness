@@ -104,6 +104,27 @@ two bits per segment, *"storing movement values instead of locations"*, which to
 75 segments to *"200+"* 〔AtariAge `topic/308519` wip-2600-snakes; only the distillation notes are held
 here〕. **Cited only, not verified.**
 
+**A RAM diet, item by item.** Thomas Jentzsch's *Pac-Line Panic* (2024, 4K) needs 27 bytes for each of its
+eight rows kept naively, 216 in all, and the post that says so prices each cut 〔AtariAge `topic/368501`〕.
+The shared speed, the animation read off the position and the reserved position value are summarised in
+`techniques/input-budget.md`; three more cuts are not. Pellets: 20 bits a row *"could fit into 2.5 bytes.
+But we have to unpack them on-the-fly, because the rows follow closely upon each other. There simply is not
+enough CPU time for 2.5 bytes"* — so 3 bytes, left and right pellets interleaved, at *"only 2 cycles per
+PF-write for a simple AND #$55 or #$AA"*, and the 12 cycles a line that leaves short are paid by drawing the
+sprites single-coloured on the pellet lines (24 bytes saved). The power-pellet timer *"runs in sync with the
+(ghost) speed. The faster the ghosts, the less power time. So we do not need the fractional byte here too"*
+(8 bytes). The row status began as one byte per flag with a bit per row — *"8 rows fit perfectly into 8
+bits"* — and ended at seven such bytes. The death animation reuses the power-pellet timer, *"there cannot be
+both at the same time"*: the never-live-together rule above. Every count is his. **Cited only, not
+verified.**
+
+**A position that is also a flag.** `techniques/missiles-bullets.md` keeps an inactive shot at row 200, so
+the kernel draws nothing for it without testing a flag; *Pac-Line Panic* reserves a position value for "no
+power pellet" instead of a status bit (above). kikipdph, 2023, used the parked value on the logic side: a
+sprite that is shot is moved to *"y = 200"*, and its movement runs only *"when the sprite is in a section
+where movement is needed"*, tested as `< 195` 〔AtariAge `topic/353984`〕. One range of the coordinate then
+stands for "absent" wherever it is read (our reading). **Cited only, not verified.**
+
 **Where a table lives decides what it can do.** Manuel Rotschkar, 2004, on *Crazy Balloon*: *"I was also
 forced to switch the display of the level layout from RAM to ROM, as I just didn't get the "rest" of the
 game working with 22 Bytes... This also means that I have to find some new way for those levels where
@@ -202,6 +223,17 @@ byte) **index a small parameter table** at runtime → many variants from shared
 valid/curated combinations are reachable. Density metric: *feature-count-per-K* (§D).
 *Source: Kang et al. FODA; Kästner & Apel (annotative vs compositional); Combat 27-variant table.*
 
+**Shared across games on one cartridge.** wickeycolumbus, 2013, on his *Mini Game Collection*: *"There are
+several routines shared across the 3 games on the cartridge, including the score kernel, "blank" kernel,
+joystick/switch reading, random number generation, and probably more that I'm forgetting."* To the idea of
+making each game a list of routine numbers: *"Making the entire game a table of subroutine addresses
+probably won't compress it too much. There are many cases where the code would take less space if it weren't
+a subroutine."* roland-p added that a jump table stores two bytes per routine, and `LDX #subroutine_id` /
+`JSR gotosubroutine` *"doesn't take less space than"* `JSR mysharedsubroutine`; he pointed to a BRK-based
+call instead, which §G prices 〔AtariAge `topic/208200`〕. Doing the same for a larger multicart was only
+proposed (`design-principles.md`, "The same move scaled to a multicart was proposed, not built"). **Cited
+only, not verified.**
+
 ### 5. Orthogonal composition beats accretion. ★★★
 *(systemic design / effective complexity — guides WHAT to build)*
 State-space grows **multiplicatively** with interactions, additively with parts. Depth comes
@@ -265,6 +297,17 @@ worst"* (the last digit needs no gap), *"LESS the improvements in the actual x5 
 replaced by a simple x8 (which for the BCD high byte would be just an AND and a LSR)"* 〔`200405/msg00107`〕.
 `techniques/asymmetric-pf-score.md` uses 8 bytes per digit. **Cited only, not verified.**
 
+**Forward and mirrored digits in one byte.** JeremiahK, 2020, to an author drawing a 3×5 score with the
+playfield: *"you have to store 2 copies of the digits, one being flipped"*, but *"Bits 765 and 321 hold
+regular forward copies as usual. Bits 543 hold a mirrored version of the same graphics."* With columns `a b
+c`, the byte reads `a b c b a b c x`: bit 5 is `c` and bit 3 is `a` in both copies that share it, so any
+3-wide glyph fits (our check, on paper). The display must *"shift the copies into place before ORing them
+together"*; with ten digits *"the table is 50 bytes, but with the extra overhead to handle the mirrored
+copies, it would probably save you 30ish bytes"*, and that game's eleventh character *"wouldn't work with
+this method"* 〔AtariAge `topic/311006`〕. `techniques/asymmetric-pf-score.md` has the nibble form of a
+reversed copy; Ed Fries' 26-letter font in 28 bytes, overlapped both ways, and his verdict on it are in
+`design-principles.md` ("Packing a table pays only when the table dominates"). **Cited only, not verified.**
+
 **The bytes in front of an alignment are still ROM.** `BOUNDRY`, *"a new macro from Dennis"* in the
 updated `macro.h` of 2004, as Edwin Blink explained it to Manuel Polik, who had asked how it differed from
 `ORG $F500` / `ds 5`: *"with BOUNDRY you don't have to do the ORG $F500"*; *"Bytes waisted for the boundry
@@ -284,6 +327,28 @@ wasting 4 bytes here, and sometimes you will discover unoptimized code easier)"*
 worked examples, `cpx`/`cpy` in place of `txa`/`tya` and `cmp` — *"Another two bytes saved here."*
 〔`200109/msg00046`〕. The 4 bytes are the `JSR` and its `RTS` (our arithmetic). **Cited only, not
 verified.**
+
+**One diet, itemised.** Two months later Eid, *"a beginner"* by his own account, reported *"almost 260 bytes
+of code"* gone from *Euchre* without losing *"the message display capability"* (the feature priced in §D),
+in fifteen numbered changes; his stated total is 257, and the items add to 276 〔stella-list
+`200111/msg00408`〕. Four swap code for table reads (20, 19, 6 and 24 bytes — *"The larger savings is due to
+table reuse!"*), and one replaces a compare-branch section by computing the address of the right `jsr` and
+taking an indirect `JMP` (30). Together 99 bytes, about 36% of the 276 (our arithmetic). The largest item
+folds code *"repeated four times, differing only in the suit being examined"* into a loop (66). Dropping the
+duplicate J, Q, K and A images by moving the rank images into the letter table — the glyph sharing named
+above — saved 18. The instruction-level edits — an unneeded `clc`, an unneeded `sec` (*"If bcc is not taken,
+carry must already be set"*), `lda`/`tax` and `lda`/`tay` folded into `ldx` and `ldy`, and an `eor` whose
+result was already the value needed — came to 9 (items 6–9; our grouping). One beginner's program; that it
+argues for restructuring before single instructions is our reading. **Cited only, not verified.**
+
+**A carry you can prove needs no `CLC`.** cd-w, 2017: *"When writing 6502 code, you can often optimize out
+the CLC instructions as you can infer that the carry will not be set at that point in the code, e.g. you
+have already performed an addition that cannot overflow."* 〔AtariAge `topic/262178`〕 Two worked cases are in
+`techniques/kernel-micro-idioms.md` ("Fold the borrow into the constant", "A carry the shifts already
+cleared"), and Eid's `sec` above is the same inference after a branch. The inference stays the author's:
+`internal/cyclebound`'s abstract interpreter follows C through `CLC`, `SEC`, `SBC`, `CMP`/`CPX`/`CPY` and
+the two carry branches but sets it unknown after every `ADC` (`absint.go`), and it uses flags to price and
+prune paths, not to report a flag instruction as removable. **Cited only, not verified.**
 
 **When not to take a saving yet.** Thomas Jentzsch, reading a DiStella listing of Davie's *Qb*, pointed
 at two places to save bytes — one a caller's `LDA #$08` / `JSR LFA60` where the instruction just before
@@ -308,6 +373,16 @@ and larger code size is o.k."* 〔`199805/msg00112`〕. So the region's name doe
 the region is already spent does, which is the condition in Debro's *"If I know I have plenty of time"*
 (our reading). §G's first unsolved question leans on the same off-screen budget. **Cited only, not
 verified.**
+
+**Dense code reads like obfuscation.** Asked in 2016 whether 2600 games were obfuscated against reverse
+engineering, kylearan doubted it: techniques such as *"semantic NOPs, jump into the middle of instructions,
+opaque predicates, VM packing etc. always come at the expense of ROM"*, decryption on the fly needs RAM,
+*"so I heavily doubt they were used back then"*. Thomas Jentzsch: *"I have disassembled a number of old
+Atari 2600 games and there is also some original source code available. But I haven't found any intentional
+obfuscation. However there exist some optimizing tricks (e.g. using BIT to skip the next instruction), which
+may look like obfuscation."* 〔AtariAge `topic/247638`〕 The `BIT` skip is measured in §G; kylearan's
+`CMP #$C9` slide from the same thread (such slides *"in fact often confuse disassemblers in a similar way"*) is
+in `design-principles.md`. **Cited only, not verified.**
 
 ### 7. Tight, VALID numeric feedback is the master training lever. ★★★★★
 *(deliberate practice / feedback loops — HOW to get better)*
@@ -360,6 +435,49 @@ wide (he wrote *"48 x 64"*, then *"the sprites are 48 x 80, not 48 x 60"*), *"us
 data"*, and he estimated *"almost 200 frames of animation"* 〔stella-list `200301/msg00106`,
 `200301/msg00107`〕. Every number is his. **Cited only, not verified.**
 
+**Hand-rolled packing in stages, the price moved off ROM.** piledriver, 2024, on how *Oh Shoot!* got its
+screens. Stored plainly, PF0/PF1/PF2 for 22 rows is 66 bytes a screen, drawn straight from ROM: *"I think
+this only allowed me 4 screens in my 4KB game? Don't remember."* Then *"used 4 unused bits in PF0 to store
+run length value"*, *"identical adjacent rows now grouped into chunks"*, *"extracted on the fly in the
+kernel code (not ideal but it worked)"*: 16 screens (the PF0 half is in `techniques/kernel-micro-idioms.md`,
+"PF0 is a second carrier"). Then each screen became *"a list of indexes into a chunk palette"*, 2 to 15
+one-byte indexes, *"limiting the number of times I can change the playfield values to 15 times per screen"*,
+each chunk PF1, PF2 and a run length, *"I ditched PF0"*. That *"could no longer be decompressed on the
+fly"*: *"22 rows x 2PF bytes of RAM"*, *"44 bytes of RAM required!!!"*, and *"one frame between rounds to
+load/decompress the screen into RAM"*; *"about 640 bytes for all my screens"* held 64. The game then went to
+32K (F4, by the thread's opening post), with four banks of level data for 1024 screens and a PC tool that
+reports how much ROM each screen set uses 〔AtariAge `topic/367878`〕. Each 4K step bought screens with
+something other than ROM — kernel time, then RAM, a frame, PF0 and changes per screen (our reading). The
+counts are his; the ROM was not examined here. **Cited only, not verified.**
+
+**An entropy coder and its pointer tables in 540 bytes.** Thomas Jentzsch, 2001, on fitting 600 *Jammed*
+puzzles (Rush Hour on a 6×6 grid) into 4K 〔stella-list `200102/msg00199`〕: a puzzle is twelve strips, six
+rows and six columns. Before coding a strip he counts the patterns that still fit its empty squares — *"22
+(empty strip), 13, 8, 7, 4, 2 and 1 (only the empty pattern fits) and there's a special compression table
+for each number"* — frequent indices get shorter codes, *"(If the number is 1, i don't need any bits at
+all!)"*, and rows alternate with columns because *"The sooner i can reduce the number of free patterns, the
+more efficent is the compression."* The content was fitted to the coder too: *"Then I tried all computed
+defined pattersn, and choose those which I could compress best, optimized the compression tables and
+iterated the process"*, reaching *"less than 2.3 bits/strip or about 2k for 600 puzzles"* at *"~7000
+cycles/puzzle"*. The decoder is *"about 540 bytes (including decompression and level pointer tables)"*,
+beside about 1300 bytes of other code 〔`200102/msg00233`〕. Eckhard Stolberg's version of the same game went
+without an efficient packing method: *"I didn't need to come up with an efficient packing method. This means
+that my version can only store about 250 levels in 4K. But on the other hand my version can handle levels
+with two escape cars or levels where the escape car is 3 squares long."* 〔`200102/msg00170`〕 Where
+Jentzsch's decode went in the frame is in `techniques/blank-a-frame.md`; the break-even is in §G. **Cited
+only, not verified.**
+
+**Packing does not shrink a RAM buffer.** Andrew Davie, 2001, planning Conway's *Life*, proposed run-length
+packing of the board in RAM, since most of it is 0 during a game 〔stella-list `200103/msg00087`〕. Erik
+Mooney: *"That's a nice compression for the average and best cases, but the kernel and algorithm have to be
+able to handle the worst case"*, and *"Sure you can compress it, but it doesn't save you RAM in worst-case
+scenarios, which you have to support."* Answering Clay Halliwell's point that the grid must be held twice,
+current and next generation (〔`200103/msg00093`〕, quoted in the reply), Mooney: *"No cell can affect or be
+affected by another nonadjacent cell. So we can go with as few as 2 rows of common storage"*
+〔`200103/msg00096`〕; the 1997 *Life* thread's *"floating" update window* is in `design-principles.md`.
+Packed ROM data has one size, fixed when it is built; a RAM buffer is reserved for the worst content the
+game can reach (our reading). **Cited only, not verified.**
+
 ---
 
 ## D. Density Scorecard (measure a ROM against a reference)
@@ -384,7 +502,10 @@ Each metric is measurable *with the harness*, and compared to a reference ROM (e
 > **Anti-gaming caveat (open question).** The axes interlock — you can *trade* one for another (spend cycles to
 > save bytes, overlay RAM at the cost of a branch). So the scorecard is a **vector, not a single score**:
 > progress = moving one axis toward target **without regressing** the others. Collapsing them into one index
-> that can't be gamed by a resource trade is unsolved (§G).
+> that can't be gamed by a resource trade is unsolved (§G). For one flag a practitioner gave every arrow:
+> a byte per flag is faster and uses less ROM, packed flags save RAM and cost slower, longer code
+> (Christopher Tumber, quoted in `techniques/kernel-micro-idioms.md`, "The trade has three sides").
+> **Cited only, not verified.**
 
 **Four rows added 2026-09-06, and two of them are honest about having no instrument.** The
 distillation of the stella-list archive produced a classification of the resources a 2600 design
@@ -455,6 +576,18 @@ for each bank"*) and a total, and ECHOes the address, the gap, the bank sum and 
 〔AtariAge `topic/267367`〕. This repository reads the built image instead (`internal/build.ROMBytesUsed`:
 a lower bound on the bytes used, and the `$FF` run at the end), and reports neither gap by gap nor bank by
 bank. **Cited only, not verified** — the macros have not been assembled here.
+
+**Bytes per file, and what the gaps are for.** Dionoid, 2022, splitting a game into include files, ends each
+file with `BYTE_COUNT`, which ECHOes the file's name and the bytes emitted since a start label; his
+`ALIGN_PAGE` ECHOes how many bytes `align 256` skipped, *"bytes free before"* the named block (where he used
+it the post does not say); his third macro, `CHECK_PAGE`, is in `design-principles.md` 〔AtariAge
+`topic/345618`〕. Thomas Jentzsch, 2016, on where such gaps come from, after a suggestion that a linker would
+place routines in them: *"Usually those unused bytes result from avoiding page crossing penalties. And when
+you have to align code to a new page, you have to manually look e.g. for a small table which fits into the
+space. I doubt a compiler can help me here."* kylearan's answer survives in this copy only as its quotation;
+Jentzsch's next post: *"Sounds like I have to give it a try."* 〔`topic/252613`〕 `tool-landscape.md` follows
+the linker question into 2017. `ROMBytesUsed` above has one caller, its own test
+(`internal/build/romsize_test.go`). **Cited only, not verified** — the macros have not been assembled here.
 
 **Where half a K came from.** Andrew Davie, 2001, itemised what *Qb* v0.10 had won back, headlined as 500
 bytes: *"about 200 bytes"* from converting the sprite routine to *"the system as used/suggested by Thomas
@@ -593,6 +726,16 @@ Re-verifying them is the first practice task (§E rung 1). Status:
 **Unsolved questions (the research agenda this playbook opens):**
 1. **Compute↔storage crossover.** At what *generation cost per row/screen* does procedural-from-seed stop
    paying, given 76 cy per visible line **plus** the larger off-screen VBLANK/overscan budget? (Measure it.)
+   Two priced cases from the archive, neither a generator from a seed. Decoding instead of storing:
+   *Jammed*'s 540-byte decoder is a fixed cost, after which a level costs 2.3 × 12 / 8 ≈ 3.45 bytes by
+   Jentzsch's own formula (§C); Stolberg's version, without an efficient packing method, works out at most
+   about 12 bytes a level from his figures, so the decoder pays for itself after at least about 60 levels
+   (both our arithmetic). Building each line's bytes during the line before: Manuel Polik, 2001, on
+   *Outlaw*'s playfield score, *"the actual graphical data is 10 Bytes, but the RAM usage is only 2
+   Bytes(!). There's two blank lines at the beginning, then every line creates the data for the next line on
+   the fly"* 〔stella-list `200102/msg00021`〕. In the posted loop each digit row is drawn on two scanlines
+   and the next row's two bytes are built during them, so the price is those lines' cycles plus the two
+   blank lines (our reading of the code). **Cited only, not verified.**
 2. **Single density index without gaming.** How to weight/normalise the scorecard's axes into one comparable
    number that cannot be gamed by trading one interlocking resource for another (cycles↔bytes↔RAM)? (§D caveat.)
 3. **"Dense" baseline.** What is the *measured* functionality-per-byte of the references (Combat 27 / ~28 B;
