@@ -43,6 +43,16 @@ Measured here 2026-08-25, from private `roms/` work that had concluded six shape
 hardware ceiling and went looking for why; the spacing sweep and the two-player band were added
 2026-08-26, after the first version of this doc was found to be generalising from one spacing.
 
+**On the mailing list the trick is from August 1997, and was credited to Erik Mooney.** Asked for
+code, Eckhard Stolberg answered *"It was Erik, who discoverd it"* and corrected his own description
+of two days earlier (quoted in 〔stella-list `199708/msg00172`〕): *"You have to write something to
+NUSIZx, but only once. And you don't have to write to RESPx before the last copy has been drawn. You
+can do that at any time."* — and *"VDELx doesn't have anything to do with this effect."*
+〔`199708/msg00191`, 1997-08-26〕. Cited only, not verified. The fixture here writes NUSIZ once, at
+reset, and leaves VDELPx at the zero its clear loop puts there, so it agrees with the first and
+third points without testing them. "At any time" should not be read past the table below: when the strobes land relative
+to each other decides how many copies draw.
+
 **Cycle convention is this catalogue's:** `c` is the **write cycle** — the last of the three cycles
 of `sta RESPx` — and a normal-width player lands at **`x = 3c − 60`** (`sprite-placement.md` rule 1).
 
@@ -96,8 +106,28 @@ should keep `s10 k1 == 4` as the alignment check — it is what caught the misre
 mailing-list distillation (helper-2), who also left a prediction worth scoring: that 11 behaves like
 10 (climbs, then falls) rather than like 12.
 
-(A dash is a schedule the machine cannot build: a gap of exactly one cycle has no filler, and a
+(A dash is a schedule this generator cannot build: a gap of exactly one cycle has no filler, and a
 store ending past cycle 74 runs out of scanline.)
+
+The one-cycle half is true of the generator's instruction set — zero-page `sta` plus `nop`/`bit`
+padding, `scripts/gen_litmus_restrobe.py` — and not of the machine (the cycle-74 half, the
+generator's `LAST_CYCLE`, is the scanline running out). There is no one-cycle instruction, but a
+write can be moved one cycle later instead: when Andrew Davie needed exactly one cycle in 2001 the
+list's answer was to make the store itself a cycle longer (`sta.w GRP0`, or the TIA mirror at
+`GRP0+$100`), because the write lands when the instruction completes — collected, with its byte
+costs, in `kernel-micro-idioms.md` 〔stella-list `200102/msg00150`, `msg00154`, `msg00156`,
+`msg00159`, `msg00185`〕. Chris Wilkson also asked *"Can you align the code so the the LDA
+instruction crosses a page boundary? That'll give you an extra cycle"*, which Davie took up as a
+branch crossing a page 〔`msg00154`, `msg00159`〕; that the extra cycle comes from an indexed read
+whose effective address crosses a page is our reading. Re-strobe
+kernels on the list do this: the row kernel Christopher Tumber posted for his own game strobes,
+after its first, with `sta RESP1,x` / `sta RESP0,x` and X zero, four cycles each, and he notes he
+*"could eliminate the use of ,X for timing by using sta.w instead but then the routine gets bigger"*
+〔`200210/msg00043`〕; Erik Mooney delayed a formation by self-modifying its GRPx stores from zero
+page to zero page,X with X always zero 〔`200311/msg00198`〕. So the `s=4` row's dashes are
+unmeasured rather than impossible: a zero-page `sta RESP0` followed by `sta RESP0,x` lands four
+cycles apart. Cited only, not verified; the write-at-completion rule is the same one this page's `c`
+convention assumes.
 
 **Read the rows that disagree with each other.** Only 6, 7 and 8 give the "3 + k" ladder:
 
@@ -137,6 +167,15 @@ kernel built on this".
 **The leading two copies are fixed** at the parked base and base+16, at every spacing in the table.
 Only what comes after the first strobe is yours to place.
 
+**And the last copy of a chain sits closer than the pitch.** Eckhard Stolberg, 1998: in the
+15-sprite version of his demo *"the second sprite from the right ... is displayed 2 pixel more to the
+left. This happens with all sprites, that don't have another sprite hitting the same RESPx register
+in time"* 〔stella-list `199804/msg00178`〕. Our reading of the `s=6, k=5` row above shows the same
+thing measured: the drawn bases 45, 63, 81, 99 are 18 apart, and 115, which no later strobe follows,
+is 99 + 16 — two short of the pitch. Read the same way, the shortfall is pitch minus copy distance, so "two" holds
+only at an 18-pixel pitch: at `s=8` the last step is 16 against 24. The two-player band shows it on
+both players (P0 99 → 115, P1 108 → 124).
+
 ## Two players: sixteen, measured
 
 The fixture's last band puts both players in NUSIZ=3, parks P0 at x=3 and P1 at x=12, and interleaves
@@ -155,6 +194,13 @@ player had ever been measured, and the doc's own real-world datapoint below is E
 Note what sixteen slots does *not* give you: at this schedule the copies sit 9 and 7 pixels apart in
 alternation, so **three of the sixteen are clipped to 7 px** by the next object starting. Sixteen
 places is not sixteen full-width places.
+
+**The two players' strobes can be closer than this band's three cycles.** With the stack pointer on
+`RESP1`, a `JSR` to the next instruction pushes into `RESP1` and then `RESP0` one cycle apart, and
+Christopher Tumber chained such pairs (`txs` / `jsr`, eight cycles a pair) into a row of
+*"11 pixel wide sprites"* 〔stella-list `200404/msg00157`〕. The sources, the stack-pointer restore
+before `rts`, and the BRK variant are in `sprite-placement.md`, "Strobes closer than a store". Cited
+only, not verified: nothing here has run a JSR strobe.
 
 ## What it costs
 
@@ -207,6 +253,94 @@ that is depends entirely on how many fit in a byte — two 4 px letters to a byt
 letter to a byte is ten. Widening the letter costs count at exactly that rate, and no amount of
 re-strobing changes it.
 
+## Turning one slot off
+
+Everything above counts slots on a full row. Nothing here measures a row with a slot missing; this
+section is what the list found, all of it **Cited only, not verified**.
+
+**The count is the easy half.** Christopher Tumber, 2003: *"doing 11x5 in and of itself is not a big
+deal ... The big trick is NOT displaying sprites. Specifically, leaving the space blank when aliens
+are killed off."* Much of his game's code handled the gap patterns where the RESPn trick can no
+longer be used — `010_0_010`, 0 and 1 being P0 and P1 slots and `_` an empty one — manageable at
+nine a row, but at eleven *"the number of exceptions is increased exponentially and some of them may
+not be possible to do at all"* 〔stella-list `200311/msg00191`〕. Erik Mooney replied that his
+scheme — NUSIZ 1 on both players, every visible sprite a second copy drawn by its own strobe —
+*"will actually handle every case, except when there are no copies of one of the players on the
+current line"* (his emphasis on "no" dropped), and that case only needs GRPx set to zero ahead of
+time, by pointing the graphics pointer at zeroes — *"I never coded that in but it's quite doable"*.
+He added that he did not remember needing a special case for a player with only one copy on a line
+〔`200311/msg00198`〕. Thomas Jentzsch answered that point — *"Yup, you are wrong"*: a player strobed
+only once a line, always at the same cycle, shows its first copy too, so the one-copy case needs
+ordinary positioning with NUSIZ 0; for the no-copies case he patches the opcode into `bit GRPx`
+instead of changing the pointer 〔`200311/msg00201`〕.
+
+**A slot is turned off by not strobing it.** Erik Mooney, 1997, at a five-cycle spacing, suggested
+the kernel *"might"* run from RAM and each frame *"alter some of the STA RESP0 lines to something
+harmless like STA $80... this would let you turn on and off each graphic individually, but there's
+no time to change GRP0 between copies"* 〔`199708/msg00186`〕. Eckhard Stolberg's demo kernel that
+week already had most of its strobes written as `STA $86`: *"If you replace the STA $86 with STA
+RESPx again, it would display 15 sprites per line"* 〔`199708/msg00191`〕. Tumber, 2002, on his own
+game: *"I have self-modifying code in RAM, it's still really tight"*; his row routine *"gets loaded
+into RAM, the RESP0/RESP1 are then switched on and off"* 〔`200210/msg00043`〕. Eckhard's
+2001 worry that replacing strobes with RAM stores *"could destroy the trick"* he withdrew a day
+later 〔`200103/msg00172`, `msg00203`〕. Thomas Jentzsch disables a strobe with `lda`/`bit RESPx`
+instead of a store elsewhere — same address, same three cycles, and a read in the TIA's range is a
+collision register, not a strobe (Erik Mooney, 〔`200404/msg00165`〕: reading `RESP1` at `$11`,
+*"that's the same thing as reading from $01, which is CXM1P"*) — so that patching the opcode turns slots
+on and off while patching addresses sets the formation's position, independently
+〔`200311/msg00201`〕. One disagreement to keep in view: Mooney's
+five-cycle ladder (*"the second copy of each RESP0 will be displayed"*) is not this page's `s=5`
+row, which is flat at four. His first strobe ends at cycle 22 in his count with NUSIZ 1 or 3; this
+fixture's is at write cycle 29 with NUSIZ 3; nothing here has run his schedule.
+
+**Closest packing shifts a neighbour; wider packing eats the travel.** Tumber, 2002: *"if you align
+the sprites closest together with RESP0/RESP1 then when you remove a sprite, the previous sprite is
+shifted out of alignment to the left. It is possible to eliminate this shifting by spacing the spites
+a little further apart as I have done, however if you do that then a row of 11 sprites is extremely
+wide and there's no room for the Invaders to move left and right (A full row could move like 2 or 3
+pixels back and forth)"* — the first of his two reasons for nine a row instead of eleven
+〔`200210/msg00036`〕. Jentzsch the same day: *"Yes, that was a problem for me too. I managed to get a
+few more pixels, but still maybe not enough"* 〔`200210/msg00039`〕. In 2003 he recalled (*"IIRC"*) the
+shift as one pixel when strobes are three cycles apart, against four in his and Tumber's kernels,
+and *"AFAIK nobody has found a solution for that problem yet"* 〔`200311/msg00201`〕; Eckhard
+Stolberg had called it *"the two pixel shifting"* in 2001 〔`200103/msg00203`〕 — in our reading the last-copy
+shortfall measured above. Tumber wrote in 2003 that his game could not use the leftmost fifth or
+so of the screen for the formation, and that Jentzsch's new eleven-wide demo had overcome this
+*"using the illegal HMOVE trickery, however, so did Erik Mooney's old demo years ago"*
+〔`200311/msg00190`〕. Jentzsch's account: two extra strobes at the end of the previous line, behind
+an early HMOVE, with HMPx values found on his Jr. that Eckhard then corrected for his own console
+*"and most others too"* 〔`200311/msg00201`〕 — the console split of the Scope note above, again.
+
+**Or blank the unwanted copies with the playfield.** Eckhard Stolberg, 1998, comparing a re-strobe
+demo with the extra-life display of Activision's Robot Tank: *"Robot Tank uses the playfield to blank
+out the unwanted extra tanks"*; the 18-sprite version *"doesn't have the cycles left to change all 6
+PF registers in time"*, though several routines that each change only the needed registers *"might"*
+make an 18-slot display possible 〔`199808/msg00099`〕. Piero Cavina on Robot Tank's row: *"up to 12
+(or 13?) miniature tanks in the same row"*, *"6 pixels with 2 pixels spacing"* — not two tanks per
+object, as Glenn Saunders had guessed 〔`199808/msg00089`, `msg00092`, `msg00093`〕.
+
+## The playfield buys a second colour or per-slot hiding, not both (our reading)
+
+Trick12's two-colour inversion is also described, as a design pattern, in `design-principles.md`.
+
+Thomas Jentzsch, 2001, needing two colours: *"To get the additional needed CPU time, I had to reduce
+the number down to 12. Each sprite can have one of the two colors."* 〔stella-list `200103/msg00127`〕.
+Eckhard Stolberg on how: the colours *"are coming from the playfield and the background"*; the
+playfield pattern follows which colour shows where, the shapes are masked out with the player
+graphics, and the players are black — *"this routine won't be usable, if the individual sprites need
+to have more than two states"* 〔`200103/msg00204`〕. His own `extra18` demo spent the playfield the
+other way: *"instead of using the playfield graphics for a second sprite colour I use it to hide the
+individual sprites"*, eighteen 5-pixel sprites, each on or off 〔`200103/msg00171`〕. In our reading
+the playfield is one resource here: eighteen in one colour with per-slot hiding, or twelve in two
+colours without it. Cited only, not verified.
+
+**Without re-strobing, each copy can have its own colour.** karl-g's kernel for h0trod (AtariAge
+`topic/307974`, 2020): both players at NUSIZ two copies medium, interleaved P0 P1 P0 P1, with GRP0,
+GRP1, COLUP0 and COLUP1 each rewritten mid-line for the second copies and the colours put back before
+the line ends — four shapes in four colours on one scanline, a 72-cycle loop, no VDELPx; close
+spacing reportedly leaves too little time. That is four slots, not eight or sixteen. Held here only
+as distilled notes; Cited only, not verified.
+
 ## Traps
 
 - **Do not pick a strobe spacing without measuring that spacing.** Three of the eight in the table
@@ -230,6 +364,11 @@ re-strobing changes it.
   them measured a player with ONE copy, where "the first copy" and "the only copy" are the same
   thing and rule 8 eats it. **Measure the mechanism's own precondition.** `litmus_resp_edge` had
   already pinned the single-copy answer; nothing here contradicts it.
+- **Re-strobing is single-width.** It needs a NUSIZ copy mode, and every copy mode draws the player
+  at single width — double (`$x5`) and quad (`$x7`) are one copy each (`nusiz-shaping.md`). Eckhard
+  Stolberg, asked in 2000 whether the trick works only at size 1: *"if you enable multiple player
+  copies in NUSIZ, you can't use any other pixel width than 1"* 〔stella-list `200009/msg00046`〕.
+  Cited only, not verified: every band of the fixture is NUSIZ 3.
 
 ## The ball is the one object this technique does not reach
 
