@@ -56,6 +56,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   - **Minimum width of a horizontal colour band = store-instruction cycles × 3 colour clocks**. An arbitrary
     colour costs ~6cy per band (about 8 bands per line is the ceiling). There is also the trick of borrowing SP
     (`txs`/`tsx`) as a 4th colour register. 〔170018 multiple-colors-per-scanline〕 `→ design.MinColorBandWidthPx/CheckColorBands`
+  - **Turning the screen 90 degrees was proposed once and rejected; among the reasons Polik gave is that "the colors are shifted 90° too".**
+    Andrew Davie, 2001, in a brainstorm about a Gunfight game, said to *"turn the actual TV on its side"*
+    — *"It has been known for games to require you to rotate your TV, and I don't think it's a real sin"*
+    〔`200102/msg00266`〕. Manuel Polik, who was planning the game, listed what the idea would cost him: *"The colors are shifted 90° too + my sprites
+    are 19 Pixel long, which is some more than 8"*, and *"my $$$$ TV will NOT be turned by 90°"*
+    〔`200102/msg00289`〕. Mooney answered that 16 or 32 pixels are possible *"using both players"*, and
+    that *"many TVs experience color distortion and warping when turned sideways"* 〔`200102/msg00296`〕.
+    Read with the rule above, "shifted 90° too" means colour that changes per scanline would change
+    per column on a turned screen, where the TIA's colour changes are the costly ones (our reading; Polik
+    does not spell it out). **Cited only, not verified** — a game was being planned, nothing was turned.
   - **A colour change can be hidden in the black between bands.** Glenn Saunders, 2002, to Billy Eno,
     who wanted four states per tile on a 16×16 board of playfield tiles: *"You know it is possible to
     change color registers at least six times in the middle of the scanline."* And: *"If all you did was
@@ -230,6 +240,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   here. It is the cheapest look at the quantity `pkg/design/color.go` says is *not measured anywhere in
   this tree* — how small a luminance difference still reads. **Cited only, not verified**: nothing here
   has rendered a design with its hue removed.
+  - **Why the console leaves B&W to the game: a hue-only difference has nothing left in B&W.** Mike
+    St. Clair, 1997, answering a poster (quoted inside Matt Pritchard's reply) who had asked whether B&W
+    could have been done in hardware, by sending the TIA's chroma signal through the switch: *"If black and white were done in hardware, graphics that were of the same intensity but
+    different colors would look exactly the same 'shade', and things could disappear. or not have
+    sufficient contrast"*, the same as playing a colour game on a B&W television 〔`199707/msg00030`〕.
+    That is the failure the Seawolf 2 quote above names, seen from the hardware side. That a game doing
+    it in software can pick other luminances is our reading; the Pitfall code in the next entry only
+    masks the hue away. **Cited only, not verified** — no game was played in B&W here.
 - **Attract-mode colour cycling and the B&W switch can share one store path, with no branch.** Nick
   Bensema, 1997: *"Most games use an EOR or ADC on every write to color registers against a memory
   location in RAM which holds zero when there's no attract mode"*, naming Combat, Defender and Pitfall.
@@ -242,8 +260,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   AtariAge in 2007, with the updated timer as the `EOR` operand: the table colour, `EOR` the timer, then
   `AND` by the B&W switch state (`AND #$FF` colour; `AND #$0F` for B&W is our reading, since the note's
   quote breaks off at *"AND #$0F ="*) 〔mining 108824
-  code-for-screen-color-changing; only the distillation notes are held here〕. Combat's attract colour cycle is
-  in the Minimal-UI rule below. **Cited only, not verified** — Bensema gives the code as *"something like
+  code-for-screen-color-changing; only the distillation notes are held here〕. Erik Mooney, 1999, put
+  the same idea as a table rather than a mask: *"In most Atari-produced games (usually not for other
+  companies), all the color accesses went through a lookup table, to accommodate the color/BW switch,
+  and it probably made PAL conversion easier"*, and a screen saver, he said, *"wouldn't be that hard to"* build: a counter that changes the index
+  into that table every so many frames 〔`199908/msg00016`〕 — one indirection serving the B&W switch,
+  a PAL palette and the attract cycle (our reading; his "probably" covers only the PAL part). Combat's
+  attract colour cycle is in the Minimal-UI rule below. **Cited only, not verified** — Bensema gives the code as *"something like
   this"* (so perhaps recalled rather than copied — our guess), and nothing here builds it.
 - **A whole screen in ONE hue is a style, and can be offered as an option.** The craft section has the
   single-object case (8 px monochrome → spend it on the silhouette); this is the screen-wide one. One hue
@@ -277,6 +300,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
       colors. I'll give the ball a try."* 〔mining 281341 sprite-graphics-adviceassistance〕 The same
       kernel time buys either the ball's colour or colour changes down the player (our reading).
       **Cited only, not verified** — LS_Dracon's mock-up was not looked at here.
+    - **The way out of the shared colour is to empty the playfield on those lines.** Roger Nystrom,
+      1997, planning a game in which the ball would be a player's hair, beard and weapon, asked whether
+      the background would take the hair colour too; Greg Troutman answered that on lines where ball
+      and playfield are both drawn *"you have the potential for the two objects blending together"*, and
+      that *"the easy way out is to make the playfield empty, so the character is never really on top of
+      the playfield, but on top of the background"*, whose colour (`COLUBK`) can differ from the
+      ball's; the playfield then *"fill[s] in around"* the character to make the walls
+      〔`199702/msg00014`, `199702/msg00015`〕. It is a layout answer to the colour tie, advised for a
+      game not yet written. **Cited only, not verified** — no such screen was drawn here.
 - **Black is a colour you need, not the absence of one.** Aloan (2015) asked why the palette has a black
   when the beam can simply be off. seagtgruff: blanking cannot draw fine pixels — *"It takes a minimum
   of 3 CPU cycles to turn blanking on or off"*, so *"the smallest "pixel" you can draw this way (by
@@ -886,17 +918,27 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     the 128 bytes this is already done, at a price: *"Space Instigators uses a RAM routine to draw the
     Instigators. However, since I can only have one copy of the routine in RAM, the kernal has to
     re-seed the RAM routine after each row of Instigators. This leads to a couple blank lines between
-    rows of Instigators"*. Of a kernel built wholly in RAM: *"we could be writing to the TIA registers 15
+    rows of Instigators"*, and the cure he names is more RAM: *"5 different RAM routines, one for each
+    row, and then seed them during Vblank/Overscan"*, so the re-seeding falls outside the picture (his
+    wish for a larger RAM; he does not say it was tried). Of a kernel built wholly in RAM: *"we could be writing to the TIA registers 15
     times per scanline"*, and lines chained by `JMP` cost *"only a sacrifice of 3 cycles per
     scanline"*, or by `JMP (table)` so that lines *"can be re-used"*. 〔`200305/msg00006`〕 15 writes at 5
     cycles are 75 of the line's 76, so the 15 and the 3-cycle `JMP` do not both fit one line (our
     arithmetic; his count adds that writes needing no load, such as `STA RESPn`, come on top). The
     whole-screen version he sized needs cartridge RAM, not the console's. **Cited only, not
     verified.**
-- **Write deadlines for an asymmetric PF (measured cycles)**: when you display the left half and rewrite the right half on the same scanline, aim each write at the moment that PF is **no longer visible**. The classic kernel's actual values =
+- **Write deadlines for an asymmetric PF (measured cycles; the REFLECTED-mode case)**: when you display the left half and rewrite the right half on the same scanline, aim each write at the moment that PF is **no longer visible**. The classic kernel's actual values =
   first pass PF0[cy7] / PF1[cy14] / PF2[cy21] (for the left half — in time before it becomes visible) → then for the right half
   **PF0 rewritten at cy31 / PF1 at cy38 / PF2 at "exactly cy45"** (too early or too late and it breaks — adding a single nop destroys it).
   What remains, 76−47 ≈ **29cy per line, is the free budget for sprites and the like**. Judge whether a horizontally multi-coloured PF is feasible by asking "can we hit that single 45cy point without fail, and does the rest of the work fit in the remaining 29cy?". 〔Williams/Saunders "Asymmetric Reflected Playfield" tutorial〕
+  **The single point is the reflected mode's, not every asymmetric PF's.** Reflected, the right half opens with PF2, so PF2 is the one write that
+  must land at the centre boundary. Repeated, the right half runs PF0, PF1, PF2 in that order and PF2 has a window: `pkg/design.AsymRightWindow` gives
+  repeated PF2 48–64 (its source is the woodgrain Playfield_Timing table; the windows are in the cycle the `sta` ends, as `pf.go` counts them). A kernel in a
+  work-in-progress is consistent with that: Andrew Davie's Qb, 2001, has its right-half PF2 `sta` begin at cycle 61 and end at 64 (his notation `->64 < 66 (@61)`; "<
+  66" = must start before 66), in the kernel he posted as his current one, with timing notation he said he had just corrected (he warned against relying on the
+  timing of code he had submitted earlier) and values he had probably taken from the list 〔`200102/msg00019`〕. The posts do not name the CTRLPF mode; the PF0, PF1, PF2 order and the windows fit
+  the repeated mode (our reading). **Cited only, not verified** — Qb was not run here, and `litmus_pf_async` locks only part of the left and right windows
+  (the comment on `AsymRightWindow` says so).
 - **A free 2-colour PF = CTRLPF D1 (the score bit)**: set bit1 and **the left half of the PF takes COLUP0, the right half COLUP1**, independently coloured (no asymmetric write timing needed). The staple for score display, but also a cheap way to colour the left and right of a background differently. 〔w11/Asym2scrol〕 `→ design.ScoreModeTwoColor`
 - **The saving trade of giving up PF0**: not drawing PF0 (on top platforms and the like) forces PF2 to be written at **exactly cycle 48** instead, but it frees **12cy per line + 18 bytes of RAM**, and lets the player fall off both edges of the screen (an advantage of the reflected PF). 〔mining blog SpiceWare Stay Frosty〕
   - **The PF0 trade is one rung of a ladder counted in registers rewritten per line.** SpiceWare,
@@ -916,6 +958,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     **CPU time**, and a level number because the snowman and fireball graphics used up the **ROM**
     〔mining 136387 the-2600-is-truly-challenging; only the distillation notes are held here〕.
     **Cited only, not verified.**
+  - **If the playfield does not affect play, a reviewer said not to draw it.** samiam, reviewing a
+    skateboarding game's alpha on AtariAge, said that in his opinion a PF that does not affect the
+    gameplay should not be used, citing the *Footbag* stage of *California Games* as very appealing yet
+    using no PF at all, and *Space Invaders* as using the PF only for the player's score; for the
+    background he would use a simple colour gradient, and spend the PF on things the skater can land
+    on 〔mining 213904 skateboarder-alpha-v01; only the distillation notes are held here, so this is
+    a paraphrase〕. It is the other side of the trade above: what is not
+    spent on the PF is left for colour and sprites (our reading). **Cited only, not verified** — it
+    is one reviewer's opinion, and neither cartridge was inspected here.
 - **The wall can be the background.** iesposta, 2017, looking at Starpath's *Escape from the
   Mindmaster* in Stella's debug colours: *"Wow that means the background color is the walls and the
   Playfield is the ceiling, floor and side passages."* The day before he had described it as using
@@ -1082,6 +1133,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     an even number of scanlines 〔`200006/msg00040`〕. A plan, not a report of the result. Next to
     Cavina's switch, which buys only the line count, Jentzsch's list adds game speed, and Stolberg names
     the palette as the larger difference (our reading). **Cited only, not verified.**
+  - **A seconds counter kept in frames follows the line count the ROM draws, not the standard.**
+    Crackers, 1997, writing a virtual-pet demo, planned to use the colour/B&W switch as an NTSC/PAL
+    switch and added: *"The clock will also have to be different in the PAL version as the second
+    counter will be updated every 50 frames instead of 60."* 〔`199710/msg00021`〕 Eckhard Stolberg
+    answered: *"The framerate depends on the number of lines drawn. If you do 262 lines, which
+    practically all PAL TVs can sync to, it will be almost 60 Hz on PAL too. The PAL VCS is a little
+    bit slower than the NTSC one, but that would only be a couple of seconds per day in your timer. If
+    you want to use a 50 Hz timer, which will be marginally more acurate on PAL, you would have to blow
+    up your graphics to 312 lines per frame."* 〔`199710/msg00022`〕 So the 60-to-50 change belongs with
+    the 312-line build; Cavina's switch, which buys only the line count, would have to move the counter
+    with it (our reading). Nothing on the screen shows a wrong clock, so a look at the picture would
+    not catch it (our reading). **Cited only, not verified** — no clock was run here, and "a couple of
+    seconds per day" is his estimate.
   - **A kernel that reads a table per line pays for PAL's extra lines in ROM.** Eric Ball, 2002, on
     *Skeleton*: *"it is going to be difficult to accomodate the 20% increase in table size for the PAL
     version"* 〔`200209/msg00047`〕. Manuel Polik did not see why a conversion should cost space: *"Just
@@ -1149,6 +1213,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     anyway..."*. In the same post he had adapted the code *"in numerous ways"* and reduced *"the
     required ROM space to some 20%-30% of the original code"* 〔`200211/msg00018`〕; how much of that the
     skipped repositioning saved, he does not say. **Cited only, not verified.**
+  - **Picking a free square by redrawing until one is free may never end; a random start plus a walk
+    does.** Andrew Davie, 2001, turning down Manuel Polik's replacement of his place-a-piece code (which
+    branched back to the start whenever the grid square was taken, as the quoted code reads) in his Qb game: *"It is unlikely, but
+    possible, that the random number routine will NEVER select a vacant grid position. And here the
+    program will lock up looking for one (using your code). The original code selected a random
+    position, then stepped along the row/column until it DID find a blank spot. Guaranteed termination.
+    It is much safer left as it is (though less elegant). ESPECIALLY when using a dodgy random number
+    routine which isn't really nearly random at all."* 〔`200102/msg00122`〕 The walk's worst case is
+    the length of the row or column it steps along (our reading), which is what makes the routine's
+    time boundable at all. **Cited only, not verified** — the two versions were not run here.
 - **An odd width is a power of two PLUS ONE, and the join is free.** A ball is 1, 2, 4 or 8 pixels
   and nothing else, so a shape that must be an odd number of pixels wide has no ball that fits it.
   Thomas Jentzsch, 2001: *"all cursors are **7 pixels wide** (has to be an **odd number** to make the
@@ -1254,6 +1328,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     usage if you're not careful."* 〔mining 253253 begginer-questions-to-get-me-started〕 The first two
     differ on calls inside the kernel; the collision SpiceWare names is the quantity measured above.
     **Cited only, not verified.**
+  - **The same split from three list posts, 2004: strict in the kernel, relaxed outside it.** Lee Fastenau, on a new build of *Reflex*: *"One of the most important changes in the source is
+    the heavier use of JSR/RTS. I don't believe the calls go any deeper than 2 levels, using 4 bytes of
+    stack space at most. The JSR's have made the code much more flexible and makes managing game
+    "states" a cinch"* 〔`200404/msg00109`〕. Kirk Israel, who had avoided JSR, said that *"except for the
+    kernal, things don't generally have to be as hyper optimized in the rest of the game"*, and Fastenau
+    answered *"hyper optimization is critical in the kernels, but perhaps what you lose in efficiency in
+    other parts, you gain in maintainability"*, while counting the cost: 19 free bytes become 15 with two
+    levels, he caught himself before a third, and he added that *"if I really knew what I was doing,
+    I'd probably find a way to do it without JSR's"* 〔`200404/msg00113`〕. Manuel Rotschkar, on the kernels of
+    his *Jumpman* (specialised, hard-coded per screen section): *"Wastes tons of ROM, but I don't want to
+    waste any cycles on conditional logic or JSR/RTS combos at the moment"* 〔`200409/msg00264`〕. All
+    three keep the cycle-counted part free of calls; they differ in how much of the rest they give to
+    them (our reading). **Cited only, not verified.**
 - **★Everything measured here is measured BEFORE the television.** `internal/emu` imports
   `hardware`, `cpu/instructions`, `cartridge/mapper` and `memorymap` — and nothing from the engine's
   GUI, where the CRT model lives (`gui/sdlimgui/gl32_crtseq_effects.go`, `preferences_crt.go`).
@@ -1323,6 +1410,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     Mission: *"The flashing covers the entire screen!  But the frequency is just 1/2.  That's not bad.
     And though the foreground is white, there is a background color to cushion the blow."*
     〔`199805/msg00164`〕 **Cited only, not verified** — none of the four games was looked at here.
+  - **One flicker that was tried for detail and called a failure by its author.** Andrew Davie, 2001,
+    announcing a build of *Qb* in which the player had gained colour: *"A not-so-great flash (or should
+    I say flicker) of inspiration was adding interlaced hair to the player. Try it and see what I mean
+    :) It works, but it doesn't WORK. Oh well, nice idea :)"* — and he left it as one of the
+    compile-time switches, *"player with interlacing hair on/off"* 〔`200102/msg00235`〕. He does not
+    say what looked wrong; this is a case of the "motion or damage" question above answered "damage"
+    for hair flickered onto a small player (our reading). **Cited only, not verified** — the build was
+    not run here.
 - **Flickering more than 2 objects: list reordering REPLACED age-based, and it costs priority.**
   The older way is **age-based** — count how many times each object has been shown and display the
   oldest next. The newer one is **list reordering**: try each object in FLICKERLIST order, move the ones
@@ -1355,6 +1450,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     engine's per-instruction counts put the stall on the instruction AFTER the strobe
     (`integration-density-playbook.md`, the `sta WSYNC` note), so a figure read off them for that
     instruction is not its share of the new line (our reading). **Cited only, not verified.**
+  - **Write the register on every line even when it need not change; a known waste can be counted.**
+    Nick Bensema, 1997, in a comment in the playfield kernel he posted: *"I realize that it updates
+    the PF registers whether it needs it or not, but it would be pointless to branch around these
+    updates. Better to know you're wasting cycles and have them counted than to get unlucky and have
+    your code spill into the next scanline every time too many things get updated."* 〔`199703/msg00015`〕
+    What has to fit in 76 cycles is the worst line, and a branch around the store does not lower it
+    (our reading); this repository's tool answers the same worry over every path
+    (`prove_line_budget`). **Cited only, not verified** — his kernel was not run here.
 - **★RIOT 6532 timer wrap-around bug (the "Stella passes / real hardware rolls" trap)**: write `TIM64T`/`TIM1024T` on **exactly the cycle** the timer wraps around and the divider silently degenerates to **1T**, wrecking the frame length so the picture rolls on hardware. **The fix = a double write (double-write TIM64T).** Easy to miss because it is emulator-dependent = a direct hit on the harness's core mission (gap B). Diagnosed in that thread by Gopher2600's author (JetSetIlly). 〔mining 303277 "To Roll or not to Roll"〕 (harness-hardening candidate = an assert that detects a timer write on the wrap-around cycle)
   - **The longest the timer counts in one run is about a fifth of a second.** Erik Mooney, 2001, asked
     for a timer of roughly one second that does not depend on the frame rate: *"Can't really do that on
@@ -1394,8 +1497,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     used to. People designing games would be pretty safe if their game had 200 or even 205 visible
     scanlines centered on the TV."* 〔`199904/msg00002`〕 Brad Mott, in the same thread: *"It wouldn't
     surprise me if there are more that display more than 192 lines than display 192 lines. I'm sure
-    Pac-Man uses more than 192 lines and I think Combat does as well."* 〔`199904/msg00003`〕 The
-    frame's total is held by the bounds above; how much of it is picture is a margin set on 1970s
+    Pac-Man uses more than 192 lines and I think Combat does as well."* 〔`199904/msg00003`〕 Eckhard
+    Stolberg, the same day, answers the same question with PAL titles: *"PAL only games like Acid Drop
+    or Pick n Pile do this, as well as some PAL versions of Atari's early titles like Combat or Air Sea
+    Battle."* 〔`199904/msg00001`〕 John Saeger: *"I know of 4 games that display more than 240 lines,
+    like seamnstr.bin. I think they're all PAL though, and I think they're all Bit Corp."*
+    〔`199904/msg00004`〕 The PAL-only and Bit Corp parts are his "I think". In 2000 Stolberg, asked whether Activision's
+    games ran longer than 262 lines, said: *"I think Activision games use more lines in the visible part
+    of the frame. But they do less scanlines during the VBLANK and overscan part of the frame to make up
+    for that. 192 visible scanlines is a very conservative value. I heard that most NTSC TVs can display
+    over 200 scanslines."* 〔`200005/msg00180`〕 Both halves are hedged by him ("I think", "I heard").
+    The frame's total is held by the bounds above; how much of it is picture is a margin set on 1970s
     sets (our reading). 200 and 205 are two of the line counts in the pixel-aspect note in the craft
     section. **Cited only, not verified** — no ROM's visible line count was measured for this.
   - **The total has a range too.** NoLand's summary of a Digital Press table of measured line counts,
@@ -1406,6 +1518,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     that the count be the same in every frame, which agrees with `frame_lines_stable` asking for one
     value rather than 262 (`internal/emu/framelines_corpus_test.go`). **Cited only, not verified** —
     the table was not seen here, and no television was tried.
+  - **One planned split of a scrolling screen's lines.** John Champeau, 2004, in his first post to the
+    list, describing a hockey game he had started: *"a vertical scroller, with 32 lines for the status
+    area (clock, period, score), 160 lines for the rink (the total rink length is 400 lines) and 8 on
+    the bottom for the my logo"* — 32 + 160 + 8 is 200 visible lines, with a 400-line world scrolling
+    through the 160 (our sum). He left PF0 out of the rink (*"it starts 16 pixels in"*) so that *"only
+    PF1 and PF2 need to be updated every 4 scanlines"* 〔`200406/msg00031`〕. A plan for a game he was
+    still writing, not a shipped layout. **Cited only, not verified.**
 - **WSYNC semantics**: `sta WSYNC` halts the CPU until **the start of the next HBLANK** (68 colour clocks = 22⅔ CPU cycles). Choose where to write with the register-update delays in mind (colour = immediate / PF = 2-3 clocks / VBLANK = +1 colour clock / note length = delayed). 〔mining 192183 register-update delay table〕 The VBLANK figure is seagtgruff's, also in an earlier thread: *"Changes to VBLANK are delayed by 1 color clock."* 〔mining 131319 asymmetric-reflected-playfield〕 The bundled Gopher2600 does the same: `tia.futureVblank.Schedule(1, reg.Value)`, so a mid-line write blanks the rest of that line, not the next one. On real hardware: **Cited only, not verified.**
   **`WSYNC` inside a kernel line is spent cycles, not alignment.** Verdant, 2024, to bkumanchik, whose
   kernel strobed `WSYNC` between computing the invaders and the missiles: *"strobing WSYNC literally
@@ -1583,6 +1702,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     232200 ninja-wall-jump-game-wip〕. Against Fries's font above, the decoder here was cheaper than
     the code it replaced; the width came from the largest value in the data, measured after the table
     was laid out for reading (our reading). **Cited only, not verified.**
+  - **Which resource is short decides whether a tight encoding pays: a 1998 exchange on "fractional
+    bits".** Andrew Davie offered storing a value in a fraction of a bit-width by working in another
+    base (a number 0–11 plus one 0–20 in one byte, which whole bits would need 9 bits for), and pulling
+    them out with two 256-byte tables per base, `mod12` and `div12`, 4 cycles each — *"If you could
+    save a single bit with this method, meaning that your RAM requirements were one byte less than
+    otherwise, well maybe it would be worth the ROM space. Maybe it would even be worth using
+    division. It's all a trade-off."* 〔`199805/msg00226`〕 David C. Schweinsberg, who had done this
+    kind of packing on a Casio PB-100 (1.5KB), where *"space was the problem, and not time"* (his emphasis on "not" dropped), said
+    of the 2600: *"This has always been the big issue for me with the 2600 - time. Early on I spent
+    days inventing really "clever" encoding schemes for my vast game landscapes, only to find I'd
+    never have the time to decode it quickly enough"* 〔`199805/msg00220`〕. The two are not in
+    conflict about the cost: Davie counts it in table bytes and 8 cycles, Schweinsberg in the time a
+    kernel line does not have (our reading). **Cited only, not verified** — neither scheme was run
+    here, and Schweinsberg's encodings are not shown.
 - **Adventure's 255-room ceiling is the width of a byte, not of the machine.** On a 2011 thread about a
   multi-load RPG, syntaxerror999 took Adventure's rooms to be capped *"(255 I think)"*. e1will: *"the
   255-room limit in Adventure is fairly easy to overcome. I'm currently working on a 300+ room
@@ -1744,6 +1877,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     one-pixel shift of the players, narrower than the parent line's "reverses behaviour", and the
     one-pixel difference between consoles in `techniques/restrobe-copies.md` has the same size (our
     reading). **Cited only, not verified** — his own "IIRC" and "AFAIK"; nothing was run here.
+  - **A third kind of TIA that is not the original: the Atari Flashback 2's.** Dennis Debro, 2005,
+    answering Bob Colbert's question whether anyone had hacked one into a development system: *"The TIA
+    isn't perfect. First off the HMOVE lines are missing (not that big of a deal though...right)."* He
+    adds that on an AtariAge thread someone who had modded one to add a cartridge port *"tried Galaxian
+    and Cosmic Ark with not so good results"* 〔stella-list `200508/msg00125`〕 — a report at second
+    hand; the post does not say why those two failed, and whether the missing HMOVE lines were the cause
+    is not stated. **Cited only, not verified** — nothing was run on that console.
 - **Minimum-byte initialisation + hotspot placement**: in a tight 2K/4K, Omegamatrix's 8-byte self-modifying init (`bne .loop+1` jumps between operator and operand → `#$0A` executes as an ASL) yields A=0 / X=0 / SP=$FF / carry clear. Put bank hotspots **at the highest addresses (near the already-used interrupt vectors)** and the free chunk is maximised (a ZP hotspot = Tigervision 3F saves 1 ROM byte + 1cy per switch). 〔mining blog 12061, 11811〕
   - **The RIOT's `$02xx` addresses give the same trick a table.** omegamatrix, on AtariAge: *"The $2xx
     registers (TIM64T, INTIM, etc...) can be jumped between operator and operand in some cases for new
@@ -1892,6 +2032,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   question-for-1970s-1980s-vintage-console-computer-homebrew-developers〕. A frame that differs
   completely from the last costs the CPU no more than one that repeats it (our reading); both are paid
   from the kernel's share of every line. **Cited only, not verified.**
+- **The game's update rate need not match the frame rate, but the picture is still drawn every frame.**
+  Andrew Davie, 2002, answering what separates a 60 fps game from a 30 fps one: *"The rate at which a
+  game performs its tasks doesn't have to have a 1:1 correspondence to the rate of the TV frame
+  display"*; a game that takes two frames to do its work runs at 30 Hz, three frames 20 Hz, and *"20Hz
+  is about the low-limit of acceptable animation - below that things start to get jerky and/or
+  flickery."* In a follow-up he added that *"you still need to generate the actual frame data at 60Hz
+  for the TV"*: the game LOGIC runs once every two TV frames, the draw loop does not. 〔`200212/msg00248`,
+  `200212/msg00251`〕 The 20 Hz floor is one author's rule of thumb with no source given. (He calls the
+  television rate 59.94 Hz in passing; this repository's own figure for the 2600's frame is in
+  `techniques/subpixel-velocity.md`.) **Cited only, not verified** — no animation was run at 20 Hz here.
 
 ## Drawing craft (making the sprite/character pictures = the concrete rules of ⑥craft)
 - **Start from thumbnail legibility**: verify **first** that it is still identifiable when shrunk to about one dot, then add detail. Shrink without interpolation (nearest, halving each step). 〔326595, 106110〕
@@ -1979,6 +2129,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     vertically oriented people don't really need the added vertical resolution unless I want to make
     them look squashed."* 〔`200108/msg00577`〕 A rule for choosing which shapes get a one-line kernel,
     not a value for the aspect. **Cited only, not verified.**
+  - **The same choice from the other side: the line count was fixed by cycles, and the shape looked
+    better for it.** Kirk Israel, 2002, adding an animation frame to the players of *JoustPong*: his
+    cycle count showed the one-line kernel was *"well over the appointed 76 machine cycles"*, and he had
+    *"already noticed that my new pong characters were looking a bit squashed, (looking better when they
+    were stretched in fact) so a two line kernal made everything all better!"*, adding later that *"the
+    two line kernal actually looks better than the single version did"* 〔`200209/msg00108`〕. So a row
+    height is chosen for the picture's proportions as well as for detail against load (our reading of
+    one post). **Cited only, not verified** — his half-counted cycles and the look of the characters were
+    not checked here.
 - **★The canonical image→title route (a professional's real workflow)**: SpiceWare builds **the Photoshop mock FIRST and the kernel after it**. Logos and titles use a **flicker-free 2-colour 48px kernel** to turn "a designed 48px image" into "a stable on-screen display" (SF2 is the real example). = exactly this project's Photoshop→2600 path. `multicolor48`/`bitmap48` are its implementation basis. 〔mining blog SpiceWare 10640, 10515〕
   - **Mid-scanline colours sit on a 3CC grid, but a band is as wide as the STORE that paints it**:
     3 colour clocks is the CPU's granularity — one cycle — and it is not the band width. A band costs a
