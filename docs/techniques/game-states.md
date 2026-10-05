@@ -19,6 +19,14 @@ extended `SetPanel` (now also `color` / `p0pro` / `p1pro`) and scenario panel in
     selected"* (AtariAge `topic/292204`). That `BIT` copies the memory's bit 7 into N and bit 6 into V
     is measured here (`internal/emu/bitflags_test.go`); the layout itself is **Cited only, not
     verified** — the demo uses the values 0/1/2.
+  - **A counter beside the flags, and a flag that is also an offset.** Lee Fastenau, 2004, in *Reflex*:
+    *"a cool gameMode byte that contains a 3-bit counter and 5 mode flags"*
+    〔stella-list `200404/msg00109`〕, and, in a later post where he is *"trying really hard to reuse
+    variables and compacting flags"* for RAM, of one of those flags: *"the joystick/driving controller flag
+    is dual purpose. It's stored as bit D3 in the gameMode variable, which equates to decimal 8, which
+    just happens to be the offset of the joystick and steering wheel icon graphics"*
+    〔`200404/msg00113`〕 — masking the byte with `#$08` leaves 0 or 8, usable as the table offset
+    with no shift (our reading; his attached reflex16.asm is not held here). **Cited only, not verified.**
 - **Input snapshots + edge detection**: read INPT4 + SWCHB once per frame into "current" cells,
   compare with "previous" cells; transitions fire on edges only (hold-to-repeat bugs gone).
   - **RESET needs this too.** An init that runs on every frame RESET is down keeps re-initialising for
@@ -40,6 +48,66 @@ extended `SetPanel` (now also `color` / `p0pro` / `p1pro`) and scenario panel in
       of A, so the press code must not leave D7 set — **Not verified**. The same
       thread's other form keeps INPT4's masked D7 in a byte and `cmp`s it, which needs masking if that
       byte's other bits are in use.
+  - **Read every frame, the fire button hardly needs the latch.** Eckhard Stolberg, 2002: *"For reading the
+    joystick buttons the latches are pretty much unnessesary. As long as you check the joystick at
+    least once per frame, it's better to leave bit D6 of VBLANK zero all the time"*; with D6 set, a
+    press keeps D7 of INPT4 at 0 *"even after the button has been released again"*, and a new press
+    shows only after D6 is dropped to zero and set again 〔stella-list `200207/msg00300`〕. The case
+    for the latch, as Ruffin Bailey relayed what Stolberg had told him (*"as I understood him"*): a
+    kernel that checks the button only every third screen or so — *"If you throw down the latch, you
+    can preserve the button press until you deal with it"* 〔`200207/msg00298`〕. That the latch holds
+    a press after release is measured here (`litmus_input`, `docs/verified-coverage.md`: INPT4 stays
+    pressed ≥3 frames after release). The demo reads INPT4 every frame and its VBLANK writes are only
+    `#2` and `#0`, so D6 is never set. When to use the latch is **Cited only, not verified.**
+  - **Where an ARM runs the game, one call can both draw and read.** ZackAttack, 2023, sketching an API
+    for the ELF support of UCA-based cartridges, had `draw_frame()` draw the frame and capture input.
+    splendidnut: *"I would decouple the frame drawing from the input gathering. They are two different
+    things. I know that's probably a convenient way of doing it due to switching between the 6507 and
+    the ARM, but there's got to be a better way to handle that."* ZackAttack: *"Yeah, that's why I combined them. That way the game code never puts itself
+    in a position where it can get the two out of sync"*, offering `set_input_type()` and
+    `get_last_input()` as the other shape (AtariAge `topic/347047`). An argument about that API's
+    design; nothing was run. **Cited only, not verified.**
+- **The colour/B&W switch as an input — and where it is not one.** The demo reads D0/D1/D6 only;
+  D3 is read by `litmus_swchb` above.
+  - **As a selector, read by its edges.** In the *INV* thread, 2004, Erik Mooney wished the switch had
+    a third state, for both PAL-50 and PAL-60; Adam Wozniak: *"Three states: NTSC, PAL50, PAL60"* /
+    *"Transition of the Color-B/W switch from 0 to 1 or 1 to 0 causes a state transition."* 〔stella-list
+    `200404/msg00016`〕 Mooney used it in *INV* on one direction only: *"Cycling the video mode is
+    done when the switch changes from B/W to Color ... Essentially, this treats the Color/BW switch as a
+    momentary switch like Select and Reset"*, so *"NTSC users (the most common case) don't have to
+    worry about anything at all, since the game will always just boot up in NTSC and stay there"*
+    〔`200408/msg00005`〕. The concern Mooney was answering is Lee Fastenau's, who had meant to use
+    Wozniak's method and was now proposing to read a joystick, or SELECT/RESET, at power-on instead:
+    *"That's generally the problem with the non-toggle console switches, including the
+    difficulty switches: it requires the user to alter the state of their system from what they might
+    consider the "normal" state"* 〔`200408/msg00001`〕; he then took both the power-on hold and the
+    cycle 〔`200408/msg00010`〕 (power-on reads: `design-principles.md`, *"The switches can also be read
+    once, at power-on"*). The demo's `prevSe` test does not carry over as is: it
+    fires when the bit goes 1→0 (SELECT is active-low), which on D3 (1 = Color) is Color→B/W, the
+    opposite of Mooney's direction, so the snapshot's sense must be inverted; Wozniak's both-edges form
+    fires whenever the bit differs from the saved one (read from `roms/techniques/game_states.asm`; the
+    D3 versions are not built here). **Cited only, not verified.**
+  - **On a 7800 the switch does not stay put.** Kirk Israel in the same *INV* thread: *"will the
+    color/b-w switch idea work well with a 7800? Didn't they turn it into more of a 'momentary contact'
+    kind of thing?"* 〔`200404/msg00014`〕 — not answered there. The 1997 answer (Bob Colbert, Chris
+    Wilkson's software latch, Piero Cavina) is in `known-traps.md`, *"A colour/B&W switch read as a
+    position is a button on a 7800, and it cannot be held"*. Andrew Davie's
+    *"On the 7800 it's a momentary switch"* is in `design-principles.md` (*"The same switch is a
+    different switch on a 7800"*). **Cited only, not verified** — the 7800 is not modelled here.
+  - **A pause on the switch that also works on a 7800, without detecting the console.** Dionoid, in
+    the thread whose Lode Runner routine `design-principles.md` cites, posted an earlier one: toggle the
+    pause at once when the switch (or the 7800's button) changes, *"but delay storing its state (i.e.,
+    BIT3 of SWCHB) by 32 frames, which is around 0.5 second on NTSC. This allows for the 7800 pause
+    button to return to its original state as the user releases the button again"*; the cost, in his
+    words: *"pushing the pause button twice within half a second isn't handled"* (AtariAge
+    `topic/194119`). His code counts the frames in the pause byte's low bits until bit 6 sets, and
+    notes 64 frames (about a second) as the alternative. **Cited only, not verified.**
+  - **On SECAM there is nothing to read.** The Stella Programmer's Guide (*PAL/SECAM conversions*): a
+    SECAM console *"takes the PAL software, but the console color/black & white switch is hardwired as
+    black & white"* (`ingest.md` quotes it for the colours). So an edge-cycled mode never steps there,
+    and a level-read selector — Nick Bensema, 1997: *"turn the B&W switch into a PAL/NTSC switch"*
+    〔stella-list `199703/msg00166`〕 — always sees B&W (our reading). **Cited only, not verified** —
+    SECAM is not modelled here.
 - **Frame logic under TIM64T in VBLANK** (the dynamic-multisprite pattern): state branches have
   wildly different lengths; the timer keeps the frame at 262 lines regardless.
 - **title**: SELECT cycles the game variant (0-3); RESET *or* fire starts; 300 idle frames turn
@@ -50,6 +118,19 @@ extended `SetPanel` (now also `color` / `p0pro` / `p1pro`) and scenario panel in
 - **game-over**: 120 frames back to title; RESET restarts immediately.
 - **Deterministic state entry**: `EnterPlay` strobes RESP0 at a fixed cycle after WSYNC, so the
   sprite X is identical on every entry (golden-stable).
+- **What an entry resets, and what must not come back.** Two bugs from the list, of opposite kinds.
+  Paul Slocum, 2002, on *Space Treat*: *"your ship slows when you're energy gets low. But if your
+  energy gets low and then you die, your next ship will have full energy but will still be slow"*
+  〔stella-list `200212/msg00347`〕; the author: *"Ouch thanks! I must've broken it recently...!"*
+  〔`200212/msg00348`〕 — the new life reset one value but not one that followed it (our reading).
+  Erik Mooney, 2004, on *INV*: *"if the lowest row of invaders reaches the shields, the shields
+  disappear correctly, but then if invaders are shot so that there are no longer any invaders down
+  that low, the shields reappear. Fixed it to permanently remove the shields for that wave in that
+  case"* 〔`200404/msg00003`〕 — the shields followed the current lowest row instead of a record that
+  they had been destroyed (our reading). In the same *Space Treat* thread Albert Yarusso on the
+  convention the title state here follows: *"My experience shows that Reset usually starts a new
+  game, and oftentimes (depending on the game) the joystick button will do the same"*, where that
+  game's Reset went to the splash screen 〔`200212/msg00355`〕. **Cited only, not verified.**
 
 ## Verified
 - Full lifecycle (11 asserts over ~1100 frames): variant select, both start paths, B vs Pro round
@@ -60,7 +141,21 @@ extended `SetPanel` (now also `color` / `p0pro` / `p1pro`) and scenario panel in
 ## Integration notes
 - A real game replaces the play-state body and keeps the dispatcher/edges/timer shell as is.
 - SELECT-cycled `variant` is where game options live (number of players, speed class …).
-- Attract typically swaps to a self-playing demo; the flag + idle counter here is the hook.
+- Attract can swap to a self-playing demo; the flag + idle counter here is the hook. Nick Bensema,
+  1997, after describing the colour-cycling form: *"Not all games use the color cycling method as an
+  attract mode. Some games have a "demo game" running, while others run a cute animation sequence"*
+  〔stella-list `199707/msg00021`〕. The colour form, with the B&W switch folded into the same store,
+  is in `design-principles.md` (*"Attract-mode colour cycling and the B&W switch can share one store
+  path"*, with the lookup-table form beside it) and `kernel-micro-idioms.md`; this demo pulses the
+  background instead and does not read D3. **Cited only, not verified.**
+- **For a computer opponent, the advice was a state machine, and the worry was RAM.** In a 2003
+  thread about making Combat one-player, Chris Wilkson: *"If you start with the combat disassembly,
+  you've got 2k of ROM space to work with even before you start bankswitching. That's a lot."* —
+  *"The real trick will be fitting the AI in RAM"* 〔stella-list `200302/msg00041`〕; Andrew Davie:
+  *"without question you should be considering a FSM for your AI"*, *"You can do an awful lot of
+  intelligent-seeming things with simple state-machines. And they remove the need for lots of
+  conditional code"* 〔`200302/msg00043`〕. Advice to one project at its start. **Cited only, not
+  verified.**
 - **Adding a menu to a game built without one** — SpiceWare's order, from a 2019 thread about old
   games (AtariAge `topic/291009`): make room in ROM (easy from 2K; beyond that it means adding
   bankswitching), find the RAM that holds the variation and the RAM the menu can borrow, write the
