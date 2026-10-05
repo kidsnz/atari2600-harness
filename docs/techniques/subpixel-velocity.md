@@ -18,6 +18,13 @@ So integers alone offer whole multiples of 1 px/frame, or 1 px every N frames. A
 speeds in between (0.75, 1.25, …); a speed of exactly 1/N px/frame comes out of the DDA as the same one
 step every N frames, so for that case the fraction changes nothing. **Not verified** — the choppiness at N = 4 is his report; nothing here has measured it.
 
+**A half without an accumulator.** Thomas Jentzsch, 2003, on Thrust's missiles: *"use two tables, one
+for even and a different one for odd frames. That way you can do something like 0.5. But with the low
+values you will need, you could also squeeze those two values into one byte"* 〔stella-list
+`200301/msg00392`〕. Alternating two integer steps by frame parity is what the DDA below does with
+`Vel_frac = $80`, with the frame counter's low bit standing in for the accumulator (our reading).
+**Cited only, not verified.**
+
 **Technique.** Keep the position an integer. Carry the *fraction of the velocity* in a separate
 1-byte accumulator and let it spill an extra whole pixel every few frames (a 1-D DDA / Bresenham
 error term):
@@ -39,6 +46,17 @@ the ÷15 loop, HMOVE, and any edge/collision compare keep working untouched. Fre
 frame moves at most `Vel_int+1` px, choosing `Vel_int ≤ 1` makes tunnelling (skipping past a thin
 paddle/wall in one frame) structurally impossible.
 
+**Any angle is a pair of these, one per axis.** Kirk Israel, 2004, on giving the JoustPong ball a Y speed
+set by the paddle: *"the not-fine-grain-enough speed led to too many flat (horizontal) ball paths"*, so
+he had kept fixed angles; Thomas Jentzsch: *"With factional speeds and some small sine/cosine tables that shouldn't be a
+problem anymore."* His recipe: for each angle an x and a y speed of two bytes each — 3 px/frame at 30°
+is 1.5/2.6, stored as `1/128` and `2/153` (high/low byte) — added every frame, with only the high bytes
+used for display; the tables can overlap and need not cover the whole circle 〔stella-list
+`200401/msg00118`, `200401/msg00122`〕. That is an 8.8 position, which this page avoids; in this
+page's form the same table would hold a `Vel_int`/`Vel_frac` pair per axis, except that a negative
+component under 1 px/frame needs its direction held separately (see below) (our reading). **Cited only,
+not verified.**
+
 **The sign trap.** The carry adds `+1` *numerically*, but a leftward-moving object needs `−1`. You
 cannot `adc #0` your way out of it: for `Vel = $FF` (−1) a carry gives `$FF + 1 = 0` = no move.
 Branch on the direction (or keep a `±1` unit and `adc dir`). One clean form:
@@ -52,6 +70,70 @@ Branch on the direction (or keep a `±1` unit and `adc dir`). One clean form:
 sub1:   sbc #1              ; C is still 1 here → Vel_int − 1
 done:   sta Step            ; signed per-frame step; position code does `Pos += Step`
 ```
+
+In this form `Vel_frac` is a magnitude applied in the direction of travel, and the direction is read
+from `Vel_int`'s sign — so, reading the code above (not run), a leftward speed under 1 px/frame
+(`Vel_int = 0`) cannot be expressed unless the direction is held somewhere else. It also means that
+moving left the average is `Vel_int − Vel_frac/256` (a carry takes `sbc #1`), so the `Vel_int +
+Vel_frac/256` formula above is the rightward form; the measured `1.5 (left) → −12` over 8 frames below is
+`Vel_int = −1`, `Vel_frac = $80` read this way (our reading). **Not verified.**
+
+**Two two's-complement ways to write it, from 2004.** Eric Ball kept only a signed fraction and
+extended its sign by hand: *"An example which limits the fractional portion to +/- 127/128 since the most
+significant bit is the sign. This would be termed 'sign extend' on later CPUs"* — `clc / lda fracvel /
+bmi .negvel`, then `adc fracpos / sta fracpos / lda intpos` followed by `adc #0` on the positive path and
+`adc #-1` on the negative 〔stella-list `200401/msg00253`〕. `adc #-1` adds `$FF` plus the carry out of
+the fraction, so the integer moves −1 without a carry and stays put with one: the leftward step is one
+instruction, and small leftward speeds come for free. As posted, the positive path ends in a comment
+(*"check for overflow & jump to staint"*), so that jump is left to the reader. He added that the range
+can be widened by shifting out or inverting the top bit, and *"There is also no reason to limit yourself
+to 8.8 fixed point. If you're dealing with accelerations you may want to go to 8.16."* Asked why the
+negative path adds rather than subtracts, Thomas Jentzsch answered *"adding a negative value is the same
+as subtracting a positive one"*, said he had problems following the example himself, and rewrote it with
+the sign extended into Y at run time: `ldy #0 / lda fracvel / bpl .posvel / dey`, then `clc / adc
+fracpos / sta fracpos / tya / adc intpos / sta intpos` 〔`200401/msg00255`〕 — one path through the
+add, at the price of Y; counted from the opcode table with zero-page variables (not measured), the two
+signs differ by one cycle. **Cited only, not verified.**
+
+**Whether the form is a precision question.** Glenn Saunders, 2004, kept his angle tables unsigned and
+added or subtracted by the rotation index: *"That way maybe I'm getting a bit more accuracy out of the
+angles."* Jentzsch: *"I don't think so, it will only make the code a bit longer (though maybe better
+understandable now). And 1/256 pixel is pretty accuarate for game anyway"* 〔stella-list
+`200401/msg00145`, `200401/msg00148`〕. **Cited only, not verified.**
+
+**Sign in bit 0, no `SEC`/`CLC`.** Manuel Polik, 2002, packed a small step and its direction into one
+byte — `FREEX110` for add 3, `FREEX111` for subtract 3 — so `LSR` drops the sign into the carry, `AND
+#$07` keeps the size, and on the negative path `EOR #$FF` makes the following `ADC` subtract because
+the carry is already set. Jentzsch shortened it by letting both paths share one `ADC`: `BCC .MoveRight /
+EOR #$FF / .MoveRight: ADC xpos,X` 〔stella-list `200211/msg00066`, `200211/msg00071`〕. Counted here
+from the opcode table (zero-page,X operand, branch not crossing a page; not measured), Polik's two paths
+take 9 cycles each from the branch to the `STA`, Jentzsch's 7 and 8 — the shorter form is also the
+one whose time depends on the sign. **Cited only, not verified.**
+
+**Clipping an 8.8 velocity by its high byte.** Eric Ball, 2004, to the JoustPong author: *"Be careful when
+comparing only the integer portion of a fixed point number because the fractional portion is considered
+unsigned"* — integer 2 covers 2.000 to 2.996, integer −1 covers −0.004 to −1.000 — *"So if you clip the
+integer value to +/- 2 your positive range will be higher than your negative range. You will also need
+to update the fractional portion if you are dealing with small integer values or you will get a weird
+stutter. (e.g. clip the integer portion of +3.004 to 2 and the value is 2.004 instead of 2.996)"*. He had
+just found it in his own SpaceWar! 7800 〔stella-list `200403/msg00067`〕. The lopsided range belongs to
+the two's-complement forms; in this page's form, where `Vel_frac` is a magnitude, it does not arise, but
+the stutter does — clipping `Vel_int` alone keeps whatever `Vel_frac` held (our reading). **Cited only,
+not verified.**
+
+**Resetting a fraction chooses where the next carry lands.** JoustPong, 2004, kept an 8.8 position, and
+a player resting on the floor sometimes ignored a flap. The author's fix came first: he had been
+ignoring the position's fraction after a floor collision; zeroing it left the player *"absolutely glued
+to the floor"*, and setting it to `#%11000000` *"seems to work well"* 〔stella-list `200403/msg00139`〕.
+Erik Mooney then worked out why: on the floor the integer position is 10 and the fraction anything; a
+flap increments the velocity to `%00000000.11001000`, and *"Iterate one frame with that velocity, and the
+player's vertical position will usually exceed 10, but not always - not if the fractional part of the
+position was %00110111 or less"* — *"slightly less than one-fourth of the time"* if the fraction is
+effectively random — after which the floor test, comparing only the integer part, rebounded the player
+downward 〔`200403/msg00140`〕. `$37 + $C8 = $FF` is the largest sum without a carry, so the safe value
+depends on the size of the next impulse. The serve reset in the tier table below
+zeroes `Err` for the opposite reason — there the point is that every rally starts identically. **Cited
+only, not verified.**
 
 **Budget placement.** The accumulate+sign is ~20-28cy. If the line that moves the ball is already
 near the 76-cy wall (e.g. it also does collision + miss detection), don't inline it there — compute
@@ -85,6 +167,13 @@ working on a regular CRT and misplacing one or more of the four on newer sets th
 〔AtariAge `topic/249185`〕. **Not verified** — no step size
 or rate has been put on a screen here; the test would be 4-pixel steps at 30 Hz through `cmd/crtview`.
 
+**Coarsening the position makes the step bigger too; whether slow objects show it was left open.** Thomas Jentzsch, 2002,
+suggested widening a game's horizontal view *"by multiplying each value with 2"*, granting that *"The
+horizontal movement might not be as smooth as it is now"*; Manuel Polik: *"I think those two pixels jumps
+wil be badly noticed, especially with ships that have a low horizontal speed."* Jentzsch: *"Might be, or
+might be not..."* 〔stella-list `200210/msg00109`, `200210/msg00110`, `200210/msg00111`〕. The thread
+leaves it there. **Cited only, not verified.**
+
 **Friction caps the speed without a clamp.** Each frame, subtract the velocity shifted right by n
 (`vel −= vel >> n`) as well as adding thrust or gravity. The loss grows with speed, so the two balance
 at `vel = force · 2^n` and the object stops accelerating there by itself — a top speed nobody wrote as
@@ -98,6 +187,18 @@ not on it.
 /paddles on its path, `Vel_Y = 0`), step N frames, read `Pos`: the delta must equal
 `round((Vel_int + Vel_frac/256) · N)` exactly, for both signs. Measured for pf2-06:
 1.25 → +10 over 8 frames; 1.5 (left) → −12; 2.0 → +16. Exact.
+
+**The same error term, spent in cycles.** Fred Quimby, 2005, bit-banging serial out of the 2600 at
+115200 bps: *"at 10.329 cycles per bit and 10 bits to send per character, you need 9 of these delays
+between bits or 92.97 cycles, and I'm using 93. The delays between bits are 10,10,11,10,11,10,11,10,10
+cycles"* — a fractional period spread over whole-cycle delays. His 10.329 assumes *"exactly 1.19 Mhz"*;
+his later table gives 10.36 for NTSC and 10.26 for PAL 〔stella-list `200508/msg00104`,
+`200508/msg00128`〕. Computed here, every bit edge of that sequence stays within 0.72 cycle of the ideal
+at either 10.329 or 10.357. Whether the rate works is not settled by the thread: it worked for him once,
+failed for Glenn Saunders, and later *"115200 is no longer working for me"* while *"38400 and slower are
+proving to be quite reliable"*; Saunders then found 57600 reliable where Quimby had called it flaky, and
+both looked to the cable or the out-of-spec signal levels rather than the timing
+〔`200508/msg00102`, `200508/msg00105`, `200508/msg00111`, `200508/msg00127`〕. **Cited only, not verified.**
 
 **Origin.** 8bitworkshop `brickgame` DDA; the identical idiom is the fraction-then-carry propagation
 in Breakout 1978 (`breakout.asm` 8.8 position, 2.6-packed speed) and djmips APong (8.8 throughout,
@@ -135,6 +236,19 @@ n frames on NTSC, and the PAL values make that every 36n/30 = 1.2n frames: **slo
 (a simulation of the described loop gives 0.83–0.86× the NTSC rate). Whether the 36 belongs on the
 subtracted constant instead is not settled in the thread. 6/5 is the nominal 60/50. **Cited only, not
 verified** — no ROM was built with either table.
+
+**Games found using the technique.** Thomas Jentzsch, 2002, on Cosmic Ark: *"this is the first game I
+know, that uses 'fractional addition techniques'. This was required by the Stella Programmer's Guide (see
+page 16) to make conversions from NTSC to PAL much more accurate."* From a quick look at a few other
+Imagic games, *"they seem to have used this technique generally. Compared to the simple conversions of
+Activision (or my own), this is IMO a major quality improvement"* 〔stella-list `200204/msg00042`〕.
+Dennis Debro, 2004, found it in Berzerk, *"the first game I've disassembled see do this"*: the player
+moves on the carry of `lda playerMotion / clc / adc #PLAYER_FRACTIONAL_DELAY / sta playerMotion / bcc`
+— this page's DDA with no integer part — and *"PLAYER_FRACTIONAL_DELAY is 112 for NTSC (i.e. 7*256 / 16
+-or- move 7 out of 16 frames) and 134 for PAL (i.e. [7*256 / 16] * 1.2 adjusted for 50 frames per
+second)"*; the missiles move the same way 〔`200411/msg00047`〕. 134 is the nominal 6/5 (134.4)
+rounded down; the 120.18% below would give 134.6. **Cited only, not verified** — neither ROM was run
+here.
 
 **The conversion factor, from the 2600's own clocks** (the colour clock over 228 colour clocks per
 line — `pkg/audio`'s `BaseClockNTSC` and `BaseClockPAL` × 114, which agree with the engine's
@@ -195,6 +309,17 @@ somebody's port, not Atari's shipped PAL release. What was measured is **what a 
 which is a different question from **how two official versions differ**. Byte counts only; no
 disassembly was read. Found by the mailing-list distillation (helper-2) and re-measured here.
 
+**What one disassembler reported of PAL builds.** Dennis Debro on Surround, 2004: *"Again, this game
+doesn't have any speed adjustments for the PAL game. The kernel height and colors were the only thing
+adjusted"* 〔stella-list `200409/msg00278`〕. On Tigervision's Jawbreaker, 2005, whose game speed is
+set by *"fractional delay values"*: *"the PAL version didn't adjust these values so the PAL game runs
+slower than NTSC"*, and after going back through his ROMs, *"all the PAL versions I have didn't adjust the
+speed"*; the one with corrected colours also changed VBLANK_TIME and OVERSCAN_TIME (to 66 and 59). A
+better PAL build would need another routine, he added, because the current one cannot take a value over
+15 〔`200501/msg00030`, `200501/msg00032`〕. Counting Berzerk above, of the three games cited here, one
+rescaled the speed and two did not. **Cited only, not verified** —
+no PAL dump was run here.
+
 ## Three rungs, and the game with no fraction to rescale (2026-09-30)
 
 spiceware, 2013, laid conversion out as a ladder with a different price on each rung: *"The simplest
@@ -208,11 +333,61 @@ asker's price was RAM — *"I'm not using fractional positioning. I'm not sure I
 extra RAM, I would need 17 more bytes of data"* — so on a 128-byte machine keeping the speed can be a
 RAM decision. **Cited only, not verified.**
 
+**The same three in 2004, with the television as the other axis.** Thomas Jentzsch to an author
+finishing a game: *"PAL-60 (just corrected colors), simple PAL-50 (colors and 50Hz, slower game play) or
+complete PAL-50 (colors, 50Hz, game speed adjustments)? For a complete PAL-50 conversion you would need
+'fractional addition techniques' and then you may be also able to fine tune the NTSC speeds too."* The
+author picked simple PAL-50 for the same kind of reason: *"16-bit math for fractional speeds is no
+obstacle for me, but rewriting the kernel is. I'm also out of RAM"*. Jentzsch called that *"IMO the
+worst solution, even PAL-60 is better then"*, setting PAL-60, *"speed identical to NTSC original, a few
+PAL-TVs may have problems"*, against simple PAL-50, *"~18% slower than the NTSC original, fully
+compatible with all PAL TVs"*. The author answered that *"Most users would never even notice the speed,
+but they'll certainly notice if the picture rolls"*, which Manuel Polik seconded, and asked about 55 fps
+instead, which drew *"Some TVs may still roll ... and the game speed is still not 100% ok"* 〔stella-list `200404/msg00007`,
+`200404/msg00011`, `200404/msg00012`, `200404/msg00013`, `200404/msg00017`, `200404/msg00018`〕. His
+~18% is a round figure: at this page's rates an unadjusted 50 Hz build runs at 83.21% of the NTSC speed,
+16.8% slower. **Cited only, not verified.**
+
+**Moving the frame rate part of the way.** Zach Matley, 2003, noticed that some of Jentzsch's PAL→NTSC
+conversions ran above 270 lines. Jentzsch: *"The reason why I did this was, that I wanted to keep the
+gamespeed a bit closer to the original one"*, adding that original games ran longer (*"Desert Falcon
+280"*) and *"therefore I think 270 is quite safe"* 〔stella-list `200307/msg00056`〕. Andrew Davie's
+formula in the same thread, frames/second = clock / (lines × 76), puts 270 lines at *"roughly 58"*
+〔`200307/msg00055`〕; computed here from the clock above, 58.15 Hz, so a PAL game's frame code runs
+1.166× its PAL speed instead of 1.2018×. The limits, from the same thread: Paul Slocum's 274-line
+Testcart *"did roll on one of my monitors"* 〔`200307/msg00058`〕, and of 280 Jentzsch recalled that
+*"soem people have had problems with those games. I would stay a bit below if possible"*. His recipe:
+find the two `TIM64T` writes outside the display kernel, reduce both, *"Then check if the game still
+produces a constant scanline line number"* 〔`200307/msg00059`〕. In 2002 he listed Thrust's NTSC/PAL60
+build at 270 lines (the cartridge; the public binary ran 262) and Jammed at 270 (NTSC) and 300 (PAL),
+noting that Atari's PAL library ranges *"~284..342 (Acid Drop)"* lines 〔`200211/msg00097`,
+`200211/msg00109`, `200211/msg00124`〕. **Cited only, not verified.**
+
 **The first rung, made cheap at assembly time.** spiceware again: *"use color constants everywhere …
 Then set COMPILE_VERSION to NTSC or PAL to select which build you're going to make. You'll end up with
 a PAL60 version"* 〔AtariAge `topic/238183`〕. The byte table above is why this rung is the one worth
 automating: the palette is most of what differs between the builds. **Cited only, not verified** — no
 build here is assembled that way.
+
+**The same switch carrying the timing too (2002).** Erik Eid's Euchre selects with `IFCONST PAL` not
+only its colours but its frame-count constants (a 90-frame wait becomes 75, 180 becomes 150) and the
+vertical-blank and overscan timer values, and shipped two binaries with a Stella properties entry for
+each MD5 〔stella-list `200209/msg00105`〕. In his words, *"The PAL version of Euchre runs at 50 fps,
+but I changed the timing of sounds, delays, etc. accordingly so it appears to run at the same speed as
+the NTSC version"*, and *"There's no detection or in-program switch; the PAL and NTSC version are two
+separate binaries"* 〔`200211/msg00119`〕. One screen of the PAL build came out at 290 lines instead of
+312, which he put down to rounding in `TIM1024T` 〔`200209/msg00139`〕 — the line count has to be
+checked per build, not assumed from the NTSC one (our reading). **Cited only, not verified.**
+
+**Or one cartridge, the mode chosen at run time.** Thrust (NTSC/PAL60) and Jammed (NTSC/PAL): *"Both
+switchable with right difficulty"* (Jentzsch, 2002) 〔stella-list `200211/msg00109`〕. Dennis Debro's
+released prototype changed *"the scan line count from 262 to 312 with the right difficulty switch"*
+〔`200211/msg00122`〕. Space Treat Deluxe compiles to NTSC or PAL with a switch, and *"the PAL version
+can be toggled bewteen 50hz and 60hz mode on the fly using the right difficulty switch"* (Fabrizio
+Zavagli, 2003) 〔`200305/msg00071`〕. Reflex holds all three: hold Game Select at power-on for PAL60,
+Game Reset for PAL50, neither for NTSC, or move the TV TYPE switch to cycle; Z26 reported 262 lines for
+NTSC and PAL60 and 312 for PAL50, and the author was still asking PAL users for feedback (Lee Fastenau,
+2004) 〔`200408/msg00011`〕. **Cited only, not verified** — none of these was run here.
 
 **The third rung when speed lives in a frame counter, not a fraction.** Everything above assumes a
 fraction to rescale. Thomas Jentzsch, 2017: *"many developers back then and even today choose to base
