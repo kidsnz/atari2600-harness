@@ -82,6 +82,36 @@ DaveC's `landscape.asm` (AtariAge; `reference/files-dave/`) and the 8bitworkshop
 - **General multi-sprite kernel:** a *sort → position → display* pipeline that Y-sorts an arbitrary set of
   objects each frame, allocates the nearest two to P0/P1, and (when a 3rd collides on a line) **flickers**
   them with a priority counter so they blink instead of vanishing. More flexible, more code. (Roadmap item.)
+  **What it cost one game, itemised — and why he declined it** (Manuel Polik, 2001, on Bob Colbert's
+  multiplexer for the bullets of Gunfight 2600). RAM first: eleven arrays of `MAXSPRITE + 1` bytes, so
+  *"he uses 22 bytes for the first sprite, another 11 for every additional one. For six bullets this would be
+  77 bytes, which is already more than I have, even without any shootable obstacles"* 〔stella-list
+  `200103/msg00190`〕 — 11 × (6 + 1) = 77, so the "+1" is a slot beyond the sprite count (our reading).
+  Glenn Saunders answered that it is *"just one example of sprite multiplexing"*, pointing at Solaris (no
+  RAM in the cart) and, he thought, Stargate 〔`200103/msg00197`〕. Two days later Polik listed his reasons not
+  to merge it 〔`200103/msg00244`〕: the routine *"can do a repositioning every 4th line, i.e. one would come
+  down to 1/4th of the vertical resolution for positioning"*; *"at least two additional tables"* of RAM (the
+  sorted vertical positions and per-sprite flags); he did not think he could also paint *"2 sprites with two color
+  changes + 2 PF values"* while repositioning; the kernel ROM — *"I assume that'll at least quadruple"*; and
+  it was *"eating nearly all the time of the vertical blank"* and the overscan, which with the RAM held him
+  to six bullets. Colbert's reply: *"You can double or triple your overscan cycles by dividing your code
+  among frames"* — he ran his across three, and *"even reading the joystick every 3 frames was still very
+  responsive"* 〔`200103/msg00248`〕. Polik's own test of where it fits: *"a non-flickering player vertical
+  separated from all other objects floating around"* 〔`200103/msg00251`〕. A month later he put the scaling
+  in two lines: *"Every bullet added would eat up some 5 or more Bytes in the RAM"* and *"Every bullet added
+  would add lots of cycles in the sort routines, it'd add more than a linear function"* 〔`200104/msg00058`〕.
+  **Cited only, not verified.**
+  **A blind spot at the top edge** (Polik again, 2002, a flicker multiplexer for ships that enter from
+  the top): *"I don't get a smooth transition done between the point where still the half sprite is done
+  and where finally the kernel kicks in. Any object starting at a certain range inbetween these two points
+  get's invisible. So there's a blind spot for any ship of any size"* 〔stella-list `200210/msg00037`〕. He
+  was *"only able to shift that blind spot"*; the attempt cost *"~100 bytes"* of ROM and *"~ 5 scannlines"* and
+  *"still looked crappy"*, so he discarded it 〔`200210/msg00030`〕, and the *"2 extra lines for the kernel
+  to determine wether the next ship is ready for repositioning"* he took to be part of it 〔`200210/msg00032`〕.
+  Thomas Jentzsch disagreed: *"I still see no technical reason, why you can't show objects that startt
+  before the top"* 〔`200210/msg00035`〕 and *"Many 2600 games have proven that this shouldn't be such a big
+  problem"* 〔`200210/msg00038`〕. He posted the source with the problem still in it 〔`200210/msg00052`〕, and the
+  thread ends with the question open. **Cited only, not verified.**
 
 ## How our demo works
 Per-band X lives in RAM (`zx0`/`zx1`); the kernel walks bands top→bottom and per band:
@@ -117,15 +147,149 @@ Per-band X lives in RAM (`zx0`/`zx1`); the kernel walks bands top→bottom and p
   page — or even if it does, when each kernel is synced with `sta WSYNC` — and its branches do not
   cross one 〔AtariAge `topic/112133`〕. **Cited only, not verified** — the thread is held here as distilled notes,
   not its text, and FlipDraw's mechanics are not in it; the same thread's last resort (precompute each
-  line's `GRPx` into RAM) is the RAM-strip route above.
+  line's `GRPx` into RAM) is the RAM-strip route above. For bullets crossing a band boundary, see "Objects that cross a
+  boundary" below.
 - **Flicker** is the accepted way past the 2-per-line wall: alternate which objects get P0/P1 each frame; a
   priority counter gives the longest-unshown object precedence so motion stays legible.
 - **2-line kernel** is usually worth it (CPU headroom for game logic); cost is half vertical sprite resolution.
 - **Page alignment** of the kernel and the HMOVE table matters (a mid-loop page cross adds a cycle and shears
   the picture); a timer (`TIM64T`) keeps VBLANK stable regardless of per-frame work.
+  **Where the kernel sits in the source follows from that.** Christopher Tumber, 2003, on how 2600
+  sources are laid out: because *"the display kernal often needs to be page aligned for timing
+  purposes"*, it is often put after the data or as the very first code, *"So that <display kernal> can
+  be anchored (with an ORG or because it's the very first part of code) so that it doesn't move around
+  every time you add/remove new code. Game data (bitmaps and such) are often also anchored in this way
+  for the same reason."* Those layouts call the kernel with `JSR`; he himself kept the code linear
+  because of *"unnesessary JSR/RTS combinations (12 wasted cycles!)"*, and says the anchored layouts
+  are *"probably a lot more common, particularly among hombrewers"* 〔stella-list `200304/msg00089`〕. The 12 is
+  `JSR` 6 plus `RTS` 6, held by the static budget prover in `internal/cyclebound/jsrplacement_test.go`; the anchoring advice
+  is **Cited only, not verified**.
+
+## Band boundaries and kernel splits — cases from the list and AtariAge (the cases themselves not measured here)
+- **Objects that cross a boundary.** Manuel Polik, 2001, weighing a sideways Gunfight cut into five
+  horizontal segments: *"You'd have to do some repositioning whenever reaching a segment border. Now - how
+  display the bullets, when they cross the border?"* 〔stella-list `200102/msg00326`〕. Glenn Saunders pointed
+  at Air-Sea Battle and Canyon Bomber 〔`200102/msg00329`〕; Polik's reading of the first: *"The bullet from
+  Air Sea battle"* jumps *"in a certain patern and it's three or four pixels wide, so ENAMx is just hit right
+  before & after the repositioning"* — not open to him, *"since I'd have two sprites to reposition every
+  segment, needing at least four complete lines to reposition"* — and *"Canyon Bomber IIRC doesn't need any
+  repositioning of sprites"* 〔`200102/msg00330`〕. The thread leaves it open; carrying one sprite across zone
+  kernels is the "One sprite across several zone
+  kernels" entry above. **Cited only, not verified.**
+- **Never reposition: `HMOVE` every line.** Glenn Saunders, 2005, asking how to scroll two groups of stars
+  in opposite directions, guessed the scroll itself works *"similar to how Combat animates, via applying
+  movement every frame without resetting position, and that will take care of the wraparound, so the only
+  challenge is the repositioning in mid-screen"* 〔stella-list `200508/msg00154`〕. Thomas Jentzsch: *"Maybe
+  you shouldn't repostion inside the kernel at all. If there is enough vertical space between the stars of
+  one direction, you could just HMOVE every scanline. IIRC Starmaster does that."* 〔`200508/msg00157`〕
+  No reposition means no reposition line, and the wrap comes from the motion; the price is the vertical
+  spacing (our reading). Three years earlier he described the same game's stars as a split: *"The stars in
+  Starmaster are also separated into upper and lower parts and you hardly notice that. The big difference
+  is, that the border between those parts is slightly movable up and down"* — answering Polik, who found
+  Star Raiders' upper/lower split left its sprites *"trapped"* in their part 〔`200207/msg00336`〕.
+  The two descriptions are not reconciled here; Starmaster's kernel has not been read. **Cited only, not
+  verified.**
+- **A playfield drawn in blocks quantises the sprites.** Nick S Bensema, 1997, on a loop that loads the
+  playfield once per 8-line block and then only waits on `WSYNC`: it *"will make it difficult to add
+  players, unless you want your players to only be positionable every 8 scanlines or so, as Centipede and
+  both versions of Frogger do"*, and *"Instead of spitting out eight WSYNCs, you could use that time to
+  position or draw a sprite. Perhaps there isn't time to do both if you want the full eight scanlines."*
+  〔stella-list `199703/msg00182`〕 **Cited only, not verified** — those games' kernels have not been read.
+- **The block height is the time budget.** Chris Wilkson, 2003, to a kernel whose wall bricks are 11 lines
+  tall: *"if your blocks are 11 scanlines tall, then you can break the processing into 11 pieces and do a
+  little bit on each line (of course you have to do if for both players). So...for each individual block,
+  you effectively have 5.5 scanlines to use, minus the processing for the bats and the ball"*; and,
+  tentatively, merge the two walls into alternating bits of one byte, so *"you only have to fetch and rotate
+  one byte per level instead of 2"* 〔stella-list `200309/msg00055`〕. The asker went the other way, to RAM:
+  *"given my simple game concept, RAM and ROM are cheap compared to kernal time"* 〔`200309/msg00067`〕 — the
+  thread the RAM-strip price above quotes. **Cited only, not verified.**
+- **Ragged band heights.** Piero Cavina, 1998, for a ship that sinks one line at a time, where a four-line loop
+  body would need an exit test on every line: *"break the kernel that does the ship body in two
+  parts: one for the upper part, made only of groups of four lines, where you won't have to care of "exit
+  points", and one for the scrolling-end, where you'll draw 1,2 or 3 lines only, according to the sink
+  level. Maybe you won't have time for sprites in these last lines, but the various elements might be
+  arranged so that this is not a big problem"* 〔stella-list `199806/msg00085`〕. He posted it rebuilt that
+  way the same day, *"in groups of 4 scanlines, plus from 1 to 3 final scalines"* 〔`199806/msg00088`〕.
+  **Cited only, not verified.**
+- **One crowded line gets its own kernel.** Christopher Tumber, 2002, for a display whose shots run to a
+  crosshair line at the horizon: split the kernel into the top half, *"the crosshair's scanline only (and
+  enemy ships)"*, and the bottom half — *"This should free up a bunch of cycles on crosshair scanline"*, and
+  because *"the shots terminate at the horizon … you could treat the upper and lower halves of the screen as
+  completely seperate entities as far as the missiles go"*. The cost: *"later changes to the kernal more
+  difficult since you have to change all three parts"*; a gain: *"you could just push new values into
+  COLUPF only on that one scanline"* 〔stella-list `200210/msg00066`〕. The author's reply cut both ways: *"elegance and
+  ROM space certainly are already very good reasons, plus add that I like the current solution"*, and of the
+  split itself, *"This sounds like more economic way of doing it. At least it'll be less than 1/2 K"*
+  〔`200210/msg00068`〕. The mechanism, self-contained zone routines, is `rts-dispatch.md`'s; the motive here
+  is one line's budget, not the number of zone types. **Cited only, not verified.**
+- **Hiding the transition.** Thomas Jentzsch on his game Bottom: *"The game kernel is split into five
+  vertical stripes (top power-ups, top obstacles, road, bottom obstacles, bottom power-ups) and transitions
+  between the stripes. Between the stripes, several player and missile repositionings are required. These
+  happen during the transitions. The code makes sure that there are no visible gaps between the stripes and
+  no visible HMOVE blanks (often using "early HMOVEs")."* 〔AtariAge `topic/343591`〕 How an early `HMOVE`
+  hides the blank is not in the post; the shifted `HMxx` table it brings is in `docs/known-traps.md` (the
+  cycle-73/74 `HMOVE` row). **Cited only, not verified.**
+- **Reposition on the lines that have time.** boutell asked on AtariAge whether Ms. Pac-Man, whose dots are
+  playfield, draws the dot lines with an asymmetrical playfield and the rest symmetrical, repositioning
+  sprites *"only on the repeated symmetrical playfield scanlines"*. Dennis Debro: *"I haven't totally
+  disassembled Ms. Pac-man but from what I've seen you're right. The dots are an asymmetrical PF and the maze
+  is symmetrical. I haven't gone as far as seeing where and how the positioning is done … but looking at the maze
+  resolution you seem to be right on"* — so the playfield split is reported from a partial disassembly, and
+  where the repositioning happens is his inference from the maze, not something he found in the code. Thomas
+  Jentzsch's alternative for a playfield
+  that must be asymmetrical everywhere: *"Striped playfield graphics like in Dig Dug, Mr. Do or Thrust may be
+  an option for you"* and *"very efficient repositioning code"* 〔AtariAge `topic/56658`〕. **Cited only, not verified.**
+- **One object, five times — and then not.** Erik Mooney's Space Invaders (the game quoted above; that
+  passage is the later two-scanline kernel), the 1997 alpha: *"the ball is used for the invader bombs, and it
+  can be recycled up to 5 times to display 5
+  bombs simultaneously (as always, no two bombs in the same vertical zone.) Everything is displayed every
+  frame"*; a bomb due to start on an invader line was skipped for that frame, *"because there's no time to
+  set RESBL during a scanline in which I'm writing to the playfield registers six times"* 〔stella-list
+  `199704/msg00061`〕, and repositioning the ball *"needs a full scanline"* 〔`199704/msg00066`〕. Two days
+  after the alpha he dropped it: *"I rewrote the kernel to not reposition the ball (bombs), so it can only
+  handle one bomb at a time, or two on alternating frames"*, and *"The kernel now
+  barely fits within two scanlines within the invader block"* 〔`199704/msg00102`〕. **Cited only, not verified.**
+- **A kernel version per horizontal half.** Glenn Saunders, 2001, with Y the line counter and X the
+  playfield index, found it *"hard to do all the writes bunched up close
+  together"* (the `GRP0`/`GRP1` writes and the missiles' motion and size writes), and proposed: *"I could have
+  different versions of the kernel that update at different spots depending on the X position of
+  the objects in order to avoid stomping on the sprite while it's being drawn. If I evaluate the screen as
+  two halves and have two different kernels depending on whether the sprite is on the left or right half,
+  then that's 16 possible combinations if done for all 4 objects"* 〔stella-list `200110/msg00185`〕. Thomas
+  Jentzsch: *"that's a nice idea and it should work"*, but optimise the single kernel first — *"And maybe you
+  won't need all 16 combinations, maybe 2 or 4 a sufficient"*; and on how much time a playfield border buys,
+  *"3 pixels give you 1 cycle, so 4 playfield pixels (=16 pixels) will give you about 5 cycles"*
+  〔`200110/msg00201`〕. **Cited only, not verified.**
+- **How many objects one line can test.** Ruffin Bailey, 2002, testing two players and two missiles by Y on
+  every line: *"Though skipDraw is quick, you unfortunately still can't get in four checks per scan, much
+  less four checks per line with writes to the ENAMx's and GRPx's"*. His alternative is Kirk Israel's buffer, which
+  he adopts — a RAM byte per object, loaded into `GRP0` at the start of the line and refilled for the next
+  line before `WSYNC` 〔`200207/msg00037`〕: *"LDA from zero page takes 3 cycles and STA into zero page also
+  takes 3. That's 6 per object checked, making 24 for four objects. Since I can "carry over" one value from
+  the preceding scan line, that's 24-3 = 21"* 〔stella-list `200207/msg00041`〕. Kirk Israel: *"Why only one
+  "carry over"? … you should be able to populate both A and X with a value"* 〔`200207/msg00046`〕, which
+  would make it 18 (our arithmetic). Here skipdraw is measured at 17 or 20 cycles from `WSYNC` to the `GRP0`
+  store for one object on one fixture (`docs/fundamentals-audit.md`), so four would be 68–80 of the line's
+  76 before anything else (our arithmetic); `sta GRP0` at three cycles is measured in
+  `internal/emu/ramstrip_test.go`. The buffer budget is **Cited only, not verified.**
+- **A frame as a stack of kernels.** ZackAttack, 2023, proposing a framework for the ELF support of
+  UCA-based cartridges: *"Each frame can be composed of one or more display kernels. Frames and kernels would
+  be created once at the start. Each kernel will have a set of functions that can be used to change its
+  appearance"*, and *"The kernels would stack vertically to produce a full 192+ lines of visible screen"*
+  〔AtariAge `topic/347047`〕 — pseudocode only in the thread. On a stock cartridge the same composition, with
+  the zone order as data in RAM, is `rts-dispatch.md`. **Cited only, not verified.**
 
 ## Cycle-level craft (verified in our build)
-- HMOVE table placed to avoid a page-cross on the positioning line (`LOOKUP = TABLE_END - 256`, negative index).
+- HMOVE table placed so the lookup on the positioning line ALWAYS crosses a page (`LOOKUP = TABLE_END - 256`,
+  negative index), which makes the read a constant 5 cycles whatever the remainder. This line used to say the
+  placement *avoids* a page-cross; it does the opposite. After the `sbc #15` loop `Y` is 241–255, and in the
+  assembled `zone_multiplex.bin` the read is `lda $EFF1,y` (table end `$F0F1`), so every effective address is
+  `$F0E2`–`$F0F0`, one page above the base: always crossed, so always the +1 — measured for an `abs,Y` read
+  that crosses in `internal/emu/ramstrip_test.go` (`lda Cross,y / sta GRP0` = 8 against 7 uncrossed). It holds
+  while the table's end sits at least 15 bytes into its page. The same move,
+  named as such, is in the `bzoneRepos` routine on the list: *"Consume 5 cycles by guaranteeing we cross a
+  page boundary"* 〔stella-list `200506/msg00061`〕. **Not verified** by a cycle trace of this kernel — read
+  from the binary and the page-cross rule.
 - Every line budgeted to 76 CPU cycles; the per-frame position-update loop is absorbed by retuning VBLANK to
   keep the frame at 262 lines.
 
