@@ -95,6 +95,13 @@ step. Put `$00` on the lines inside a band and the whole band shares one edge.
   be seen through the "holes" of the ones that are on top of them, creating what seems a high res
   multicolor sprite"* (AtariAge `topic/344242`; **Cited only, not verified**). That is two objects,
   so the cost bullet above applies to it.
+  Offsetting the pair instead of stacking it 1:1 widens the shape. Manuel Polik (`cybergoth`, the
+  Manuel Rotschkar of the 2004 posts below), 2001, to B. Watson, whose sprites were overlaid 1:1:
+  *"My idea was shifting that by 2 or more Pixel. Then you could do some 10 or 12 pixel wide, yet in
+  the middle area still multicolored enemies..."*, or *"overlay double width sprites with single
+  width ones"*. Watson's reply, about his jet, names the side effect:
+  *"he'd be easier for the playet to hit, if he's 12 pixels wide instead of 8"* (his spelling). An
+  idea, not a build 〔stella-list `200108/msg00476`, `msg00481`〕; **Cited only, not verified**.
 
 ## Verified numbers
 

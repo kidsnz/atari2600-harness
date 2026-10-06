@@ -221,6 +221,8 @@ implemented here:
   one, the remainder `r = a − b·q` is off by the whole divisor `b` (**Not verified** — our arithmetic,
   not the thread's), so it is for screen positions, not for score digits (base conversion is his own
   counter-example). **Cited only, not verified**.
+  By Williams' account (2001) the converter runs *"in 93 to 114 machine cycles"* and *"has been
+  tested in Z26, Stella, and on a real 2600"* 〔`msg00292`〕; **Cited only, not verified**.
 - **A percentage, `n*100/t`, two ways.** Asked for the share of a level's secrets found (`t` up to 50,
   different every level), gauntman's direct route — `n*100` by shifts and adds, then a 16-by-8 division —
   took about 362–397 cycles (average 377) and is exact; groovybee's keeps a table of `(100<<3)/t`

@@ -211,6 +211,8 @@ Per-band X lives in RAM (`zx0`/`zx1`); the kernel walks bands top→bottom and p
   arranged so that this is not a big problem"* 〔stella-list `199806/msg00085`〕. He posted it rebuilt that
   way the same day, *"in groups of 4 scanlines, plus from 1 to 3 final scalines"* 〔`199806/msg00088`〕.
   **Cited only, not verified.**
+- **Band heights from a table of boundaries:** see `kernel-micro-idioms.md`, "No `CPY abs,X`" and
+  "A table of boundaries instead of a counter per block".
 - **One crowded line gets its own kernel.** Christopher Tumber, 2002, for a display whose shots run to a
   crosshair line at the horizon: split the kernel into the top half, *"the crosshair's scanline only (and
   enemy ships)"*, and the bottom half — *"This should free up a bunch of cycles on crosshair scanline"*, and
