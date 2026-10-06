@@ -9,6 +9,9 @@ CI: TODO — no gate yet. Proposed litmus + negative control under "How to verif
 Hardware basis: **not measured here.** The only evidence in this repository is a 1999 report from
 real hardware, quoted under "Sources": a PAL 7800 showed the picture jump for one frame at respawn,
 and the fix proposed by the person who saw it is the technique above.
+Other reports from hardware are about what an overrun costs and what one television tolerates, not
+about this technique: Dennis Debro's 2003 report under "Sources" and alex_79's 2016 line counts under
+"What this cannot settle".
 
 ## Why this is a third answer, not a worse first one
 
@@ -62,6 +65,26 @@ frames with the picture on, not to blank several in a row.
 are unchanged — blanking removes the *picture*, not the obligation to emit 262 lines. A routine
 that runs long enough to eat the VSYNC as well produces exactly the fault it was meant to avoid.
 
+**Eight blank frames in a row, by choice (2002).** Erik Eid wrote that he *"discovered (thanks to the
+scanline count capability of Z26) that my deck shuffling routine was taking many hundred scanlines to
+finish"*; the reason he gives is that *"one shuffle needed about 134 lines!"*, so *"only one shuffle
+is performed per frame, and the screen is blanked during those frames. (It's only eight frames,
+which is far fewer than the "thinking" pauses in 3-D Tic Tac Toe and Video Chess.)"* 〔stella-list
+`200204/msg00006`〕. The 134 is the arithmetic in the comments of the source he posted — about 5.6
+lines per random byte, 24 random numbers per shuffle, 134.4 lines, with *"not enough time to do this
+during overscan (30 lines)"* — which also give the length, *"0.133 seconds (0.16 seconds in PAL),
+which should not be terribly disruptive"*. So the work was split across frames, as the first
+paragraph of this section advises, but with the picture off, and how long a blank may last was
+judged against other games' pauses; no test on players is reported. In that source the shuffle runs
+after VBLANK has been switched off, in a kernel his comment calls drawing *"a blank screen"*, rather
+than under a full-frame VBLANK as in **The shape** (our reading). Cited only, not verified. That
+kernel also ends by jumping to `WaitForEnd`, whose `INTIM` wait is commented out in the posted
+source, so nothing visible in it pads out the display period after the shuffle (our reading). Four
+months later he confirmed the effect: *"I also changed the shuffle routine so it actually waits for
+the end of the display period; before it was dropping several lines per frame"* (`200208/msg00045`)
+— the frame-length obligation of the paragraph above, missed while the picture was off. Which build
+"before" means is not said. Cited only, not verified.
+
 ## How to verify (proposed — not yet run)
 
 1. **Litmus, positive.** A ROM whose per-event routine deliberately overruns VBLANK+overscan on one
@@ -74,6 +97,24 @@ that runs long enough to eat the VSYNC as well produces exactly the fault it was
 4. **What this cannot settle.** Whether a real television relocks in one frame or several is not
    measurable here; the emulator has no vertical-hold model. The line count is ours to check, the
    picture rolling is not.
+
+   What the forums report instead is testimony, not measurement. alex_79 (AtariAge `topic/183085`,
+   2016) says of his own multistandard CRT that it *"can handle between 360 and 244 scanlines without
+   rolling (that is between about 43Hz and 64Hz)"*, using the PAL aspect ratio from 288 lines up and
+   the NTSC one from 287 down; and that with 122-180 lines he gets *"a stable picture with 2 frames
+   displayed in a "split-screen" arrangement"* — *"The TV seems to just ignore the VSYNC signal which
+   happens too early after the first frame outputted by the console, while it detects the second
+   one"*, the two frames' sum being in range. spiceware: *"My 1084 does the split screen too, don't
+   recall the range."* These are steady line counts — alex_79's figures from one set, spiceware's
+   split screen from a second with no figures — not one odd frame among good ones, so they say which
+   steady frame lengths those sets lock to, not how long relocking takes. Cited only, not
+   verified.
+
+   Nor is the cost the same on every display. Andromeda Stardust (AtariAge `topic/249008`, 2016): if
+   overscan work runs long, *"the Vblank will be delayed adding extra scanlines to the display,
+   potentially causing the screen to jump or roll, or worse, completely black out the picture for up
+   to several seconds [out of range] in the case of some digital displays."* The post does not say
+   how many long frames that takes. Cited only, not verified.
 
 ## Sources
 
@@ -106,3 +147,41 @@ that runs long enough to eat the VSYNC as well produces exactly the fault it was
   record is two proposals, and the jumping build was the code's original VBLANK-only blanking, not a
   try of the advice; that the missing VSYNC causes the jump is Jentzsch's "seems". Whether the jump
   was seen on hardware or in an emulator is not said. Cited only, not verified.
+
+- **Several routines in one frame, from the same reviewer that month** (stella-list `200102`, the
+  *Qb* thread). On Andrew Davie's v0.05 Stolberg wrote *"The routine that changes the target screen
+  seems to take too long too. Everytime the target screen changes, the screen jumps"*, and suggested
+  raising the VBLANK and overscan timers until *"the game would do 312 lines per frame total"*
+  (`msg00228`). On the binaries from Davie's website, the v0.06 post not having reached him, he
+  found *"still some minor syncronization issues"*: *"When a new level starts and the little guy ...
+  comes riding in on a block the screen jumps, because the initialization routine seems to take too
+  long. This isn't much of a problem, but you might want to change it anyway for a nicer
+  appearance"*, and *"there seems to be a sync problem when several routines get executed in the same
+  frame and they take too long combined. This especially obvious when more blocks are on the screen.
+  Then jumping or moving a block might cause the screen to jump. I couldn't figure out which routines
+  are involved in this though"* (`msg00240`). No reply about the jumps follows in that thread. On 27
+  February, on v1.00 (alpha #1), he repeated both: *"some issues with some of the routines combined
+  taking too long for the timer, which results in the screen to jump. I think you should cycle count
+  the worst case for all your routines and see how you can combine them so that they will always fit
+  into the timer"*, and the level-start jump as something that *"isn't really a problem, but more a
+  case of making your game look 'professional'"* (`msg00352`). His advice reads as a budget for the
+  worst case of the routines that can run together, not for each routine alone (our reading). As with
+  *Jammed*, where he saw the jumps is not named: "my system" appears only in `msg00228` (*"everything
+  displays nicely on my system"*) and `msg00240` (*"the binaries worked on my system"*), and in
+  `msg00240` he read the NTSC version's line count from an emulator — *"z26 shows that you are doing
+  287 scanlines per frame"* — and asked that *"someone could try it out on a real system"*. Cited
+  only, not verified.
+
+- **An overrun seen on hardware and not in the emulators, and what fixed it (2003).** Dennis Debro,
+  testing his *Climber 5* *"on a 4 switch VCS via CC"*: when the climber was within the 5-pixel zone
+  of a ladder or the death or success sound played, *"The screen seems to lose sync or something. The
+  top of the screen gets compressed to a few scan lines"*. Those routines ran in overscan; moving the
+  ladder check to vertical blank cured the ladder case but not the sound; the PAL option showed no
+  problem; *"Also Z26 reports the correct number of scan lines each frame"* (`200303/msg00198`).
+  Thomas Jentzsch: *"That sounds like a timing problem, as if in NTSC mode, you don't have enough time
+  to do the calculations"* (`msg00201`). Debro replied that *"doing a trace using Z26 shows there's
+  still time left before overscan finishes"* (`msg00203`), then on 24 March: *"Thomas was right. I
+  looked at the trace closer this time and noticed my kernel was producing 2 scan lines too many (202
+  scan lines instead of 200 scan lines)"*, and with the kernel's line count adjusted *"it works fine
+  now"* (`msg00249`). So the fix was the kernel's line count, not moving work out of overscan, and it
+  was found only on a second reading of the trace. Cited only, not verified.
