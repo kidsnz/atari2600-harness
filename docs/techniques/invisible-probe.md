@@ -51,6 +51,17 @@ cycles"* where the TIA's is free — keeping hardware collision for *"determinin
 destroy something that the player touched, but not for constraining the player's movement."*
 **Cited only, not verified.**
 
+**Or skip the hardware when the region is fixed.** A newcomer planning a hockey game asked how a
+puck inside the net would be told from one hitting the boards 〔stella-list `200102/msg00325`〕.
+Manuel Polik: *"Just forget about collision detection. You know the coordinates of the puck, you
+know the coordinates of your net, just calculate if the puck is in or not. Whith clever use of an
+offset table, you can even calculate if it's within a round shape"* — his example is one offset per
+row of a curved edge (`0, 2, 3, 3, 3, 2, 0`), and *"Of course you don't need to do the zeros"*
+〔stella-list `200102/msg00327`〕. Andrew Davie agreed: *"I wouldn't touch the hardware collision
+registers with a barge-pole. Much more accurate to do it with simple software collision checking."*
+〔stella-list `200102/msg00338`〕
+**Cited only, not verified.**
+
 ## The three ways to hide a probe, and what each costs
 
 **1 — Same colour (a missile on its own player).** Free: `M0` cannot be a different colour from
@@ -75,10 +86,49 @@ colour as the background hides it everywhere. *Cost:* this is the expensive one 
 becomes invisible too**, everywhere on the screen, for every line where it holds. Worth it for a
 game whose background is a flat colour; ruinous for one that draws with the playfield.
 
+The coupling runs the other way too: hiding the playfield hides whatever else is drawn in `COLUPF`.
+Erik Mooney hit it in *INV+* (2004), where the invisible-invaders game also made the bombs invisible.
+His partial fix: *"On the scanlines \*between\* invaders, I can set COLUPF to gray to make the bomb
+visible. It looks a bit ugly, but it's better than not seeing the bombs at all."* 〔stella-list
+`200404/msg00197`〕 That the invaders and the bombs both take `COLUPF` is our reading of that fix.
+**Cited only, not verified.**
+
+**Hidden by colour is still drawn.** A colour changes what an object looks like, not whether the TIA
+draws it, so it keeps its place in the priority chain (our reading of the chain above). Erik Mooney's
+*INV+* changelog, under *"Fixed a bug"*: *"in a two-player game, if player 0 got game over, his sprite
+continued to be drawn in black which would obscure player 1 if P1 moved to the spot where P0 died."*
+〔stella-list `200405/msg00002`〕 That the black was the background colour, so P0 itself was unseen, is
+our reading. **Cited only, not verified.**
+
 **A fourth, implicit in the source: enable the probe only on the lines it is testing.** A hit box
 is a few scanlines tall, so `ENAM0`/`ENABL` is set for those lines and clear for the rest. This is
 not really a hiding method — it is what makes the other three cheap, because the exposure is a
 handful of pixels rather than a whole sprite.
+
+**Not a hiding method: `VBLANK`.** The latches are set only while `VBLANK` is off (`known-traps.md`,
+the row *"collision latches are not set while `VBLANK` is on"*; `verified-coverage.md` under
+Collisions), so blanking a probe also blinds it. ZackAttack, sketching how a ball's position could be
+read back in overscan: *"Don't forget collisions are only detected when vblank is disabled. So you'd
+need to color everything black during the detection phase to avoid visible artifacts."* (AtariAge
+`topic/279317`, 2018). **Cited only, not verified** — the engine gates the latches on `!vblank` in
+`video.go`, and no litmus here overlaps two objects under `VBLANK`.
+
+## The same colour sharing, used for drawing
+
+- **A black missile as a mask over the playfield.** Glenn Saunders, with no time to rewrite the
+  playfield between the left and right half of the screen for a gear indicator beside his score:
+  *"I may try dropping a black missile over part of the playfield"* 〔stella-list `200508/msg00167`〕;
+  in his next build, *"I added the missiles in. Since they are a mask, you only see the copy of each
+  missile that is on top of the playfield."* 〔stella-list `200508/msg00174`〕 Our reading: this is
+  method 1's cost used on purpose — the missile shows only where what lies under it is another
+  colour — and since a missile takes its player's colour, that player is black on those lines too.
+  **Cited only, not verified.**
+- **The ball as a finer playfield edge.** sohl, replying in a thread about a Bruce Lee mockup: *"The
+  ball is only available once per scanline, and is the same color as the playfield foreground
+  (COLUPF), but can be a few different widths. Ball width of one or two color clocks (= 1 or 2 sprite
+  pixels) can help smooth out playfield "pixels", which are 4 color clocks wide each."* johnnywc, in
+  the same thread, suggested the missiles (*"3 copies each"*) to smooth the mountain tops and the ball
+  for the playfield mountain (AtariAge `topic/347106`, 2023-01-27). **Cited only, not verified.**
 
 ## The same technique has different requirements in a litmus and in a game
 
@@ -101,6 +151,36 @@ collision field returning 0 when the objects do not overlap.** `roms/litmus/scen
 asserts all fifteen pairs `== 1` with everything overlapped at the left edge and has no `== 0`
 assert at all, so a probe's negative direction is unverified. A game can live with that; a
 measurement cannot.
+
+## Beyond hit boxes: the latches and the screen as instruments
+
+A probe answers "did these overlap". The collision latches have also been used to answer questions
+the CPU has no register for, and the picture itself to show what a register write did.
+
+- **Reading a counter the CPU cannot read.** JeremiahK, 2017, wanting the power-on object positions as a
+  random seed: *"the objects' positions are determined by timers which you can only reset, not read, you
+  would have to use collision detection against the playfield."* His test program: *"enabling only one
+  "pixel" in the playfield, and also one "pixel" in Player 1. Then I shift Player 1 to the right by 1
+  color clock over and over until a collision is detected, keeping track of the number of shifts."* With
+  the playfield copied that gave *"only a value from 1-80, not 1-160"*; telling the halves apart by
+  re-checking with the mirrored playfield is a step he described, not one he posted. He called it
+  *"kind of pointless"* next to seeding from `INTIM` (AtariAge `topic/273214`). **Cited only, not
+  verified.**
+- **A property of the console, and the trap in it.** Christopher Tumber's 2002 PAL/NTSC detector
+  runs *Kool-Aid Man*'s score code for one frame and takes `CXPPMM` D7 as the answer 〔stella-list
+  `200211/msg00098`, `200211/msg00100`〕. It did not measure what it was named for. Eckhard Stolberg
+  replied that the effect it reads *"only affects certain TIAs"* and *"happens on PAL and NTSC
+  consoles alike"*; to him all PAL 7800s *"seem to have the problem"* and 6- and 4-switch consoles
+  *"seem to be unaffected"* 〔stella-list `200211/msg00116`〕. Yet a PAL woody (a model he counts
+  as unaffected) and a PAL 7800 both came up NTSC 〔stella-list `200211/msg00110`,
+  `200211/msg00131`–`00132`〕. The quotes and the other testers' reports are in
+  `design-principles.md`, the bullet "Detecting the standard from inside the ROM was tried in 2002,
+  and it did not work". **Cited only, not verified.**
+- **The screen itself as the instrument.** Andrew Davie, on sprite writes that had *"gone wonky on
+  the 2nd sprite"* in *Qb* — *"If I can't fix it, I won't mind too much"* — pointed to *"a few
+  switches at the top of the code which allow you to set the destination for sprite data - set it to
+  COLUBK to see timing in colour on the screen itself"* 〔stella-list `200102/msg00256`〕. Reading it
+  needs no emulator tool, only the picture (our reading). **Cited only, not verified.**
 
 ## How to verify (proposed — not yet run)
 
