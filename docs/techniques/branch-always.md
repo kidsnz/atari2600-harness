@@ -63,6 +63,27 @@ VStore: sta GRP0            ; both paths converge here
 The value is doubled when the seed is one you needed anyway: in the kernel above, `lda #0` is
 loading the blank sprite byte, and the flag it happens to set buys the jump for nothing.
 
+**A carry seed, in an arm written for constant timing.** Glenn Saunders, 2001, checking a missile
+routine of Thomas Jentzsch's for *"a constant 30 cycle timing"*, ended its two out-of-line arms with
+branches back to `.continue`: `.enable` with `lda #2 / sta ENAMx / bne .continue` (the table's
+`lda #<non-zero>` → `bne`, one `sta` between), `.disable` with
+`lda #0 / sta ENAMx / sec / nop / bcs .continue`, the `sec` commented *"keep carry state constant"*
+and the `nop` *"waste 2 cycles for constant timing"*; he counts each closing branch `+3`
+〔stella-list `200111/msg00155`〕. `sec` → `bcs` is a fourth seed (C = 1), not one of the three in the
+table above. The arm wanted the padding, so the `sec` is a seed needed anyway: `sec` + `bcs` is 3
+bytes and 5 cycles against 4 bytes and 5 cycles for `nop` + `jmp` (our reading). `.disable` is
+entered only by a taken `bcc .disable` and `lda` / `sta` leave C, so the carry is already clear
+there and a `bcc .continue` would be unconditional without the `sec`; what the `sec` adds is the
+same carry the `.enable` arm leaves — that arm is entered by a taken `beq` after `sbc`, so C = 1
+there and nothing in it writes C — while the normal path's two `asl` leave C at bit 6 of the byte it
+loaded, so C is still not known after `.continue` (our reading). Jentzsch: *"At the start of .enable
+you put 14 cycles, but you only need 10 to get there"*; dropping the normal path's `nop` and
+*"removing the SEC (which I was counting as +2)"* gives *"Result: 26 cycles"* — which `sec` is not
+said, and the routine has one before `sbc M0_Y` too. Glenn: *"I'm not confident removing the SECs
+right now. I don't know what the condition of the carry flag will be in all cases. So it will have
+to stay at 28 cycles for now."* Jentzsch: *"Just do your kernel(s) with SEC and we will help you
+removing them"* 〔`msg00157`, `msg00159`, `msg00160`〕. **Cited only, not verified.**
+
 ## Economics — and the condition the source leaves out
 
 | | bytes | cycles |
@@ -120,6 +141,72 @@ What actually guards it today is the result side — a branch that becomes condi
 other path, which moves the picture (golden frame) and the line's cycle count
 (`prove_line_budget`). The proof route below is worth more than the comment route not because it is
 stricter but because a re-derived fact cannot go stale, and comments here have.
+
+**The seed can be a whole path away.** Wade Brown, 2003, ended a routine with
+`BCS NextByte ; ALWAYS Taken`. Andrew Davie: *"The last comment appears to be incorrect. I can see
+situations where the carry will be clear at this point."* The path Davie gives runs through
+`AND #$C0 / CLC / ROL / ROL / ROL`, after which *"the carry would be clear (since you roll off the
+top two bits, and then one you have guaranteed to be 0)"*, and on that path *"the BCS at the end
+\*won't\* be taken and you will instead execute the next function StorePatVal inadvertently."* His
+moral: *"If you're going to use unconditional branches be really really really sure of your
+"uncondition"!"* Wade had asked about a bug that *"causes the alien to drift slowly downward"*;
+Davie: *"The above probably isn't the problem, but it is A problem"*, and the thread does not come
+back to the drift 〔stella-list `200305/msg00032`, `msg00033`〕. As posted, that path then re-reads
+the same non-zero table byte with the same X, so in that pass it does not reach the `BCS` (our
+reading); the conclusion stands on the other paths in. No single instruction above that
+branch is its seed: the carry is whatever the last carry-writing instruction on each path into it
+left (our reading). **Cited only, not verified.**
+
+## When the crossing is the part
+
+Everything above treats the page-crossing cycle as a cost. Three of these sources use it, or a skip
+byte, as a part, and one asks for it; two of them use it to make two paths cost the same. **Cited
+only, not verified** — none of it was assembled here.
+
+- **Branching over a 2-cycle instruction.** SeaGtGruff, 2016, allowed that the extra cycle *"could
+  be used to advantage"* but thought it *"probably so rare and so difficult to manage ... that it's
+  probably best to forget about entertaining such thoughts."* Nukey Shay, in the next post: *"Taking
+  advantage of the added cycle is not so rare when you need to decide whether to branch over a
+  2-cycle instruction. That leaves either case at 4 cycles. Handy for display kernels when cycle
+  time must be precise."* By the cycle table under *Economics* and the instruction-table note below
+  it: taken across a page, 4; not taken, 2 + the skipped instruction's 2, also 4 (our count; that
+  the taken branch is the one that crosses is our reading) (AtariAge `topic/250652`).
+- **Making the assembler insist on the crossing.** The same-page macros that stop the assembly when
+  a branch leaves its page (`sbne` and the rest, John Payson's, posted by SpiceWare) are in
+  `tool-landscape.md` and `known-traps.md`. In the `topic/264527` post that `tool-landscape.md`
+  cites, SpiceWare also gave the inverse set, `dbcc` … `dbvs`, credited to himself: the branch, then
+  `if ((* ^ {1}) & $FF00) = 0` / `echo "SAME PAGE","WARNING ",{1}," at ",*` / `err` / `endif`, so
+  the build stops when the target is on the *same* page — *"I made a variation set of them as dXXX
+  to confirm branch to a different page as I needed the extra cycle to occur one time."* He was
+  answering enthusi, who wanted *"100% control of all bytes"* and disliked macros; enthusi's reply:
+  *"admittedly that is a nice solution but it affects the source code"* — he would rather patch the
+  assembler to honour a `;nocross` comment — *"Then again, your version works, mine is just a 'what
+  if' in my head"* (AtariAge `topic/264527`, 2017).
+- **Asking for it as a constraint.** Kylearan, 2017, in a thread on the `BOUNDARY` macro in
+  `macro.h`, wished for *"an assembler/linker that takes care of code and data placement for you,
+  observing such constraints as "align 256 offset PLAYER_HEIGHT" or "must not cross a page boundary
+  but otherwise can be anywhere" or "this conditional branch must cross a page boundary""*, then
+  *"(Almost there...)"*, which the thread does not explain. Thomas Jentzsch replied *"See above:
+  COND_ALIGN_FREE(_LBL)"* — his macro from earlier in the thread, which aligns a block only when it
+  would otherwise run onto the next page; that meets the do-not-cross constraint, not the must-cross
+  one (our reading of the macro as posted) (AtariAge `topic/267367`).
+- **Skipping instead of branching: `$0C`.** Eric Ball, 2003, on the RobotCity skipdraw Dennis Debro
+  quoted (`bcs .doDrawP0 / lda #0 / NOP_W / .doDrawP0: lda (ptrP0),y / sta.w GRP0`): *"The key is
+  the NOP_W, which is an equate for $0C, which is the opcode NOP abs. (An illegal/undocumented
+  version of NOP. The documented way is to use $2C which is BIT abs) So if the bcs is not taken the
+  lda (ptrP0),y gets absorbed into the NOP and is not executed."* His count: not taken 2 + 2 + 4 =
+  8, taken 3 + 5 = 8 — *"always the same number of cycles"* 〔stella-list `200309/msg00060`〕. The
+  taken count assumes neither the `bcs` nor the `(ptrP0),y` load crosses a page (`definitions.json`
+  marks both page-sensitive); with a crossing it is 9 or 10, while the not-taken path pays neither
+  (an untaken branch is 2 wherever its target is; `NOP abs` is not page-sensitive) and stays 8 (our
+  reading). Jentzsch's own account of the trick, the next day, is *"the setup of yPosP0 (and ptrP0!)
+  and the arrangement of the data (starting \*inside\* a page) in the ROM"* 〔`msg00069`〕. The two
+  skip bytes differ in the flags: the engine's `BIT` case writes N, V and Z, and its `NOP` case does
+  nothing (`Gopher2600/hardware/cpu/cpu.go`), so `$0C` is the one to use when N, V or Z set before
+  the skip is read after it (`BIT` does not write C) — as in Jentzsch's *Thrust*
+  (`integration-density-playbook.md`, 〔`200103/msg00052`〕). Nothing in the quoted lines, which end
+  at `sta.w GRP0`, reads N, V or Z. The `$2C` skip is measured in `integration-density-playbook.md`
+  §G; `$0C` is not.
 
 ## Where it is used here (measured 2026-09-03)
 
