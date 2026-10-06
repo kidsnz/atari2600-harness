@@ -112,6 +112,16 @@ reused as-is for regression). **Unknown fields are an error** (typos are not swa
 | `collisions.<pair>` (p0_p1, m0_p0, p0_pf, bl_pf …) | `ReadCollisions` |
 | `audio.ch0\|ch1.control\|freq\|volume` | `ReadAudio` |
 
+**`ram.0xNN` takes a number, never a label** (`resolveRAM` parses the address and nothing else), so
+a scenario keeps reading the same byte when the program moves a variable. Under DASM's `ds`, the
+address is the declaration order: *"Rather than explicitly giving an address for Team1Score, it is
+just given an address beyond the end of the previous one"*, and Erik J. Eid used that *"so I could
+shuffle around the order of variables without having to manually assign new addresses"*
+〔stella-list `200108/msg00282`〕. The same reshuffle, or one `ds` inserted early, moves every
+later variable while a scenario's `ram.0xNN` stays put and reads a different variable without an
+error (our reading). This repository's own `.asm` assigns RAM with `=` and uses `ds` only to fill
+ROM (our count, 2026-10-06), so it has not happened here. **Not verified.**
+
 - **`motion`** = the smoothness of one object's movement, as `jerk_rms` over a window of frames
   (`object` P0/P1/M0/M1/BL, `axis` `"top"` for the rendered vertical or `"x"`, plus `frames`,
   `warmup` and a `y_top`/`y_bot` search window). A position that jumps rather than glides fails it.

@@ -136,6 +136,20 @@ that count nobody had asked the digest whether it still held. Raised by the mail
 where the point was that the people who read the disassembly and the people who wrote the code were
 **different people**, which is the one control this project cannot copy.
 
+Between machine output and someone else's annotated source sits a further kind, and the citation
+string hides it too: the author's own program, posted as a disassembly of itself. Ruffin Bailey,
+1998, wrote his demo on a Mac, then was *"assembling it with "RAsm" and then dissembling it with
+Distella and "re-commenting" it before send it on to the list"*. The listing he had posted the day
+before was *"some source that I've distella'd"*, headed `Using DiStella v2.0 on a Mac`, and its
+labels are DiStella's (`LF044`, `LF07D`) 〔stella-list `199808/msg00065`; quoted back by Erik Mooney
+in `199808/msg00068`〕; he found it *"easier to read this less-commented code"*. Erik Mooney asked
+why he could not post the original, and Bailey's answer was that RAsm differs from DASM and the
+list's readers used DASM; Mooney's advice was *"Just post the Rasm. Probably better to see it with
+the original comments"* 〔stella-list `199808/msg00071`, `199808/msg00072`, `199808/msg00074`,
+`199808/msg00075`〕. Such a listing is not someone else's interpretation, but its labels and layout
+are machine output and its comments were written a second time (our reading). **Cited only, not
+verified.**
+
 ### `check_memory.py` — 3 catches, and it was wired to nothing
 
 Added `34fedb4`. Four findings on its first run, **two of which were the checker itself** (raw

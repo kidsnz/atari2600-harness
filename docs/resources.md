@@ -152,11 +152,27 @@ from the memory's bit 7.
 ★★It lands directly on TIMINT, whose two bits `litmus_timint_pa7` separated (D7 = timer expired,
 D6 = PA7): **`BIT TIMINT / BMI expired / BVS pa7` reads both in one instruction** rather than two.
 
+The same read makes a timer wait that tests the expiry flag instead of a zero count. Dennis
+Debro, 2004: *"It's done in some games. One in particular is Moonsweeper (since I'm transcribing
+it now). IIRC Bob also does this in Dragonfire. Bob sets the timer and then does..."* — `BIT TIMOUT`
+/ `BPL` back to itself, *"TIMOUT is register $285"* 〔stella-list `200405/msg00081`〕, replying to
+the claim that with no interrupts *"you have to check when the count is 255"*. The listing follows
+his sentence about Bob, so it reads as Dragonfire's, from memory (our reading). In this engine D7
+reads set a few cycles after the timer expires (the `INTIM` read just after it returns `$EF`), and
+that `INTIM` read clears it (`TestTIMINTsTwoBitsAreNotBothMeasurements`), so a loop on D7 does not
+need to catch the count at zero (our reading; the loop itself was not run here).
+`design-principles.md` holds a longer wait built on the same flag (`safeTimerWait`). **Cited only,
+not verified.**
+
 ★★★And the limit belongs next to the capability: **`BIT` has no immediate mode**, so the mask must
 live in memory. Source: Bill Heineman, stella-list `200207/msg00281` for the three flags; Chris
 Wilkson, `199806/msg00118` for the missing immediate — in a thread where Andrew Davie said otherwise
 and then corrected himself (*"my memory got mixed up with the 65816"*). Found by the mailing-list
 distillation (helper-1).
+
+**`LDA CXxx` / `BVx` does not test D6:** a load leaves V alone — see the `known-traps.md` row
+*"`LDA` sets N and Z but not V: `lda CXP0FB` / `bvc` tests a V left by something else"*. **Cited
+only, not verified.**
 ```
 CXM0P : D7=M0-P1 D6=M0-P0    CXM1P : D7=M1-P0 D6=M1-P1
 CXP0FB: D7=P0-PF D6=P0-BL    CXP1FB: D7=P1-PF D6=P1-BL

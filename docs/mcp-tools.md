@@ -198,6 +198,12 @@ Source: `emu.VCS.TV.GetCoords()` → `{Frame, Scanline, Clock}`.
   catches each write. Negative control: writing the same value twice produces no intermediate at any
   gap. **Use `AudioSamples()` when the question is what was heard; use this when the question is what
   was written.** The same caveat applies to `read_audio_trace`.
+- Scope: "what was heard" above means this engine's mixed output. No audio measurement in this
+  repository has been compared against a recording of a console (searched 2026-10-06), and a
+  recording brings its own chain: `docs/known-traps.md` has the row on a console recording's
+  DC-blocking capacitors, and a 2009 AtariAge thread that wanted 2600 sounds for a web page reported
+  finding a way to *"use a real Atari 2600 WITHOUT THE CRACKLING NOISES"* 〔AtariAge `topic/152704`; held here only
+  as distilled notes, so the wording is not checked〕. **Cited only, not verified.**
 
 ### 5c. `read_collisions`  ★ CXxx structured (P1, v0.14.0)
 - In: `struct{}`

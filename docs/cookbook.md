@@ -36,6 +36,29 @@ row 13 of [`techniques/README.md`](techniques/README.md). **Read one of those be
 12 or 24 characters is the ceiling** — a work in the private `roms/` repository decided exactly that
 in 2026-08, without either page, and lost days.
 
+**Large title letters from playfield, player and missile graphics.** Paul Slocum, 2002, for
+*Marble Craze*: *"I couldn't think
+of any games that have large hi-res titles"*, so he built the letters from three kinds of object —
+*"All of the letters use playfield. I use a reflective playfield so I only have to change PF1 and
+PF2. The M,C and both A's use player graphics, and both R's, B and Z use missile graphics. For the
+missiles, I made a table of what to set HMM0 and HMM1 to on each line."* He called it *"messy
+code"* 〔stella-list `200202/msg00060`〕. [`techniques/bitmap48.md`](techniques/bitmap48.md) records
+the missiles and the ball widening the 48-pixel sprite to 52; this one starts from the playfield
+instead. His title was not looked at here, and whether its lines fit in 76 cycles was not worked
+out. **Cited only, not verified.**
+
+**One player judged flicker on a puzzle board differently from flicker in an action game.** Andrew
+Davie's 1998 Sokoban-style demo drew everything with a four-colour playfield, and he expected its
+flicker to be *"minimal on the actual hardware"*. Eckhard Stolberg, on his PAL console: *"the
+flicker is noticable very much. For an action type of game it would be OK, but if I'm trying to
+concentrate on a level in a puzzle game, the flicker would annoy me quite a bit"*; he suggested
+animated monochrome playfield graphics instead. Erik Mooney, on an emulator only, found the flicker
+*"annoying, but the game is perfectly playable"*. On 19 May, under 40 hours after the demo by the
+two Date headers, Davie dropped the project, citing the reaction 〔stella-list `199805/msg00214`,
+`199805/msg00216`, `199805/msg00218`, `199805/msg00236`〕. That is one player on one console, not a
+threshold. `design.NeedsFlicker` counts sprites sharing a band; it does not say whether a genre will
+bear the result, and this flicker was the playfield's. **Cited only, not verified.**
+
 ## Beyond-bB (advanced, future)
 DPC/DPC+/CDFJ/ARM (bigger ROM, writable gfx RAM, 3-voice ARM music) — `reference/atariage/blogs/` (SpiceWare
 SF2/Frantic/Draconian) + `docs/design-principles.md` Bitmap section. Out of scope until the vanilla path is solid.
