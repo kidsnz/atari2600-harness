@@ -14,6 +14,8 @@ shipped game, and the three idioms the list converged on.** All three are ⬜ un
 (Thomas Jentzsch, 2000-07-31) is the symptom in a finished game; `200412/msg00026`
 (Nick Bensema quoting Lee Fastenau, 2004-12-02) is the temporal idiom; `200005/msg00043`
 (Piero Cavina, 2000-05-05) is the coordinate idiom.
+The section *Before 2000* below adds five messages from 1997-12 (`199712/msg00021`, `199712/msg00023`, `199712/msg00025`,
+`199712/msg00026`, `199712/msg00028`), older than every message above.
 
 ## The failure, in a shipped homebrew
 
@@ -84,6 +86,46 @@ What it needs that Idiom A does not: every copy lives in a **fixed** band, so a 
 function of Y. The 16 is the earlier poster's guess (*"let's say, I didn't count"*), not a
 measurement of Air-Sea Battle, and he did not know whether that game uses collisions at all. Cavina
 adds *"I used a more elaborate version of this concept for Oystron"*.
+
+## Before 2000 — the latch as a gate, a position test as the answer (Cited only, not verified)
+
+Greg Troutman, 1997, on his game Rescue, answering Bob Colbert, whose shots were tested in software
+against each sprite's rectangle (Colbert: it *"does not check to see if a particular pixel in the
+rectangular area is "on""*, `199712/msg00021`):
+
+> Rescue does both collision tests.  If the 2600 doesn't report the type of collision I'm testing, it
+> just skips along, but if it does, then I bounds test to isolate which sprites/platforms are involved.
+> — `199712/msg00023`
+
+He thought that would give Colbert *"the full pixel-level collision checking you need"* without too much
+extra work. Asked what a bounds test is, he answered the next day:
+
+> So, when I say "bounds test" I mean I wait until an entire section of the screen is drawn, before
+> checking the  collision register.  If it shows I collided, I still don't know which object it
+> collided with, since it just passed through an area where one of the player graphic registers (and
+> the missile and playfield graphic registers) are re-used multiple times.  In that event, I then test
+> to see where the lander craft actually is in that frame to determine what it crashed into (or, where
+> the lander's missile is located to determine which enemy it hit)...
+> — `199712/msg00025`
+
+That is Idiom A's section read followed by Idiom C's coordinate test, with the coordinate test run only
+when the latch has fired. The same message gives the reason not to read inside the section — checking
+*"repeatedly during the drawing of your screen"* tells you *"for a fact which copy"* was involved, but
+*"when you've got a bunch of copies, and you're short of cpu cycles ... extra non-display code like
+that is undesirable"* — and, in Colbert's kernel, the failure described above: objects whose graphics
+are turned off on frames where more than one share a scanline are not reported on those frames,
+*"So, the 2600's built-in collision detection is potentially unreliable."*
+Piero Cavina replied that Oystron *"does a mixed hardware and bounds collision detection too"*: the
+registers cleared before each of its 8 zones, checked after each zone's 16 scanlines and ORed into
+memory, a VBLANK routine that handles the objects in a zone that hit, and an X-bounds check to find
+which copy of a multiple-copy object was hit 〔`199712/msg00028`〕.
+
+The same exchange has a third form, on paper only. Ruffin Bailey, who had asked what a bounds test is,
+described his planned game when Troutman asked for details: a player sprite *"eight or nine bits
+high"*, and *"placing the blocks that he's trying to collect at least 5 scan lines away from one
+another (vertically) so that I only have to check the y-coordinate of my player to determine which
+block it is with which he had collided"* 〔`199712/msg00026`〕. That is Idiom C with the layout chosen so
+that Y alone decides. He had not yet assembled anything, and nobody in the thread assessed the plan.
 
 ## What this page does not settle
 

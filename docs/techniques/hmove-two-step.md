@@ -8,6 +8,14 @@ X≈149 the positioning line overruns 76 cycles (measured 152cy = 2 scanlines = 
 and later); standalone demo ROM + CI scenario = TODO (candidate for the techniques pipeline).
 **Source:** in-house invention, PONG fly-off work 2026-07-02 (session fa891501). Budget wall measured
 with `assert_line_budget` (BallX≥150 → 152cy); fix verified with `read_row` (ball at clock 158-159).
+**Prior art, for a different purpose (Cited only, not verified):** two HMOVEs on consecutive lines
+were proposed on the list in 2004 by Erik Mooney, to cut the number of unrolled RESP kernels: *"instead
+of needing to have a branch to RESP at every possible 15-pixel interval, you can write to RESP at every
+30-pixel interval instead, if you then use the next TWO scanlines to do two different HMOVEs before
+actually starting to draw the player object"* 〔stella-list `200405/msg00041`〕. In this page's technique the second HMOVE
+carries one of three fixed values: `$80` (right 8) rescues a ÷15 loop that has run out of cycles at the
+right edge, `$10` (left 1) takes a sprite the loop placed at clock 1 to clock 0, and `$00` is a no-op for
+every other target (steps 1–3 below). The in-house work above did not cite it.
 
 ## The problem
 `A = X; loop: sbc #15 / bcs loop` positions by *burning cycles proportional to X*. On a shared

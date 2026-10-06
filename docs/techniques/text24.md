@@ -39,3 +39,23 @@ screen, packed buffers non-zero, 262 lines, golden-pinned.
 - For genuinely interleaved single characters (za2600's look), switch to NUSIZ medium and offset
   by 8px instead of 48 — same skeleton, different position constants.
 - Per-frame color staging works in the gaps for two-color text.
+- **Alternating by scanline and by frame at once (Cited only, not verified).** Rob Kudla, 2000, from
+  what he saw on screen (*"I haven't looked at any of this code"*): Stellar Track and Dark Mage
+  *"appear to simulate a 12-character display"* of 8-pixel players, drawing alternate cells on
+  alternate scanlines and swapping them on the next frame (*"crisscrossing every other scanline"*);
+  Suicide Mission only alternates columns every frame and *"might appear more flickery as a result"*
+  〔stella-list `200001/msg00025`〕. The scanline half is `venetian-blinds.md`'s interleave; Manuel
+  Polik's 2003 reading that Stellar Track's text routine shifts its letters every other line is in
+  `design-principles.md`. Opinions of that text differed in 2003: Clay Halliwell called it *"the
+  flicker-interlace mess of the Stellar Track routine"*, Thomas Jentzsch *"the best you can get on a
+  2600"* (of Stellar Track or Dark Mage/FotR) 〔`200301/msg00444`, `200301/msg00449`〕.
+- **Three frames, several rows (Cited only, not verified).** Andrew Davie, 2003, posted a multi-line
+  text screen: *"This is really just displaying 3 time-separated frames... so its nothing too
+  difficult.   Flickers, but how does it look on hardware, guys?"* 〔stella-list `200301/msg00427`〕.
+  Adam Thornton put the demo at 18x6; Davie said *"I can extend the sytstem/resolution to 18 x 12,
+  actually, with the same flicker"*, and in a later post that it takes 12 bytes of RAM per text line 〔`200301/msg00428`,
+  `200301/msg00431`, `200301/msg00434`〕. Paul Slocum's answer to the hardware question: *"Personally I
+  think the flicker is way too much even on real hardware."* Replying to Slocum's idea, which he did not know how to fit in RAM, of a
+  variable-width font in the 48-pixel sprite, Clay Halliwell proposed instead what this
+  page does, *"2 left-right flickering 48-pixel sprites, at 4 bits per character"* for *"a generous 24
+  characters per line"* 〔`200301/msg00442`, `200301/msg00444`〕.

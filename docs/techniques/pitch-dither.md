@@ -159,6 +159,16 @@ The engine has the mechanism he describes: its divider resets only on equality o
 per-frame swap above ever meets the delay was not checked. (The *wolf* elsewhere in this repository is
 "crying wolf", a false alarm — a different word.)
 
+Why a faster swap is not simply better, in his words: asked by Thomas Jentzsch whether processing the
+bits more often makes it sound better, Eeben answered *"True and false - In a perfect world the sound
+would always improve when increasing the tuning rate and on VIC 20 I happily went up to 5-8 kHz... If
+the internal TIA freq counter was a downwards counter that loaded AUDF value to itself when reaching
+zero, then that would work, but apparently it's not."* 〔AtariAge `topic/353703`, 2023-08-14〕 The
+8th-to-16th halving quoted above is from the same reply. In a later post that day he reports trying the
+other direction in emulator code (the same post had just described reading Stella 7's), *"changing myDivCounter to a downwards counter that resets at zero to
+AUDF value (removing "overflows" caused by rapid AUDF changes), but then we lose the E.T. landing sound
+and phaser06 test doesn't sound right (if I got it right in the first place)."* Cited only, not verified.
+
 ## It costs nothing audible
 
 A modulation puts energy either side of the note. Measured as the fraction of spectral energy
