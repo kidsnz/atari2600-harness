@@ -60,6 +60,13 @@ trailing `RTS` → `list[1]`; … `list[NLIST-1]`'s `RTS` → `EndKernel`. Every
 `RTS` = constant ~6 cy regardless of which zone runs next. `ZoneTbl` stores `routine − 1` so the `RTS` `+1`
 lands exactly on the routine. **Cost:** 2 stack bytes per zone (here 4 zones = 8 bytes) + 2 for the terminator.
 
+The −1 is a 16-bit subtraction. A routine starting at `$xx00` needs `$(xx−1)FF` in its entry; take
+one from the low byte alone and that routine is sent a page astray. Rob Mundschau: *"If the Lo byte is
+$00, then you must subtract 1 from the Hi byte as the borrow for the subtraction"* 〔stella-list
+`200301/msg00031`〕. The demo writes `.word ZoneSolid-1` and `#>(EndKernel-1)`, one expression each, so
+the assembler takes the borrow; a table built at run time, or `#<` and `#>` halves taken of different
+expressions, has to take it itself (our reading, not assembled). **Cited only, not verified**.
+
 ## How total lines stay 262 (the hard part)
 Variable zones could make the frame breathe; this demo nails it three ways:
 1. **Fixed zone count & height.** The list is always `NLIST = 4` entries of `ZONE_H = 40` lines → visible
@@ -106,6 +113,66 @@ fixed-height form; the elastic-spacer form is a documented extension.)
   pointer)"* 〔`msg00039`〕. The stack bytes are claimed at that moment; the vector can be two bytes
   that mean something else outside the kernel. In this page's chain every zone's address sits on the
   stack for the whole kernel (the **Cost** line above). **Cited only, not verified**.
+- **The same pair five years earlier, with the doubling counted.** Andrew Davie, 1998, from a `lda
+  value / asl a / tax` start: Piero Cavina's `JMP (temp)` form, *"16 bytes and 26 cycles"*; the `PHA /
+  PHA / RTS` form, *"13 bytes and 27 cycles - saves 3 bytes on the earlier implementation, at the cost
+  of a single cycle"*; and with `value` already doubled, *"11 bytes, 23 cycles"* 〔stella-list
+  `199805/msg00052`〕. Three minutes later he got the 11/23 form without the doubling by splitting the
+  table into low and high byte tables 〔`msg00053`〕, which Bob Colbert was about to post 〔`msg00058`〕.
+  By the opcode table (zero-page `value` and `temp`, no page crossed) the first form is 17 bytes, so
+  the saving is 4, as in Mundschau's pair above; his other figures match (**Not verified** — a hand
+  count, not assembled). His posted code pushes the low byte first, and he warned *"memory fails me as
+  to if the high byte or low byte should be pushed onto the stack first"*: high goes first, the order
+  this page's dispatcher uses and its scenario's dispatch trace depends on. His tables hold no −1 either.
+  **Cited only, not verified**.
+- **Four answers to one question, 2012.** Asked for an address table, an AtariAge thread gave four
+  (read from our distilled notes; the thread text was not kept) 〔AtariAge `topic/198867`〕: tokumaru's word
+  table, index doubled, copied into a zero-page `Pointer` for `JMP (Pointer)` (two bytes of RAM); Joe
+  Musashi's `PHA / PHA / RTS` from separate low and high tables of `address−1` (no pointer, up to 256
+  entries); omegamatrix's table of whole `JMP` instructions — `.byte $4C` and a `.word` per entry —
+  entered by `JMP (indirectAddr)` with the index tripled and the vector's high byte set beforehand, 19
+  cycles, 14 when the index is already a multiple of three; and omegamatrix's `(indirect),Y` pointers,
+  which pick DATA for one piece of code rather than which code runs — a difference the thread itself
+  blurred. Both cycle figures agree with the opcode
+  table once the `JMP` inside the table is counted (our count; **Not verified**). **Cited only, not
+  verified**.
+- **Half the table: low bytes only.** Greg Troutman, 1997, answering a compare-and-branch lookup: *"I
+  *usually* try and build a table only with the low bytes, and put all the target addresses into the
+  same page of memory"* — `ldx variable / lda jmpTable,x / sta jmpWord`, the high byte written to
+  `jmpWord+1` — it *"might need to be loaded only once when program inits, unless you are recycling this memory with other
+  routines"*, then `jmp (jmpWord)` 〔stella-list `199709/msg00368`〕. Seven hours later he gave the same shape
+  for data pointers, `.byte` instead of `.word`, with an `ALIGN` to force the page *"if you have enough
+  ROM available"* 〔`msg00374`〕. In the RTS form the high byte would be pushed as a constant, and a
+  routine at the first byte of that page would need the previous page's high byte for its −1 (our
+  reading). **Cited only, not verified**.
+- **A vector that is set once.** Christopher Tumber, 2003, answering a beginner's book that called
+  indirect `JMP` useless, listed its uses: an enemy-AI routine picked by a random number through
+  `LSB`/`MSB` tables; one vector per player, computer or human, set at game start (`casebook.md` has
+  that one); a level-drawing vector instead of *"a bunch of CMPs"*; and scheduling during vertical
+  blank or overscan — *"Check if there's enough time left … if there is call the next routine from a
+  list"*, carrying on down the list the next time. His condition: *"if you're not hurting for RAM many
+  sequences of related CMP branches can be replaced with this kind of branching, particularly if the
+  value being tested does not change often so you can setup the JMP vector once and leave it be"*
+  〔stella-list `200305/msg00012`〕. Set once, the four-instruction build leaves the hot path and each
+  dispatch is the `JMP (vector)` alone, 5 cycles by the opcode table; the `RTS` form has no such split,
+  because the jump consumes the address it pulls (our reading; **Not verified**). **Cited only, not
+  verified**.
+- **A third table for the bank.** sunpazed, writing a first game, gave each character a state list
+  whose states *"are then jumped to via a look up table"*. Thomas Jentzsch uses state lists in his
+  Elite demo; his dispatch reads three parallel tables — `TaskPtrTblLo,y` and `TaskPtrTblHi,y` into a
+  `jmpVec`, then `ldx TaskBankTbl,y / beq .runTaskInBank / jmp RunTask` — under the comment *"enough
+  time left, start current task"*, the last line annotated `;14 = 40`. SplendidNut runs the menu system
+  and title-screen sequence of ChaoticGrill on a state machine 〔AtariAge `topic/382726`〕. The 2012
+  address-table thread above gives the same low/high/bank tables for the *E.T. Book Cart* 〔AtariAge
+  `topic/198867`〕. **Cited only, not verified**.
+- **One line per entry for both the ID and the table.** Andrew Davie, 2003, on a vector table whose
+  entry names were hand-kept equates that had to follow the table's order: a DASM macro, `TOKEN`, that
+  defines `TOKEN_{1} equ TOK`, bumps `TOK`, and emits `.word Animate{1}`, so *"you never need worry
+  about the values of tokens, or adding/removing or reordering entries in the vector table"*. His
+  catches: entries must be unique, and the target labels must share one format, or the macro takes two
+  parameters 〔stella-list `200302/msg00049`〕. This page's `ZoneTbl` and its zone IDs are kept in step
+  by hand; for the `RTS` form the emitted word would be `Animate{1}-1` (our reading, not assembled).
+  **Cited only, not verified**.
 - **A variable delay, entered by `JMP (ptr)` and left by `RTS`.** shazz, timing a 48-px sprite into
   place, pushes the continuation and jumps into a run of `nop`s: `STA WSYNC / LDA #>ScanLineLoop / PHA /
   LDA #<ScanLineLoop-1 / PHA / JMP (DelayRoutine)`; the run ends in `RTS`, which lands on
@@ -113,6 +180,27 @@ fixed-height form; the elastic-spacer form is a documented extension.)
   number of cycles spent — 2 per `nop`, so he keeps separate even and odd tables. The push-(target−1)
   -then-`RTS` above, used once to come back rather than to chain zones; `SLEEP` elsewhere in this
   repository is a delay fixed at assembly time. **Cited only, not verified**.
+- **Rewrite the jump instead of stacking it.** Glenn Saunders, 2004, to Eric Ball about a Lode
+  Runner-style game, as a way to *"fully exploit the SC RAM"*: *"You can basically copy the kernel code
+  to RAM (or have a bunch of different kernel modes and overwrite JMP addresses to script out which to
+  run and when) on the fly between frames. Assuming there is enough CPU time inbetween frames, that
+  would allow for as much flexibility as you can do in a static title screen since nothing really has
+  to be evaluated inside the kernel anymore"* 〔stella-list `200404/msg00004`〕. Ball had not planned to
+  use SC-RAM for code changes — he had found a way to do without the self-modifying code he had tried —
+  and was spending it on data, four pages for the playfield background and two for player graphics
+  〔`msg00023`〕. Here the chain's targets are data on the stack; in that suggestion the jump's own operand
+  is RAM (our reading). The thread has no measurement of the copy against the time between frames.
+  **Cited only, not verified**.
+- **One kernel, or one per section: which resource is short.** Andrew Davie, 2001, in his Qb
+  post-mortem: *"Initially, I recall, I had something like 4 kernels in there... all doing similar, but
+  not the same, things. They were all rather massive, and I started to run seriously out of ROM
+  space"*; he generalised them into one kernel drawing the target area, the playfield area and the
+  sliding cube coming on to the screen, and *"compressing the multiple kernels into a single one meant
+  that I 'd saved many hundreds of much-needed ROM bytes"* 〔stella-list `200103/msg00196`〕. Manuel
+  Rotschkar's *Jumpman* went the other way, hard-coded kernels per screen section: *"Wastes tons of ROM,
+  but I don't want to waste any cycles on conditional logic or JSR/RTS combos at the moment"*
+  〔`200409/msg00264`〕. The same trade from its two ends, settled by whichever of ROM and cycles was
+  short (our reading; neither of them links the two). **Cited only, not verified**.
 - **The list as a timeline.** The zone list here is spatial — one entry per band of the screen. In a
   2025 thread on growing stalactites drawn in the playfield, two replies made the list temporal.
   SplendidNut: treat *"each PF byte as its own unique stack of bitmap changes"*, each entry a pattern
