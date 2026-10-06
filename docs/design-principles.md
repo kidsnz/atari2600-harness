@@ -93,6 +93,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
       `LDA #`/`STA` is the 5-cycle form and the parent's ~6 is the zero-page one (our arithmetic). The
       RAM-routine mechanism and its costs are under the asymmetric playfield (Tumber 2003, MarcoJ).
       **Cited only, not verified.**
+  - **Missiles side by side, recoloured part-way along the line.** kiwi, on a ROM that shows the
+    forum member Random Terrain's avatar: *"I used 2 quad size player to make the
+    icon"*, and *"I'm using the middle-of-the-scanline color change technique to change the color of the
+    MISSILES side by side of the [icon]"* 〔mining 300645
+    random-terrain-avatar-icon-screen-saver-now-on-atari-2600; only the distillation notes are held
+    here, and "[icon]" is the notes' word in brackets, not the post's〕. A missile draws
+    in its player's `COLUPx` (`techniques/missiles-bullets.md`), so the colours come from mid-line `COLUPx`
+    writes at the band widths counted above (our reading). **Cited
+    only, not verified** — the attached source was not opened here.
   - **Turning the screen 90 degrees was proposed once and rejected; among the reasons Polik gave is that "the colors are shifted 90° too".**
     Andrew Davie, 2001, in a brainstorm about a Gunfight game, said to *"turn the actual TV on its side"*
     — *"It has been known for games to require you to rotate your TV, and I don't think it's a real sin"*
@@ -237,6 +246,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     line Chronocolour is a fake of horizontal colour but not necessarily a flickering one (our reading).
     **Cited only, not verified** — the single-field triad was described in 2004, not posted as a ROM;
     the 2003 nointerleave binaries were posted but not run here, and nothing else here was run.
+  - **The 'RGB interlaced' sprite was posted as one that moves.** Andrew Davie, 2003: *"This
+    multicolour 'RGB interlaced' sprite can move around the screen at will.  I'm still amazed it works,
+    but ... hey, it does!"*, asking NTSC owners how it looked 〔`200302/msg00183`〕. Paul Slocum,
+    replying: *"All of them look fantastic on the real thing.  Compared to Thomas's attempts: IMO
+    Thomas's clown looks better, but your baboon looks better."* 〔`200302/msg00197`〕 He does not say
+    whether he moved the sprite. **Cited only, not verified** — the attached `sam.zip` was not run here.
   - **An ICC picture fades without a second image.** Davie, 2003, posting a fade of an Interleaved
     Chronocolour full-screen bitmap: *"This is just one image, by the way - the colours used to create
     the interleaved chronoblahblah (TM) thingy are being changed on the fly to give the fading
@@ -299,6 +314,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     on an emulator, and *Pac-Man* was not looked at here.
 - **There is no "one correct RGB"**: Stella generates the palette from YIQ dynamically, so the same register value differs by a dozen up to 0x20 between emulators and settings.
   For us the running table `internal/ingest/palette_stella.go` is authoritative (100% match against Stella). 〔rgb-color-values, 118495〕
+  - **When emulators disagreed on which of two colours was darker, the colour was changed.** Kurt
+    Woloch, 1998, on his first demo: *"Z26 displays the "shadow" of the ship darker than the
+    surrounding water; PCAE displays it lighter (which is obviously wrong). I'd like to know how it
+    comes out on a real NTSC Atari."* 〔`199806/msg00057`〕 His "obviously" rests on what a shadow is,
+    not on a measurement (our reading). Eckhard Stolberg, replying, pointed at the choice of colours:
+    *"according to the programmers guide you hvae chosen light blue, dark blue and torquise for the sky
+    the sea and the shadow. It might be better, if you use the same hue with different luminance values
+    for them."* 〔`199806/msg00058`〕 Within one hue the order then rests on the luminance steps rather
+    than on how each palette renders two hues (our reading). Tennessee Carmel-Veilleux proposed `$90`,
+    *"a shadowy dark blue"* 〔`199806/msg00065`〕; Woloch gave his reason for the separate hues — *"I
+    wanted to have the sky more greenish-looking, and at the same time, lighter than the sea. The shadow
+    color should be somewhat of a mixture between the ship's brown and the sea's blue."* 〔`199806/msg00070`〕
+    — and his next version *"exchanged the shadow color by the $90 you suggested"* 〔`199806/msg00080`〕.
+    No reading from a real NTSC console is in the thread. **Cited only, not verified.**
 - **hue ↔ colour map**: hue1 = yellow / hue4 = red / hue8 = blue / hue12 = green (hue15 ≈ hue1). hue1 is the standard choice for yellow. 〔132561〕
 - **The higher the luminance the lower the saturation — it washes out toward white** (bright blue in particular stops being identifiable) → **place colours you want to read as vivid at mid-to-low luminance**. Saturation and luminance trade off. 〔132561〕 `→ design.Hue/Luminance/WashoutRisk, HueName, GradientSameHue, SameLuminance`
   - **Luminance can fade a hue to white, never to black.** Nick Bensema, 1997: *"The truth about Atari
@@ -341,6 +370,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     bands, since a PF pixel is 4 clocks wide and a line gets one `COLUPF` unless cycles are spare.
     〔mining 166082 yars-safety-zone〕 **Cited only, not verified** — only the distillation notes are
     held here, not the thread.
+  - **Noise seeded into the objects' registers can finish a screen with no drawing code.** Manuel
+    Polik, 2002, on how *Battlezone*'s "Crash" scene is done: *"Basically just some random \*noise\* is
+    produced over the essential registers for P0/P1/M0/M1. Once everything is \*seeded\*, just some 165
+    STA WSYNC STA HMOVE are executed, to finish the screen."* 〔`200210/msg00288`; the two instructions
+    are on lines of their own in the post〕 He does not list the registers; if the motion registers are among
+    them, the `HMOVE` on every one of those lines moves the objects again on each line, and the left-edge
+    comb (Sprites section) stays in the picture either way (our reading). **Cited only, not verified** — his attached reverse-engineering was not
+    opened here, and the game was not run.
   - **Background bands can carry motion when nothing else on screen moves.** Verdant, 2026, on
     vacuous_b's *Onward*: *"you could change the background colour in alternating bands which scroll
     down the screen to keep the illusion of vertical movement going (and as a way to gauge the
@@ -850,6 +887,30 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     PLAYFIELD. Just checked again and forgot about the balloon using a MISSILE to round out its shape."*
     〔mining 328452 sky-jinks; only the distillation notes are held here〕 **Cited only, not verified** —
     the ROM was not looked at here.
+  - **The playfield as the colour fill, the objects as its edges.** Glenn Saunders, 1997, describing
+    the top of three skill levels in a list poll: *"playfield graphics used mostly just as a color
+    "fill" with sprites used to clean up the blocky edges and add detail"* 〔`199703/msg00030`〕. Two
+    days later, in a different thread, Nick Bensema gave the objects the same job — rounding out the
+    edges — rather than face the timing of mid-line playfield colour writes (Colour section, the 1997
+    entry under horizontal multi-colour) 〔`199703/msg00101`〕. **Cited only, not verified.**
+  - **The ball and a missile over the end of a PF run can put the edge between the 4-clock columns.** As the
+    distillation notes record a 2011–12 thread started by a pixel artist, BladeJunker, planning a paint
+    program for the 2600: hold the ball and a missile at 4 clocks wide over the end of a PF run and move
+    them with `HMOVE`; the part that juts out past the PF pixel places the edge 1, 2 or 3 clocks beyond
+    the PF grid, and before it would jut out a full 4, the PF is extended by one pixel and the objects
+    start over. That draws circles and curves finer than the PF grid; the notes give *Battlezone*'s
+    mountains, smoothed with both players and both missiles, as an example 〔mining 190154
+    ball-missile-copy-flicker-limit; only the distillation notes are held here, so this is a
+    paraphrase〕. **Cited only, not verified** — the ROM was not looked at here.
+  - **A growing line can be a coloured head from a missile and a tail in the playfield.** Thomas
+    Jentzsch, 2002, on the alpha of his *JtzBall*, a 2600 version of JezzBall, in which the new lines
+    are coloured while they are created: *"I think I can get away, when I only color the "heads" (using
+    missiles) and draw the tail with PF-graphics."* In the same reply, on a different question — drawing
+    the bouncing atoms with the ball, among the ideas for less flicker — to Erik J. Eid's *"I'm not sure
+    about the ball since it would inherit the color of the playfield"* 〔`200203/msg00078`〕: *"The ball
+    would perhaps work on an inversed playfield (*filled* areas get PF-color). But that would only look
+    good for very small atoms, else the different colors would be a bit disturbing"*
+    〔`200203/msg00079`〕. **Cited only, not verified** — the alpha was not run here.
   - **Terrain can be playfield for the coarse shape and the ball plus both missiles for the detail.**
     walaber, 2015, on the first kernel of his motocross work in progress: *"I've accomplished it by
     using an asymmetric playfield for the rough details, and then the ball and both missiles (set to 8
@@ -940,6 +1001,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     data 〔mining 103417 window-algorithm; only the distillation notes are held here, and they do not
     name who answered〕. Against the three layers above it is one buffer and no copy into a display
     buffer (our reading). **Cited only, not verified.**
+  - **A playfield that moved carried the clouds drawn in it.** Kurt Woloch's 1998 demo sinks a
+    ship drawn in the playfield, a variation, he wrote, on Nick Bensema's "How to draw a playfield" demo
+    〔`199806/msg00057`〕. Tennessee Carmel-Veilleux, trying to add clouds to its second version: *"since
+    you don't load PF0 in the kernel, they would be pretty ugly, and when I coded them, they sank with
+    the ship :)"* 〔`199806/msg00087`〕. Something that has to stay put needs lines, an object or data
+    of its own (our reading). **Cited only, not verified** — the demo was not run here.
 - **PAL frames must have an even scanline count** — an odd total loses the colour in that frame, so a
   kernel that varies its line count must vary it in twos. The count is the whole frame's, not only the
   visible lines. Eckhard Stolberg, 1999: *"The major difference between PAL and NTSC is the colour
@@ -1107,6 +1174,24 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
       〔`200210/msg00032`〕. So the comb, kept on every line, is a mask 8 pixels wide on the left only
       (our reading). About fourteen months later, posting as Manuel Rotschkar from the same address, he chose black PF
       pixels at both sides for *Seawolf* (the entry above). **Cited only, not verified.**
+    - **A wider player was said to need edge art on top of the comb, with one exception.** A 2020 thread on sprites leaving the
+      screen without wrapping, as the distillation notes record it: one way is the left-edge `HMOVE`
+      bar from striking `HMOVE` on every line (*Barnstorming*), another is extra graphics for the left
+      and right edges that cut the shape off there; and spiceware sorted them by size — a 1x player
+      needs only the bar, a 2x or 4x player needs the bar and the extra graphics, which *Space Rocks*
+      and *Draconian* generate on the fly with the ARM; yet *Stay Frosty 2* hides its boss's fireball, a
+      4x player, with a bit-shift mask alone and no bar, leaving a black gap at the edge on three frames
+      of four that the notes call no problem in practice 〔mining 304342 scrolling-offscreen-sprites; only
+      the distillation notes are held here, so this is a paraphrase〕. **Cited only, not verified.**
+    - **The edge strip shares `COLUPF` with the ball, so a coloured ball has to give the colour back.**
+      Thomas Jentzsch, on the kernel of his *Top&Tom 2* (renamed *Bot&Tom*): *"The obstacles are
+      smoothly faded into and out of the screen by changing player's and missile's size and by hiding
+      their remains behind a four pixel playfield left and right of the screen."* And: *"The band between
+      the cars is the ball. Its color is set to red and back to black in each line it is displayed. Else
+      the obstacle hiding playfield would become red too."* 〔mining 343591 bottom-was-toptom-2〕 The ball
+      takes the playfield colour (`techniques/invisible-probe.md`), so the black edge playfield and the red ball
+      are one register written twice on each line the ball is shown (our reading). **Cited only, not verified**
+      — the ROM was not run here.
   - **Keep PF0 as a fixed frame and the playfield becomes a board that fits in RAM.** kylearan,
     sketching a Space Taxi-like game: *"Restrict the playing area to PF1 and PF2 and use PF0 only for the
     enclosing border. That gives you 32 blocks = 128 pixels horizontally for level design of the interior
@@ -1193,6 +1278,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     kernel for the overall position and en/disabled invaders indepently now."* 〔`200311/msg00201`〕 A
     `BIT` reads and does not write, so the slot keeps its cycles and loses its effect (our reading).
     **Cited only, not verified.**
+    The patched operand can also be the pointer. Robin Harbron, 1998, posted a six-digit routine meant
+    to be copied into zero page and run there, its loads `lda $ffff,y` with the addresses patched in:
+    *"6 cycles were saved by using regular indexing instead of indirect indexing... another 4 were saved
+    over my original routine because I could load directly into x : LDX $FFFF,Y instead of having to
+    load it into A then transferring it."* — leaving 13 cycles a line free, with no `WSYNC`
+    〔`199803/msg00196`〕. Erik Mooney: *"This isn't practical for anything but a demo or Supercharger,
+    though"* 〔`199803/msg00197`〕. Harbron's count of the RAM: *"57 bytes out of 128? :)"* … *"normally
+    12 bytes are taken up by the zero page pointers - that's integrated into the self modifying code, so
+    we're left with "only" 45 bytes above a regular 6 digit display."* 〔`199803/msg00198`〕 The 6 is one
+    cycle on each of six loads, `(zp),y` at 5 against `abs,y` at 4 when
+    neither crosses a page (our arithmetic). **Cited only, not
+    verified** — the attached `test.bin` was not run here.
   - **Single-line sprites do not forbid a busy playfield; the two are paid for separately (our reading).** Glenn
     Saunders, 2000: *"I think most games released that had single line res tended to have relatively
     simple or nonexistent playfields.  For instance, Demon Attack."* 〔`200006/msg00090`〕 Erik Mooney
@@ -1616,6 +1713,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     without additional hardware"* 〔mining 345559 auto-detect-pal-vs-ntsc〕. The ARM-timer reading in the Colour section measures that clock difference, with
     an ARM on the cartridge. The 2002 thread's emulator results are the known-traps row *Emulators can
     agree with each other and disagree with the machine*. **Cited only, not verified.**
+    A 2001 thread, *NTSC/PAL detection*, had already ruled out timing the frame itself. Jan Paul
+    Schmidt asked why setting a timer, waiting for two vertical blanks and reading the timer would not
+    tell the systems apart. Manuel Polik: *"That's because the vertical blank is just as long as you make
+    it, totally indepent from the TV system the console is hooked to."* 〔`200108/msg00073`〕 Schmidt,
+    after re-reading the Stella manual: *"You can't wait for a new frame, but you signal when a new frame
+    starts. OK, big difference here!"* 〔`200108/msg00079`〕 Glenn Saunders asked whether the 76-cycle
+    line is the same on both; Eckhard Stolberg: *"Yes, this is correct. There are no obvious timing
+    differences between the PAL and the NTSC console, that we could exploit for a system detection
+    routine."* 〔`200108/msg00095`, `200108/msg00108`〕 So a frame timed from inside the ROM measures the
+    length the ROM chose, and the switch in the parent line asks the player for what the program cannot
+    measure (our reading). **Cited only, not verified.**
 - **Two different needs share the word "random", and only one of them is expensive.** A starfield or
   a terrain must be **reproducible** — Manuel Polik: *"Total randomness won't work, since you've to
   **REPEAT** what you're doing every frame"* — and that is what a fixed-seed LFSR is for
@@ -1967,6 +2075,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     The frame's total is held by the bounds above; how much of it is picture is a margin set on 1970s
     sets (our reading). 200 and 205 are two of the line counts in the pixel-aspect note in the craft
     section. **Cited only, not verified** — no ROM's visible line count was measured for this.
+    SpiceWare, 2018, gave the same reason as a safe area: *"Older TVs, like in the 70s when these
+    guidelines for the Atari were established, had a lot of variation so the safe area was smaller.
+    Newer CRTs are much better, so you can safely increase the size of the safe area."* And the range
+    he uses: *"For NTSC 192 was recommended back then.  My games vary from 182 to 202 based on the needs
+    of my game (Draconian needed more time for game processing so only used 182 for the game screen)."*
+    〔mining 280378 atari-2600-50hz-pal-242-or-228-picture-lines〕 So the count moves below 192 as well
+    as above it, and in *Draconian* it went down to buy processing time. **Cited only, not verified.**
   - **Where `VBLANK` goes on and off can letterbox the picture.** Chris Wilkson, 2005, in a
     thread about a rolling 262-line kernel, by the broadcast numbering: *"So theoretically, VBLANK should be turned on 3
     lines before the start of VSYNC, and it should remain on for 20 lines.  But this will result in
@@ -2025,6 +2140,29 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     until the start of the next scanline. Everything else (including the timers) works just as
     normal."* 〔`200104/msg00096`, `msg00109`〕 So `WSYNC` lines inside a span timed with `TIM64T` do
     not move the moment the timer expires (our reading). **Cited only, not verified.**
+  - **A loop of exactly 76 cycles can branch back past its `WSYNC`.** Eckhard Stolberg, 1999, to the
+    author of *griddemo*, who asked how to move a board drawn too far left when one more `NOP` broke
+    the display: *"The current routine to display one scanline takes 73 cycles from one WSYNC to the
+    next. If you add another NOP, it would be 75 cycles and cycle 75 is too late for WSYNC to catch the
+    end of the current scanline. What you could do is add a 3 cycle instruction, like STA $3f, to the
+    NOPs. Then have the DEX/BNE ... thing loop to the instruction after the WSYNC at scanloop. This way
+    you would be doing 76 cycles per scanline which fills the whole scanline, so that the next time
+    through scanloop everything would be executed at the same cycle in the scanline as before. This
+    would shift the display 9 pixels to the right."* 〔`199909/msg00044`〕 The shift was what was asked
+    for; 9 is 3 cycles × 3 colour clocks (our arithmetic). The loop keeps its place only while every
+    pass costs exactly 76 (our reading). **Cited only, not verified.**
+  - **Without `WSYNC`, the code's seams and the scanline's need not meet.** Glenn Saunders, 2001, had
+    *"a 2 line kernel working completely without the use of WSYNCs at all"* for *Death Derby*
+    〔`200111/msg00156`〕. Thomas Jentzsch, on it: *"There can be difference between the scanlines and the
+    code layout. A new scanline can start everywhere in the code."* 〔`200111/msg00173`〕 For the
+    missiles: *"You will have to start their code at the end of the previous line, so that you are ready
+    before the are displayed on the playfield line (which is fortunately about the same time you have to
+    start the write to the playfield registers :)."* — with both missiles starting on the same line, the
+    code *"will look something like: |mmmmfffffffgggg|ggggglllmmmm| or |ggggfffffffmmmm|mmmmmlllgggg|
+    (g=graphics, m=missiles, f=playfield, l=looping, |=cycle 76/0)"*; and *"in kernels where the
+    missiles \*don't\* start at the same % 2 line, you will need 2 HMOVEs and 2 HMCLRs"*
+    〔`200111/msg00162`〕. The last condition is his, for that two-line kernel. **Cited only, not
+    verified.**
 - State = one GameState variable + a kernel per state. A title picture is padding top and bottom + a central PF table, clearing GRP/PF at the end. 〔title-to-game-transition〕
   - **Clearing at the end is for the lines after the loop, not for the loop.** Andrew Davie, 2019, asked
     whether PF must be cleared at the end of the loop: *"Just make sure the PF registers (PF0, PF1, PF2)
@@ -2036,6 +2174,11 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     next frame *"until it encounters PF writes to alter the values"*. 〔mining 295514
     loop-counter-basics〕 **Cited only, not verified.**
 - Cycle saving = the unofficial ISC/ISB opcodes + borrowing SP as a line counter (needs litmus backing). 〔5cycle-color-cycling, illegal-opcodes〕
+  - **What the SP counter saved in one kernel, and what it required.** Thomas Jentzsch, 2003, on
+    Andrew Towers' version of a 13-character text kernel: *"You can save 5+6\*3 = 23 cycles by not using
+    'count' and checking the stackpointer ('chara' etc. must start at $80 then!) instead."*
+    〔`200312/msg00073`〕 The 23 is his count for that kernel, not a general figure, and no litmus here
+    measures it, so the parent line's "needs litmus backing" still stands. **Cited only, not verified.**
   - **`SAX` applies one mask to several stores.** walaber, 2015, to mikes360, whose kernel ANDed one
     mask into three registers: *"I think you could also use the SAX command, which ANDs A and X and
     then stores the result. That way you only load the mask once and reuse it multiple times"*
@@ -2337,6 +2480,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   enough to move more code across it. **Cited only, not verified** — 4K and "without flicker" are the
   author's.
 - **The canonical kernel vocabulary** (Andrew Davie): "**N-scanline kernel**" (one picture row = N scanlines) plus 4 shape axes = sprite spacing / PF spacing / symmetry (sym/asym) / reflection (mirrored). Adopted as the harness's internal kernel vocabulary. 〔mining 320714〕
+  - **An N-scanline kernel can be entered at any of its N lines, and the entry picks the vertical
+    phase.** Piero Cavina, 1998, to Kurt Woloch, whose demo sinks a playfield ship: a four-line loop
+    labelled `kernel:`, `line2:`, `line3:` and `line4:`, each line opening with `STA WSYNC`, and
+    *"initialize Y and jump to kernel:, line2:, line3: or line4: to enter the main loop according to the
+    sinking level"* — *"if you don't enter the loop from kernel: you'll have to initialize the graphic
+    registers too - obviously, this is easier to say than to do :-)"* 〔`199806/msg00076`; comment
+    lines in the post, joined here without their leading `;`〕. Woloch asked
+    how the ship's body, which can end on any of the four lines, would leave the loop 〔`199806/msg00083`〕;
+    Cavina: *"Try to break the kernel that does the ship body in two parts: one for the upper part, made
+    only of groups of four lines, where you won't have to care of "exit points", and one for the
+    scrolling-end, where you'll draw 1,2 or 3 lines only, according to the sink level. Maybe you won't
+    have time for sprites in these last lines, but the various elements might be arranged so that this
+    is not a big problem.."* 〔`199806/msg00085`〕. So a picture held in four-line rows
+    moves by single scanlines with no per-line test inside the loop (our reading). **Cited only, not
+    verified.**
 - **Movement = fixed-point subpixels**: hold position as 8.8 fixed point and add `vel` every frame → the carry moves the integer part = smooth slow motion, friction, gravity and wind in one framework. **A parabola = constant velocity in X × constant acceleration in Y** (no trigonometry). Enemy chasing = proportional homing from the sign-shift of `(target−pos)/16` (no division; 16 directions = octant + slope threshold — **but a signed shift is not free**: keeping the sign through `(target−pos)/16` costs a `cmp #$80` before each of the four `ror`s, so "no division" means four extra instructions, not none 〔107024:16〕). 〔mining 178177, 270373, 107024〕 (technique-candidate ㉕)
   - **Direction and speed in one byte, used as a table index rather than decoded.** SpiceWare, on
     *Medieval Mayhem*'s fireballs: *"I use a single byte to denote speed and direction, SSSDDDDD"* — 32
@@ -2489,8 +2647,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     state itself, the widest form of the lodging above. **Cited only, not verified.**
 - **Objects spent on decoration are objects the game no longer has, and sound can take over one of
   their jobs.** Rob Kudla, 2001, proposed drawing the column separators of a Tetris well with both
-  players at three copies each, coloured black 〔`200101/msg00041`〕; Erik Mooney: it works *"as long as
-  you don't need the players or missiles for anything else"* 〔`200101/msg00044`〕. Eckhard Stolberg
+  players at three copies each, coloured black, and positioned once: *"set all the players' and
+  missiles' positions at the top of the screen, and just switch them off when you draw the frame
+  containing the game"* 〔`200101/msg00041`〕 — which, asked by Erik Mooney, he glossed as *"Move them
+  offscreen or whatever.  Any usual method of not displaying them."* 〔`200101/msg00046`〕. Mooney
+  counted the fence: *"you'd actually need 13 lines to enclose 12 columns, so you'd have to use one
+  missile"*; and it works *"as long as
+  you don't need the players or missiles for anything else"* 〔`200101/msg00044`〕. Kudla did not think
+  both ends needed closing, and for 10 columns suggested *"3 copies of player 1, 2 copies of player 2
+  and 1 copy of a missile"* 〔`200101/msg00046`〕. Eckhard Stolberg
   named what it costs: *"you can't generate a two player version with it, and that you can't use the
   player graphics to highlight the falling piece anymore. Highlighting the falling piece so that you can
   see how long you have control over it, when it lying on the bottom of the bin and you want to slide it
@@ -2819,6 +2984,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     one million five by five families"* 〔`200111/msg00488`〕. The 3×5 set was made; the 5×5 catalogue
     was a proposal. 2^15 = 32,768 (our arithmetic). **Cited only, not verified.**
 - **In 8px monochrome, spend the entire budget on the silhouette**: concentrate on the single most identifying part (hat, moustache, etc.). If that is not enough, buy density with double width + venetian stripes. 〔106110〕
+- **A figure to be drawn with a missile was kept to one run per line in the mock-up, before the
+  sprite code.** Glenn Saunders, 2001, on the mock-up he drew in PaintShop Pro for
+  *Death Derby* while his code was still *"some very rudimentary playfield code"*: *"The pedestrians are to be made from repositioned and
+  rescaled (single, double, or quad) missiles which is why they share the same color as their players.
+  You'll notice that never do you see two separated pixels on the same horizontal with the pedestrians.
+  Even with these limitations you can generate some convincing shapes."* 〔`200108/msg00510`〕 A missile
+  draws in its player's `COLUPx` (`techniques/missiles-bullets.md`), and apart from the copies its
+  player's NUSIZ makes (`techniques/sprite-placement.md`, rule 4) it is one run on a line, so both of
+  his limits can be kept in the drawing program (our reading). **Cited only, not verified** — the
+  mock-up was not looked at here.
 - **A walk cycle needs a minimum of 2 frames at 50:50**: one bit of the frame counter (`and #2^n`) gives even spacing with no reset, and runs **only while moving**. 〔301861〕 `→ design.WalkFrame`
   - **The `and #2^n` schedule is what an accelerated frame counter must not skip.** Thomas Jentzsch,
     on converting games to PAL-50: *"a NTSC to PAL-50 conversion based on a frame counter will slow
@@ -2969,6 +3144,14 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     〔mining 214231 sprite-vertical-flip; only the distillation notes are held here〕. Counting up pays
     the `cpy` that counting down to `bpl` does not (our reading). **Cited only, not verified.**
 - **One interleaved HIRES buffer can feed BOTH players (P0 = even bytes / P1 = odd)**: a single 16-byte RAM buffer serves both sprites — pick a player's bytes with `AND #$FE` / `ORA #$01`, no shape math. Halves the RAM vs two separate buffers (~16 B) = a RAM-thrift move to hold in reserve for when 128 B is tight. 〔Combat shared 16B HIRES, P0/P1 interleaved; comparison §2.1/§2.2/§7〕
+  - **Inside a kernel line, one index walking an interleaved list pays in cycles.** Eckhard
+    Stolberg, 1998, after disassembling Ruffin Bailey's kernel: *"You seem to have the data for PF1 and
+    PF2 interwooven into one list, which you address with the same pointer. Increasing the index
+    register between the reads for PF1 and PF2 is another unnessessary time waster. You should use two
+    lists and two pointers."* He went on to plain indexed reads, `lda PF1list,y` / `sta PF1` /
+    `lda PF2list,y` / `sta PF2` with one `iny` 〔`199808/msg00086`〕. The buffer above saves RAM; this
+    names what interleaving costs when the two reads share a line (our reading). **Cited only, not
+    verified.**
 - **Fan one byte out to many duties, phase-locked, when RAM is tight**: `CLOCK` serves **5 roles** (frame timer / attract color / debounce pace / score-flash clock …) and `GameTimer` serves **3** (match clock + bit7 in-progress flag + attract period), sub-fields phase-locked so their uses never collide. Master-class RAM economy — but **only pay this when RAM is actually scarce**: packing with 43 B free just spends clarity for nothing (premature optimization). Know it; deploy it only under pressure. 〔Combat `CLOCK` (5-duty) / `GameTimer` (3-duty) / `VCNTRL`; comparison §2.7/§7〕
 - **Load-level VBLANK with `TIM64T`/`INTIM` so the picture starts at a FIXED beam position — don't rely on a fixed WSYNC count + elastic filler**: arm a RIOT timer at VBLANK start, spin on `INTIM` until it expires, then begin the visible kernel = display-start **independent of how long the frame's logic ran**. A fixed WSYNC count + elastic `VBpad` tuned to today's code does NOT auto-absorb logic growth: add work and the picture dips (screen dip — the exact fragility the clone's positioner had to hand-engineer around). Prefer timer load-leveling when VBLANK work is variable or expected to grow. 〔Combat `VCNTRL`/`INTIM`/`TIM64T`; comparison §2.1/§6, diff-gaps (measure the VBLANK length with INTIM)〕 `→ techniques/sound-driver.md · game-states.md`
   - **Timing the visible kernel itself was proposed in 1997, for zones whose heights move.** Piero
