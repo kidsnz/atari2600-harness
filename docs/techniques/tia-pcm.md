@@ -136,6 +136,56 @@ the ROM deliver the waveform it declares, on time"*, never *"is that the right
 waveform"*. A ROM-level value defect therefore has to break the **player** — narrowing
 the low-nibble mask to `and #$07` gives `107/144 values exact, 144/144 still in slot`.
 
+## Making the sample data
+
+The demo's levels come from a LUT. A real voice starts as a recording, and what is done to it
+before it becomes nibbles is part of the technique. Everything in this section is Cited only, not
+verified: no ROM here is built from a recording.
+
+**Filter before you quantise.** Glenn Saunders, in the list thread on Eckhard Stolberg's 1997
+sampled voice ("Stella says ..."): *"One of the tricks to low bitdepth, low sample rate samples is to
+equalize it during the sampling phase. This usually involves rolling off the high frequencies which
+will wind up as noise anyway."* He set the ceiling conditionally: *"If the 2600 system is like the
+Atari 8-bit, then we're talking about frequency responses that are at telephone quality at best. So
+keep tones<5khz and filter out the upper harmonics"* 〔stella-list `199703/msg00002`〕. reveng, twenty
+years later: *"The source sample should also be low-pass filtered to drop any frequencies over the
+Nyquist Frequency"* 〔AtariAge `topic/272948`〕. The SoX `lowpass 2000 rate 4000` recipe named under
+G3 in `docs/capability-gap-audit.md` is this step; nothing here measures what it buys.
+
+**The conversion chain used for Draconian.** SpiceWare: *"Samples need to first be converted to
+unsigned 8 bit raw format, which I used sox to create:"* `sox $file -b 8 -u $root.raw`, then
+`raw_to_dpc $root.raw $root.pds` — a small C program he attached in answer to a request for *"a tool
+to convert files to 4 bit (high and low nibbles in one byte)"* — and the result goes into the source
+with `INCBIN` 〔AtariAge `topic/273769`, 2018〕. `.pds` is not a standard format: *"I made that up, PDS =
+Packed Digital Samples"*. The chain broke on the asker's SoX: *"the switch -u was not recognized so I
+used"* `-e unsigned-integer`. The thread does not say which nibble `raw_to_dpc` puts first
+(`cmd/pcmcheck` takes either, `-low-first`), and `pcmcheck` cannot read an `INCBIN` table at all
+(G3, `docs/capability-gap-audit.md`).
+
+**Fit the ROM first, then set the rate — for some phrases.** Mike Mika, on the voices he added to
+Berzerk, set the rate per phrase, not per game: *"Intruder Alert! Intruder Alert!"* — *"I stored the
+one half of the phrase, and played it back every 4 scan lines like Eckhard's demo, twice"*; *"Chicken
+Fight Like A Robot"* — *"sampled this at a bit less than 4000hz, and update about every 4.5 lines (I
+believe)"*. Of "Humanoid must not escape" (and, by "Same thing here", Chicken Fight): *"in an effort
+to make the samples fit, I downsampled below 4000hz until it could be stored in a bank + code, then
+adjusted the playback rate."* One more phrase was dropped because *"it had to be so downsampled it
+was too unrecognizable"* 〔stella-list `200208/msg00080`〕. `pcmcheck`'s `-pitch` is a
+whole number of lines, so a 4.5-line phrase cannot be declared to it.
+
+**One sample per line, and long clips.** rbairos, converting zackattack's demo: *"I simply took the
+audio channels, averaged them, resampled to 60*262 HZ, scaled slightly, then remapped 0..15"* —
+60 × 262 = 15720 Hz, a round figure for the 15699.76 Hz line rate above. That demo plays *"about 30
+seconds of sampled audio"*; it was thrown together while testing *"a routine that runs in zeropage
+memory during overscan and vblank"*, stores its samples *"in a very inefficient manner"* on purpose,
+and *"If someone only cared about playing back audio it would be possible to fit more than a minute
+into a single rom."* It is a 3E image — DirtyHairy: it runs in 6502.ts/Stellerator *"if you set the
+cartridge type to "bank switched 3E (Tigervision + RAM)" manually --- it won't autodetect"*. His own
+5-bit driver, also 3E, *"plays 510k of packed 5bit samples"*; *"the first three bytes of each bank
+(=2048 byte block) are ignored, so there is room for 2045 * 255 * 8 / 5 = 834360 samples before it
+loops"*, and he had not yet got his ROMs or zackattack's to run on a Harmony Encore 〔AtariAge `topic/272948`,
+2017-12〕. 3E is in `docs/techniques/bankswitching.md` (`roms/carts/cart_3e.asm`); no ROM here
+streams audio across banks.
+
 ## Caveats
 
 - A per-frame update is a slow "envelope," chosen for deterministic, readable
@@ -150,9 +200,33 @@ the low-nibble mask to `and #$07` gives `107/144 values exact, 144/144 still in 
   some objects), but it should be doable without having to switch the screen off"*, on the
   condition *"if the game will be bigger than 4K"* 〔AtariAge `topic/261054`〕. Both are plans, not
   shipped kernels — Cited only, not verified.
+- **Blanking the screen for speech is not the same as dropping sync.** omegamatrix, on testing
+  iesposta's speech strings for the Dr Who hack of Berzerk: *"You will run into trouble on so some
+  modern TV's if you blank the display and let go of handling VSYNC. I have a Toshiba 55" LED TV, and
+  when it looses sync it mutes the sound. There is no setting to stop that"* — he saw *"a black screen
+  with no sound"*. The fix was *"a kernel that blanked the screen while still keeping sync"*: *"If
+  you're updating the audio every line, or every second line, then it is easy to do. Dr Who was a
+  little more work as it was every 4 lines, and 262 is not divisible by 4. I didn't want to do 260 or
+  264 line game"* 〔AtariAge `topic/247859`, 2016-01〕. The muting rests on one television; the 4-line
+  pitch is the one `litmus_pcm.asm` says a real voice would use. Cited only, not verified.
 - `pcmcheck` grades a stream on ONE volume register. The pseudo-5-bit variant above
   splits a level across AUDV0+AUDV1; grading that means running it twice, once per
   register, and the two halves are not independently meaningful.
+- **The pseudo-5-bit sum is not 31 equal steps of output.** The split above and the demo's
+  `LevelLUT` are linear; the mixer is not. The engine's mixer table is a compressive curve in the
+  SUM of the two volumes (`docs/known-traps.md`, "two voices at high volume squash each other";
+  `internal/emu/mixnonlinear_test.go`), so how a level is split between AUDV0 and AUDV1 does not
+  matter there, but a waveform quantised evenly onto 0–30 comes out bent. DirtyHairy built the same
+  5-bit sine scale twice, one ROM *"created using naive quantization, the other (test_nonlinear)
+  corrects for the TIAs nonlinear response. To my ears, the nonlinear version sounds cleaner, while
+  the linear one exhibits a ringing effect"* — compared in Stellerator, not on a console. reveng
+  thought the curve itself harmless (*"I don't think it's a big problem. The non-linearity still gives
+  31 unique fairly-evenly distributed values"*) but the quantiser not: *"But in my mind, 5-bit is
+  pointless without the non-linear resampling."* Sheddy, from POKEY: *"Without non-linear resampling,
+  combining channels still gives a noticable improvement there"* 〔AtariAge `topic/272948`〕. The
+  thread's formula is the one from `topic/271920`, which `known-traps.md` takes to be the engine's own
+  curve (the equation itself is not in the copy held here), so the engine cannot confirm the hardware
+  here. Cited only, not verified.
 - ADPCM here is a compact didactic LUT (16 states, 0–30 levels). Tjoppen's
   production codec is a 62-byte table tuned by an encoder against a WAV; same
   shape (`next = ADPCMTable[(sample<<1)|bit]`), better fit.
@@ -185,6 +259,20 @@ digests would have differed for reasons unrelated to the tone generator. The tes
 first, and fails loudly if the setup block ever changes shape. Found by the mailing-list distillation
 (helper-1).
 
+## Pitch from a timed loop instead of AUDF (2017)
+
+With the carrier silent, the CPU alone can set the pitch. BNE Jeff's first routine *"changes
+frequency without changing the frequency register- AUDFx"* 〔AtariAge `topic/264918`〕. SpiceWare
+recorded it on a console — *"Sounds OK to me"*, *"That was on my 2600"* — where the author had heard
+*"2 or 3 little breaks"* in his Stella (4.7.3); on his Harmony it *"worked correctly"*. In the tune
+version's posted source: write `#$0F` to `AUDV0`, spin a `dec`/`bne` loop (*"8 machine cycles per
+loop through"*) for half a period, write `#$00`, spin again. The intended pitch is the table's loop count
+(C5 = 141 passes per half-wave) — and the program does nothing else: no VSYNC,
+no WSYNC, no picture, and AUDC0 is 0 only because its start-up loop clears `$01`–`$FF`. That version
+came out *"way,way out of tune"*, and the thread ends without a cause. Cited only, not verified. Our
+reading of that source: the duration loop jumps back to the high half-wave with the counter already at
+0, so after a note's first period every high half-wave runs 256 passes whatever the note. Not verified.
+
 ## The other direction: one volume register split among several voices (2001-09)
 
 The pseudo-5-bit trick above adds two registers into ONE sample. Kevin Horton proposed the reverse:
@@ -200,3 +288,17 @@ cpu time). And the channels only loose some (or a lot of) dynamic. Correct?"* �
 and the thread's eight messages carry no answer. Horton posted fragments (the add chain, two
 waveform tables) but no working player; the cost he named is the picture (Caveats, above).
 Cited only, not verified.
+
+Andrew Schwerin described a running engine in 1999 and posted its inner loop (*"I took out my
+interface code"*): a "Quad" loop that adds two 3-bit
+sine lookups (values 0–6) into each of AUDV0 and AUDV1, each voice a 16-bit fixed-point pointer
+stepping through one 256-byte table — *"I have played chords on this engine"*. In the same message he
+named the trade that removes the real-time mix: *"if the music is always the same, the music can be
+presampled. Instead of reading a wavetable for each voice, read a wavetable for each channel. The
+chords get mashed together at assembly time and not in real-time."* The cost he gave: *"The limitation
+here is memory storage, and lack of appropriate tools to design music & soundtracks"* 〔stella-list
+`199904/msg00006`〕. Chris Wilkson's suggestion just before, to store note data per channel rather than
+per voice 〔`199904/msg00005`〕, is a different thing, and Schwerin said so: *"I don't see how I can
+combine the musical information for two voices into one channel. (Other than wavetable
+precomputation, which is a different matter than musical note data for a song)."* Cited only, not
+verified.
