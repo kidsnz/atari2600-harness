@@ -99,6 +99,16 @@ background, color constancy kicks in and people perceive the colors as relativel
 aren't in the absolute sense."* (AtariAge `topic/172888`). **Cited only, not verified** — read through
 our distillation note; the thread itself is not on disk here.
 
+**One case where the colour use took the frames from the object use.** Andrew Davie, 2003, posting a
+ChronoColour frame of a creature drawn with the large-sprite system of *Fu Kung!*: *"Only one creatre
+possible, though - as both alternate frames are used to generate the chronocolour. There are, however,
+enough cycles/line to change BOTH P0 and P1 colour. So that's another way to change the colour."*
+〔`200301/msg00161`〕 Our reading: the alternation that could have carried a second creature is spent on
+colour, so that object cannot also be one of a flickered set. Star Ship above does both at once, but
+on different objects. Later that day he posted a last version: *"this is probably the last we'll see of
+this monster. Consider this the termination of an exploratory branch of the capabilities of the
+system."* 〔`200301/msg00164`〕 **Cited only, not verified.**
+
 ★**A third use: flicker that mixes depth order.** Thomas Jentzsch, 2022, to the author of *Raptor*:
 *"you are using the same PF priority flicker trick for the shield which I came up with for the clouds
 in Aardvark. And in your game it is a key element."* (AtariAge `topic/332187`). The post names the
@@ -203,6 +213,19 @@ memory against sorting.
 He names *Dig Dug* as doing this with extra RAM on the cartridge. **Cited only, not verified** — read
 through our distillation note; the thread itself is not on disk here.
 
+**Assuming the worst case saves ROM.** Asked why Atari's *Pac-Man* flickers its ghosts
+constantly even when none of them share a scanline, pacmanplus answered: *"It takes less ROM to always
+assume the worst-case scenario that all objects are on the same line, than to try and compute where each
+object is and see which objects you need to flicker"*. SpiceWare gave the other side's bill: flicker
+management, *"the logic used to reduce flicker by reusing object(s) multiple times as the screen is
+drawn"*, *"takes up space in ROM, plus require RAM to keep track of things"*. His extreme example is
+Draconian: the routines that reposition player0 while also drawing all five objects use 483 bytes
+(*"though they're about to be rewritten"*), and adding the routines for the other four objects brings
+it to 2462 — extreme, he says, because the ARM's speed lets it reuse all five (AtariAge `topic/264347`,
+2017). Our reading: this page's fixed-parity demo is the worst-case
+assumption and the full form above is the management. **Cited only, not verified** — no ROM size was
+measured here.
+
 ## Verified here (Gopher2600, locked in CI)
 - Four objects (two vertical bouncers at X=40/120, two horizontal at Y=60/120), all four
   trajectories deterministic; 262 lines every frame; budget clean.
@@ -234,6 +257,18 @@ for what it costs and the two idioms, and `internal/emu/flickerattrib_test.go` f
 The 1998 advice was not wrong; it was practical. Software rectangles need no per-frame discipline and
 survive an author who forgets one. The hardware route is cheaper and conditional, and the condition is
 the thing to write down.
+
+**Two more conditions, from 2003: how small and fast the objects are, and how the subsets are split.**
+Thomas Jentzsch suggested a two-player, two-missile kernel with constant 30 Hz flicker for four players
+and four missiles 〔`200310/msg00051`〕; Kirk Israel asked whether that would miss hits — the
+pass-through described above 〔`200310/msg00052`〕 — and Jentzsch answered: *"That depends on the
+size and speed of the objects. The smaller and faster the objects are, the more problems you will have
+with hardware collision detection."* Bounding rectangles, the other option, can also miss some
+collisions when a missile *"moves faster than the size of the bounding rectangles"*
+〔`200310/msg00053`〕. Kirk added that the split decides which pairs can meet at all: *"if you always
+displayed player and bullets 1 + 2 on one frame then 3+4 on the alternate, 1's bullets could never hit 3
+I think, and vice versa."* 〔`200310/msg00054`〕 `HardwareCollisionUsable` takes only whether an object
+is flickered; neither the split nor size and speed is an input to it. **Cited only, not verified.**
 
 ## Choosing what flickers, how often, and how evenly (added 2026-09-30)
 
@@ -286,6 +321,17 @@ objects only get a bit darker"* 〔`200210/msg00031`〕. Manuel Polik, who had j
 down to visible vertical collisions, was not persuaded: *"Right now I'd prefer reducing flicker
 situations at best, instead of going the SW-TAG way."* 〔`200210/msg00030`〕 The thread did not settle
 it. **Cited only, not verified.**
+
+**Eight months later, a fix to invisible objects was felt to reduce Star Fire's flicker.** Manuel
+Polik, in an update to his third release candidate: *"Fixed any possibillities of deadlocks through
+troubles with invisible objects. I finally found the ultimate solution of getting rid of them. I feel
+this also significantly reduced flicker."* 〔`200306/msg00031`〕 Rob, running it in Stella: *"It did seem
+a bit less flickery, and I didn't even really notice the flickering before."* 〔`200306/msg00032`〕 The
+post does not say how invisible objects reached the flicker, and "them" can mean the invisible objects
+or the deadlocks. Our reading takes it as the objects: an object nobody sees was
+still being counted among the objects sharing the slots, so the count `SubsetsFor` is given should be of
+the objects actually drawn. **Cited only, not verified** — a feeling and one player's impression, no
+count.
 
 **The duty need not be the same for every object.** Kirk Israel, 2004, planning a pterodactyl
 ("Pterry") between the two JoustPong players: alternate `[1 2]`, `[1 P]`, `[1 2]`, `[P 2]`, so
