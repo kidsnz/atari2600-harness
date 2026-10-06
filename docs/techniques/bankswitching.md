@@ -221,7 +221,11 @@ not run.
    `jmp XxxCode` — the `jmp` is fetched from bank N, so it must be there too — and every bank ends
    with the hotspot bytes and the vectors (`RORG $FFF4`). For EF's 16 banks that end block moves to
    `$1FE0`. Many banks make the table long; Thomas Jentzsch's alternative, `bit SelectBank1,y` then
-   `jmp (vector)`, is slower but fits in a macro. **Cited only, not verified.** The engine's EF switches
+   `jmp (vector)`, is slower but fits in a macro. **Cited only, not verified.**
+   Manuel Polik found the vector kept in RAM in Aquaventure, 2002: *"it only needs two temporary bytes and
+   a single all purpose proxy jump per bank"* — the caller stores the target in `tempVar1`/`tempVar2` and
+   jumps to the proxy, `LDA LFFF8` / `JMP (tempVar1)` 〔stella-list `200212/msg00116`〕 — read here: so
+   the landing site is no longer fixed per routine. **Cited only, not verified.** The engine's EF switches
    on any access to `$0FE0-$0FEF` and takes the bank from the low nibble (`mapper_atari_ef.go`:
    `cart.state.bank = int(addr & 0x000f)`). Read from the code; **Not verified**.
    *By `BRK`, from any bank to any bank* (vdub_bobby, AtariAge `topic/122388`): a call is `brk` followed
@@ -250,6 +254,13 @@ not run.
    (`docs/fundamentals-audit.md`): Pat Brady, *"you can't use INC or DEC instructions with on-cart RAM
    (regardless of bankswitching method)"*, and since it is not zero page every access takes a cycle
    more (AtariAge `topic/326419`). The procedure is **Cited only, not verified**.
+   *On 3E the write port is the same window plus 1K.* Andrew Davie, 2005: a write to `$3E` switches a 1K
+   RAM bank into the address space the ROM banks use, the highest address bit of that window telling read
+   from write, so *"no indexed writes may cross page boundaries, and one must remember to add 1K to the
+   address of data to which you are writing"* 〔stella-list `200505/msg00128`〕. `docs/fundamentals-audit.md`
+   gives the same page-crossing rule for SuperChip RAM. **Cited only, not verified.** The engine's 3E reads
+   RAM at `$1000-$13FF` and writes it at `$1400-$17FF` (`mapper_3e.go`, `Access` and `AccessVolatile`). Read
+   from the code; **Not verified**.
    *The kernel itself in RAM*: PitKat gives E7's 1K RAM bank wholly to its 8×8 tile display kernel —
    code that runs from RAM, whose rewritten parts are the tile addresses and colours; no co-processor
    (the author, AtariAge `topic/308669`). **Cited only, not verified**; the ROM was not run.
@@ -262,6 +273,13 @@ returning from the trampoline flipped to bank 1, executed garbage, and hit the r
 the ROM sat in a reboot loop (symptoms: 350-line TV frames, RAM cyclically re-cleared,
 level stuck at 0). Diagnosed in minutes with `watch_ram` (the buffer's writer PC alternated
 between the loader and the boot-time `Clr` loop). Trampoline at $FF80 keeps a safe distance.
+
+**Nor a table.** Erik Mooney, 1997, adding a saucer to his game: it *"Worked fine on PC Atari"* but
+on the real thing showed *"a vertical bar the color of the saucer"* and nothing else, until he found *"I had
+stored the saucer graphics across location $FFF8, so the program was hitting the Supercharger's
+bankswitching hardware and crashing"* 〔stella-list `199704/msg00195`〕. `docs/fundamentals-audit.md` lists
+code *and* data in the last bytes before the vectors as accidental hotspot hits; this is the data case, and
+the emulator he ran it on did not show it. **Cited only, not verified.**
 
 **Not on the hotspot, and not just before it either, on F6.** Eckhard Stolberg, against a plan to put `BRK` on the
 hotspots: *"Remember that the 6502 always reads at least two bytes for every instruction. So a BRK at $FFF8
@@ -319,7 +337,15 @@ hardware is **Cited only, not verified**. `STA` to the hotspot was only guessed 
 cause bus contention, and the same thread reports that Centipede switches banks with `STA`. On E7,
 where the cartridge sees no R/W line, `STA` is the recommended form because it leaves A
 intact (AtariAge `topic/340351`; **Cited only, not verified**) — and this page's own trampoline,
-`lda $FFF9`, spends A on every call. The opposite hazard — a `NOP`/`BIT` skip switching a 3F cart by accident — is in
+`lda $FFF9`, spends A on every call. The same holds when an existing ROM is changed: tom on AtariAge
+`topic/66892`, after *"it's only the ADDRESS that shows up on the bus that's important"*, warns that *"if you
+modify an existing ROM to use lda instead of sta, you might break the ROM if it still needed the value in
+the accumulator"* (**Cited only, not verified**). In `definitions.json` the absolute
+`lda`, `sta`, `bit` and `cmp` cost the same as that `nop`. `$0C` is marked `undocumented` and carries no
+`stability` field; the stability map for illegal opcodes in `docs/design-principles.md` names the
+LAX/SAX/SBX/DCP family, and its 2026-09-04 extension reads an absent field as stable. Read from the code;
+**Not verified**.
+The opposite hazard — a `NOP`/`BIT` skip switching a 3F cart by accident — is in
 `docs/known-traps.md`.
 
 ## Verified
@@ -404,6 +430,10 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
   carries straight on — read here: the next instruction is the same in either bank, the next-fetch rule of
   the trampoline with the whole routine as the landing site. He assembled the 1K separately, emitted a byte
   at `$3FF` *"so that it would come out to 1024 bytes"*, and `incbin`'d it twice. **Cited only, not
+  verified.** Darrell Spice proposed the whole-bank form in 2004, for a Rally-X: *"If you can
+  make it work with 1 map in 4K, consider making it a 16K game so you can have all 4 maps. Each bank of
+  4K would contain a complete copy of the program code, but a different map"*, and Paul Slocum agreed
+  〔stella-list `200404/msg00095`, `200404/msg00096`〕 — a suggestion, not a build. **Cited only, not
   verified.**
 - **Call a bank like a subfunction** (brpocock, AtariAge `topic/82141`): load a bank ID and a function
   ID into registers and `jmp bank_switch`; the selected bank's common entry reads the function ID. The
@@ -416,7 +446,18 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
   verified**. The stores-per-scanline table above is the measured half of the same reason.
 - **The limit is the bank's, not the image's.** mzxrules' 3E+ Zelda port leaves bombable walls looking
   like plain walls, partly because *"the rom bank that handles that is near max capacity"* (AtariAge
-  `topic/320907`). **Cited only, not verified.**
+  `topic/320907`). **Cited only, not verified.** On a scheme with a fixed part, that part can be the one
+  that runs out: deater78's Myst on a 16K E7 cartridge, 2023, was *"seriously low on ROM space here, at
+  least in the small chunk of always-visible ROM on the E7 cartridge"* (AtariAge `topic/338659`; **Cited
+  only, not verified**). In the engine that chunk is the image's last 2K at `$1800-$1FFF` less the 256-byte
+  RAM window's write and read ports at `$1800-$19FF`, leaving `$1A00-$1FFF` (`mapper_mnetwork.go`,
+  `Access`), which also holds the hotspots at `$1FE0-$1FEB` and the vectors. Read from the code; **Not verified**.
+- **Counting what is left in a bank.** Asked whether `ORG` or `RORG` is the one to count with, cd-w:
+  *"I believe that you use the RORG value"*, with the check he used on Juno First (F4): after each bank's
+  code, `echo "----",($FFF4 - *) , "bytes left (BANK 1)"`, then `ORG $8FF4` / `RORG $FFF4` for the hotspots
+  and vectors (AtariAge `topic/138791`, 2009). Read here: `*` counts in the `RORG` address, so the
+  subtraction is from the bank's own end block, the same in every bank. `docs/known-traps.md` has why an
+  `ECHO` like this prints twice. **Cited only, not verified.**
 - **Which bank is which is ROM too.** In a Defender II hack nukey-shay swapped the two banks so that
   `$F000` is the first and `$D000` the second — *"this takes advantage of the hotspot jumps to save a
   little Romspace"* — and added a switch at the end of each bank to drop a duplicated score routine from
@@ -456,6 +497,17 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
   at `$F400-$F7FF`, with 2K ROM above it (`mapper_commavid.go`), whose comment names another svolli 512-byte demo
   (AtariAge `topic/342021`) as the reason it was implemented; the Supercharger's arming sequence is in
   the table above. Read from the code; **Not verified**.
+- **3F, as the list recommended it in 1998.** Greg Troutman, 1998, to Eckhard Stolberg, on *"bank-switching
+  more ROM for graphics"*: ask Kevin Horton about *"the Tigervision method, which is supposed to let you go
+  all the way to 32k with a logical 2K permanent bank, swapping in 2K chunks with a simple LDA/STA sequence,
+  and supposedly can do this with fewer chips than any other known method"* 〔stella-list `199808/msg00003`〕
+  — hearsay in his own words. Brad Mott pointed to Horton's `sizes.txt` instead: *"The original Tigervision
+  method only used 4 2K slices with made it an 8K cart. However, if you use all 8 bits of 3F then you could
+  have 256 2K slices for a total of 512K"* 〔`199808/msg00013`〕. **Cited only, not verified.**
+  The engine's 3F keeps the image's last 2K fixed and switches only the first 2K, for any image that is a
+  multiple of 2K (`mapper_tigervision.go`); read from the code, **Not verified**. The latch behind the
+  32K figure, why code in RAM cannot switch this scheme, and the `NOP`/`BIT` skip that switches it by
+  accident are in `docs/known-traps.md`.
 
 ## The image: size, joining, recognition
 
@@ -510,8 +562,11 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
 - **Signing the image so that it is recognised.** An author keeps `STA $3E` / `LDA #$00` in his code only
   so that Stella detects 3E (AtariAge `topic/249429`) — exactly the engine's 3E fingerprint
   (`fingerprint3e`: `0x85, 0x3e, 0xa9, 0x00`), which `roms/carts/cart_3e.asm` carries for the same
-  reason. On Harmony the way round a wrong guess is the file name: renaming to `.3E` overrides its
-  detection (Omegamatrix, same thread), and the author reported that it *"works better"*; Stella had no
+  reason. Stella's own check, quoted from its source by spiceware in a 2016 thread,
+  AtariAge `topic/256420`, is the same four bytes wanted once — `isProbably3E`, *"STA $3E; LDA #$00"*, tested on
+  an 8K image after SuperChip, 4K and E0 and before 3F, UA, FE and 0840, with F8 the default. On Harmony
+  the way round a wrong guess is the file name: renaming to `.3E` overrides its detection (Omegamatrix,
+  `topic/249429`), and that thread's author reported that it *"works better"*; Stella had no
   such override then (stephena wanted to add one). **Cited only, not verified.** The
   engine does the same: `internal/emu` loads with `"AUTO"`, and `cartridgeloader/loader.go` then takes
   any extension on its explicit list (`.3E`, `.F8`, `.EF`, …) as the mapping, so the file is never
