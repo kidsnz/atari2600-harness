@@ -332,6 +332,39 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     darker blue background"* 〔`199805/msg00191`〕. What his advice changes is the distance between the
     colours and from the ground, not their number (our reading). **Cited only, not verified** — seen
     on an emulator, and *Pac-Man* was not looked at here.
+  - **A colour stripe is a store on every line, so count it when asking whether a kernel fits.** Kurt
+    Woloch, 2000, to the list's single-line-resolution discussion: *"you totally ignored the color
+    stripes. Many newer games color-stripe some, or all objects, or the background. This also uses
+    additional cycles to re-write the color registers and should be considered when judging if a sort
+    of a Kernel is doable or not. For instance, most Atari games only do solid-color sprites, while
+    color stripes are more common in Activision games."* He counted a kernel in "strings", *"a
+    color-striped player as one "string", since you can use the same index register to fetch the
+    player data and the color"*, and thought *"Most games only use three of such strings maximum."*
+    〔`200006/msg00132`〕 Of *Pitfall II* he had guessed that its enemies *"are either solid-shaded (like
+    the bats) or, when they aren't, they don't move independent to the background (up and down)"*, as
+    Chris Wilkson quoted him, who answered: *"In Pitfall II, the condors, which move up and down, are 2
+    colored (I think). When the balloon is just floating by, it zigzags up and down, with a stationary
+    playfield.  When Harry has it, the balloon is vertically stationary (I think), with a vertically
+    scrolling background."* 〔`200006/msg00133`〕 Woloch: *"this breaks my theory of only stationary
+    objects being color-shaded"*, keeping only that *"both the balloon and our main character are
+    stationary while floating up"*, and adding that even with the balloon floating by the playfield
+    *"can be scrolled down slightly by jumping up"* 〔`200006/msg00135`〕. So the one rule proposed for
+    *Pitfall II* did not survive the thread. Another reply explains where a cost landed in one game.
+    *Oystron*, per Piero Cavina, who wrote it (he speaks of its source code as his own in
+    〔`200004/msg00020`〕): *"one shot is the ball, and the
+    other is a missile. This explains why one is always white, and the other is color-striped: the
+    "missile" shot gets the colors from the player used to display the enemies in the same group of
+    scanlines. That would have been an ugly effect for most objects, but it is acceptable (if not a nice
+    touch) for a shot."* 〔`200006/msg00136`〕 Woloch added *Jungle Hunt*'s rope and *Galaxian*'s enemy
+    shots 〔`200006/msg00138`〕. The borrowed colour was left on the object where it shows least (our
+    reading). **Cited only, not verified** — none of these games was run here.
+  - **Chronocolour that uses the background as one of its colours leaves no room to change the
+    playfield.** Andrew Davie, 2003, on the last of his "allegront" ChronoColour creature demos, which
+    had *"8 cycles free in the first line of each pixel row, and 14 cycles in the 2nd"*: *"I had a play
+    with PF modification, but it doesn't work with chronocolour if you're using the BG as part of the
+    colour scheme (of course!)."* 〔`200301/msg00164`〕 He gives no reason beyond "of course"; the free
+    cycles did not help, so the limit is in how the picture is built, not in the budget (our reading).
+    **Cited only, not verified** — the demo was not run here.
 - **There is no "one correct RGB"**: Stella generates the palette from YIQ dynamically, so the same register value differs by a dozen up to 0x20 between emulators and settings.
   For us the running table `internal/ingest/palette_stella.go` is authoritative (100% match against Stella). 〔rgb-color-values, 118495〕
   - **When emulators disagreed on which of two colours was darker, the colour was changed.** Kurt
@@ -910,6 +943,31 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     rule 4) and draws in its player's `COLUPx` (`techniques/missiles-bullets.md`), which is presumably
     the influence (our reading). So an assignment table fills `Missile1` only after deciding what
     `Sprite1` does. **Cited only, not verified.**
+  - **Start from the busiest scanline, then give the smallest area to the smallest object.** Erik
+    Mooney, 2003, answering Manuel Polik's question of how to fly through a corridor like the arcade
+    *Tunnel Hunt* 〔`200303/msg00293`〕: *"First, you have to decide on the worst-case scenario - that
+    is, what's the maximum amount of stuff you're trying to do on one scanline?  I think you'd have to
+    limit it pretty severely.  Probably three colors at the most, if you're also trying to draw (but not
+    reposition) the two player sprites. Use the ball for the innermost (smallest) color."* A fourth
+    colour through `COLUBK` alone means *"the second-innermost color would have to always be at least 9
+    pixels wide (LDA Color1 / LDX Color2 / STA COLUBK / STX COLUBK), but since the ball goes up to 8
+    that should be okay.  Four colors might be doable this way."* 〔`200303/msg00303`〕 The 9 is the
+    three cycles between the two stores, at three colour clocks each (our arithmetic). His answer
+    closes on its own condition: *"This all assumes you aren't resorting to flickering or Interleaved
+    Chronocolor, in which case it's a pretty simple task to draw two colors on one frame via the
+    playfield and another two on the next frame."* The tunnels the
+    thread then drew are in the Colour section, under re-ordering the colours. **Cited only, not
+    verified.**
+  - **When something has to go, the theme can decide which.** SpiceWare's 2007 *Stay Frosty* blog,
+    part 5, a short exchange about the colours of the fireball, the nose and the melt trail, as our
+    distillation notes summarise it (no wording of it is held here): if only one of the snowman's nose
+    and its melt trail could stay, the trail was the one to keep, because it fits a game about a
+    snowman melting 〔mining blog SpiceWare 13143 stay-frosty-part-5〕. The notes do not say who argued
+    which side. Two entries elsewhere in this file record what happened to the same two things: under
+    "Why 21 and not 26: the line it had to fit." part 3 dropped both the nose and the melt trail for lack
+    of time, and under "What the two-register ceiling left out, and which resource ran out." the game
+    keeps the melted trail as a missile and lost the nose for want of CPU time — the choice the theme
+    would make, though the reason given there is cycles (our reading). **Cited only, not verified.**
 - missile/ball = lines, edges, vertical frames; player = area via double width / multiple copies / 4x. Build one apparent shape by stacking several objects.
   - **The playfield can be the body and an object the outline.** Sohl, on a screen of his *Immunity*,
     where he *"used the playfield bitmap and color to fill in part of my viruses in a non-play portion
@@ -1023,6 +1081,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     doubles the speed. 〔mining 322030 pf-2cc-wide〕 One emulator frame holds only one of the two
     patterns (our reading), as with flicker in the Multiplexing section. **Cited only, not verified** —
     only the distillation notes are held here, not the thread.
+  - **The same 1997 argument about *Life* also put the opposite choice: write the playfield off and
+    draw with the objects.** Glenn Saunders, in the thread "Supercharger RAM - why the reluctance??",
+    arguing for a finer *Life* than the playfield gives: *"If you aren't
+    going to use the sprites, you may as well press them into playfield duty. Games like Stargate, for
+    instance, did the wise thing and just wrote off the playfield graphics and drew just about
+    everything with sprites."* 〔`199706/msg00030`〕 Crackers kept the playfield for the cells: *"Using
+    the playfield graphics for the cells means you'll have the sprites, ball, and missles free for...
+    ...other interesting uses"* 〔`199706/msg00029`; "missles" is his〕, and later *"I still think I'd go
+    playfield for this game"* 〔`199706/msg00032`〕. Saunders's account of *Stargate* was not checked
+    against its ROM here, and nothing was built in the thread. **Cited only, not verified.**
 - **A still playfield can be stored as variable-length bands, not one entry per line.** 8bitworkshop's
   `complexscene` sample holds its picture as `.byte count, PF0, PF1, PF2` per band with a final
   `.byte 0` ending the table, reads it through a zero-page pointer (`lda (PFPtr),y`), loads the three
@@ -1065,6 +1133,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     you don't load PF0 in the kernel, they would be pretty ugly, and when I coded them, they sank with
     the ship :)"* 〔`199806/msg00087`〕. Something that has to stay put needs lines, an object or data
     of its own (our reading). **Cited only, not verified** — the demo was not run here.
+  - **A tile width that divides the playfield's bytes turns each line into a few pointers.** Andrew
+    Davie, 2003, trying Interleaved ChronoColour screens for a Boulder Dash. Thirteen blocks of 3 PF
+    pixels: *"we'd have one left over and it would look OK. It does look OK, but I couldn't figure a
+    good way to represent the screen in RAM and build on-the-fly."* Ten blocks of 4 PF pixels: the
+    system *"essentially sets up 6 pointers per line, each of those being a 1:1 relationship to the 6
+    asymmetrical PF bytes per line"*, and *"the most any of these bytes contains is just 2 blocks (of 4
+    bits each)"*, so the pre-drawn pairs number *"the number of different object-types, squared"* —
+    for 20-line blocks and 10 types he reckoned 100 x 20 = 2000 bytes, and roughly 6K with the three
+    colour passes 〔`200304/msg00029`〕. A 3-pixel block straddles PF bytes, which is why the pair
+    table belongs to the 4-pixel width (our reading). What he could not solve was RAM: the drawing
+    alone would take 24 bytes, *"leaving just 100 for the actual playing area - not enough"*, and three
+    days later he was *"confident enough to claim the game is DEFINITELY doable with more RAM"*
+    〔`200304/msg00070`〕. **Cited only, not verified** — the attached demos were not run here.
 - **PAL frames must have an even scanline count** — an odd total loses the colour in that frame, so a
   kernel that varies its line count must vary it in twos. The count is the whole frame's, not only the
   visible lines. Eckhard Stolberg, 1999: *"The major difference between PAL and NTSC is the colour
@@ -1103,6 +1184,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   complaints, but it did roll on one of my monitors."* 〔stella-list `200307/msg00055`,
   `200307/msg00056`, `200307/msg00057`, `200307/msg00058`, `200307/msg00059`〕 **Cited only, not
   verified** — no count above 262 was tried on a set here.
+  - **The broadcast PAL frame has half a line more ("as far as I know", said the poster), and counting
+    lines alone gets the frame rate's direction wrong.** Eckhard Stolberg, 1998, answering whether PAL consoles have slower clocks: *"It might
+    be a bit slower, but not much. The programmers guide says"*, quoting the Programmer's Guide, *"PAL:
+    312 lines \* 50Hz = 15600 lines per second"* and *"NTSC: 262 lines \* 60Hz = 15720 lines per
+    second"* 〔`199805/msg00213`〕. Kurt Woloch: *"This could be a
+    rounding error. The normal PAL frequency is, as far as I know, 312,5 lines (in normal interlaced
+    TV). 50 Hz as well states the normal TV frequency. So, if you only display 312 lines on every frame,
+    the Hz have to be a bit faster (?!)"* 〔`199805/msg00224`, which quotes Stolberg; "312,5" is his
+    decimal comma〕 The line length decides it the other way (our arithmetic). A 2600 line is 228 colour clocks, and
+    `techniques/subpixel-velocity.md` computes the frames from the engine's clocks as
+    3546894 / 228 / 312 = 49.8607 Hz for PAL and 3579545 / 228 / 262 = 59.9227 Hz for NTSC — both
+    below the broadcast 50 and 59.94, despite the half line fewer (that page marks the PAL colour
+    clock itself Cited only, not verified). **Cited only, not verified** for Woloch's figure; nothing
+    was timed on a set here.
 - **Hold the board at the game's resolution, not the kernel's.** DaveM, 2022, planning ice blocks drawn
   in the playfield: five PF registers × 47 double-lines = 235 bytes of RAM. Pat Brady: *"Pengo's
   resolution (in terms of data storage for the stationary ice blocks) is 11x8. Conceptually that can fit
@@ -1694,6 +1789,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   it's very impressive although the bouncing up and down Mario is hard on the eyes after a while."*
   〔`200303/msg00067`〕 He does not say what about the moving Mario tired the eye. **Cited only, not
   verified** — the demo was not run here.
+  - **Line counts written as literals inside the kernels keep one ROM from adapting at run time.** sohl (M. Losh), asked
+    on AtariAge for a PAL version of his homebrew *Immunity* (PAL60, per our notes), as the distillation
+    notes quote him: *"The Immunity code has very many drawing kernels with hard-coded scanline limits
+    and not a lot of extra ROM or RAM to make it dynamically adaptable... Otherwise, eventually, I can
+    use conditional assembly statements to be able to build a PAL version instead of the NTSC version
+    with different hardcoded loop limits, color values, etc."* 〔mining 318868 immunity-homebrew-wip〕
+    His way out is a second build rather than the run-time switch above, and it is only as cheap as the
+    limits are easy to find; keeping each one under a named assembly-time constant is the step that
+    makes it so (our reading). **Cited only, not verified** — the notes are the only source here.
   - **A two-position switch is already set when the program starts.** Dennis Debro, 2002, choosing a
     pause switch: *"I know Kool-aid Man uses the difficulty switches for a pause feature but I wanted to
     stay away from that. I want to reserve the difficulty switches for game difficulty or for a
@@ -1833,6 +1937,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     routine."* 〔`200108/msg00095`, `200108/msg00108`〕 So a frame timed from inside the ROM measures the
     length the ROM chose, and the switch in the parent line asks the player for what the program cannot
     measure (our reading). **Cited only, not verified.**
+    Earlier, in July 2001, Christopher Rydberg had asked for a header that *"would automatically detect
+    NTSC/PAL format and adjust within software to suit the setup it's facing"* 〔`200107/msg00029`〕.
+    Erik Mooney: *"On the VCS, software cannot detect what format the television is.  The best you can
+    do is provide a difficulty or color/BW (most common method for us homebrewers) switch for the user
+    to tell the game whether to run in NTSC or PAL."* 〔`200107/msg00035`〕 Thomas Jentzsch, quoting
+    that: *"You should use a difficulty switch, because not every console has the color/BW-switch."*
+    〔`200107/msg00036`〕 **Cited only, not verified.**
 - **Two different needs share the word "random", and only one of them is expensive.** A starfield or
   a terrain must be **reproducible** — Manuel Polik: *"Total randomness won't work, since you've to
   **REPEAT** what you're doing every frame"* — and that is what a fixed-seed LFSR is for
@@ -1853,6 +1964,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   a constant. What looks like randomness is *when a person pressed*. ★★★★**And the middle row is the
   one to remember — it is MORE uniform than the irregular case and completely deterministic.** A flat
   histogram is not evidence of unpredictability, and an auto-fire button is exactly a fixed period.
+  - **When a person pressed may itself be less random than assumed.** Mark De Smet, 2001, on his
+    Simon: he kept a per-frame counter running and *"sampled whenever the player pressed the joystick.
+    Given that I only needed a 2 bit random number, and the presumption that the player cannot control
+    when she presses the button to within 1/15 of a second, it becomes a true random number based on the
+    player response"*, on two conditions he stated: *"a sufficiently small number of bits"*, and that
+    *"the game garuntees that the player presses the button at least once before every time you need a
+    new number"* 〔`200110/msg00156`; "garuntees" as posted〕. Two bits of a per-frame counter repeat
+    every four frames, 1/15 s at 60 frames a second (our arithmetic). Erik Mooney doubted the
+    presumption: *"I think you might be surprised at the timing accuracy that video game players are
+    capable of."* With a PC keyboard repeating 30 characters a second, *"If you end within one character
+    of the target, you had 1/15 of a second accuracy. I can do it 90% consistently, and (this scares me)
+    about 60% consistently with my eyes closed."* 〔`200110/msg00157`〕 That is his own report from a
+    keyboard, not a timing taken on the console; a player that accurate is partway to the synchronised
+    rows of the table above (our reading). **Cited only, not verified.**
   - **A range that is not a power of two costs time somewhere; one draw per frame moves the cost into
     frames.** TROGDOR, 2010: for 1–6, draw 0–7 and redraw on 6 or 7, but *"it requires an indeterminate
     number of cycles"*, so *"adjust the game requirements so that only powers of two are needed"*.
@@ -2360,6 +2485,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     (his capitals; the post's subject is *"Very nasty 6502 tricks, don't use them! :-)"*). `TXS` and
     `TSX` take 2 cycles each against 3 for `PHA` and 4 for `PLA` (our arithmetic). **Cited only, not
     verified** — Starmaster was not looked at here.
+  - **`ISB` can be chosen for the result it leaves in A rather than for cycles.** Aaron, 2004, on a
+    skipdraw variant, `lda #SPRITEHEIGHT` / `sec` / `isb SpriteEnd` / `bcc .skipDraw`: *"The nice thing
+    is that it leaves the a register with useful information that you can use to draw the sprite.  In
+    the dcp version you need to reload the value out of SpriteEnd, which for me at least outweighed the
+    extra 2 cycles from the sec (which you might not even need)."* The cost he named: *"you need to store
+    the negative of the distance from the top of the screen in SpriteEnd"*. On stability: *"I'm assuming
+    isb is ok to use since it's in the same group as dcp and lax... probably would still be a good idea
+    if someone could check though."* 〔`200411/msg00015`, his resend of `200411/msg00005`〕 Asked by Dennis
+    Debro how it helped 〔`200411/msg00016`〕, he showed the difference feeding a pointer, and: *"The
+    version of skipdraw with dcp just throws that result away since dcp is based on cmp, see?"*
+    〔`200411/msg00017`〕 The engine's instruction table gives none of the seven `isc` opcodes a
+    stability field, the same as `dcp` (`Gopher2600/hardware/cpu/instructions/definitions.json`, read
+    2026-10-06; the field is described in the stability map below). **Cited only, not verified** — his
+    demo was not run here.
 - **Stability map for illegal (unofficial) opcodes**: **the ones that are stable on real hardware are the LAX/SAX/SBX/DCP family**. ★**"Real hardware" here means original NMOS silicon.** A 2600 cartridge also runs on machines that are not 6507s at all, and AtariAge `113732-clean-assembly` reports **`SBX` and `ARR` failing on the Flashback 2** — a chip-level reimplementation. ★★We cannot check that (no Flashback 2 here, and the engine models a 6507), so it is the source's claim, not ours; but the map should not be read as "safe everywhere". ★★★The `ASR` row in `known-traps.md` already carries this kind of scope (*late Taiwanese Atari Jr*) and this one did not. Found by the mailing-list distillation 2026-09-05, cross-checking the two corpora against each other for the first time. **LXA/XAA are unstable = do not use** (they depend on the individual chip and on temperature). **`ASR`/`ALR` is NOT in the stable set** — the very source this line cites reports it **failing on official hardware**: late Taiwanese-built Atari Jr units, with Thunderground's score corrupting, and a second independent report (omegamatrix, on real hardware) says the same. The one byte and two cycles it saves are not worth a unit-dependent failure. Gate opcode-level code generation on this allow/deny table. That `cmd/cpucheck` finds the engine and the perfect6502 netlist agreeing on `$AB` (LXA) is agreement with one netlist, not with every chip (`capability-gap-audit.md`, VV-7).
   **Extended 2026-09-04 — the map was right and incomplete.** `definitions.json` carries a
   `stability` field on exactly 8 of 256 opcodes (it is `omitempty`, so an absent field means
@@ -2438,6 +2577,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     front of it and it is reassembled 〔mining 40993 title-screen; only the distillation notes are held
     here〕. Whether `bless` follows a `JMP ($nn)` was not checked here; `cmd/dissect`'s runtime trace
     records the TIA stores of code that ran, wherever it was reached from (our reading). **Cited only, not verified.**
+  - **Why `LAX` exists at all, as Erik Mooney explained it in 2000.** *"The opcode for LDY is $AC, or
+    10101100 binary. The opcode for LDA is $AD, or 10101101 binary. The opcode for LDX is $AE, or
+    10101110 binary. The first six bits, 101011, indicate a load instruction.  Then the last two bits
+    indicate the destination"*; with both low bits set, `$AF` *"meets the conditions for both the "load
+    into A" and "load into X" cases, so the value is loaded into both of them!"* At the gate level, *"The
+    8-bit latches for the A and X registers are each triggered to read from the bus by a single bit in
+    the opcode.  Nobody bothered to check the second-lowest bit for A's latch or the lowest bit for X's
+    latch - it's unnecessary, and adds to chip real estate and hence manufacturing cost."*
+    〔`200006/msg00051`〕 He called it the picture *"In a nutshell"*, and of the designers only *"I'd be
+    fairly sure"* that they knew. It explains a combined load; it does not by itself say which forms are
+    stable — the immediate `$AB`, also a load into both registers, is the one the map above marks
+    magic (our reading). **Cited only, not verified.**
 - **The resource triangle + a register convention**: RAM (128B) / CPU (76cy) / ROM are mutually exclusive = growing one shrinks the others (plus the human cost). The Thomas Jentzsch convention = inside the kernel, pin the roles to **Y = scanline and sprite index, X = PF, A = everything else** and it runs faster. Use subroutines for code reuse only (the call cost is high). 〔mining 146817〕 The same convention, older and with its reasons, from Thomas Jentzsch on the list in 2003: *"I usually use Y for graphics (lda (ind),y) and in parallel for scanline counting, X for the PF (normally also having a vertical lower resolution) or other things (like stack manipulation or to store temporary results, A is for multi purposes."* 〔`200303/msg00381`〕 Y is the register the graphics read needs — the 6502's post-indexed indirect mode exists only as `(zp),Y` — so it is also the line counter; X goes to the playfield because the playfield usually changes on fewer lines (our reading of his parenthesis). **Cited only, not verified.**
   - **The three sides are not equally for sale.** Kirk Israel, 2003: *"given my simple game concept, RAM and ROM are cheap compared to
     kernal time, but that might be true everywhere. (which is funny, because while a supercharger
@@ -2467,6 +2618,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     bytes JUST for the finishing touches that everyone requests."* 〔`200103/msg00196`〕 The Combat rule
     near the end of this file says the same of RAM — packing *"spends clarity"* (our reading). **Cited
     only, not verified.**
+  - **A title screen can cost under 200 bytes, and code it shares is not part of its price.** Davie
+    again, on *Qb*'s new title: *"194 bytes, to be exact.... a bit more expensive than I planned."*
+    〔`200103/msg00000`〕 Posting the code that evening: *"The routines VBPreliminary and VBFinal were
+    not included in the byte-count, as they were already used for the other kernal display - they've
+    been re-used for the title screen.   That is, there was no title-screen-related cost in using
+    them."* and *"The best bit is how I packed almost full-screen graphics into just 4 bytes/line, just
+    6o bytes for the total screen graphics (I'll optimise-out those trailing 0's later).  Total is about
+    180 bytes."* 〔`200103/msg00002`; "kernal" and "6o" as posted〕 Sixty bytes at four a line is fifteen
+    rows of graphics for nearly the whole screen, so each row must span several scanlines (our
+    arithmetic and reading). **Cited only, not verified** — the ROM was not run here.
   - **A macro is one line in the source and every instruction it expands to in the budget.** Manuel
     Rotschkar's 2003 `SET_POINTER pointer, address` stands for `LDA #<address` / `STA pointer` /
     `LDA #>address` / `STA pointer+1`; its header notes *"Alters the accumulator"* and gives no cycles
@@ -2516,6 +2677,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     〔`199801/msg00151`; Erik Mooney corrected the spelling in `199801/msg00173`〕 The post does not say
     which axis was doubled or how many bytes it freed; a shield stored at half the resolution needs half
     the bits (our reading). **Cited only, not verified.**
+  - **Packing a variable-length field saves nothing when the layout has to hold the longest one.**
+    Eckhard Stolberg, 2004, on a file format for the AtariVox's EEPROM (*"there are only 128 blocks
+    with a fixed length of 128 bytes each"*): a name of known packed size helps programs with hard-coded
+    filenames, *"But for programs that want to allow the user to select the filename freely, you'd have
+    to design your data structure for the worst case where all characters take the maximum number of
+    bytes. And then the space you gain by compressing the filename would have to remain unused."*
+    〔`200412/msg00010`〕 Days earlier, answering a reply that doubted many programs would need more than
+    117 bytes of a block, he had shown why three bytes can matter: *"what if you had a puzzle game with
+    a level editor for example, where each level is 60 bytes large. Then the three extra bytes would make
+    the difference between storing one or two levels per block."* 〔`200411/msg00071`〕 Two levels are
+    120 bytes, three more than 117 (our arithmetic). Paul Slocum: *"Then you'll have to figure out how
+    to make it fit into 58 bytes.  :o)"* 〔`200411/msg00072`〕 A fixed-size record pays for its worst
+    case, and a remainder just short of one more item is lost whole (our reading). **Cited only, not
+    verified** — the device is a save store, not the console's RAM.
   - **Keep an instruction you cannot yet prove away, and count it as removable.** Glenn Saunders,
     2001, told by Thomas Jentzsch that a missile routine could come down to 26 cycles, partly by
     removing a `SEC` 〔`200111/msg00157`〕:
@@ -2732,6 +2907,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     opposite to the current direction."* 〔`200401/msg00113`〕 Falling under gravity g alone, the speed
     settles where y-speed/16 = g, at 16 g (our arithmetic), and the signed /16 pays the four `cmp #$80`
     of the parent line's note (our reading). **Cited only, not verified.**
+  - **The signed shift on its own: which "efficient" is wanted decides the sequence.** Kirk Israel,
+    2004, asked for something better than branching on the sign (`LSR`, then `ORA #-128` when negative)
+    〔`200402/msg00075`〕; Eric Ball and Russ Perry Jr offered versions that still branch
+    〔`200402/msg00076`, `msg00077`〕, and Thomas Jentzsch answered `lda var` / `cmp #$80` / `ror` /
+    `sta var` 〔`200402/msg00078`〕 — the compare sets the carry exactly when bit 7 is set, and `ror`
+    puts it back into bit 7. Andrew Davie: *"Less bytes (just!), more cycles..."*, `lda var` / `asl a`
+    / `ror var`, and *""Efficient" can mean different things, so the above may be useful, too :)"*
+    〔`200402/msg00082`〕. Jentzsch: *"Yours is better if the result isn't needed for further
+    calculations."* 〔`200402/msg00083`〕 — Davie's leaves the result in memory and A holding `var`
+    shifted left. With `var` in zero page and the documented timings, Jentzsch's is 7 bytes and Davie's
+    5, and both are 10 cycles (3+2+2+3 against 3+2+5; our arithmetic), so the "more cycles" does not
+    show there. **Cited only, not verified** — neither sequence was run here.
 - **×2^n on a small signed value = repeated `asl` (no multiply, sign preserved)**: in two's complement `asl` is exactly ×2, so a signed velocity such as BallDY becomes ×2^n with n `asl`s (e.g. the lookahead target = BallRow + 4×BallDY = two `asl`s + one `adc`). But (a) **the result's range widens → bit7 can no longer serve as the sign test** = do clamp/wrap tests on the value range instead (if the extrapolated target maxes out around ~190 the threshold is `cmp #220`; an application of known-traps' "bit7 clamping is not usable"), and (b) an input that overflows into bit7 during the shift (|value| × 2^n ≥ 128) destroys the sign = check the input range first. 〔in-house: PONG ai-variants v3 lookahead 2026-07〕
 - **A BCD score can be compared with `cmp` without decoding**: for a valid packed BCD byte, binary ordering = decimal ordering (the upper nibble dominates) → both `cmp #$11` (first to 11 points) and a ScoreR vs ScoreL comparison are correct as written. But **a binary difference is not a decimal difference** (it inflates by +6 across a digit boundary: $10−$09 = 7) → when the difference is used as a QUANTITY, bucket it with saturation so the coarseness is harmless (v4 rubberband's score difference → error-width modulation). The bit7 sign of a subtraction is valid only while |binary difference| < 128. 〔in-house: PONG ai-variants v4 2026-07〕
   - **Read the encoding before applying a peephole: only `ADC`/`SBC` count in decimal.** Thomas
@@ -2836,6 +3023,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   **space**; this divides it by **time**, and the budget it buys is the whole line rather than a band
   of it. The price is that the two configurations must not both be needed at once, which is a rule
   about the game, decidable before any code exists.
+- **An 8x8 board, as Glenn Saunders advised it in 2004: colour per row, a spare line between rows
+  to underline squares, blinking across frames, words when the shapes fail.** Writing to "Manuel" on a thread titled "Archon board approaches", he
+  put the priority first: *"Being able to adjust the palette on a scanline by scanline basis is what it
+  does best, not in midscreen like this demo, otherwise you are sacrificing your sprite abilities
+  enormously."* The gap between rows can carry interface: *"If in addition do that you added an extra
+  scanline between rows you could use that to underscore special squares for any reason and you could
+  still selectively blink squares over frames for emphasis."* And when the pieces do not read, he
+  reached for text rather than more drawing: *"If the monster shapes are a little hard to make out in
+  venetian blinks, then just print out a text caption above or below the board as you move your X
+  cursor over it."* (`blinks` and `do that` are as he wrote them.) He offered all of it as *"I think
+  you're going to have the most luck if you work with the 2600's strengths"*, with two mock-up GIFs and
+  no kernel; the *"variation of the Video Chess kernel"* he assumes is `techniques/venetian-blinds.md`.
+  〔`200404/msg00233`〕 **Cited only, not verified.**
 - **★The lodging pattern has an OBJECT version, and the choice it forces is about feel, not bytes.**
   The same reasoning that shares one WSYNC line between mutually exclusive code paths shares **one
   object slot** between mutually exclusive events. Piero Cavina, 1997, on a game with a single
@@ -3245,6 +3445,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     〔`199709/msg00098`〕 The two shapes Saunders said a missile cannot make in 1997, a gap inside a
     line and a width such as three, are both absent from his own 2001 mock-up above, whose missiles
     are single, double or quad (our reading). **Cited only, not verified.**
+- **The picture can absorb a colour limit, and the direction of motion may hide a timing one —
+  proposed in 2002, not built.** Planning a *Sea Wolf* port with 24-pixel ships, Manuel Polik listed
+  his ways to colour them: one additional colour read and two writes, *"or if that is not possible,
+  maybe only some simpler color shading. Or clever graphical design of the ships, where for example the
+  middle part wouldn't change it's color at all, but only the the sides."* (`it's` and `the the` are
+  his.) Eckhard Stolberg had warned that, depending on where the ship is positioned, *"the display of
+  your topedos might be off by one scanline"* 〔`200209/msg00074`〕; Polik answered with a hope, phrased
+  as a question: *"we are hopefully on safe grounds this time. The torpedos are going straight
+  vertically, so no one can notice the \*jump\* we'd experience with horizontal movements, right?"*
+  〔`200209/msg00075`〕 No later message in the thread as held here takes up either point. The
+  Multiplexing section's rule "add a missile rather than change the drawing" goes the other way; here the drawing, or the
+  axis of motion, is what gives (our reading). **Cited only, not verified.**
 - **A walk cycle needs a minimum of 2 frames at 50:50**: one bit of the frame counter (`and #2^n`) gives even spacing with no reset, and runs **only while moving**. 〔301861〕 `→ design.WalkFrame`
   - **The `and #2^n` schedule is what an accelerated frame counter must not skip.** Thomas Jentzsch,
     on converting games to PAL-50: *"a NTSC to PAL-50 conversion based on a frame counter will slow
