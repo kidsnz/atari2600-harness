@@ -141,3 +141,48 @@ It also names the cost this file already pays: the HMOVE blank cuts horizontal r
 and TJ's idea for avoiding it is a well-timed RESP on every line instead of HMOVE. Cited only, not
 verified. The measured neighbours: per-line NUSIZ + HMOVE on one player is `nusiz-shaping.md`;
 mid-line RESP as a placement mechanism is `sprite-placement.md`.
+
+## Cited neighbours (not measured here)
+
+None of the games or demos below was run here.
+
+**Hills from M1 and the ball.** From the thread that took *Defender II* apart for a hack: *"You'll
+find many instances of ENAM1 followed by ENABL. This is what produces the hills. The M1 and Ball
+sprites both start at the same horizontal location. The missile is given a horizontal motion…"*
+〔AtariAge `topic/289892`, 2019; held here only as distilled notes, so the wording is not checked〕
+The notes stop there, so how each line's motion is chosen, and what the ball does, are not known
+here. **Cited only, not verified.**
+
+**Reading which object draws what from its colour.** Piero Cavina asked how *Road Runner* puts
+*"three multi-color, single-scanline-resolution, no-flickering sprites in the same vertical space"*
+〔`199705/msg00056`〕. Eckhard Stolberg's reply: *"I think Road Runner is player0, Wile E. Coyote is
+player1, the bird food and the bombs are missile0, the left half of the truck is the ball and the
+right half of the truck is missile1."* His evidence is colour: the right half *"changes it's colour,
+when Coyote is on screen"*, and *"The left half of the truck first has the same colour as the road
+marks, which are playfield graphics, until it has been drawn over them. Then it changes colours."*
+〔`199705/msg00057`〕 Our reading: those are the two shared colour registers — missile 1 draws in
+`COLUP1` with player 1, and the ball in `COLUPF`, as noted above. For the truck's shape he guesses
+*"just some precise size and HMOVE changes."* **Cited only, not verified.**
+
+**Is Stampede a sheared player?** Glenn Saunders, listing ways to make an object look larger: *"by shearing or
+italicizing the sprite, you can stretch its total width. Stampede does this, doesn't it?"*
+〔`200102/msg00040`〕 Erik Mooney answered *"Sort of. The lasso looks to be drawn with that player's
+missile (slow down an emulator and look at the 'loop' on the end), which I guess you could call
+sheared in the way you describe. It does do that to a small extent on the player's horse's legs."*
+〔`200102/msg00043`〕 **Cited only, not verified.**
+
+**A thick diagonal from player graphics.** Guessing how a *Rubik's Cube 3D* prototype draws the
+cube's diagonal edges, Christopher Tumber proposed *"just a double-sized P0 or P1 sprite (one
+for either side)"*, with the graphic set to `#128+64` on scanline 1, `#128+64+32+16` on scanline 2
+and `#128+64+32+16+8+4` on scanline 3, so that *"on the scanlines with a diagonal, the ONLY registers/RAM which needs
+to be manipulated is GRP0 and GRP1 and they need to be moved every fourth scanline"*
+〔`200212/msg00282`〕. At double size, two more bits a scanline is 4 more pixels (our arithmetic).
+Eckhard Stolberg then doubted that the prototype shifts any objects during the cube display: in a screenshot with a grey
+background *"there aren't any HMOVE-blanks visible"*, so any shifting would need late HMOVEs
+〔`msg00316`〕. Tumber dropped the moving: *"There's no need to move anything! Two quad-sized players
+covers the whole cube except 1 1/2 squares"*, with a stationary M0 and M1 for the rest (perhaps the ball too, he added), *"Which also
+explains the 4-pixel 'steps'"* 〔`msg00324`〕. When Thomas Jentzsch said that version would
+have HMOVE blanks 〔`msg00336`〕, Tumber answered *"No, there are no HMOVEs. P0 and P1 are
+stationary"* and posted a demo whose diagonals he called the same as the prototype's *"except the
+center which is off a couple pixels"*, adding *"this may not be exactly how they did it"*
+〔`msg00337`〕. **Cited only, not verified.**
