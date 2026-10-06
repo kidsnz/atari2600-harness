@@ -49,6 +49,19 @@ All operands are zero-page and all stores are deterministic (no page-cross penal
 fully predictable. The same routine serves all four divisors — only the loaded `RECIP` constant
 differs (`DivCalc` selects it from the divisor passed in X).
 
+When one factor is a known constant the loop is not needed: write the constant in binary and add
+shifted copies. Andrew Davie's ×10 (`%1010`) is `lda n / asl / sta temp / asl / asl / adc temp` —
+*"a x10 with just 15 cycles of processor time, and 9 bytes"* — with the `CLC` left out, as he
+explained for ×3, *"on the assumption that it would be cleared by the shift (asl) instruction
+before"*, a bound he states himself (*"assuming n was < 127"* for ×3, *"assuming we won't have
+overflow"* for ×10). The other end of the
+same trade is a ROM table, `ldx n / lda times10,x`, which *"only took 7 cycles"* 〔stella-list
+`199805/msg00155`〕. For two variable factors, Robin Harbron passed on the quarter-square identity from
+The Fridge: with `f(x) = x^2/4`, *"a*b = f(a+b) - f(a-b)"*, two table reads and a subtract
+〔`199806/msg00020`〕 — a table, which this page set out to avoid. A floored `f` stays exact, because
+`a+b` and `a-b` have the same parity (our arithmetic). **Cited only, not verified** — none of these
+was assembled here.
+
 ## CI — what the scenario proves
 
 `scenarios/divtable.json` asserts the exact RAM results at frame 3:
@@ -126,11 +139,66 @@ on-screen value at `$B0` (÷15 of 90 = 6). 13 exact RAM asserts in total, `ntsc_
   the two, then one `cmp #$0F / bcc / sbc #$0F / iny` 〔stella-list `199709/msg00006`〕. No table, no
   multiply. **One conditional subtract is exact for 0..254 but not for 255**, where `h + l = 30` needs
   two (it returns 16 r15 instead of 17 r0) — checked in Python over all 256 inputs. Colbert's routine
-  increments its input first, so its failing input is 254. Cycle cost: **Not verified**.
+  increments its input first, so its failing input is 254. It was already in circulation: five months
+  earlier Erik Mooney decoded the same steps in a routine Piero Cavina had posted as taken from
+  Air-Sea Battle 〔`199704/msg00015`, `199704/msg00043`〕, and in 2001 Thomas Jentzsch
+  answered Andrew Davie's reinvention 〔`200102/msg00088`〕 with *"I think it's an old standard
+  routine which is based on the same idea"* 〔`200102/msg00091`〕. Cycle cost, as posted
+  (**Cited only, not verified**): Mooney gave
+  *"between 59 and 73 cycles plus the JSR and RTS"* for the Air-Sea Battle version (range check and
+  HMxx packing included) against *"a range of 30 to 100"* for the subtract-15 loop — *"The average is
+  about the same, but I like the new one because it's more consistent"* — and said that with the range
+  check removed, as a macro, *"it will fit into one scanline if needed"* 〔`199704/msg00051`〕.
+  Jentzsch's per-instruction comments add up to 46 or 52 cycles including the `RTS`; Davie moved the
+  `ldy` ahead of the compare and swapped `inc tmpVar` for `iny`, *"a lousy three cycles better"*
+  〔`200102/msg00096`〕 — on the path that subtracts, 52 to 49 by our count of his comments.
+- **The coarse position is time, not a number.** Every ÷15 on this page — the reciprocal helper and
+  the nibble sum alike — returns the coarse count as a value, and the beam still has to be walked
+  there. Colbert's routine above follows `calcpos` with a `DEY/BPL` wait after `WSYNC`, and he says of
+  it *"it wastes 2 entire scanline"* 〔`199709/msg00006`〕. The routine Manuel Polik posted from
+  Battlezone runs the `SBC #$0F / BCS` loop itself right after `WSYNC / HMOVE`, so the subtract is
+  also the wait (the mechanism `hmove-two-step.md` describes as *burning cycles proportional to X*)
+  〔`200210/msg00281`〕; he thought it could *"in some cases probably save a whole scannline"*
+  〔`200210/msg00284`〕 and later labelled the loop *"2 in 1 magic"* 〔`200211/msg00165`〕. So neither
+  helper here replaces that loop on a positioning line; they are for when the quotient is wanted as a
+  number. ROM can take over the calculation, though not the wait: Colbert noted a line could be saved
+  by precalculating the coarse and fine values into a table 〔`199709/msg00006`〕, and Piero Cavina replaced
+  *"the well known routine"* with a 160-byte table
+  *"to save RAM and CPU time, things more important than ROM at the moment"* 〔`199704/msg00152`〕.
+  A dedicated-line form of the loop (`sec / sta HMCLR / sta WSYNC`, the loop, `eor #7`, four `asl`,
+  `sta.wx HMP0,X`, `sta RESP0,X`, `sta WSYNC / sta HMOVE`) is reported to finish exactly 79 cycles
+  after the first `WSYNC` for every position up to 160 〔AtariAge `topic/125115`, 2008〕 — constant
+  because the closing `WSYNC` absorbs the loop's variable length (our reading). The 152 cycles
+  `hmove-two-step.md` measured at X≥150 (`assert_line_budget`) were on a shared line in the PONG
+  kernel — one that also carries other work, by our reading of that kernel — which is a different
+  setting from this dedicated line, not a measurement of it.
+  **Cited only, not verified** — none of these routines was assembled here.
+- **÷36 from a ÷3 result.** For a value 0..107 already divided by 3 (so 0..35, in A), an AtariAge
+  thread finishes ÷36 with two compares, `tax / lda #0 / cpx #12 / rol / cpx #24 / adc #0` — 10 bytes,
+  12 cycles, A = 0, 1 or 2 — used there to sort a sprite position into three screen areas 〔AtariAge
+  `topic/271568`, 2017〕. The `rol` stands in for a first `adc #0` and saves a byte. It is exact on that
+  range because `n div 36 = (n div 3) div 12` (our arithmetic). **Cited only, not verified**.
+- **Rounding a constant at assembly time.** DASM evaluates expressions in integers and truncates:
+  Dennis Debro's `[(3 * 256 / 16)* 6] / 5` came out 57 where he wanted 58, and a literal `2.5` was
+  not accepted (*"unless I'm missing something"*) 〔stella-list `200412/msg00001`, `msg00003`〕.
+  Adam Wozniak's general form: for `N/D` rounded to the nearest whole number,
+  *"compute (2*N+D) / (2*D)"* 〔`msg00006`〕. The reciprocal
+  constants above are typed in, not computed; written as `256/d` in DASM they would come out as the
+  floor (85 / 36 / 25 / 17), which matches none of the four, and the `ceil` the table holds is
+  `(256+d-1)/d` (our arithmetic). **Cited only, not verified** — not assembled here.
+- **Binary to BCD without dividing by 10: double dabble.** The ÷10 here splits a byte into digits by
+  quotient and remainder. Kevin Horton's 6502 routine converts a 16-bit value to packed BCD by shifting
+  it left one bit at a time into three result bytes and, after every shift but the last, adding 3 to any
+  BCD nibble of 5 or more (`adc #3 / and #8` tests the low nibble, `adc #$30 / and #$80` the high) —
+  *"it requires no temp variable storage"*, in his words 〔stella-list `200102/msg00104`〕. Our reading
+  of the posted code finds two things: it shifts the input bytes out, so the input does not survive; and
+  the rotate chain runs `bcd_out2` → `bcd_out1` → `bcd_out0`, which makes `bcd_out0` the most
+  significant byte, though its header comment says `bcd_out2`. **Not verified** — neither assembled nor
+  run here; the post gives no cycle count.
 
 ## When the divisor is a runtime value
 
-Everything above divides by a constant. Two shapes for a divisor known only at run time, neither
+Everything above divides by a constant. Three shapes for a divisor known only at run time, none
 implemented here:
 
 - **Binary long division — exact.** Shift the dividend's top bit through carry into the accumulator;
@@ -153,3 +221,9 @@ implemented here:
   one, the remainder `r = a − b·q` is off by the whole divisor `b` (**Not verified** — our arithmetic,
   not the thread's), so it is for screen positions, not for score digits (base conversion is his own
   counter-example). **Cited only, not verified**.
+- **A percentage, `n*100/t`, two ways.** Asked for the share of a level's secrets found (`t` up to 50,
+  different every level), gauntman's direct route — `n*100` by shifts and adds, then a 16-by-8 division —
+  took about 362–397 cycles (average 377) and is exact; groovybee's keeps a table of `(100<<3)/t`
+  and adds one entry into a 16-bit accumulator each time a secret is found, so reading the percentage
+  is three 16-bit right shifts, at the cost of rounding error that accumulates, put at up to 4%
+  〔AtariAge `topic/139620`, 2009〕. **Cited only, not verified**.
