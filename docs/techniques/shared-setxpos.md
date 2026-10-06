@@ -93,6 +93,18 @@ line"*; he moved the code, and it came back when a monster walked past its right
 shifting the platform one pixel down"* 〔`200410/msg00142`, `200410/msg00144`〕. **Cited only, not
 verified.**
 
+**A table instead of the division, as priced in 2001.** Manuel Polik's Gunfight 2600 positioned from
+a table, `HorzTable` (161 bytes as posted), each byte holding the HMxx value in its upper nibble and
+the coarse wait count in its lower (`lda HorzTable,X` / `sta HMP0,Y` / `and #$0F` / `tax` /
+`dex`-`bpl` / `sta RESP0,Y`). In 2001 Andrew Davie pointed him at doing it *"with a routine instead
+of a table (MUCHO bytes savings... about 128 bytes, approx)"*, naming Qb's `PositionSprites`.
+Polik's answer: *"Check the number of WSYNCS in both routines. You see the difference? :-)"* and
+*"I've mid-screen repositioning in mind, so saving a whole scanline might make a BIG difference in
+finding the right spot for a repositioning - well worth 128 bytes"* 〔`200102/msg00152`,
+`200102/msg00163`〕. Neither routine's line count is counted here; `divtable.md` (*The coarse
+position is time*) has Bob Colbert's 1997 remark that precalculating into a table saves a line.
+**Cited only, not verified.**
+
 **Why `ldx #4`, not `#5`.** The five objects are indices 0..4. A sixth pass writes the next
 register in each run instead: `RESP0+5` = `$15` = `AUDC0` and `HMP0+5` = `$25` = `VDELP0`
 (`internal/beamtrace/beamtrace.go`) — an audio register and P0's vertical delay, not a position. It
@@ -123,6 +135,15 @@ had simply been declared next. **Cited only, not verified.**
   the 15 remainders.
 - HMOVE fires **once at the end**, applying every object's pre-latched HMxx simultaneously.
 - `sta.w RESP0,x` forces the 16-bit absolute form = 5 fixed cycles, stabilizing the strobe.
+  The 4-cycle zero-page `sta RESP0,x` is not variable either (the cycle table above); what the extra
+  cycle changes is when the strobe lands, because a store reaches the TIA when the instruction
+  completes, so `.w` puts the `RESxx` write one CPU cycle (3 colour clocks) later. That was the
+  list's answer in 2001 when Andrew Davie needed exactly one more cycle before a write: Kurt Woloch
+  suggested `sta.w GRP0` (*"if that works"*), and Davie, asked by Chris Wilkson whether GRP timing
+  depends on when the instruction starts or finishes, replied *"When the instruction completes,
+  unfortunately"* and *"You don't need to use the mirror, just sta.w GRP0 will do the job"*
+  〔`200102/msg00154`, `200102/msg00156`, `200102/msg00159`〕 (also `restrobe-copies.md`,
+  `kernel-micro-idioms.md`). **Cited only, not verified.**
 - That depends on the assembler keeping the index. In 2017 two DASM builds both numbered 2.20.11
   disagreed: kylearan's (20140304) assembled `sta.w RESP0,x` to `STA.wx RESP0,x`, Thomas Jentzsch's
   (*"DASM 2.20.11 unofficial RevEng 20140124"*) to `STA.w RESP0` — the `,x` dropped without a word,
@@ -133,6 +154,22 @@ had simply been declared next. **Cited only, not verified.**
   `,x` would send every strobe to `RESP0`, so the demo's four `hmoved_pixel` asserts for P1, M0, M1
   and BL should catch it indirectly (inference, not tried; the local `.bin` has `$9D`).
   **Cited only, not verified** for the DASM builds.
+- A load can buy the cycle instead of the store. RMundschau's `PosObject` makes its table read,
+  `lda fineAdjustTable,Y`, always cross a page: the table is ORGed at `$F000`, the label sits 241
+  bytes (`%11110001`) below it, and `Y` holds the loop's leftover `$F1`..`$FF`, so every effective
+  address is on the page after the base's. His comments: *"Consume 5 cycles by guaranteeing we cross
+  a page boundary"*, *"In your own code you may wish to consume only 4"*, and the table is at the
+  top of a page *"to guarantee the processor will cross a page boundary and waste a cycle I need to
+  waste in order to be at the precise position I want the RESP0,X to happen at"*
+  〔`200403/msg00260`〕. That is one crossing per call, outside the wait loop, not the per-pass
+  crossing inside it that `hmove-two-step.md` warns against. It is the same +1 Chris Wilkson
+  suggested to Andrew Davie in 2001, *"Can you align the code so the the LDA instruction crosses a
+  page boundary? That'll give you an extra cycle"* 〔`200102/msg00154`〕 (our reading; Davie took it
+  as a branch crossing, *"utilising the extra cycle when branching over a page boundary is certainly
+  something worth looking at"*, and noted that his branch back to the top would *"take an additional
+  cycle, too"* 〔`200102/msg00159`〕). Eric Ball's table under *Variants* uses the same 241-byte
+  offset the other way, ORGed at `$xxF1` so the index never leaves the page. **Cited only, not
+  verified.**
 
 ## Variants
 
@@ -141,6 +178,12 @@ had simply been declared next. **Cited only, not verified.**
   the sign HMxx uses, so the shifted difference is the nibble — no table, no re-strobe. It does not
   handle the wrap at the screen edge (old 2 → new 158 wants left 4), and one HMOVE reaches only +7
   left .. −8 right (`known-traps.md`, *HMOVE range*), so a longer move is split across frames.
+  Outlaw gets the sign without the subtraction, by Manuel Polik's reading of David Crane's code
+  (*"I think I know the answer now"*): it counts horizontal coordinates *"left to right from 160 to
+  zero"*, so a bullet moving 4 pixels right adds `$FC` (−4) to its coordinate, and the four `asl`
+  before `sta HMM0,X` give, per his comment, `$C0`, right 4 (in the posted fragment the shifts act on
+  the sum after `adc`, not on `$FC` itself) — *"I think that's how horizontal movement
+  was _supposed_ to work"* 〔`200110/msg00139`〕.
   **Cited only, not verified.**
 - **Two players 8 px apart from one X, on one line** 〔AtariAge `topic/119524`, cybergoth's
   Seawolf code as quoted there〕: after the `sbc #$0F`/`bcs` wait, `and #$0F`/`tax`/`lda hmovetab,x` is P1's nibble
@@ -149,8 +192,53 @@ had simply been declared next. **Cited only, not verified.**
   9 colour clocks apart and the one-step nibble difference closes that to 8 — the correction
   `sprite-placement.md` (*What rule 3 buys*) takes from two shifted tables, here derived from one. The
   code needs a `clc` ahead of the wait loop; without it the pair shifts one pixel right when it moves.
-  **Cited only, not verified** — taken from the mining notes; the thread's own text is not in the
-  corpus.
+  Eric Ball posted the same pair of nibbles and back-to-back strobes on the list in 2002 (*"Update
+  Manuel's magic with Eric's 2 in 1 magic"*) 〔stella-list `200212/msg00193`〕, as a reply in a thread
+  whose first post is not in this corpus. Compared with Manuel Polik's Star Fire version, which
+  opens with `sta WSYNC` / `sta HMOVE`, masks the leftover with `and #$0F` and reads a 16-entry
+  table 〔`200211/msg00165`〕, his differs in two ways. His 15-entry table is ORGed at `$xxF1` and
+  read as `hmovetab-241,Y` with the loop's leftover in `Y`: *"Figured out an additional tweak: if
+  you put the hmovetab at the very end of a page, then the AND #$0F isn't required. This saves a
+  couple of additional cycles"* (by hand: the base is then the page's first byte and `$F1`..`$FF`
+  stays inside the page). And his line opens with `sta WSYNC` alone, keeping only the closing
+  `sta HMOVE`: *"I've also removed the STA HMOVE since there isn't any drawing on the line anyway
+  and it could cause problems since the STA HMP1 is less than 24 cycles after (although it might be
+  necessary for HMOVE bars)"*.
+  **Cited only, not verified** — the Seawolf form is taken from the mining notes; that thread's own
+  text is not in the corpus.
+- **Battlezone's routine** 〔stella-list `200210/msg00281`, Manuel Polik, 2002〕: the same `sbc #$0F`
+  / `bcs` wait and `eor #$07` / `asl`×4 as `SetXPos`, but it strobes with the 4-cycle `sta RESP0,X`,
+  leaves the nibble in `Y` (`tay`) for the caller to store, and does `sta WSYNC` / `sta HMOVE` both
+  before the wait and after the strobe (`divtable.md`, *The coarse position is time*, has the wait
+  itself). Ahead of it sits an entry step, `cmp #$11` / `bcs` / `sbc #$04` / `bcs` / `adc #$A5`. By
+  hand, inputs of 17 and up pass unchanged, 5..16 enter the wait as 0..11 and 0..4 as 160..164, with
+  the carry set on every path (**Not verified**). Polik guessed at its purpose — *"The add/sub stuff
+  on entry of the routine seems to fix some troubles with early RESPX"* — without knowing what range
+  Battlezone feeds it: *"Just a few guessings"* 〔`200211/msg00017`〕. He said it *"uses half the
+  bytes"* of the routine Robert Colbert had explained, that *"you can call this wherever you want,
+  even midscreen"*, and *"I think the routine presented could be even tweaked to reposition an
+  object in a single scannline - without using any table!"*, leaving open whether it is precise at
+  the borders and *"how/if the algorithm works without"* Battlezone's HMOVE lines
+  〔`200210/msg00284`〕. Dennis Debro ran it in VBLANK on Climber's main player (*"it works great"*,
+  with *"a little wall on the left where the player seems to bounce off"*) and then dropped the
+  `tay` in his kernel, where *"it seems to work fine without those 2 cycles"*; Polik's question
+  whether that gave all 160 positions has no answer in the thread 〔`200210/msg00285`,
+  `200210/msg00286`, `200211/msg00017`〕. In 2004 Thomas Jentzsch: *"Looks like Space Jockey was the
+  first game using it"* 〔`200403/msg00262`〕. **Cited only, not verified.**
+- **Pre-packed coordinates (the Air-Sea Battle form)** 〔AtariAge `topic/89293`〕: each object's X is
+  converted in VBLANK, all objects together, to one byte with the HMxx value in the upper nibble and
+  the coarse count in the lower, kept in a RAM array; the positioning line then loads it,
+  `sta WSYNC`, `sta HMP1`, `and #$0F` / `tay`, waits in a `dey` / `bpl` loop, strobes `RESP1` and
+  ends with `sta WSYNC` / `sta HMOVE`, so the kernel does no division. `HorzTable` above has the
+  same byte layout in ROM, indexed by X. On the list, Erik Mooney in 1997, discussing a conversion
+  routine, weighed storing only the standard X against storing *"both the standard X and FC_X"* when
+  short of RAM 〔`199704/msg00051`〕, and in 2004 said the Air-Sea Battle routine *"at least gets a
+  visible understandable byte with the fine/coarse numbers"* 〔`200404/msg00298`〕. Dennis Debro,
+  moving Climber from what he called *"the old Air-Sea Battle positioning routine"* to Battlezone's,
+  expected *"7 more bytes of RAM"*; the thread does not say what those bytes held
+  〔`200210/msg00285`, `200210/msg00286`〕. **Cited only, not verified** — the VBLANK conversion, the
+  nibble order and the kernel-line sequence are taken from the mining notes; that thread's own text
+  is not in the corpus.
 
 ## CI
 
