@@ -77,6 +77,16 @@ two scanlines."* 〔stella-list `200202/msg00196`〕 reveng gave a beginner the 
 holds every write gains no timing from it (our reading), and keeps only the 1-px granularity above.
 **Cited only, not verified.**
 
+**Two players without VDEL, in six cycles of HBLANK.** boutell, 2007, asked whether two freely moving
+single-height players were practical without VDEL. Manuel Rotschkar (`cybergoth`) answered with a
+sketch: get shape 1 into X and shape 2 into A first, then `STA WSYNC / STX GRP0 / STA GRP1` —
+*"Voilà, both sprites set in only 6 cycles of HBLANK"*. The next day he gave the point of it: *"_before_
+the STA WSYNC you have (almost) all the time in the world to prepare stuff - and that your loop doesn't
+have to start with it."* The six are the two 3-cycle stores; the fetches run on the previous line. Its
+price is a second register: vdub_bobby tends to keep X as another counter, or lacks the spare cycles.
+boutell later reported *"This tactic actually works very well for me. A variation on it is doing the job
+nicely"* 〔AtariAge `topic/100922`〕. **Cited only, not verified.**
+
 **The mechanism.** Each player has two graphics registers, new and old. A write to GRPx stores the
 value in that player's new register **and copies the OTHER player's new into its old**. That copy
 happens on every write, VDEL on or off; VDEL only chooses which of the two is displayed — alex_79,

@@ -273,6 +273,21 @@ came out *"way,way out of tune"*, and the thread ends without a cause. Cited onl
 reading of that source: the duration loop jumps back to the high half-wave with the counter already at
 0, so after a note's first period every high half-wave runs 256 passes whatever the note. Not verified.
 
+## A fifth bit from one register, in time, as proposed (2005)
+
+The pseudo-5-bit trick above sums two registers at once. Manuel Rotschkar (`cybergoth`), 2005, gave
+the same arithmetic spread over time on one register: *"you can fake 5-Bit quality samples with the
+TIAs 4-Bit volume register by dividing each 5-Bit sample in two 4-Bit samples and feeding them to the
+TIA twice as fast as the 5-Bit sample-speed"* — his example is 23 (*"/2 = 11.5"*) played as 11 and 12 —
+and asked *"Isn't that called "oversampling"?"* 〔stella-list `200508/msg00064`〕. It was his reply to
+B. Watson's proposal to toggle two adjacent pitches on alternate frames (the pitch side is
+`pitch-dither.md`): *"Techniques like that are normally rather used with the volume than with the
+frequency"*. None of the thread's sixteen messages reports trying it. **Not verified** — the nearest
+measurement here is the engine's, not a console's: `internal/emu/audvtwice_test.go` writes AUDV0 `$0F`
+then `$00` on every scanline (AUDC=0) and finds the played sample is the two values averaged by how
+long each held within a 38-cycle averaging window, not the last one written; an alternation like 11
+and 12 at a sample rate was not tried.
+
 ## The other direction: one volume register split among several voices (2001-09)
 
 The pseudo-5-bit trick above adds two registers into ONE sample. Kevin Horton proposed the reverse:

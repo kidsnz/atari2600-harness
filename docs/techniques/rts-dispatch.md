@@ -157,6 +157,25 @@ fixed-height form; the elastic-spacer form is a documented extension.)
   dispatch is the `JMP (vector)` alone, 5 cycles by the opcode table; the `RTS` form has no such split,
   because the jump consumes the address it pulls (our reading; **Not verified**). **Cited only, not
   verified**.
+- **A list that keeps its place across frames.** Four months before Tumber's 2003-05 post, Manuel Polik (`cybergoth`, the Manuel Rotschkar of
+  the *Jumpman* item below), 2003-01, over-running vertical blank in *Star Fire*, wanted to respawn *"only when there is still enough time
+  left that particular frame"* behind `LDA INTIM / CMP #$05 ; more than 6*64 cycles left?`, and asked
+  whether that would work on a real console. Thomas Jentzsch: *"Yes it works. I'm doing this in Thrust
+  and recently found out that Vanguard has those "emergency exits" too"* 〔stella-list `200301/msg00038`,
+  `msg00040`〕. Christopher Tumber proposed a table of low-priority routines whose index *"would only be
+  reset when the end of the table is reached. So calling the routines could be spread out over several
+  frames"*, against a check at the head of each routine, where the first routines might run every frame
+  while the last wait several 〔`msg00048`〕. Polik answered *"This is a really excellent idea!"* but
+  kept his own scheme for *Star Fire*, where *"A great deal of routines I do are really required every
+  frame"* 〔`msg00051`〕. Replying to that sentence the same day, Tumber put the list on the stack itself,
+  each next routine called by an `RTS` and the last one resetting SP to the top of the list
+  〔`msg00062`〕. Both posted guards skip the work when `INTIM` reads 5 or more and run it below that
+  (our reading): `CMP` sets carry when `INTIM` is 5 or more, so Polik's `BCC Continue` falls through to
+  `RTS` and Tumber's `BCS end_VBLANK` leaves the table — the reverse of their comment, and a timer that
+  has already run out and wrapped to `$FF` also reads as plenty; Tumber had written his *"off the top of
+  my head, may be buggy as hell"*. With `TIM64T`, an `INTIM` of 5 promises only a little over 4×64
+  cycles before it reaches 0, not the comment's 6×64 (our reading).
+  **Cited only, not verified**.
 - **A third table for the bank.** sunpazed, writing a first game, gave each character a state list
   whose states *"are then jumped to via a look up table"*. Thomas Jentzsch uses state lists in his
   Elite demo; his dispatch reads three parallel tables — `TaskPtrTblLo,y` and `TaskPtrTblHi,y` into a
