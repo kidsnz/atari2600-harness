@@ -25,6 +25,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     exist on PAL; compare the palette-side measurement in `visual-ceiling.md` (four of sixteen PAL hues
     are one grey). **Cited only, not verified** — his values have not been checked against the PAL
     table here.
+    - **The choosing can be a nearest-colour search, and its weak spot is the same yellow.** In cd-w's
+      2005 thread on PAL colour conversion, as the distillation notes record it, tom's procedure reads
+      the RGB of every NTSC and PAL colour from a TIA colour chart and, for each NTSC colour, takes the
+      PAL colour at the smallest Euclidean distance in the RGB cube. The notes record the result as
+      roughly right but not perfect, separate weights for luminance and hue as a possible improvement
+      that the thread did not implement, and no exact PAL match for NTSC's pure yellow. 〔mining 68132
+      pal-colour-conversion; only the distillation notes are held here, so none of this is quoted〕 The
+      same minimum is what `Quantizer.Nearest` in `internal/ingest/palette.go` finds (it compares squared
+      RGB distance, which ranks the same). `visual-ceiling.md`'s `ceiling -palette-spec PAL` quantises
+      an NTSC frame against the PAL palette on purpose, to show the failure; it is not offered as a
+      conversion, and whether its search is tom's was not checked. **Cited only, not verified.**
   - **Dark luminances can be lost on PAL.** mr-sql, 2019, on the PAL version of his *Breakout 2002 Laserbeams*, as the
     distillation notes record it: in an earlier revision the low-luminance rows were lost on PAL, most
     visibly on a PAL console modded for composite, and the next revision raised the PAL luminances
@@ -92,6 +103,27 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     Read with the rule above, "shifted 90° too" means colour that changes per scanline would change
     per column on a turned screen, where the TIA's colour changes are the costly ones (our reading; Polik
     does not spell it out). **Cited only, not verified** — a game was being planned, nothing was turned.
+  - **A colour change part-way along a moving sprite has to move with it, so it belongs on things that
+    stay still.** Eckhard Stolberg, 1999, to Russ Perry Jr, who had asked of colour changes along a
+    line *"Are there games that actually use this?  It sounds like the old "rule" about one color per
+    line per sprite isn't necessarily true then..."*: *"Writing code
+    that changes the colour of a freely moving sprite always at the same pixel is practically
+    impossible. This trick only makes sense for stationary objects. I don't know of any games that
+    change the sprite colour while it is being drawn, but Qbert changes the playfield colour several
+    times per scanline for displaying the pyramid."* 〔`199903/msg00066`〕 Robin Harbron: *"it would only
+    be possible if the sprite was only allowed to move at a poorer "resolution" - in other words, the
+    sprite would have to move, say, in multiples of 3? pixels at a time, left and right.  Still, it would
+    occupy far too much processor time for what the effect is worth."* 〔`199903/msg00067`〕 His 3 matches
+    the 3 colour clocks per CPU cycle in the band rules below, and the per-line colour of the parent
+    line is untouched, since it changes between lines, not along one (our reading). **Cited only, not
+    verified.**
+  - **A sprite that rotates was given its second colour by flicker instead.** walaber, 2014, on his
+    *Tubular* work in progress, as the distillation notes record it: *"This is my first time making a
+    flickering kernel, which I used in order to get 2 colors on the player sprite (and since it rotates
+    I can't just pick"* — where the notes' quotation breaks off 〔mining 232768 tubular-wip; only the
+    distillation notes are held here〕. A colour per line is fixed to rows of the graphic, and turning the
+    figure moves its parts to other rows (our reading of why). **Cited only, not verified** — his ROM
+    was not run, and the rest of his sentence is not held here.
   - **A colour change can be hidden in the black between bands.** Glenn Saunders, 2002, to Billy Eno,
     who wanted four states per tile on a 16×16 board of playfield tiles: *"You know it is possible to
     change color registers at least six times in the middle of the scanline."* And: *"If all you did was
@@ -101,6 +133,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     board, `200208/msg00049`〕 His six sits under the parent line's ceiling of about 8. The store lands
     while the playfield is off, so the new colour first shows on the next lit stretch (our reading).
     **Cited only, not verified** — "could" is his, and no such kernel was built here.
+  - **In 1997 the idea was put on the list as extra playfield resolution, and as a slanted edge.** Jim
+    Nitchals, 1997, answering that playfield resolution is limited to 40×192: *"it's possible to rewrite
+    the playfield color registers to create the appearance of more resolution.  The 6502 runs one clock
+    cycle for every 3 pixels, so it's possible to create playfield images that have more complex
+    shapes.  The timing's a nightmare though - I'm only planning on using the technique to build a pretty
+    title screen."* 〔`199703/msg00098`〕 Glenn Saunders: *"The other trick is to offset the timing of the
+    graphics display to create a diagonal border between two colors.  This is supposedly how Radar Lock
+    generates its various diagonal horizon lines with such smooth resolution."* 〔`199703/msg00099`〕 Nick
+    Bensema: *"The timing would be too much hell to deal with, you might as well use player, missile or
+    ball graphics to round out the edges."* 〔`199703/msg00101`〕 The 3 is the band step below; a write
+    moved by one cycle on each line moves the edge 3 colour clocks a line (our reading of Saunders').
+    **Cited only, not verified** — "supposedly" is his, and Radar Lock was not examined here.
   - **How many colours a line holds depends on how the stores are fed, and a 2013 challenge counted
     the rungs.** Andrew Davie's thread on how much colour a still picture can carry, as the
     distillation notes record it: Tjoppen's kernel of consecutive zero-page `STA`/`STX`/`STY`/`SAX`
@@ -174,7 +218,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     successive line alternating between red, green, blue"*, each three lines forming an RGB triad.
     *"The memory requirements are 1/3 of the original interleaved chronocolor(TM) technique, but this
     technique is a lot less flickery.  Actually, it doesn't flicker at all."* 〔`200408/msg00065`〕
-    For the interlaced two-field form he proposed next, Davie claimed *"improved perceived resolution
+    He had reported the same finding in March 2003, about seventeen months earlier, with binaries: *"if you \*DON'T\* do the interleaved
+    colour frames, but instead just show a single frame and have the colours RGB on successive scanlines
+    (that is, each scanline is always red, or green, or blue), the frame itself still looks OK.  See
+    nointerleave bin files for a demo of this.  The advantage of this, of course, is that you only need
+    1/3 of the graphics data to have similar visuals."* 〔`200303/msg00072`〕
+    For the interlaced two-field form he proposed next in the 2004 thread, Davie claimed *"improved perceived resolution
     (we're doubling vertical resolution with the interlacing anyway)"*; Thomas Jentzsch, replying to
     that line: *"Yes, but IMO you are also reducing the effective vertical resolution by combining 3
     lines."* 〔`200408/msg00070`〕 What Davie then posted as ROMs was an interlaced two-field version,
@@ -186,8 +235,8 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     black and white 〔`200408/msg00084`〕. Davie: *"I think the preference is for ICC;  but in a crunch a
     very acceptable result can be achieved by the new method."* 〔`200408/msg00083`〕 So in the parent
     line Chronocolour is a fake of horizontal colour but not necessarily a flickering one (our reading).
-    **Cited only, not verified** — the single-field triad was described, not posted as a ROM, and
-    nothing here was run.
+    **Cited only, not verified** — the single-field triad was described in 2004, not posted as a ROM;
+    the 2003 nointerleave binaries were posted but not run here, and nothing else here was run.
   - **An ICC picture fades without a second image.** Davie, 2003, posting a fade of an Interleaved
     Chronocolour full-screen bitmap: *"This is just one image, by the way - the colours used to create
     the interleaved chronoblahblah (TM) thingy are being changed on the fly to give the fading
@@ -536,6 +585,23 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     `STY WSYNC`, a `DEY` wait, `STA RESP0,X`, `STA HMP0,X` (our reading of the ROM's bytes). The
     saving is 1 byte a call, not 2 — `integration-density-playbook.md` has the BRK-as-call measurement
     and the same three call sites. **Not verified** — the routine was not run here.
+  - **Whether the divide and the wait share one loop was said to cost scanlines.** Dennis
+    Debro, 2004, disassembling *Kaboom!* and *Pac-Man* (both, he notes, copyright 1981), posted their
+    positioning routines — in *Pac-Man* a divide-by-15 loop and then a separate wait loop; *Kaboom!*
+    pre-calculates the position — and called them *"sort
+    of similar to the way Gary Kitchen did it for Space Jockey and Donkey Kong"* 〔`200407/msg00004`〕.
+    Manuel Rotschkar disagreed: *"They do two loops and they're wasting 2 scanlines, just like the
+    original Air-Sea-Battle did from the beginning.  The trick of the advanced code is to do the
+    "calculating" and the "waiting" in one single loop."* 〔`200407/msg00005`〕 Debro: *"True but it looks
+    to be the start or spawning of the "advanced" technique. They reduced the horizontal positioning
+    significantly from Joe Decuir's original routine used in Air-Sea Battle."*, adding that Rick Maurer's
+    *Space Invaders* routine is *"similar to KABOOM!"* 〔`200407/msg00006`〕. The Video Olympics routine
+    above is the two-loop kind by our reading of its bytes (the divide before `STY WSYNC`, the `DEY`
+    wait after it), and `techniques/shared-setxpos.md` is the one-loop kind: after `sta WSYNC`, its
+    `sbc #15` / `bcs` loop is both the divide and the wait, and its cost is measured there: one scanline
+    per object, or two when the next `WSYNC` misses the line (input 90 or more in its loop; 2026-10-01,
+    on copies of its demo with the input changed). **Cited only, not verified** for the two-loop kind — its scanline cost was not
+    measured here, and the commercial routines' remainder constants are not copied.
 - **Moving an object relatively inside the kernel goes a few pixels at a time, and a paddle does not
   wait.** Thomas Jentzsch, 2025, on *StalaX*: *"Since the movement of the missiles is relative during
   the kernel, they can only move +/-7 pixel per missile. But the paddle can move much faster. So when
@@ -627,6 +693,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     screen.  Ie, just negate your x-axis."* 〔`199803/msg00164`〕 The parent line's measurement shows the
     same direction: the deeper the entry, the shorter the delay. Counting the position from the right
     edge is his suggestion: **Not verified**.
+  - **The table need not start a page, only stay inside one, because only the pointer's low byte
+    changes.** Chris Wilkson, March 1998, in another thread ("6 digit score display and other
+    ramblings"), to Erik Mooney, who had written that such a
+    `JMP ($xx)` delay works *"if TABLE is the first byte of a page"*: *"I don't think TABLE has to be the
+    first byte.  But the table does have to fit inside one page."* With his code at `$FFE6`, the
+    pointer's high byte is `$FF`, and *"you just have to remember when generating your offset that it's
+    from address $ff00, not from $ffe9 (the address of TABLE)"*; then *"actually, I guess the table would
+    need to be contained in the first half of the page because you lose a bit during the shift."* His
+    count for the jump is *"WASTE 5 CYCLES"*. 〔`199803/msg00158`, quoting `199803/msg00154`〕 The `$xxFF`
+    trap above is a different page rule, about where the pointer is stored rather than where it points
+    (our reading). **Cited only, not verified.**
 - **48px** = NUSIZ $03 (3 copies) + P1 shifted 8px right + VDEL double-buffering to swap GRP with a time offset. Reuse score/bitmap48. 〔48px-positioning〕 `→ pkg/sprite.SplitWide/NUSIZ / design.MaxChars(Text48px)`
   - **When a picture's proportions do not fit the pixel, the technique and the layout are derived
     backwards from it.** Thomas Jentzsch, 2026, on drawing the American flag: *"For a reasonable star,
@@ -767,6 +844,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     requires a copy of the screen"* proposed *"a "floating" update window of 3 or 5 lines"*
     〔`199706/msg00018`, `199706/msg00019`〕.
     **Cited only, not verified.**
+    - **A picture too big for RAM can be computed during the kernel instead of stored.** Paul Slocum,
+      2004, on a demo that bounces a large playfield logo around the screen: *"The logo bouncer doesn't
+      use the RAM as video memory (it's 26 lines, so that would require more than the Atari's got.)  It
+      generates the playfield data during the kernel, only requiring a few rolling buffers."*
+      〔`200411/msg00014`〕 What the buffers hold, and what the generation costs per line, the post does
+      not say. **Cited only, not verified** — the ROM was not run.
   - **Animation can cover the 4-pixel step.** Erik Mooney, 1997, on his playfield Space Invaders, told
     that the invaders march in place for two frames on every horizontal move: *"In the arcade, they
     alternate frames every time they move, but they move in single-pixel increments. I'm using
@@ -949,6 +1032,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
       left edge covers the parked objects, the left side of a wrap and the comb (Sprites section) at
       once; the right side of a wrap needs the right edge covered too, as his river banks do, and a band
       in any other colour leaves the comb showing (our reading). **Cited only, not verified.**
+    - **Three ways to hide a wrap, and what each cost in one game.** Manuel Polik, 2002, had given up
+      bringing ships smoothly in at the left and right edges of his space shooter — *"I don't like what
+      these would cost"* 〔`200210/msg00030`〕. Thomas Jentzsch listed the options: *"some additional AND
+      inside the kernel to mask the wrapping bits"*; *"the trick with all HMOVE-blanks on the left side.
+      They would mask 8 bits."*; or *"two 8 pixel wide vertical borders using the PF (like a cockpit
+      window)"* — *"IMO all is better than ships poping out of nowhere."* 〔`200210/msg00031`〕 Polik:
+      masking would *"reduce the the visible space for another 16 pixels on both sides. So it'd be
+      reduced from 128 to 96 Pixels"*; the HMOVE blanks mask 8, *"But not 16"*; the PF borders *"Which'd
+      turn the croshair & the stars black"*; and his best idea *"would require 8 times the needed ROM"*
+      〔`200210/msg00032`〕. So the comb, kept on every line, is a mask 8 pixels wide on the left only
+      (our reading). About fourteen months later, posting as Manuel Rotschkar from the same address, he chose black PF
+      pixels at both sides for *Seawolf* (the entry above). **Cited only, not verified.**
   - **Keep PF0 as a fixed frame and the playfield becomes a board that fits in RAM.** kylearan,
     sketching a Space Taxi-like game: *"Restrict the playing area to PF1 and PF2 and use PF0 only for the
     enclosing border. That gives you 32 blocks = 128 pixels horizontally for level design of the interior
@@ -988,6 +1083,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     GRP0."* 〔`200409/msg00001`〕 That is the VDEL delay of the 48px line under Sprites, used here to move
     a GRP0 write off the line that positions (our reading). **Cited only, not verified** — Ms. Pac-Man
     was not disassembled here.
+    Kurt Woloch, 1999, saw the same opening in a picture rather than a kernel, answering Thomas
+    Jentzsch's announcement of a 2600 *Thrust* modelled on the C64 game: *"the fact that the playfield,
+    also in the original version, isn't displayed on every scanline, makes it possible to do other
+    things on the other scanlines, e.g. to update the players!"* 〔`199911/msg00025`〕 So a design whose
+    playfield has gaps in it buys the rest lines without any compromise to the picture (our reading).
+    **Cited only, not verified.**
   - **Or run the line from RAM, where every load is an immediate.** Christopher Tumber, 2003: five
     table-fed TIA writes (`lda table,x` / `sta`) cost 35 cycles and the same five with `lda #` cost 25;
     the second form *"could be used now if you have enough ROM to predetermine all possible routines
@@ -1072,7 +1173,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     kernel, though it'd take a bit more RAM. My INV is PF 012012 and uses lots of RAM for the
     playfield."* 〔`200109/msg00329`〕 So in repeat mode the mask is paid off-screen or in RAM, not in
     the kernel (our reading). Saunders' reflected version was not yet working when he wrote; Mooney's
-    guess was a cycle-counting error. **Cited only, not verified.**
+    guess was a cycle-counting error. Saunders gave the same reason in 2003, asked why he had wanted a
+    reflected asymmetric playfield: *"I really did NOT want to have to deal with that half-byte in the
+    middle of the screen, doing bit masking and having an extra store for the right border."* The
+    price he named: *"it's still a pain dealing with the bit order reversals"*; and while *"a lot of
+    games manage okay with a non-reflected playfield bitmap, and gain the advantage of looser timing in
+    the middle of the screen"*, *"I think it was a net gain for DD, timingwise, to do it with
+    reflected."* 〔`200308/msg00128`〕 The half-byte is the repeated right half's `PF0`, which starts at
+    the centre (our reading). **Cited only, not verified.**
   - **The PF0 trade is one rung of a ladder counted in registers rewritten per line.** SpiceWare,
     2015, on showing different images left and right: *"Takes a lot of cycles per scanline though ... In
     Stay Frosty I mirrored the screen and only updated PF1 and PF2. In Stay Frosty 2 I used the time
@@ -1311,6 +1419,30 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     an even number of scanlines 〔`200006/msg00040`〕. A plan, not a report of the result. Next to
     Cavina's switch, which buys only the line count, Jentzsch's list adds game speed, and Stolberg names
     the palette as the larger difference (our reading). **Cited only, not verified.**
+  - **On a SECAM console the colour/B&W switch always reads B&W, so a game's B&W colours can be its
+    SECAM colours.** Eckhard Stolberg, 2002, answering a SECAM question from Christopher Tumber, who
+    was converting a game to PAL: *"I think some of the EbiVision games have an optional SECAM mode selectable
+    through the Colour / Black and White switch. The input of this switch is hardwired to B/W on a SECAM
+    console, although the switch itself still turns off the colour generation in hardware. Atari's PAL
+    games also had the colours for B/W mode selected in such a way that they would look good in SECAM."*
+    He added that he was *"not sure how well SECAM handles 60 Hz signals"* 〔`200211/msg00095`〕. So a
+    game that keeps a separate B&W colour set, as the B&W rules in the Colour section describe, already
+    has the place a SECAM palette goes, and the console selects it without a switch (our reading).
+    **Cited only, not verified** — "I think" is his, and nothing here models SECAM.
+  - **Read the switch once and keep it as a table index, and the choice costs the same cycles on every
+    path.** Andrew Davie, 2003, reviewing Dennis Debro's *Climber 5* source, where NTSC or PAL is set by
+    the right difficulty switch and tested in branching sections (`bit SWCHB` / `bpl`): *"I'd
+    probably check the switch at startup and save the relevant bit as D0 of a variable (or D1 - see later
+    in this post).  Then you could use that variable as an index to tables."* — `ldy PAL_NTSC` /
+    `lda SKYColour,y` / `sta COLUBK`, with `SKYColour .byte NTSC_SKY_BLUE, PAL_SKY_BLUE`. *"This code only
+    benefits from being constant cycle-time - on average faster, and more readable.  It requries a RAM
+    variable to save the switch state, though."* For tables of words, *"you might be better setting D1 of
+    the PAL_NTSC variable instead of D0.  Then you don't need to ASL"* (`ldx PAL_NTSC ; 0 or 2`)
+    〔`200304/msg00199`〕. Thomas Jentzsch, replying to Debro about the same time, kept the low bytes and the
+    high bytes in two rows, so an index of 0 or 1 reads `Table,x` and `Table+2,x`, still choosing the index with a `bit SWCHB` /
+    `bpl` branch each time 〔`200304/msg00200`〕. Debro, on the RAM:
+    *"I'm currently using 79 bytes of RAM. ... I do hate wasting 7 bits though."* 〔`200304/msg00202`〕
+    **Cited only, not verified.**
   - **A seconds counter kept in frames follows the line count the ROM draws, not the standard.**
     Crackers, 1997, writing a virtual-pet demo, planned to use the colour/B&W switch as an NTSC/PAL
     switch and added: *"The clock will also have to be different in the PAL version as the second
@@ -1715,6 +1847,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     The frame's total is held by the bounds above; how much of it is picture is a margin set on 1970s
     sets (our reading). 200 and 205 are two of the line counts in the pixel-aspect note in the craft
     section. **Cited only, not verified** — no ROM's visible line count was measured for this.
+  - **Where `VBLANK` goes on and off can letterbox the picture.** Chris Wilkson, 2005, in a
+    thread about a rolling 262-line kernel, by the broadcast numbering: *"So theoretically, VBLANK should be turned on 3
+    lines before the start of VSYNC, and it should remain on for 20 lines.  But this will result in
+    active video outside the top and bottom visible area on most TVs.  So you can adjust VBLANK if you
+    want to add letterboxing to your 2600 displays."* And why some games blank late: *"as soon as VBLANK
+    is turned on, the screen goes black.  In those games they are using a different color for the
+    border IIRC.  So they don't turn on blank until it's outside the viewable area."* 〔`200503/msg00090`〕
+    Twenty blanked lines leave 242 of 262 (our arithmetic), so how much of the frame is picture is set
+    by where `VBLANK` goes on and off (our reading). His 20 is the broadcast's theory, and it is one
+    line under this file's 3 + 3 + 15 floor above (our arithmetic). **Cited only, not verified.**
   - **The total has a range too.** NoLand's summary of a Digital Press table of measured line counts,
     as the distillation notes record it: NTSC standard 262, minimum 238, maximum 290, median 262; PAL
     standard 312, minimum 258, maximum 336, median 312 — most games keep the standard, some, popular ones
@@ -1730,6 +1872,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     through the 160 (our sum). He left PF0 out of the rink (*"it starts 16 pixels in"*) so that *"only
     PF1 and PF2 need to be updated every 4 scanlines"* 〔`200406/msg00031`〕. A plan for a game he was
     still writing, not a shipped layout. **Cited only, not verified.**
+  - **A score drawn inside the scenery takes no lines of its own.** Manuel Rotschkar, 2004, on day
+    nine of his *Seawolf*: *"I managed to move the score display into the horizon... - while leaving the
+    horizon fully intact! (Besides looking cool this also frees 16 more scannlines...)"*
+    〔`200401/msg00116`〕 Where Champeau's plan above gives the status area 32 lines of its own, here the
+    score shares lines with a band the picture needs anyway (our reading). **Cited only, not verified**
+    — the ROM was not run, and the post does not say how the score is drawn into the horizon.
   - **End the VSYNC pulse on a `WSYNC`, not on a polled timer — one poster's rule, and a case it did not
     explain.** Roger Williams, 2002, on games that set a timer and poll it through VSYNC: *"This
     absolutely will not work with video hardware that times from the end of VSYNC instead of the
@@ -2119,7 +2267,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     blanking. This translates to 17 extra clocks per line, and so the shift is actually 17 pixels"* —
     one extra clock every four system clocks, over HBLANK's 68. He also shows the 1-1-2-0 width pattern
     breaking where a pixel straddles blanking and active video. 〔mining 261596
-    cosmic-ark-star-field-revisited〕 This is the base effect, a different layer from the revision
+    cosmic-ark-star-field-revisited〕 Eckhard Stolberg had corrected his own 1997 figure the same way
+    in 2002, replying to a post that cited it, by Carlos Lopez, who was re-implementing the TIA for
+    his "2600onachip": *"It still says that missile0 gets
+    shifted 15 pixels in every scanline. Later we found out that it is actually shifted 17 pixels per
+    scanline, and that every fourth line is empty, while the line before this has a double width
+    pixel."* 〔`200208/msg00270`〕 His empty fourth line and double-width pixel before it read as the
+    1-1-2-0 pattern above (our reading). This is the base effect, a different layer from the revision
     difference above. **Cited only, not verified.**
   - **The mechanism of the revision difference, as Eckhard Stolberg recalled it, and which objects it
     moves.** Stolberg, 2004, answering a test Thomas Jentzsch posted for "Kool-Aid-Man-compatible"
@@ -2299,6 +2453,41 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   for the other, with `COLUP0` changed at any cycle and P0 and M0 kept at least 3 pixels apart
   〔mining 260578 sprite-flicker-question〕. So a still background frees resources, and in this case did not by itself
   make the mock-up fit (our reading). **Cited only, not verified** — nothing was built.
+  - **A 1998 fighting-game kernel paid for its background lines with the fighters' vertical freedom.**
+    Eckhard Stolberg, asked by Robin Harbron whether the two big sprites of his *Beat 'em up* demo could
+    have different Y coordinates: *"Currently the kernal doesn't allow different y-coordinates, because
+    it would conflict with the background lines. But the fighters don't use the full 42 pixels at the
+    moment. Therefore small jumps would be possible. If this doesn't look good enough, I might try to
+    implement y-coordinates."* 〔`199808/msg00000`〕 The jump would be drawn inside the sprite's own 42
+    rows, which move the figure without moving the kernel's band (our reading). **Cited only, not
+    verified.**
+- **Build the main kernel first, as a ladder of placeholders; the title can be cut, the enemies
+  cannot.** enthusi, 2014, to lazycow, who had posted mock-ups for a 2600 port of his C64 game
+  *Powerglove*: *"To me it looks like the main engine kernel is the most important thing - and also the
+  one that would allow for the least cuts. If in the end the title isnt done using all missiles, players
+  and that extra portion of trickery it wont do too much harm. But if the game lacks enemies, it
+  would"*. His order for a first routine: *"player, 1 enemy on same horizontal level, multiple enemies,
+  asymmetric playfield. Next could be color update of players every line (that might be a bit tight?)
+  and playfield update"*, with *"any random/solid placeholders"* rather than final graphics. 〔mining
+  221811 powerglove〕 Each rung adds one cost to the line, so the first rung that does not fit names
+  what the mock-up has to give up (our reading). **Cited only, not verified** — nothing was built here.
+- **Sound left to the end gets what the end leaves: in *Qb* the 80 bytes offered for it went to other
+  things.** Andrew Davie, 2001: *"I have been reorganising (again), and can offer about 80 bytes of space
+  for data for sound/music, should anybody be interested"*, since *"I can neither read nor understand
+  anything related to music - and also I am rather deaf"* 〔`200103/msg00117`〕. The build he then posted
+  as FINAL had none; Kurt Woloch: *"It still has no sound - ok, you said so, but only a few days ago you
+  were offering 80 free bytes for someone to do some sound... apparently, you didn't find anyone."*
+  〔`200103/msg00145`〕 Thomas Jentzsch: *"if Andrew could add at least minimum sound, that would make it
+  perfect."* 〔`200103/msg00154`〕 In his post-mortem a few days later Davie gave two reasons for *"the
+  lack of decent sound"*: *"I am obviously not the right person to do sound (I don't hear so well, and
+  I know nothing about sound/music), and I would obviously have to trade off some other feature to allow
+  sound support. The game works OK with the minmal sound there is..."* 〔`200103/msg00196`〕 And of the
+  bytes: *"when I HAD space and asked for volunteers/help, none were forthcoming.  The space went to
+  other things, and my deadline is looming."* 〔`200103/msg00219`〕 So the later builds had minimal
+  sound, and the space once offered for more was spent elsewhere. What a voice costs is counted in
+  `techniques/sound-effects.md` (2 bytes × duration per effect in ROM) and `techniques/music-driver.md`
+  (5 zero-page bytes per channel); that sound is best planned with the kernel rather than after it is
+  our reading of this one case. **Cited only, not verified.**
 - **A recording that fills RAM at a rate the game sets has a known size; one the player sets does
   not — one porter's preference in the thread.** Manuel Rotschkar,
   2004, converting a Jumpman level whose followers replay the player's recorded input: *"That effect
@@ -2449,6 +2638,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     height is chosen for the picture's proportions as well as for detail against load (our reading of
     one post). **Cited only, not verified** — his half-counted cycles and the look of the characters were
     not checked here.
+  - **A third reason for the two-line row: the arithmetic.** Roger Williams, 2001, asked by Glenn
+    Saunders whether his polar-to-cartesian demos could move with single-scanline accuracy: they could,
+    with a VDEL kernel, but *"The single scanline vertical resolution is also so much finer than the
+    horizontal that it seemed pointless to go for it"*, and *"the polar routine can even correct the
+    aspect ratio.  But my main focus was on the polar routine and with rotation, and to my eye it looks
+    better to have nearly-square pixels, and they're more compatible with 2's complement 8-bit math
+    anyway."* 〔`200110/msg00294`〕 With near-square pixels one signed byte is the same distance across
+    and down, so a rotated vector needs no rescaling on either axis (our reading). **Cited only, not
+    verified** — the demos were not run.
 - **★The canonical image→title route (a professional's real workflow)**: SpiceWare builds **the Photoshop mock FIRST and the kernel after it**. Logos and titles use a **flicker-free 2-colour 48px kernel** to turn "a designed 48px image" into "a stable on-screen display" (SF2 is the real example). = exactly this project's Photoshop→2600 path. `multicolor48`/`bitmap48` are its implementation basis. 〔mining blog SpiceWare 10640, 10515〕
   - **Mid-scanline colours sit on a 3CC grid, but a band is as wide as the STORE that paints it**:
     3 colour clocks is the CPU's granularity — one cycle — and it is not the band width. A band costs a
