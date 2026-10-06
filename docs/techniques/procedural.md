@@ -232,3 +232,8 @@ A seed saves the ROM a stored map would take. It does not, by itself, save RAM.
   verified.
 - Attract-mode variety with a frame-counter-mixed seed at game start (keep the *gameplay* seed
   fixed if you want reproducible worlds).
+- Two random bits straight from a frame counter, no LFSR. Kirk Israel, 2004, launching the JoustPong
+  ball left or right, up or down at random, *"using the old "timer increments every frame, AND to get
+  bit D0 and D1" trick"* 〔stella-list `200403/msg00058`〕 — two bits for the two choices. The bits are only as
+  varied as the frame on which they are read, and play timing decides that frame (our reading). Cited
+  only, not verified.

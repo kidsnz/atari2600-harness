@@ -63,3 +63,16 @@ same pipeline; "documented" refinements noted per item remain available when a g
   independent of any particular game.
 - When a technique matures into reusable code, promote a generator to `pkg/` (like `pkg/playfield` / `pkg/sprite`).
 - Pick a small concrete demo/testbed per technique **flexibly**; don't anchor the whole roadmap to one game.
+- **A verified technique is not yet a picture: somebody still has to draw the frames.** Andrew Davie's
+  large-sprite fighter *Fu Kung!* was started from the large-sprite shell Eckhard Stolberg handed over to
+  him, along with the code of Eckhard's own fighting game 〔stella-list `200301/msg00096`〕. By v0.03 Andrew had a conversion tool that cuts
+  a JPG/PNG/BMP into the sprite matrix — *"This means I can now display actual graphics with very little
+  effort"* — and *"I've just drawn a few dummy frames"* 〔`200301/msg00122`〕 (in v0.0 he had asked any
+  artists who wanted to collaborate to *"put their hands up NOW!"*, `200301/msg00096`). Eckhard's reply:
+  *"people only started to really get exited about the old demo, when they saw the fighter animations on
+  their Superchargers. And then I was facing the same problem that you have now. Someone actually has to
+  draw all those animation frames. ;-) I hope you are more successfull with forcing yourself (or someone
+  else) to create them than I was over all those years. ;-)"* 〔`200301/msg00151`〕 (`../build-to-learn.md`
+  quotes the same message on whether another game's graphics may be copied in). Our reading: the items
+  above are ordered by technique alone; how many frames of art a technique asks for is a cost this list
+  does not track, and it belongs in the choice when one is picked for a piece. Cited only, not verified.
