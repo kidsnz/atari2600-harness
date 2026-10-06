@@ -370,6 +370,23 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     colour scheme (of course!)."* 〔`200301/msg00164`〕 He gives no reason beyond "of course"; the free
     cycles did not help, so the limit is in how the picture is built, not in the budget (our reading).
     **Cited only, not verified** — the demo was not run here.
+  - **An ICC bitmap screen with sprites drawn into it, planned in 2020.** Andrew Davie, in a design
+    thread for a new colour display system, as the distillation notes record it: one ICC pixel is three
+    scanlines, each shown in its own colour A, B or C, so a pixel is one of eight on/off combinations —
+    black, the three colours and four mixes — not eight free choices, and the A-and-C mix, with a
+    blank line between, blends poorly. The notes do not say whether the colours rotate from frame to
+    frame, as in the 2004 description of ICC above, or stay put as in its single-frame variant.
+    Because a pixel is three lines, the bitmap's height must be a multiple of 3 (174 lines = 58
+    ICC pixels). At 5 bytes a line (32 playfield pixels, the edges trimmed) 174 lines are 870 bytes,
+    inside one 1K RAM bank of the 3E scheme. Sprites 8 pixels wide and 24 ICC pixels (72 lines) high
+    are copied from the fixed bank into a zero-page buffer, shifted to their X through pre-shifted
+    tables, and drawn into the bitmap by overwriting, by OR (which keeps the pixels beneath but shifts
+    their colours) or through a mask. Two RAM banks swap between shown and drawn, so erasing is a block
+    clear — about 4000 cycles or more for 870 bytes, so it has to be spread over time — and a third can
+    hold a fixed background. He judged it workable, far simpler than Boulder Dash but with a lot of
+    byte shuffling, the frame rate being the problem (10 fps would be acceptable for some games)
+    〔mining 297343 new-colour-display-system; only the distillation notes are held here, so this is a
+    paraphrase〕. **Cited only, not verified** — nothing of it was built or run here.
 - **There is no "one correct RGB"**: Stella generates the palette from YIQ dynamically, so the same register value differs by a dozen up to 0x20 between emulators and settings.
   For us the running table `internal/ingest/palette_stella.go` is authoritative (100% match against Stella). 〔rgb-color-values, 118495〕
   - **When emulators disagreed on which of two colours was darker, the colour was changed.** Kurt
@@ -398,6 +415,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     code to `$00`, unless it is grey all the way (our reading). The same thread's PAL question, Glenn
     Saunders: *"there are no orangy hues in PAL, as these tend to come out "grey""*
     〔`199703/msg00176`〕 — is measured in `visual-ceiling.md` (four of sixteen PAL hues are one grey).
+- **Standing out and going with are two different choices.** Eckhard Stolberg, asked
+  what colours Piero Cavina's 1997 demo shows *"on a PAL console"*, answered with the two levels'
+  colours, and that what he liked better was that *"the ball is blue instead of green, because I like
+  blue more"* 〔`199704/msg00108`〕.
+  Glenn Saunders, replying: *"Green is the opposite of red, so the ball definitely
+  stands out that way, but blue "goes with" red better than green.  Green clashes.  Plus, the ball is
+  the only sprite that doesn't have the multi-hue treatment, which it could use to make it more
+  consistent with the other sprites."* 〔`199704/msg00113`〕 So the opposite hue buys attention at the
+  price of a clash, and one object drawn at a different level of treatment from the rest sits apart
+  from them (our reading of both). He does not say what on the screen is red, and no reply in the
+  thread takes it up. **Cited only, not verified** — one viewer's taste; the demo was not run here.
 - **The atom of the colour data model is "colour per scanline" = `colorPerRow[]`**: holding an array of scanline index → COLUPx value instead of a single `color` expresses vertical multi-colour (the cheapest multi-colour) directly. TIA Studio's M1 design decision converged on this too. 〔research w4 / `tools/research-w4-m1-open-questions.md`〕
   - **A colour table takes a decision out of the kernel, not only cycles.** nukey-shay, 2016, to
     just-jeff, whose kernel chose a sprite colour mid-line: *"That is burning unnecessary cycle time by
@@ -1331,6 +1359,25 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     bar's level set by when its colour register is changed 〔mining 89511 energy-bars; only the
     distillation notes are held here, and they do not say who gave which answer〕. **Cited only, not
     verified.**
+  - **Or let a red ground show what is missing.** Joe Grand, 2001, posting a horizontal "gas gauge"
+    demo built as Manuel Polik had suggested: the background is *"starting red at the beginning of the
+    scanline and changing to black X cycles later. The playfield graphics are used for the actual
+    gauge, which when full will cover over all the red (and a bit more, which looks sloppy to me, but
+    we can hopefully fix that later - check the binary to see what I mean)."*; *"I'm using PF0 and PF1 for a 12-pixel wide gauge"*, raised and
+    lowered with the joystick 〔`200103/msg00290`〕. In his source the change back to black is one
+    store at a fixed cycle on every gauge line and the level is the playfield bits, so the red left
+    uncovered is the part of the gauge that is empty (our reading). He *"would have liked to been able
+    to horizontally position the gauge more towards the right of the screen, but my timing would get
+    all wacky and I couldn't seem to change back to the normal BG color in time."* Polik, replying,
+    was puzzled that the red did not match the full 12 positions, since a background colour change
+    moves in steps of one cycle, 3 pixels, and by his count the gauge's width divides by 3; then: *"It
+    should be possible to match it to either 10 or 11 positions though."* Aligned to the right
+    *"should be as easy as the current solution"*; but, he assumed, PF1 alone cannot be matched
+    exactly, its width not dividing by 3, so start the red a little early and match only the end —
+    *"Now it'd be impossible to have a totally empty gauge, but you can \*fill\* it to the max"*
+    〔`200103/msg00294`〕. The gauge starts at the left edge of the visible line, so whether the red can
+    end on a playfield boundary is decided by where that boundary falls in the line, not by the gauge's
+    width (our reading). **Cited only, not verified** — the demo was not run here.
   - **The score area can also choose the title.** Glenn Saunders, 1997, when Piero Cavina floated the
     acronym *O.R.F.O.S.* for the game Nick Bensema had named *Oystron*: *"I also like Oystron because
     you can squeeze it in the score display without resorting to acronyms."* 〔`199709/msg00077`;
@@ -2983,6 +3030,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     which parabola): at most 0.056 of the peak, near x = 0.15π — about 7 counts at amplitude 127 (our
     arithmetic, a million-step sweep).
     **Cited only, not verified** — no sine table is generated here.
+  - **A quarter table is read by quadrant.** The asker, replying to Kylearan's quarter-table line:
+    *"I've never considered splitting into 4 sections before"* — *"Now you've mentioned that it seems
+    really obvious, just check the overflow amount and invert accordingly."* 〔mining 265153
+    using-sine-and-cosine〕 With a phase that runs 0–255 round the circle, the top two bits are the
+    quadrant: one says whether to read the quarter backwards, the other whether to negate the value
+    (our reading; the thread does not spell it out). A 64-byte table for the full circle, the shortest
+    Kylearan names, steps 360/64 = 5.625 degrees, and 128 bytes step 2.8125 (our arithmetic).
+    **Cited only, not verified.**
   - **Friction in proportion to speed limits the speed.** Thomas Jentzsch, 2004, to Kirk Israel on
     *JoustPong*'s flapping: *"You can get a speed limitation by adding some speed based friction to the
     movement."* Each frame, y-speed (old) − gravity (constant) + flapping (if done) − y-speed/16
@@ -3193,6 +3248,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 ## Rules of thumb for "good graphics"
 - Visual impact ≈ number of colours × sprite density. More colours are bought by adding hardware (Pitfall II = DPC). 〔Demon Attack, Stay Frosty/Draconian〕
 - The exemplars = the AtariAge Homebrew Awards "Best Graphics" category. **The strongest ground truth = the homebrew "Pizza Boy", every pixel of which the user drew personally** (designed in Photoshop; constraints confirmed with DaveC). More accurate than mining external threads = put the design questions (colour bands / NUSIZ / flicker tolerance) to the author directly.
+  - **Who drew the pictures was the difference, by one maker's account.** Rob Fulop (*Demon Attack*
+    at Imagic, *Missile Command* at Atari), 2007, answering random-terrain, who asked what made
+    Imagic's characters *"looser, lighter, more colorful, more detailed"* than other makers' — and than
+    most homebrews, for all of today's tricks and tools: the effect *"was achieved by a less than
+    remarkable solution"*. Imagic, he said, was the first videogame company to bring in actual artists
+    to do the graphics; at Atari the programmers filled in graph-paper squares with pencil and coded
+    each row of eight as a two-digit hex value, and *"most programmers' sense of style is so gawd
+    awful"*. After leaving Atari he and Bob Smith wrote a few simple editors on the Atari 800 that let
+    a graphic artist author the game graphics 〔mining 114992
+    i-dont-care-about-learning-new-tricks-old-ones-will-do; only the distillation notes are held here,
+    and they quote him in part〕. The line above — every pixel of Pizza Boy drawn by the user, then
+    put into a kernel — is the same split between the hand that draws and the hand that codes (our
+    reading). **Cited only, not verified** — one maker's recollection, decades after.
 - **Endorsement from a real production (the Pizza Boy dissection)**: professional-grade visuals were achieved **by craft on top of a STANDARD kernel** (batari Basic multisprite = 5 moving objects, P1 flickersort + P0 + M0/M1/BL + a 6-digit score). Not exotic code tricks — what works is **role separation (buildings = static asymmetric PF / moving things = sprites) + window rhythm (alternating solid and window across PF rows = vertical window texture) + colour and density design**. → a real production endorses TIA Studio's premise that "the designer composes the screen on top of a standard kernel". Details `reference/pizza-boy/dissection.ja.md` 〔Pizza Boy, bB multisprite kernel〕
   - **The other end of the same scale.** tokumaru, 2011: *"Since the amount of processing available is
     very limited, kernels have to be carefully tailored for each game in order to make full use of the
