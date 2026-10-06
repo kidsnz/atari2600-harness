@@ -88,6 +88,16 @@ point for a frame counter: synchronise with it and the output is a constant (`de
 | Asymmetric PF via double-write (windows per woodgrain) + per-pixel split on late writes | `litmus_pf_async` | left $AA / right $55 exact clocks; cyc-33 write → 5 old + 3 new bits |
 | CTRLPF: SCORE (left=COLUP0/right=COLUP1), priority D2 (player↔PF), ball width 1/2/4/8 | `litmus_ctrlpf` | per-band `read_row`; SCORE+PFP→COLUPF flagged for Stella |
 
+**Not measured here: most of the write-window table.** Woodgrain's asymmetric-playfield table
+(`fundamentals-audit.md` §4) gives repeated mode LPF0 53\*–21, LPF1 64\*–27, LPF2 75\*–37, RPF0 27–48,
+RPF1 37–53, RPF2 48–64, and reflected mode RPF2 exactly at 48; `pkg/design/pf.go` uses the left deadlines
+(21/27/37) and the three right windows from it. `litmus_pf_async` holds two points inside it, both `PF1` in
+repeat mode: a left write completing at cycle 5 and a right rewrite completing at cycle 40. Its third band,
+the cycle-33 split, is woodgrain's worked example of a late write, not a value of the table. No edge of these windows, none of the `PF0` or `PF2` rows
+and not the reflected-mode 48 is measured; `TestAsymRightWindow` checks the constants in `pf.go`, not the
+machine. (`litmus_pf0_reflect`, outside this table, sweeps a second `PF0` write under reflection across
+the right-edge copy in five-cycle steps — a window the table does not list.)
+
 ## Collisions (CXxx)
 | Behavior | ROM | Evidence |
 |---|---|---|
@@ -96,6 +106,15 @@ point for a frame counter: synchronise with it and the output is a constant (`de
 | Missile0–Player0 (CXM0P) | `litmus_collide_mp` | `read_collisions.m0_p0 == true` |
 | **All 15 pairs** at once (overlap P0/P1/M0/M1/BL + PF) | `litmus_collide_all` | every `read_collisions` field true |
 | Latches are **sticky**, **CXCLR** clears them, and **HMCLR does NOT** (it clears the motion registers — a different thing) | `litmus_cxclr` | CXP0FB snapshotted to RAM at 3 points: `$B2` collided → `$B2` after HMCLR → `$32` after CXCLR (low bits = the last byte on the bus before the read, here its zero-page address `$32`) |
+
+**Reported: no wait after a clear strobe.** doppel asked whether a timing like the 24 cycles after `HMOVE`
+applies to *"the reset strobes"*; Eckhard Stolberg, 2000: *"Triggering HMCLR is just like writing zeros into all horizontal
+movement registers, so you shouldn't do that within 24 cycles after an HMOVE either. Since triggering HMCLR
+or CXCLR clears the registers immediately, there is no need to wait with other accesses to the TIA after
+such a stobe."* 〔stella-list `200007/msg00146`, `200008/msg00011`; his spelling〕. The `CXCLR` half is
+what `litmus_cxclr` reads: the instruction after `sta CXCLR` is `lda CXP0FB`, and its D7 is already clear.
+The `HMCLR` half is not measured here — after `HMCLR` the ROM reads the collision latch, not the motion
+registers — **Cited only, not verified**.
 
 **Not measured here: latches do not set while `VBLANK` is on.** ZackAttack found it by breaking an
 instrument. His bus-stuffing demo read the collision registers to detect whether the stuffing had
@@ -121,10 +140,41 @@ collisions only when `!vblank` — but no litmus here exercises it.
 | Reads +1 on page cross; **stores fixed** (STA abs,X always 5) | `litmus_6502` | TIM1T-windowed cycle deltas |
 | Branch 2/3/4 (not taken / taken / +page-cross) ; illegal DCP zp = 5 | `litmus_6502` | TIM1T windows |
 
+**Not pinned here: an indexed illegal opcode crossing a page.** The one illegal opcode `litmus_6502`
+runs is `DCP zp`, which has no index; `TestPageCrossPenaltyRules` (`internal/cpudiff`) pins `STA`, `LDA`
+and `BNE` only; the 12 opcodes of the Harte subset CI runs are all documented
+(`scripts/check_cpu_conformance.sh`). `TestPageSensitiveTableIsWhatTheCostingAssumes`
+(`internal/cyclebound`) walks all 256 entries of the engine's opcode table and fails if a page-sensitive
+opcode is not a read, or an indexed read off page zero is not page-sensitive — that pins the engine's
+table, not the machine. `TestSiliconAllOpcodesClassified` (`internal/cpudiff`) runs 4000 vectors over all
+256 opcodes against the perfect6502 netlist and compares cycle counts. The vectors are seeded
+(`GenVectors(1, 4000, …)`), so what they cover can be counted: each of the 32 illegal opcodes in abs,X,
+abs,Y or (zp),Y form, five of them stores, meets at least one crossing (fewest: `NOP abs,X` `$5C`, once),
+and on every crossing the engine's cycle count matched the netlist's (counted 2026-10-06 with a throwaway
+test, not kept in the tree). A
+divergence on the six of the 32 that are allow-listed (`$93 $9B $9C $9E $9F $BB`) would not fail the test.
+And CI does not run it: the test skips when `bin/p6502step` is not built, CI never builds it, and `-short`
+skips it too. The question was put to the list in 2003. C. Bond: *"Has anyone verified the cycle count for
+undocumented opcodes?"* Thomas Jentzsch: *"No, I haven't verified these, but I would be very surprised
+if the general rules wouldn't be valid for those too. If an index crosses a page boundary there \*must\*
+be an additional cycles added."* 〔stella-list `200310/msg00045`, `200310/msg00046`; his spelling〕 —
+**Cited only, not verified**. In that count the "must" held only for the nine reads. The engine's table
+charges a crossing to `LAX abs,Y`, `LAX (zp),Y`, `LAS abs,Y` and six `NOP abs,X` and to none of the other
+23 (`Gopher2600/hardware/cpu/instructions/definitions.json`), and the netlist agreed on every crossing: the
+reads took one cycle more, while the read-modify-write forms such as `DCP abs,X` stayed at 7, or 8 for
+(zp),Y, and the five stores at 5, or 6 for (zp),Y, crossing or not — as the stores in the table above do.
+
 ## Procedural generation
 | Behavior | ROM | Evidence |
 |---|---|---|
 | 8-bit Galois LFSR (`eor #$8E`): exact sequence, never-zero, period 255 | `litmus_lfsr` | `read_ram` first-8 values + sweep flags |
+
+**Not measured here: how the values spread.** `litmus_lfsr` records the first eight values from seed
+`$01`, a flag that none of 255 steps from that seed gave zero, and a flag that the 255th step is back at
+the seed — a period dividing 255 would set that flag too. Nothing here counts how often each value comes
+out, or what reducing it to a range does. 255 is not a multiple of 24, so 255 equally likely values
+cannot fold evenly onto 0–23. `techniques/procedural.md` makes the same argument for 2ⁿ values and gives
+Euchre's re-roll fix 〔stella-list `200209/msg00025`〕.
 
 ## Bank switching
 | Behavior | ROM | Evidence |
