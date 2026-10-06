@@ -106,7 +106,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     Andrew Davie, 2001, in a brainstorm about a Gunfight game, said to *"turn the actual TV on its side"*
     — *"It has been known for games to require you to rotate your TV, and I don't think it's a real sin"*
     〔`200102/msg00266`〕. Manuel Polik, who was planning the game, listed what the idea would cost him: *"The colors are shifted 90° too + my sprites
-    are 19 Pixel long, which is some more than 8"*, and *"my $$$$ TV will NOT be turned by 90°"*
+    are 19 Pixel long, which is some more than 8"* (and *"The idea would perfectly work with 8x8 monocolor sprites, though."*), and *"my $$$$ TV will NOT be turned by 90°"*
     〔`200102/msg00289`〕. Mooney answered that 16 or 32 pixels are possible *"using both players"*, and
     that *"many TVs experience color distortion and warping when turned sideways"* 〔`200102/msg00296`〕.
     Read with the rule above, "shifted 90° too" means colour that changes per scanline would change
@@ -939,6 +939,9 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     days later, in a different thread, Nick Bensema gave the objects the same job — rounding out the
     edges — rather than face the timing of mid-line playfield colour writes (Colour section, the 1997
     entry under horizontal multi-colour) 〔`199703/msg00101`〕. **Cited only, not verified.**
+    The lower rungs of the same scale, from the same post: beginner has *"All traditional playfield
+    graphics, limited if any sprite reuse"*, and intermediate is *"still using some traditional
+    blocky background graphics"* 〔`199703/msg00030`〕.
   - **The ball and a missile over the end of a PF run can put the edge between the 4-clock columns.** As the
     distillation notes record a 2011–12 thread started by a pixel artist, BladeJunker, planning a paint
     program for the 2600: hold the ball and a missile at 4 clocks wide over the end of a PF run and move
@@ -974,6 +977,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     decided; this changes the picture to fit the objects (our reading). **Cited only, not verified.**
 - **A single irregular shape wider than 8px = "shape ONE player with a per-scanline NUSIZ + HMOVE table" — don't fall back on flicker**: keep GRP small and switch NUSIZ (size 1/2/4/8, copy count) and HMOVE on every scanline, and one player "stretches" into an irregular shape ~40 colour clocks wide (fish / shark / ship / wide creature). Accept a single colour. No extra object, no flicker. Confirmed on a live run. 〔Fishing Derby (David Crane / Debro disassembly) SharkTraveling*NUSIZValues = a shark made of per-line NUSIZ + HMOVE; ~40-clock width confirmed by running build/fishing_derby.bin〕 `→ casebook.md "large irregular shapes"`
 - **A 1px line at an arbitrary slope = missile/ball + fractional-HMOVE accumulation (Bresenham in HMOVE)**: take an M/BL drawn vertically, `adc` the slope held as integer + fraction on every scanline, and on carry apply a ±1px HMOVE through `HMMx`/`HMBL` — that yields the **diagonal lines** of a fishing line / tether / rope / laser (drop the assumption that only vertical and horizontal are possible). 〔Fishing Derby fishingLineSlope (Integer/Fraction) + HMOVE; right line = BL, left line = M1; the right line's slope confirmed on a live run〕 `→ casebook.md "diagonal lines"`
+  - **A line that never moves can take its steps from a table and is never repositioned.** Manuel
+    Rotschkar, 2004, planning *Jumpman* on screens drawn with timed `PF0`/`PF1` rewrites, after Thomas
+    Jentzsch's *"With assymetrical, non striped playfields, you won't be able to reposition at all."*
+    〔`200409/msg00258`〕: *"Also since all ropes are stationary for example, I don't need to reposition
+    them, I can just disable them and shift them into place."* — zigzag ropes in separate stretches,
+    *"Using one single missile without any need to reposition... just big tables of HMOVE&ENABLE
+    values..."* 〔`200409/msg00259`〕. Where Fishing Derby works its slope out on every line, this reads
+    each line's step and enable from ROM (our reading). A plan in the thread, not a build. **Cited
+    only, not verified.**
 
 ## Playfield
 - 40px across × 4 clocks per px. Expressive power is earned through vertical rhythm. 〔Davie S13〕
@@ -1132,7 +1144,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     ORing 'em in. Other differences are that my routine has to cope with the possibility of hitting two
     PF blocks at once and that there's cases when no removal is desired."* 〔`200109/msg00226`〕 Thomas
     Jentzsch, on the same pseudo-code: *"it's quite easy to reverse the bit-order, just EOR #7 the
-    remainder when the bits have to be reversed"* 〔`200109/msg00227`〕. The bit orders themselves are
+    remainder when the bits have to be reversed"*, and *"you can optimize away the FindPF_RAM_BitOrder table by simply left shifting the value in X once and checking the carry"* 〔`200109/msg00227`〕 (how one shift stands in for that table, which Saunders's pseudo-code indexes by the byte number, the thread does not spell out — our reading). The bit orders themselves are
     in `CLAUDE.md` and machine-locked by `TestEveryPlayfieldColumnLandsWhereTheTableSays`.
     **Cited only, not verified** — neither routine was run here.
 - **For HUD/text the character COUNT picks the technique**: 48px = 12 characters / venetian blinds = 32 characters (but only at 3px width). Either split the HUD into its own screen mode, or isolate it in a zone and reuse the score area for several purposes. 〔197162 text-hud〕 ⚠ **The 32-at-3px figure is the source's, not this repository's, checked 2026-09-07.** `roms/techniques/venetian.asm` demonstrates the mechanism — one player drawing figure A on even rows and figure B on odd, zero flicker, half the vertical density — and it draws **shapes, not characters**: measured, an 8-px band at clock 80..87 with runs of 1, 2, 4, 6 and 8 px. **Nothing here has ever rendered 32 characters this way**, so 3 px is the width the technique would require rather than a width anything has been read at. ★For comparison the text kernels ARE measured: 4 px a character at every rung of their ladder 〔`techniques/text12.md`〕, so venetian's 3 px would be **narrower than the narrowest thing this repository has drawn a letter at** — worth knowing before designing to it. `→ design.MaxChars` `→ design.MaxChars/FitsText`
@@ -1336,6 +1348,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     cycle on each of six loads, `(zp),y` at 5 against `abs,y` at 4 when
     neither crosses a page (our arithmetic). **Cited only, not
     verified** — the attached `test.bin` was not run here.
+  - **A scrolling kernel carries its playfield limit with it: Thrust's draws one hole per line.** Ben
+    Larson, 2002, proposed a Mario-style platform game reusing *Thrust*'s scrolling kernel. Thomas
+    Jentzsch: *"I don't think my kernel is suitable, because it can only display one hole in the
+    playfield per line. That's not very suitable for a plattform game. But the scrolling algorithm idea
+    should be adaptable to a lot of other games."* 〔`200204/msg00003`〕 Roger Williams: *"Doing much of
+    any kind of action in combination with an asymmetric playfield is a real PITA, as you spend about
+    half the kernal cycles on \*every single line\* just keeping the playfield updated.  It might work
+    as a vertical scroller, though, with a symmetric playfield."* 〔`200204/msg00004`〕 **Cited only, not
+    verified.**
   - **Single-line sprites do not forbid a busy playfield; the two are paid for separately (our reading).** Glenn
     Saunders, 2000: *"I think most games released that had single line res tended to have relatively
     simple or nonexistent playfields.  For instance, Demon Attack."* 〔`200006/msg00090`〕 Erik Mooney
@@ -1557,6 +1578,13 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     dropped, the thread itself is not held here〕 The latch is set by the pixels actually drawn, and an animation
     changes `GRPx` (our reading); `known-traps.md` carries the neighbouring point that the TIA compares
     geometry, not meaning. **Cited only, not verified.**
+  - **One playfield, several meanings: the latch cannot say which part was hit.** The 2001 hockey-game
+    exchange is told in `techniques/invisible-probe.md` (*Or skip the hardware when the region is
+    fixed*): boards or net, and the puck's direction as well, *"because we don't want the player to be
+    able to score by hitting the back of the net"* 〔`200102/msg00325`〕, answered by Manuel Polik and
+    Andrew Davie with the coordinates instead of the latch 〔`200102/msg00327`, `200102/msg00338`〕. No
+    flicker is involved here: the playfield is one object, so its regions share one latch bit (our
+    reading). **Cited only, not verified.**
 - **The object budget is counted per scanline, not per screen.** Living Room Arcade (2024) asked how
   *Star Wars: The Arcade Game* is possible with *"two players, two missiles and a ball"*. Verdant: *"It's
   doesn't become simple, but it does become less difficult, when you stop thinking so much in two
@@ -2118,6 +2146,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     What has to fit in 76 cycles is the worst line, and a branch around the store does not lower it
     (our reading); this repository's tool answers the same worry over every path
     (`prove_line_budget`). **Cited only, not verified** — his kernel was not run here.
+  - **Work for a busy row can be moved onto the quieter line before it.** A 2008 thread on the
+    machine's "real" speed, as the distillation notes record it: Andrew Davie counted 192 visible lines
+    × 76 cycles as about 14,600 cycles a frame and 876,000 a second spent on the display, leaving about
+    314,000 a second, roughly 0.3 MHz; ibogost answered that the CPU does not stop while drawing — it
+    has little room for anything beyond setting up the next line or two; and supercat gave the practice
+    of doing preparation on a simple or blank line before a complex one: *Strat-O-Gems* unpacks the two
+    colour values of six gems on the blank line before each gem row, and *Toyshop Trouble* sets the
+    graphics and colour pointers on a nearly blank line before each toy row 〔mining 120155
+    real-processor-speed; only the distillation notes are held here〕. 192 × 76 = 14,592, × 60 =
+    875,520, and 1,190,000 less that is 314,480 (our arithmetic, at the thread's 1.19 MHz and 60
+    frames). **Cited only, not verified.**
 - **★RIOT 6532 timer wrap-around bug (the "Stella passes / real hardware rolls" trap)**: write `TIM64T`/`TIM1024T` on **exactly the cycle** the timer wraps around and the divider silently degenerates to **1T**, wrecking the frame length so the picture rolls on hardware. **The fix = a double write (double-write TIM64T).** Easy to miss because it is emulator-dependent = a direct hit on the harness's core mission (gap B). Diagnosed in that thread by Gopher2600's author (JetSetIlly). 〔mining 303277 "To Roll or not to Roll"〕 (harness-hardening candidate = an assert that detects a timer write on the wrap-around cycle)
   - **The longest the timer counts in one run is about a fifth of a second.** Erik Mooney, 2001, asked
     for a timer of roughly one second that does not depend on the frame rate: *"Can't really do that on
@@ -2367,6 +2406,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     whatever the operand, and his "afaik" stands. omegamatrix's first point is a separate trap: without
     the `#`, `LAX 0` is a zero-page read of address `$00`, which on a read is the TIA's `CXM0P`.
     **Cited only, not verified.**
+  - **DASM's own `CLEAN_START` emits that form unless told not to.** In `machines/atari2600/macro.h`
+    as shipped with DASM 2.20.14.1 (its version 1.09), the macro has `lxa #0` unless
+    `NO_ILLEGAL_OPCODES` is defined and `ldx #0` / `txa` otherwise; its history dates the macro to 23
+    June 2003 — the day Manuel Polik asked on the list *"How about a common VCS_INIT macro for that?"*
+    〔`200306/msg00151`〕 — and *"added use of LXA to CLEAN_START"* to 13 July 2020 (read from the file,
+    not assembled; the rest of the macro is spelled out in `integration-density-playbook.md`,
+    *Clearing by wrapping the stack*). `scripts/check_traps.py` scans source text: a line naming
+    `CLEAN_START` counts as the reset initialisation, and its unstable-opcode check matches only the
+    mnemonics written in the file, so the `lxa` inside the macro is not flagged (our reading of the
+    script — it was not run on such a file). The operand is zero, the case enthusi calls stable above;
+    where this page's rule is to hold, define `NO_ILLEGAL_OPCODES`. **Not verified.**
   - **In an old commercial ROM, an unofficial opcode was expected to be an accident — on two people's
     experience.** Thomas Jentzsch, 2005: *"AFAIK those opcodes have not been used before modern
     homebrews. Maybe even my own first game Thrust was the first one to use 'unofficial' opcodes.
@@ -2379,6 +2429,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     〔`200506/msg00007`, `msg00009`〕. So an unofficial opcode met while decoding an old game is worth
     checking first as data or a stray entry point (our reading). **Cited only, not verified** — no ROM
     here was scanned for them.
+  - **A disassembler that follows code can lose the trail at an indirect jump.** nukey-shay, in a
+    thread begun in 2004 on patching *Adventure*, as the distillation notes record it: `JMP ($nn)` takes
+    its target from two bytes of RAM that appear nowhere in the ROM, so DiStella gives the target no
+    label and leaves the bytes after it as data — at the extreme, *Alien* jumps almost entirely through
+    indirect jumps; an indirect load (`LDA ($nn),Y`) leaves its target unlabelled the same way; and a
+    vector or pointer mistranslated inside a block of data breaks the image when code is added in
+    front of it and it is reassembled 〔mining 40993 title-screen; only the distillation notes are held
+    here〕. Whether `bless` follows a `JMP ($nn)` was not checked here; `cmd/dissect`'s runtime trace
+    records the TIA stores of code that ran, wherever it was reached from (our reading). **Cited only, not verified.**
 - **The resource triangle + a register convention**: RAM (128B) / CPU (76cy) / ROM are mutually exclusive = growing one shrinks the others (plus the human cost). The Thomas Jentzsch convention = inside the kernel, pin the roles to **Y = scanline and sprite index, X = PF, A = everything else** and it runs faster. Use subroutines for code reuse only (the call cost is high). 〔mining 146817〕 The same convention, older and with its reasons, from Thomas Jentzsch on the list in 2003: *"I usually use Y for graphics (lda (ind),y) and in parallel for scanline counting, X for the PF (normally also having a vertical lower resolution) or other things (like stack manipulation or to store temporary results, A is for multi purposes."* 〔`200303/msg00381`〕 Y is the register the graphics read needs — the 6502's post-indexed indirect mode exists only as `(zp),Y` — so it is also the line counter; X goes to the playfield because the playfield usually changes on fewer lines (our reading of his parenthesis). **Cited only, not verified.**
   - **The three sides are not equally for sale.** Kirk Israel, 2003: *"given my simple game concept, RAM and ROM are cheap compared to
     kernal time, but that might be true everywhere. (which is funny, because while a supercharger
@@ -2619,7 +2678,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     is not a big problem.."* 〔`199806/msg00085`〕. So a picture held in four-line rows
     moves by single scanlines with no per-line test inside the loop (our reading). **Cited only, not
     verified.**
-- **Movement = fixed-point subpixels**: hold position as 8.8 fixed point and add `vel` every frame → the carry moves the integer part = smooth slow motion, friction, gravity and wind in one framework. **A parabola = constant velocity in X × constant acceleration in Y** (no trigonometry). Enemy chasing = proportional homing from the sign-shift of `(target−pos)/16` (no division; 16 directions = octant + slope threshold — **but a signed shift is not free**: keeping the sign through `(target−pos)/16` costs a `cmp #$80` before each of the four `ror`s, so "no division" means four extra instructions, not none 〔107024:16〕). 〔mining 178177, 270373, 107024〕 (technique-candidate ㉕)
+- **Movement = fixed-point subpixels**: hold position as 8.8 fixed point and add `vel` every frame → the carry moves the integer part = smooth slow motion, friction, gravity and wind in one framework. **A parabola = constant velocity in X × constant acceleration in Y** (no trigonometry). Enemy chasing = proportional homing from the sign-shift of `(target−pos)/16` (no division; 16 directions = octant + slope threshold — **but a signed shift is not free**: keeping the sign through `(target−pos)/16` costs a `cmp #$80` before each of the four `ror`s, so "no division" means four extra instructions, not none 〔107024:16〕). 〔mining 178177, 270373, 107024〕 (technique-candidate ㉕) In place of the trigonometry, in 178177 as the distillation notes record it, the launch angle and speed are turned beforehand, from a table or constants, into the X step n and the starting value Yo (only the notes are held here). **Cited only, not verified.**
   - **Direction and speed in one byte, used as a table index rather than decoded.** SpiceWare, on
     *Medieval Mayhem*'s fireballs: *"I use a single byte to denote speed and direction, SSSDDDDD"* — 32
     directions, counted clockwise from up. Asked by gauauu whether that needs code to translate: *"No
@@ -2629,6 +2688,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     or subtracted 1 from D at random on a bounce 〔mining 254675
     doing-some-tank-pong-like-logic-for-ballmissile-help〕. The decoding is paid for in ROM rather than
     in code. **Cited only, not verified.**
+  - **A shipped game looked to one reader like tables of dx and dy per angle.** Roger Williams, 2001, after looking at
+    the 8K *Gyruss* image (DiStella would not take it): *"There are tables neither of squares nor of
+    logs to be found, but there are lots and lots and lots of what look like 2-element co-ord tables
+    the 2nd 4K bank.  The motion is also very coarse over a very limited low-rez x-y coordinate system.
+    I think they faked it by having tables of dx and dy for every possible theta, which is a fine
+    technique if you have the ROM for it and even faster than what I did."*, and *"They may have also
+    had a table of positions for the shooter's ship because its motion is much smoother than that of
+    the missiles and enemies."* 〔`200110/msg00335`〕 The first is his reading of bytes that look like
+    pairs, not of code, and the second his reading of how smoothly the ship moves; what he did is, by our reading, the log-table converter in `techniques/divtable.md`. **Cited
+    only, not verified** — the image was not looked at here.
   - **Fixed-point motion or a table of positions is a ROM question, and it can come out even.** Rob
     Kudla, 2000, on making his Boing demo's ball bounce: *"which would be more memory intensive - a
     vertical position table of say 64 bytes (read forward and reverse obviously for a total of 128
@@ -3112,6 +3181,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     help-with-optimizing-state-and-palette-lookup-code〕 The same Magovinna moved *Coarse Blade*'s
     tombstones for the budget (the layout rule in the Sprites section). **Cited only, not verified** —
     the order is read from the order of his posts.
+  - **Mixing playfield and players in one title picture was read as a way to smooth the steps — for
+    certain shapes only.** A 2002 thread on how *E.T.*'s title picture was drawn: a newcomer guessed a
+    solid playfield block "chiselled" by rewriting `PF0`–`PF2` as the beam crosses. Paul Slocum
+    answered that E.T. is *"probably player graphics each set to "3 copy" mode and staggered"*, and of
+    the guess, *"I did something similar to what you're talking about on the Marble Craze title
+    screen"* 〔`200207/msg00154`〕; Dan Boris traced the title page in PCAE's debugger: *"it's definitly
+    using the players for ET's picture"* 〔`200207/msg00170`〕. Glenn Saunders, answering the same
+    guess: *"I think that's what the title screen for Marble Craze does, being a mixture of playfield
+    and sprites that smooth out the jaggies.  It's a really neat trick but only works for certain
+    shapes."* and *"Most title screens are narrower and use just sprites (the six char score routine) …"*
+    〔`200207/msg00169`〕. The mixture is Saunders's reading, not Slocum's account, and which shapes it
+    suits nobody said. **Cited only, not verified** — the screen was not looked at here.
 - **Kill the misread letter pairs**: L/I/T · U/W · M/H/N · O/0/D. An author cannot notice their own misreadings → **verify with another person or by reading aloud**; the final adjustment is single-pixel. 〔294306, 326595 (confirmed twice = a strong principle)〕
 - **At 4 px wide, seven letters are the hard ones: M, N, V, Q, Y, W, Z.** sheddy, on a 4×4 font called
   surprisingly clear: *"Not surprising as it's not all 4x4! Sure something passable can be done for M,
@@ -3156,6 +3237,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   player's NUSIZ makes (`techniques/sprite-placement.md`, rule 4) it is one run on a line, so both of
   his limits can be kept in the drawing program (our reading). **Cited only, not verified** — the
   mock-up was not looked at here.
+  - **The rule had been put to Saunders four years earlier.** In 1997 Erik Mooney showed a shape drawn
+    by changing a missile's width and `HMOVE`ing it every line; Saunders replied that it gives *"the
+    illusion of having a 8-bits to play with, just like players, but you can't do shapes like:"*
+    `XX  XX` *"Or odd widths like:"* `XXX` 〔`199709/msg00097`〕. Mooney: *"So, instead of lamenting
+    the lack of those shapes, you design objects that don't need those shapes.  Simple. :)"*
+    〔`199709/msg00098`〕 The two shapes Saunders said a missile cannot make in 1997, a gap inside a
+    line and a width such as three, are both absent from his own 2001 mock-up above, whose missiles
+    are single, double or quad (our reading). **Cited only, not verified.**
 - **A walk cycle needs a minimum of 2 frames at 50:50**: one bit of the frame counter (`and #2^n`) gives even spacing with no reset, and runs **only while moving**. 〔301861〕 `→ design.WalkFrame`
   - **The `and #2^n` schedule is what an accelerated frame counter must not skip.** Thomas Jentzsch,
     on converting games to PAL-50: *"a NTSC to PAL-50 conversion based on a frame counter will slow
@@ -3194,6 +3283,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     *"Single hight mountains look too flat and far away for my liking."* 〔`199709/msg00334`, answering
     Piero Cavina's *"make the hills less 'blocky'"* in `199709/msg00331`〕 The hue blocks are read off
     his table (our reading). **Cited only, not verified** — the demo was not run here.
+  - **A gradient fixed to the screen and a coloured object that moves need two indices.** Kurt
+    Woloch, 1998, after Glenn Saunders suggested a gradient on the sky and sea behind his sinking ship
+    (a large playfield object in slices of colour, in Saunders's description): *"the problem here is
+    that the ship is sinking, but the gradient's not... so I'd have to use different indexes for them.
+    The ship color change could or could not fall together with the gradient color change in one
+    scanline."* 〔`199806/msg00084`〕 On a line where both fall, the kernel writes both colours, and as
+    the ship sinks that line moves, so the worst line is not in a fixed place (our reading). **Cited
+    only, not verified** — the demo was not run here.
 - **Decide background art on 4 axes up front**: width (48/96px), colour count (1/2), PF mode (reflected/repeated — an asymmetric PF, rewritten mid-line, is a separate cost), row height (1–16 lines per row = detail vs load). **These ARE the input parameters of the background template (`design.BackgroundSpec`)**. 〔319884 atari-background-builder (= the tool the user used on Pizza Boy)〕 `→ design.BackgroundSpec.Feasible`
 
 ## Judgement rules no machine can decide (doc-only — deliberately not landed in `pkg/design`)
@@ -3337,6 +3434,19 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     `lda PF2list,y` / `sta PF2` with one `iny` 〔`199808/msg00086`〕. The buffer above saves RAM; this
     names what interleaving costs when the two reads share a line (our reading). **Cited only, not
     verified.**
+  - **The opposite trade: one buffer per player, and the per-line colour staged as well.** Manuel
+    Polik's *Gunfight 2600* source, posted to the list in 2001, declares four 11-byte buffers —
+    `playerShape00`/`01` (*"Player 0 shape complete in the RAM"*) and `colorShape00`/`01` (*"Player 0
+    colors complete in the RAM"*) — copies the current animation frame into the shape buffers through a
+    ROM pointer outside the kernel, fills the colour buffers at reset and rewrites one row of them (the
+    hair colour) in the frame logic; the two-line kernel then reads each player's colour and graphics
+    with `LDA colorShape00,X` / `LDA playerShape00,X` off one index 〔`200102/msg00367`〕. That is 44
+    bytes, 34% of the 128 (our arithmetic). His figures from the day before: *"I've used 64 Bytes of
+    RAM so far & thare's 50+ cycles left in the kernel"*, and *"The enormous RAM usage wouldn't actually
+    be necessary at the moment, but: I've plenty of it, so why not using it, hehe ... Besides I've some
+    future plans with my current arrangements..."* 〔`200102/msg00335`〕 — so that the staging is what
+    leaves those cycles free is our reading, not his. **Cited only, not verified** — the source was
+    read, not assembled.
 - **Fan one byte out to many duties, phase-locked, when RAM is tight**: `CLOCK` serves **5 roles** (frame timer / attract color / debounce pace / score-flash clock …) and `GameTimer` serves **3** (match clock + bit7 in-progress flag + attract period), sub-fields phase-locked so their uses never collide. Master-class RAM economy — but **only pay this when RAM is actually scarce**: packing with 43 B free just spends clarity for nothing (premature optimization). Know it; deploy it only under pressure. 〔Combat `CLOCK` (5-duty) / `GameTimer` (3-duty) / `VCNTRL`; comparison §2.7/§7〕
 - **Load-level VBLANK with `TIM64T`/`INTIM` so the picture starts at a FIXED beam position — don't rely on a fixed WSYNC count + elastic filler**: arm a RIOT timer at VBLANK start, spin on `INTIM` until it expires, then begin the visible kernel = display-start **independent of how long the frame's logic ran**. A fixed WSYNC count + elastic `VBpad` tuned to today's code does NOT auto-absorb logic growth: add work and the picture dips (screen dip — the exact fragility the clone's positioner had to hand-engineer around). Prefer timer load-leveling when VBLANK work is variable or expected to grow. 〔Combat `VCNTRL`/`INTIM`/`TIM64T`; comparison §2.1/§6, diff-gaps (measure the VBLANK length with INTIM)〕 `→ techniques/sound-driver.md · game-states.md`
   - **Timing the visible kernel itself was proposed in 1997, for zones whose heights move.** Piero
@@ -3384,6 +3494,28 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     remove the timer later."* 〔`200408/msg00056`〕 Freeman and Herbert time the visible kernel, not
     VBLANK; Lee's two-value remark is about his own PAL timers, and the 64-cycle step is the same for
     any `TIM64T` target (our reading). **Cited only, not verified.**
+  - **Where an `INTIM` wait ends moves by a few cycles, and near the end of a line that can be a
+    line.** Glenn Saunders, as quoted in the reply, reported *Gunfight* jerking *"up one or two scanlines"* (*"This may not be
+    visible in PAL or emulators, but it is on NTSC on the real thing."*); Manuel Polik answered that
+    even at worst the frame had *"10+ pure idle scannlines during VBLANK and another 20+ idle
+    scannlines during the Overscan"*, and posted a z26 trace in which the `sty WSYNC` after his `lda
+    INTIM` / `bne` wait runs at cycle 72 in one frame and 75 in another 〔`200111/msg00108`〕. Eckhard
+    Stolberg, warning that the trace's own line counter has a bug: *"But as it seems there is the
+    possibility, that you are doing the WSYNC at cycle 75 in some cases. This is two cycles too late
+    and should result in an extra scanline."* — the cycle 75 of his 1999 *griddemo* answer under WSYNC
+    semantics. His fix: *"As it seems the timer loop always expires after cycle 70 or so. One timer
+    step is only 64 cycles, so if you reduce the timer value by 1, you should always get a stable
+    picture."* 〔`200111/msg00110`〕 Polik had posted a new build about a minute before that reply, by the Date headers, (*"I probably found
+    a simple & suitable solution"* 〔`200111/msg00111`〕); answering Stolberg, he described it as a
+    moved load: *"the end cycle where the
+    timer expires can only shift between 5 cycles, right? So I shifted the point where the timer is
+    loaded some cyles (> 5) later, which should have the same effect as reducing the counter, right?"*
+    〔`200111/msg00113`〕 The replies do not take up the 5; the wait in his trace is 4 + 3 = 7 cycles a
+    pass (our arithmetic). Stolberg checked the new build with a line display he had just added to
+    z26: *"while the old version was constantly switching between 261 and 262 lines, the new binary
+    does a stable 262 lines. So I think it should work alright on a real system."* — he had no NTSC
+    console 〔`200111/msg00137`〕. So the levelling above fixes where the picture starts only to within
+    the wait loop's period (our reading). **Cited only, not verified.**
   - **Budget every routine at its worst case.** Robert Colbert, 1997, whose code to move and schedule
     five copies of player 0 fits in VBLANK, on why his sort no longer stops early when a pass makes no
     swaps — he took the flag out *"on purpose"*: *"with the 2600, you need to assume that every routine
@@ -3445,6 +3577,19 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     byte or 2"*. 〔mining 325492 this-is-a-bug-right〕 A wrong write that lands in RAM nothing visibly
     uses passes every look at the screen (our reading, **Not verified**); here `defuse`'s may-write set and `watch_ram` are the
     instruments that would show it. **Cited only, not verified** — the NES ROM was not looked at.
+  - **The other direction: code that is hard to read may be shaped by the line or by 4K.** Scott
+    Huggins, 2000, after three days untangling a DiStella disassembly of *Space Jockey*: *"Anyway, the
+    code was insane. And I don't mean that it was too hard to figure out...just that it was spaghetti
+    code"* 〔`200004/msg00004`〕. Erik Mooney put it mostly down to the programmer: code from an assembly
+    veteran *"will be straightforward, except where it needs to not be to be fast or compact or both"*
+    〔`200004/msg00005`〕. Glenn Saunders asked back: *"Just because the code is hard to read doesn't
+    necessarily mean it's done the wrong way, does it?  It could be that some of the techniques
+    employed were related to 2600 kernel timing issues, or trying to cram the code into 4K?"*
+    〔`200004/msg00007`〕 Piero Cavina answered from his own game: *"When it was just a multi-sprite demo,
+    Oystron source code was very straight and clear. It didn't last for a long time.."*, the cause
+    being *"the heavy optimization needed to squeeze many features and complex graphics into 4K"*
+    〔`200004/msg00020`〕. So before a redundancy inventory like the Combat one files odd code as cruft, check what
+    the line budget and the ROM size were asking of it (our reading). **Cited only, not verified.**
 
 ## Combat deep-read: design-intent, audio model & AI-nav primitives
 A second pass over Combat (1977) through 5 lenses BEYOND round-1's efficiency/structure comparison — design intent, the audio channel model, and AI-nav primitives our own clone added (the original has no AI). Clean-room: generalized prose + labels only. Where round-1 gave **integration-under-budget** rules, these are the **why / feel / balance** rules the structural pass could not see. The AI-nav block is flagged **PONG-capstone material**.
@@ -3528,3 +3673,13 @@ A second pass over Combat (1977) through 5 lenses BEYOND round-1's efficiency/st
     in the same thread, described Qb's tables as per-enemy `.word` lists of routine addresses minus one
     (`TypeHunter .word ShifterInit-1`, ...), prefaced *"I think it's based on tables with possible
     'actions' for each enemy"* 〔`200207/msg00346`〕. **Cited only, not verified** — Qb was not run here.
+  - **One author wrote a board-game opponent's search over every move and every reply.**
+    just-jeff, 2019, writing *Awari* (mancala) in assembly for the 2600, wondered what a description of
+    the game's PDP-1 ancestor meant by *"Exhaustive analysis of move sequences"*: *"I can see going up
+    to all of the computer's possible moves, then all of the human's possible counter-moves. But beyond
+    that, it would seem extremely complicated, and of less value since the game wouldn't go in a known
+    direction after those two moves."* Then: *"I wrote a subroutine this week that runs through all
+    possible moves and counter-moves"*, and in his next post, with a new build, *"The computer is a decent player now.
+    There's still more to add but it has beaten me a few times"* 〔AtariAge `topic/291580`〕 — that the
+    new build carries that search is our reading; the post does not say. Its cycles
+    and bytes are in the posted source, which was not opened here. **Cited only, not verified.**
