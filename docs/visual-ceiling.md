@@ -141,6 +141,14 @@ are neither identical nor a uniform shift, either of which would make this a cal
 of a hue one. ★**For a work that may ship on both**: pick from the codes whose meaning survives, or
 accept that the PAL cartridge is a different picture and choose its colours separately.
 
+The PAL count of 104 in the distinct-colours table above is also the one Eckhard Stolberg gave on the
+list in 2001, answering Glenn Saunders's question whether some PAL colours duplicate: four of the 16
+colours are grey, and *"The 104 resulting different hues don't come in the nice 'raibow' order
+either"* 〔`200105/msg00063`, 2001-05-14〕. His "hues" there are the same count as that table, not hues
+in this document's sense (of those, PAL has twelve plus the grey). He states 104 without the
+(16 − 4) × 8 + 8 behind it and does not say how he knew; the claim about the sequence of the colours is
+cited only, not verified.
+
 ## Verification
 
 Run `go test ./internal/ceiling/`. Denominators are stated in every test's log line.
@@ -190,6 +198,47 @@ has had every column position of the grid checked, not just an easy one.
 7. **No temporal modelling.** One frame at a time; flicker and multiplexing (which buy real colour
    resolution on hardware) are invisible to it, so a flickered picture's true ceiling is below what C1
    reports.
+8. **The number is for the whole frame, not for the worst line.** `Compute` solves every scanline and
+   then adds the per-line errors into one sum per rung before anything is reported
+   (`internal/ceiling/ceiling.go`), so a line a rung cannot draw is diluted by the lines it can, and
+   neither `cmd/ceiling` nor `visual_ceiling` names that line. The one per-line figure `cmd/ceiling`
+   prints, `worst-line C2 pair candidates`, counts search effort, not error. A feasibility check done by hand
+   goes the other way: answering an objection that a car-and-street mockup (posted as a picture a
+   coprocessor cartridge might make possible) had too many colour changes per playfield line, e1will
+   named the line with the most changes — around the middle of the car — and counted six colours on it
+   (AtariAge `topic/141971`). Our reading: his verdict that it looked doable with a few minutes' touching up,
+   conditional on his understanding of how Harmony works, rests on that one line rather than on an
+   average. Cited only, not verified. Read a low rmse as "most lines fit", never as "every line fits";
+   `-out` lets you look for the lines that do not.
+9. **It does not count what drawing the picture leaves for the game.** No rung has a RAM or ROM term —
+   it grades only the picture (item 1) — so a ceiling the screen can reach says nothing about whether
+   input, sound and a score still fit afterwards. One thread has both halves of that order: the author
+   had spent over half the memory on the track — *"I've blown over half the memory making the track
+   work"* — and glenn-main, of his own first days in assembly, had run out entirely: *"I had the screen
+   stable with everything I needed ... I was astonished to see I had NO MEMORY LEFT for a play pattern,
+   joystick inputs, sound or a scoreline"* (AtariAge `topic/334952`, held here only as distilled notes,
+   so the wording is not checked). Neither post says whether "memory" means RAM or ROM. Cited only, not
+   verified.
+10. **Each scanline is solved on its own, so no rung pays to move an object between lines.** `solveLine`
+    sees one line's pixels, and C2's object takes whichever of its 39 windows fits that line best, line
+    after line, at no cost; on hardware a reposition comes out of the same 76 cycles as the drawing it
+    shares the line with (and, per item 2, no rung is held to those 76). Manuel Polik put that trade in
+    starfield terms in one post, mostly as questions: he did not think a starfield without regular
+    mid-screen RESBLs possible *"without either sacrificing loads of RAM or ROM"*, and thought fine
+    movement alone limits stars to *"a vertical distance of at least (160/2)/7 -> 12 lines from one star
+    to another"* (80/7 ≈ 11.4, which he rounds up) — *"not too many stars either in a 2LK"* — and with
+    a RESBL every nth line he doubted *"one could do any enemy spaceships with higher resolution than 16
+    pixels"*, because the RESBL has to be
+    possible at any horizontal position and every further GRPx write timed exactly; he floated limiting
+    the stars to pixel 0 or 80 every 6th line, or 0, 40, 80 or 120 every 3rd, and left it open
+    〔`200202/msg00102`, 2002-02-08〕. His later posts put numbers on his own build. The next day,
+    posting a work-in-progress starfield, he wrote that each star consumes 3 bytes of RAM
+    〔`200202/msg00109`〕, and in a reply the same day that his from-scratch 2LK could do stars every
+    2nd line where, he said, Starmaster can do them only every 6th, while by his own account still
+    *"doing ~100 lines too many at the moment"* — *"I'm not sure how everything will work out in the
+    end, since I already need a complete scannline for the starfield only"*
+    〔`200202/msg00112`〕. On 2002-02-12, with a crosshair added, he had *"almost consumed 1 1/2 of my 2
+    scannlines"* 〔`200202/msg00138`〕. Cited only, not verified.
 
 ## Exactness, and what was traded for speed
 
