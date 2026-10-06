@@ -85,9 +85,10 @@ step. Put `$00` on the lines inside a band and the whole band shares one edge.
   blank is a uniform left margin rather than a ragged notch, and keep the shape clear of it.
 - **Cost is about 36 cycles per scanline** for one object, which makes this a one-line kernel with
   room for a little else — not something to run for two objects at once without a 2-line kernel.
-- **The colour is single.** COLUPx is per-line at best; a shape made of copies is one colour across
-  its whole width on any given line.
-  A second colour costs the second player. SpiceWare's dragon in Medieval Mayhem: *"each player set
+- **The colour is single in this kernel.** It writes no `COLUPx` inside the loop, so a shape made of
+  copies is one colour across its whole width on any given line. That is this kernel's budget, not
+  the hardware's limit (cited, not measured: "Per-copy colours mid-line" below). Within this kernel,
+  a second colour costs the second player. SpiceWare's dragon in Medieval Mayhem: *"each player set
   for 2x size / each player is a different color / each player shifted left/right over successive
   scanlines"*, and Circus Convoy *"did add changing the colors of the players over successive
   scanlines"*. alex_79 on why the pair reads as one sprite: *"Objects with lower priority will only
@@ -130,6 +131,16 @@ register**, with the copy count changing from two copies to one wide copy inside
 the left edge stepping 44 → 43 → 42 on consecutive lines. That is this technique, read off the
 pixels — no disassembly was consulted.
 
+**Reported in other games, not measured here.** Nukey Shay, 2019, on Pete Rose Baseball: *"HMOVE is
+hit on every scanline, which is why there is a black left border"*, and when pitching, the catcher,
+batter and pitcher *"have their horizontal motion register and size set on every scanline...makes it
+appear that the sprites are wider than 8 bits. If you examine each scanline of sprites, you can see
+that no more than 8 bits are used on any of them."* Elsewhere, by his account: M-Network uses it
+*"to draw missiles and make them appear as if they are the 8-bit sprites"*, Texas Chainsaw Massacre
+for Leatherface's weapon, and Seaquest's divers and bubbles are *"Just the 1-pixel ball sprite
+shifted and stretched"* (AtariAge `topic/293976`). **Cited only, not verified** — none of these ROMs
+was examined here.
+
 ## Neighbouring uses of NUSIZ (cited, not built here)
 
 - **A black quad-width player as a mask.** omegamatrix, hiding a railing where it wraps at the right
@@ -157,3 +168,80 @@ pixels — no disassembly was consulted.
   completely"* (AtariAge `topic/274546`; **Cited only, not verified**). That puts a GRP write between
   two copies, and when such a write takes effect is `sprite-placement.md`'s rule 6, measured in
   `internal/emu/spriteplace_test.go`.
+  Removing a copy through NUSIZ is older. Piero Cavina, 1997, on groups of three identical aliens:
+  rightmost hit, two copies close; leftmost, two close and *"shift it 16 color clocks to the right!"*; centre, two
+  copies medium; one left, one copy, moved. He set aside blanking the dead copy's pattern as
+  *"much more difficult to me, as it involves cycle counting"*, and wrote *"these are only my
+  thoughts, I haven't checked the code of any game"*. Nick Bensema's reply: there is *"no NUSIZ
+  register for "nothing shows up""* 〔stella-list `199703/msg00116`, `msg00123`〕. Erik Mooney, 1998,
+  computing each bullet copy against each plane copy rather than reading the collision registers,
+  needs the same 16: *"we move the object's X-coordinate sixteen pixels to the right (because the
+  middle object became the leftmost object.)"* His plan was a ROM table indexed by NUSIZ values and
+  the 8-pixel step of the X difference, 1296 bytes if limited to 64 pixels either way 〔stella-list
+  `199805/msg00310`〕. **Cited only, not verified**.
+- **Two 2x players shifted line by line, as one picture.** SpiceWare, 2024: *"Dolphin and Medieval
+  Mayhem use the players in 2x size mode, and moves them left-right over successive scanlines"*, and
+  *"Shifting the players line-by-line eliminates the blocky look you normally get when using 2x
+  sized players"*. Asked whether Dragonfire's dragon is the same: *"Not the same. Dragonfire uses
+  both players in duplicate mode, similar to how a 6-digit score is drawn"*, which shows in debug
+  colour mode *"where Red = player0 and yellow = player1"* (AtariAge `topic/361594`). In 2022 he
+  called the dragon (the colour bullet above) *"Just 2x with line-by-line shifting"*, said size
+  and/or line-by-line shifting *"has been used to great effect for a long time, such as in Boxing and
+  Dolphin"*, and that he used it for *"the largest asteroids in Space Rocks, and the space stations
+  in Draconian"*. He converted the dragon with his web-based Two Color Sprite Converter; its output
+  is two 8-bit bitmaps and a table of one byte per line holding both players' moves, one per nibble,
+  plus a second table of the opposite moves for the other direction. The asker's reading of why it
+  works: *"shifting the next scanline so you still have illusion of 1 pixel resolution"* (AtariAge
+  `topic/344242`; our copy holds 18 of the thread's 23 posts). **Cited only, not verified**.
+- **A mirrored body with an independent centre.** SpiceWare, 2007, posting a kernel from a Care
+  Bears prototype: P0 at two copies with P1 between them, `REFP0` set before the right copy of P0 is
+  drawn and cleared again before the next line, so one graphic makes a symmetric body while P1
+  carries the centre (nose, ears) in its own shape and colour. An indirect `JMP` into a run of
+  `NOP`s is a variable delay for placing the flip (AtariAge `topic/105254`; **Cited only, not
+  verified** — read from distilled notes, not the thread).
+- **Borrowing the far player's missile for its width.** A missile's width is in its player's
+  `NUSIZx` (`missiles-bullets.md`). Rob, 2003, brainstorming a port, would draw a figure with *"the
+  missile for the player on the other side of the screen (so you can mess with the width in
+  mid-scanline:)"*. In our reading the far side is the point: that player is not being drawn where
+  the write lands. A proposal, not a build 〔stella-list `200307/msg00107`〕; **Cited only, not
+  verified**.
+- **The ball as a brush.** Fabrizio Zavagli, 2002, drew a bouncing ball with the ball object,
+  *"changing the size and horizontal position on each line (that's why it doesn't look all that
+  good, but it's still better than just a square I think :)"*, on the free line of a kernel that
+  alternates its tile graphics between odd and even lines each frame, cycle-counted with no `WSYNC`
+  〔stella-list `200209/msg00107`〕. The ball's size is `CTRLPF` D4-D5, beside the playfield bits
+  (`pf-modes.md`). **Cited only, not verified**.
+- **Quad width can cost a character its moves.** freshbrood, building Ninja Kombat, dropped one
+  character's punch and grab because *"the sprites look way too awful quad stretched"*, and gave it a
+  shoulder smash instead (AtariAge `topic/316451`; **Cited only, not verified** — read from distilled
+  notes, not the thread). One author's judgement; the 4-clock pixel is in the bullet on two quad
+  players above.
+- **Per-copy colours mid-line.** splendidnut, 2022: *"Switching colors during a scanline is indeed
+  possible. Just requires careful planning"* (AtariAge `topic/344242`). Happy_Dude's Master Mind
+  Deluxe kernel, 2004, gives five close-spaced pegs on one line five colours with five `COLUPx`
+  writes per line, the last three while the pegs are drawn. Manuel Rotschkar on why it holds: *"I
+  even think it only works because the circles are less than 8 pixels wide. (The last color change
+  would be 9 pixels wide.)"* — each write has to fall between copies or on blank bits (our reading).
+  Its author had run it only in Stella 〔stella-list `200404/msg00103`, `msg00114`〕; **Cited only,
+  not verified**. `restrobe-copies.md` has a medium-spaced four-colour version (karl-g) that reports
+  close spacing leaves too little time; that one also rewrites `GRPx` mid-line, and this one writes
+  only colours (our reading).
+- **Copies and width combined mid-line (Meltdown).** Thomas Jentzsch, 2004: the size is *"usually
+  set to two copies wide, and during displaying the player the size is set to double size. Timing is
+  critical, since you must chance the size exactly at the start of the copy being displayed. If you
+  are too early, the copy won't show at all, if you are too late, the first pixel(s) will still have
+  single size"* (his spelling). Quad size or three copies could also be used, he found, *"But since
+  the timing has to be pixel perfect and the CPU clock runs at 1/3rd of the pixel clock the timing
+  for either the 2nd or 3rd copy can't be perfect"*; he suggested scaled graphics *"with 64 pixel
+  (2x2 player, double sized)"*, and asked by Manuel Rotschkar whether Meltdown's code runs every
+  line or once: *"AFAIK every single scanline."* Eckhard Stolberg recalled the trick from an earlier
+  demo of Andrew Towers', adding that *"his timing might have been different"*. Towers' demo has
+  four double-width players on a line from P0 and P1, with `VDELP` pre-loading the right-hand
+  graphics because otherwise there was no time to switch both NUSIZ and load new graphics; he
+  *"couldn't get it to work in any emulator"*, and by his account Christopher Tumber found it works
+  on hardware *"if you move two pixels to the right (using the joystick)"* 〔stella-list
+  `200408/msg00085`, `msg00087`, `msg00089`, `msg00091`, `msg00095`〕. In 2014 Jentzsch still named
+  *"the RESPx /NUSIZx tricks used in Meltdown"* among what makes the 2600 hard to emulate (AtariAge
+  `topic/225603`); `stella-oracle.md` records Stella's later fix to its NUSIZ modelling for
+  Meltdown. `known-traps.md` lists this trick as not rendered by Gopher2600, so it has not been
+  measured here; **Cited only, not verified**.
