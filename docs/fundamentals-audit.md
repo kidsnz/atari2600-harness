@@ -40,6 +40,20 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   do display more than 192 lines. Missile Command draws 222"* (`199709/msg00226`). The size of those two
   rooms is measured in the work-placement ✅ below. **Cited only, not verified** — no picture taller
   than 192 lines was built here.
+  The same trade run the other way, Stolberg in 1999: *"If you don't need the full 192 scanlines to
+  display your game graphics, you can blank out some more scanlines and use them for game calculations
+  as well"* 〔stella-list `199905/msg00048`〕. Saunders had given the history in 2001, a year and a
+  half before his 2002 post above: *"I think the 192 line standard they used on the 2600 and 8-bit
+  were based on studies of televisions taken way back in early 1976"*, *"Most of Atari's peers
+  settled with a 200 line standard"*, and *"These days I think maybe you can push it to 208-210 as
+  long as you center the scanline usage but you might have some cropping at the edges on some TVs"*
+  (`200105/msg00135`). In
+  the same thread, on taking the extra lines from VBLANK, Chris Wilkson: *"you should be able to do
+  this, no problem. Note that if you use these lines, you may get weird results with TVs that are
+  capable of closed caption decode"* — *"line 21 I think it is"*, and *"something special about line
+  17 and a couple of others, but I don't remember the details"* (`200105/msg00134`). Thomas Jentzsch,
+  2004, to an author whose frame had too many visible lines: *"The upper limit is around 200
+  scanlines (the Stella guide suggests 192)"* (`200404/msg00122`). **Cited only, not verified.**
 - 📖 **VSYNC procedure: set D1, wait ≥2 lines, clear** (Stella PG ~§3). **Split by measurability
   2026-09-03** — the procedure and the threshold are different claims and only one of them is ours
   to measure. The *shape* (set D1, hold, clear, and the frame is accepted) is measurable here. The
@@ -118,6 +132,12 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   reaching-zero side is measured here, for `TIM64T`: written 43, INTIM first reads zero 2692 cycles
   later — about 42 intervals, not 43 (`internal/emu/tim64tzero_test.go`). How long the zero then holds
   is the documented-only line above. **Cited only, not verified.**
+  📖 **Deriving the load from a line count, as a 2000 post gives the recipe.** John K. Harvey, following
+  Nick Bensema's *How to Draw a PF*: lines × 76, then subtract *"5 cycles timer set"*, *"3 cycles
+  WSYNC"* and *"6 cycles for checking loop"*, and divide by 64; he asked whether a table of loads for 1
+  to 37 lines existed, and the thread holds no reply 〔stella-list `200007/msg00039`〕. The post's
+  worked figures do not start from 37 × 76 = 2812, so they are not repeated here, and the recipe has
+  not been checked against the one point measured above. **Cited only, not verified.**
   ✅ **The other way to use the timer — ask without waiting — measured 2026-09-04.** Every INTIM site
   in this repository *waits* (`lda INTIM / bne loop`). ⚠ **That said "five of them" until 2026-09-07 and the count was stale** — re-measured, the tree reads INTIM at **55 sites across 25 files**, of which **18, in 18 different files, are the waiting shape**; the conclusion held while the number rotted. Re-count with `git grep -n 'lda INTIM' -- roms/` and look at the line after each, since it is the branch that makes it a wait. stella-list 2002 polls instead:
   `lda #$FC / and INTIM / beq NoTime / <work> / jmp back` — ask whether there is room for one more
@@ -233,6 +253,15 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   this effect"* — he *"could swear that every other line is green in the cap of the bouncing Mario"*,
   and saw *"occasional red flashes directly to the right of both Marios"* 〔stella-list
   `200303/msg00059`〕. The post does not say what he ran it on. **Cited only, not verified.**
+  📖 **SECAM's colour/B&W switch, and where B&W lives instead.** Software sees the switch as B&W on a
+  SECAM console (the Stella Programmer's Guide, quoted in `techniques/game-states.md` and `ingest.md`);
+  Eckhard Stolberg, 2001, put it more exactly: *"The SECAM B/W switch isn't really hardwired to B/W, but
+  the B/W switch input on the RIOT is. Therefore a game can't use that switch. But you can still turn
+  the colours off on the SECAM VCS. But this is not left to the game, like on PAL and NTSC. They must be
+  doing it in hardware."* 〔stella-list `200108/msg00444`; a 2022 thread says the same, AtariAge
+  `topic/336537`, of which only the distillation notes are held here〕. On NTSC and PAL the switch only sets `SWCHB` D3, and B&W is whatever the game then
+  writes to its colour registers (`design-principles.md`, the colour/B&W entries). **Cited only, not
+  verified** — SECAM is not modelled here.
   📖 **What PAL games actually do, by one author's count.** Thomas Jentzsch, 2002, suggesting that one
   cartridge might carry NTSC, PAL60 and, with some blank lines added, PAL: *"You must not do exactly 312
   lines then"* (read here as *need not*) — *"The Atari PAL library ranges from ~284..342 (Acid Drop)
@@ -241,6 +270,10 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   lines)/PAL(300 lines)"*, *"Both switchable with right difficulty"* (`200211/msg00109`); asked about
   Thrust's 262, *"The public binary does, but the cart owners get 8 extra lines"* (`200211/msg00124`).
   **Cited only, not verified** — the range is his count, not one made here.
+  📖 **An NTSC count further out.** A 2020 thread reports Andrew Davie using **276** lines in Boulder
+  Dash, shown by nearly every television, and puts the requirement on the count being the same every
+  frame rather than on 262 〔AtariAge `topic/303750`; only the distillation notes are held here, so
+  this is not his wording〕. **Cited only, not verified.**
   📖 **How an emulator decided which region a ROM was, in 2002.** Eckhard Stolberg: *"The only thing we
   do is that we try to autodetect the TV type. But for that we only check the number of scanlines
   during the first couple of frames. If the game does a stable line number of more than 285 lines or
@@ -580,7 +613,8 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   classification; it does not make the samples equal.
   ✅ **Pitch formula measured** (`docs/verified-coverage.md:109`): `base/(AUDF+1)/D` confirmed by
   raw-sample capture (square 30/62, lead 90, bass 310).
-- 📖 SFX recipes (Slocum): kick=Buzz@30, hi-hat=Noise@0 for 1 frame, snare=Noise@~8; arpeggio/echo/
+- 📖 SFX recipes (Slocum): kick=Buzz@30, hi-hat=Noise@0 for 1 frame, snare=Noise@~8 or Buzz@~6
+  (*"The snare pitch is flexible"*; Buzz@~6 is **Cited only, not verified**); arpeggio/echo/
   portamento patterns. Driver economics: ~400–500 cycles/frame, 600–2000 bytes ROM (Sequencer Kit).
 - ✅ **The pitch table is measured against the machine at 330 of its 512 (AUDC,AUDF) points**
   (`TestEveryPitchTheHardwareHasMatchesTheFormula`, 2026-08-11). Two-sided: an exact sample-for-sample
@@ -718,7 +752,8 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   disassembly was opened, which keeps this inside the clean-room line — a ROM image carries no
   interpretation, and reading meaning out of it is the skill.
   📖 **What the DDR write is FOR is still open.** The 2004 thread's question — *"does anyone know if
-  SWBCNT has any use?"* — went unanswered, and the same post reports Combat's own comment claiming
+  SWBCNT has any use?"* — got only a general answer, about spare bits, that does not name either game
+  (`200407/msg00042`, below), and the asking post reports Combat's own comment claiming
   the write stops joystick response **when it does not**. So we know two commercial titles do it and
   we do not know why, which is a sharper open question than the one this line started with.
   📖 **One reason given for input-only bits is the board, not the chip.** Mark De Smet, 2000,
@@ -736,6 +771,12 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   *"Wow. I thought you couldn't get away with using any of the VCS registers as general RAM storage. I
   remember asking about this a long time ago and the general concensus was that it wouldn't work"*
   (`200208/msg00279`).
+  The one reply in the 2004 SWBCNT thread says the same, with a test run: zu03776, *"You can store #$34
+  into SWBCNT and get three extra bits of RAM in the unused bits of SWCHB"*. His ROM stores the
+  scanline counter into `SWCHB` on every line and draws the read-back as `GRP0`: on Stella 1.2 *"the
+  P0 sprite is solid"*, and *"After compiling MakeWav for the Mac, and putting it on the Supercharger on
+  my Atari 7800, I received a line with holes in it, as expected"* 〔stella-list `200407/msg00042`〕 — a
+  7800, not a 2600.
   The three are **D2, D4 and D5** — the bits the
   switch list above leaves out. A 2010 post keeps two flags of its own (a 7800 detected at power-up,
   and the B&W switch's flip state) in those three bit positions of the RAM byte that holds the
@@ -745,6 +786,17 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   (`rg -i 'SWBCNT|\$0?283' internal roms cmd pkg` finds only a comment; `litmus_swacnt` drives port
   A), and the D4 reading is Stolberg's *"it seems"* about Star Ship, not an answer for Combat or
   Air-Sea Battle. **Cited only, not verified.**
+  📖 **Driving a bit that a switch is wired to is the case to keep out of a port-B output test.** Kevin
+  Horton, 2001, answering whether setting the console-switch port to output could damage the console:
+  *"there is no protection against it, though I doubt it'd do any damage. The 6532 will get hotter than
+  a pistol tho if you have console switches on and the port set to output trying to output a logic "1".
+  (The switches pull to ground only) So it isn't recommended."* 〔stella-list `200111/msg00482`〕
+  groovybee's 2012 warning about a difficulty switch in B 〔AtariAge `topic/197100`〕, quoted in full in
+  `known-traps.md` (*"A port bit driven as an output…"*), describes the same mechanism and
+  ends *"This isn't good for RIOT and is best avoided"* rather than doubting the harm. Star Raiders,
+  in the next entry, drives all of port A high against joystick switches that ground it — the
+  arrangement Horton describes, shipped (our reading). So the litmus this entry says a DDR test needs
+  belongs on D2, D4 or D5 (our reading). **Cited only, not verified.**
   📖 **Port A (SWACNT) as an output does have known uses, each for a peripheral** — the answer to a
   2004 thread asking whether anything but a development tool drives it 〔stella-list
   `200404/msg00412`〕: the **keyboard controller** is an x-y grid, the four RIOT lines drive x[3:0] and
@@ -936,6 +988,22 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   describes), where the write side is a different register, `VSYNC` … `PF0`, so any RMW on a
   collision or input register through base `$00` writes one of them (read here, not stated there).
   Whether the TIA sees one write there or two is the ⬜ above. **Cited only, not verified.**
+  📖 **The strobe side has one report, for `WSYNC`.** Fred Quimby, 2005: *"I had the idea that doing an
+  INC WSYNC should give two scanlines, but on a real 2600 it didn't appear to work - I could only see
+  one"*; his explanation, *"the READY line on the 6507 only halts it during read cycles. Therefore the
+  second WSYNC gets executed before the CPU halts, thus you only get one scanline"*, which he extends
+  to a `BRK` or `JSR` with SP at `$02` and qualifies: *"I haven't verified that the above is 100%
+  true"* 〔stella-list `200507/msg00190`〕. Hours later: *"I just proved the theory in my last post by
+  writing some code that will run on a real 2600 but will crash emulators"* — `sta WSYNC / lda #$FF /
+  sta TIM1T / inc WSYNC / lda INTIM / .1 bpl .1` (`200507/msg00191`). In April of the same year he had
+  written the opposite inside a VSYNC trick — *"INC does two writes to WSYNC, giving you two
+  scanlines!"* — with *"I haven't actually tried this on real hardware, so use at your own risk!"*
+  (`200504/msg00010`), so the July report reads as his own correction (our reading). On AtariAge,
+  asked whether `INC WSYNC` waits two HBLANKs, rybags suspected the same mechanism: the CPU *"will
+  allow any pending writes to occur before recognising it"*, which is *"deliberate to allow such
+  read/modify write instructions to be able to complete properly before the CPU is snoozed"*
+  〔AtariAge `topic/238310`〕. What this engine does with
+  `INC WSYNC` was not measured here. **Cited only, not verified.**
 - ✅ **skipdraw/DoDraw is 17 or 20 cycles, not a constant 18** — measured 2026-09-03; this line said
   "constant-18-cycle draw" and added "worth a cycle litmus", which was an accurate self-assessment.
   Timed WSYNC→GRP0 over eight frames of `roms/techniques/vertical_pos_dcp.asm`: **20 cycles on the 80
@@ -981,6 +1049,13 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   `SEC/SBC/ADC` form posted in the same thread adds up to **20/20** 〔AtariAge `topic/191440`, reveng〕.
   **Not verified** — the counts are the posts' own annotations, including `STA GRP0`, and assume that
   neither branch crosses a page, which a branch to code outside the kernel makes easy to break.
+  The list had the polarity move in 2001. Glenn Saunders worried that a skip path which clears GRPx
+  forces a `JMP` after the draw path's store; Thomas Jentzsch: the skip path can branch out of the
+  kernel and jump back, which *"only works, if the cycles of the branches differ by at least 4 cycles (1
+  for the taken branch and 3 for the additional jump)"*, and otherwise *"you can change bcc .skipDraw
+  into bcs .doDraw and reorganize your code. This only adds one cycle to the long branch"* 〔stella-list
+  `200110/msg00273`〕. So `.doDraw` there is skipdraw with the branch inverted, not a separate routine
+  (our reading). **Cited only, not verified.**
 - 📖 Mirror templates (woodgrain Memory_Map): TIA at $xyz0 (x even, z∈{0,4}); RAM $80–$FF mirrored
   at **$0180–$01FF — which is why the stack works**, and the mechanism is that the 6507's stack
   pointer is **only eight bits wide** while the address bus is thirteen, so the processor supplies
@@ -1038,6 +1113,18 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   (Stella PG). Real-game RAM budgets: Pitfall ≈ all 128 bytes (world = 1 byte!), Random-Dungeon ≈45 with
   aliased overlays, za2600 overflows into cart RAM. ⬜ a RAM-map audit feature (symbols → read/write
   coverage) would catch dead variables (Pitfall's `cxHarry` is stored, never read).
+  Keyed by symbol, that audit would mislead on overlays. Andrew Davie's DASM idiom declares `temp ds 8`
+  and then several sections each opening with `org temp`, so `overlayvar1` and `linecounter` both name
+  `temp`, and *"the same routine (or section of code) CANNOT use variables in overlay section 1 AND
+  overlay section 2"* 〔stella-list `200102/msg00024`〕. A traced access carries an address, not a name,
+  so with one byte under several names a per-name table cannot say which name was used, and a
+  dead-variable report keyed by name can be wrong either way (our reading). `defuse` keys by address
+  and is not misled by names, but its own test says it proves the read set, not the ordering that
+  "these two variables may share a byte" needs (`internal/cyclebound/defuse_test.go`). **Cited only, not verified.**
+  📖 **One multi-level data point.** Manuel Rotschkar, 2004, porting Jumpman with 25 of 33 analysed
+  levels transferred: *"Highest RAM usage: 42 Bytes for Dragonslayer."* 〔stella-list
+  `200410/msg00178`〕 The post does not say whether 42 counts the whole game's RAM or that level's own.
+  **Cited only, not verified.**
   📖 **Where the 128 bytes go, by one author's rule of thumb.** Paul Slocum, 2004, on how large an
   AtariVox save file needs to be: *"I doubt many programs are going to need to store more than 117
   bytes considering there are only 128 bytes in the Atari. Most programs that use the file system will
@@ -1151,6 +1238,14 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   Because each of them puts all 255 non-zero bytes on one cycle, a second seed with the **same**
   constant only replays the same sequence from another point; a second generator that should not track
   the first wants a different constant from the list.
+  📖 **The INTIM recipe — offered as a generator in place of the LFSR, not as a seed.** Thomas
+  Jentzsch, 2001, *"a different idea about a random number generator, which doesn't cost you a lot of
+  cycles and RAM space"*: *"1. load a by one decreased value into TIM64T and let the loop countdown
+  not to 0 but to negative values 2. make the checking loop 8 or 16 cycles long 3. get the lower bits
+  (up to 3 or 4) from the last load of INTIM"* — *"Those bits shoud be nearly random, but only if
+  your code before doesn't have a very constant timing (uses branches etc.) You have to test..."*
+  〔stella-list `200102/msg00155`〕. **Cited only, not verified** — nothing here has measured how those
+  bits vary.
 ## 12. Harness/tooling implications
 - 📖 **Stella IS automatable for F-4** (debugger doc + installed Stella 7.0 verified): `<rom>.script`
   auto-runs at `-debug` startup (`frame N / tia / riot / dump 80 ff 7 / saveSnap / saveSes`); `saveSes`
