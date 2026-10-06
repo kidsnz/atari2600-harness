@@ -83,6 +83,15 @@ case to act on.
 
 The catalogue is not retro-fitted yet; new and edited pages carry the price from here on.
 
+**A routine shared with code already in the program is left out of the ROM byte count, and the page
+says so.** Andrew Davie, counting a title screen's bytes for Qb (*"194 bytes, to be exact"* in his first post,
+*"about 180"* in the next, posting the code): *"The routines VBPreliminary and VBFinal were not
+included in the byte-count, as they were already used for the other kernal display - they've been
+re-used for the title screen. That is, there was no title-screen-related cost in using them."*
+〔stella-list `200103/msg00000`, `200103/msg00002`〕 Our reading: a ROM byte count without the shared
+routine is what the technique adds to a program that already has it, and it does not compare with a
+ROM byte count that includes the routine, so the page names what it left out. Cited only, not verified.
+
 ## Promoting out of a work (roms/) into here
 
 Written 2026-08-21, after doing it once and getting three of the five wrong on the way.
@@ -106,6 +115,15 @@ Written 2026-08-21, after doing it once and getting three of the five wrong on t
   built and graded there. Measuring the working tree grades other sessions' unfinished work: the
   pre-push mirror blocked a push over two files that were not in the commit, and a run of the gates
   in the checkout said green while `go test` had never actually built.
+
+**Whether a kernel fragment carries over usually depends on what else is on its lines.** Glenn
+Saunders, 1997, answering a question about building generic routines: *"most score routines can be
+ripped out and reused from game to game"*, and he supposed the Dragster and Dragonfire *"movable huge
+sprite"* routine too, *"because usually there is nothing going on but this stuff at the offending scanlines.
+When you have funky stuff going on with sprites and playfield dynamically changing, you pretty much
+have to roll your own routines."* 〔stella-list `199709/msg00030`〕 Our reading: a fragment that
+shares its scanlines with other objects is a weak candidate however many callers it has. Cited only,
+not verified.
 
 ## Catalog
 
