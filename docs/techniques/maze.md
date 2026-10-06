@@ -79,6 +79,52 @@ every cell exactly 2px wide:
   wall than passages: all passages 2 wide gives `(n + 1) + 2n = 40` → **13 passages, 14 walls**; the
   most passages gives **20 walls and 19 passages**, all 1 pixel wide except the centre one at 2
   〔AtariAge `topic/224797`, 2014〕. Arithmetic only (14 + 26 = 40, 20 + 19 + 1 = 40).
+- **A square room with an opening on each side, in a reflected playfield.** Asked how to draw *"a
+  square room with 4 doors/openings on each side"*, Just Jeff: *"Did you set CTRLPF to reflect? After
+  that, you will be writing your data to registers PF0, PF1, and PF2 to draw the top and bottom of your
+  design, and need only PF0 for the middle of it (though you could just repeatedly write 0s to the PF1
+  and PF2 registers there)."* 〔AtariAge `topic/317568`, 2021〕. Our reading against the measured bit
+  order (harness `CLAUDE.md`, playfield): PF0 holds columns 0–3, the outer edge of the half, so with
+  reflect the side walls of every middle line are PF0 alone, mirrored to the right edge; a side opening
+  is a few lines of PF0 = 0, and the top and bottom openings are a gap at the centre — the high bits of
+  PF2 (column 19 is `D7`) — mirrored for free. The column positions are machine-locked by
+  `litmus_pf_allcols`; the room was not built — **Cited only, not verified**.
+- **Why the buffer is a window: the RAM count.** Manuel Polik (cybergoth), on a *real* scrolling PF
+  maze, which means you'd *"have to generate up to six new tables of PF Data on the fly, whenever the
+  screen scrolls"*: full-screen costs *"192 Bytes of RAM... Oooops... Ok, maybe no fullscreen maze"*;
+  then *"reflect the playfield, forget about PF0... = 36\*4 = 128. Ah, coming closer... Have some status
+  lines on Bottom/Top and we've sufficient RAM"* 〔stella-list `200104/msg00081`〕. His "36" is a slip:
+  the post divides 192 lines by 6, and both totals are computed with 32 (32 × 6 = 192, 32 × 4 = 128).
+  128 is all of the machine's RAM, so even the reduced count fits only by cutting rows. Our reading of
+  his counts, which he does not spell out: six bytes is PF0/PF1/PF2 for each half of an asymmetric
+  line, four is that without the two PF0s. This demo goes further — a symmetric half, PF1 and PF2 only,
+  16 rows of 12 lines: 32 bytes. Glenn Saunders's whole reply: *"One word: Supercharger."*
+  〔`200104/msg00087`〕. Arithmetic only; **Cited only, not verified**.
+- **Storing a whole random maze: only the walls between cells vary.** Christopher Tumber, asked
+  whether the playfield can display a random maze: *"Your biggest hurdle is not the display, it's the
+  RAM required to store your maze data. Maze Craze's maze is 23 rows high, or a minimum of 115 bytes
+  RAM"* 〔stella-list `200309/msg00167`〕. Paul Slocum: *"It only requires half of that much RAM"* —
+  start from *"sort of a pegboard"* of fixed points and *"fill in the walls to make a maze"*, *"So you
+  only have to store have of the squares"* 〔`200309/msg00169`〕. Kirk Israel, *"At the risk of missing
+  the joke a little, I think that using the RAM for the playfield would be much faster in the kernal.
+  A typical time/space trade off"* 〔`200309/msg00171`〕. Slocum: it *"does take kernal time"*, but
+  *"You just have to comb out the correct data for the line using AND/OR. And you can buffer it since
+  you repeat the same playfield data over a few lines"*, and Maze Craze still shows both players, both
+  missiles and the ball *"while doing it (although is uses zero'd out pages to display the player
+  graphics)"* 〔`200309/msg00173`〕 — whether Maze Craze stores its maze this way, the posts leave
+  unclear. Our reading: the pegs are always wall and the cell centres always open, so only the
+  connecting squares, half of the grid, need storing; 115 is 23 rows × 5 bytes, a full 40-pixel line,
+  and half is about 58 (arithmetic). **Cited only, not verified.**
+- **In *Skeleton*, a second view would have meant converting the maze.** Eric Ball, asked by Carlos
+  Lopez whether holding the button at a marked wall could replace the screen with a top view of the
+  maze in *Skeleton*, gave four reasons against: no spare cycles in parts of his kernel; the maze wraps
+  *"from top to bottom & side to side"*, so a map *"would be difficult to interpret"*; little ROM left;
+  and *"programming the TIA to produce a 16x16 display would be very difficult. I'd have to convert the
+  maze bits, which are spread across bytes into playfield bytes. If I had the ROM space, I could hard
+  code it, but I don't."* 〔stella-list `200209/msg00068`〕. This demo stores its maze as the PF1/PF2
+  bytes it writes, so it has no such step; a maze held in any other arrangement pays for a conversion,
+  or ROM for a hard-coded display, before it can be drawn as playfield (our reading). **Cited only, not
+  verified.**
 - **One byte per row, not per scanline.** This demo keeps one byte per row by nesting a 12-line band
   loop inside the row loop (`maze.asm`, `RowLoop` / `Band`). A kernel that has to stay one flat
   per-scanline loop — an asymmetric playfield rewriting PF1/PF2 mid-line, say — can get the same
@@ -116,6 +162,17 @@ every cell exactly 2px wide:
   the carve above is what would make it structural.
 - Combine with a player sprite (`dynamic-multisprite`) + collision (`CXPFB`) for wall collision to
   turn this skeleton into a playable maze game.
+- **Wall test from the drawing table, before the move.** A routine posted on AtariAge tells whether
+  a given (X, Y) is on a wall without the collision latch, by reading the same PF table the kernel
+  draws from 〔AtariAge `topic/317208`, 2021〕: column = X / 4; in reflect mode a column of 20 or more
+  folds to 39 − column; columns 0–3 are PF0, 4–11 PF1, 12–19 PF2; the row is Y / 4 (its playfield is
+  22 rows on a two-line kernel); one AND with a mask in playfield bit order picks the bit. The bit
+  order it needs is the measured one (harness `CLAUDE.md`, playfield); the routine is **Cited only,
+  not verified**. Our reading: because it reads a table and not a latch, it can be asked about the
+  position an object is about to move to and refuse the move, where the latch reports an overlap only
+  after it has been drawn; and with one table, what is drawn and what blocks cannot disagree — the
+  opposite choice to the cookbook's maze row (*"separate logic-collision map from draw"*). **Not
+  verified.**
 
 ## Two of the three maze rules are local; the third is not (2026-09-07)
 
@@ -146,3 +203,23 @@ restrictions while adding walls"*, which is what a fixed carve pattern is. ★�
 adding rules to it: **the moment a generator has to decide connectivity rather than inherit it, its
 cost stops being predictable**, and a 2600 kernel cannot pay a variable cost at a fixed deadline.
 Found by the mailing-list distillation (helper-1).
+
+★**A flood fill in 128 bytes has no room for recursion.** Christopher Tumber, grouping same-coloured
+blocks for Big Dig, called it *"essentially a travelling salesman type problem"* with recursion out
+*"as there's no way I have enough RAM for the potential stack overhead"*. His working method sweeps the
+whole grid again and again, flagging any same-coloured block beside a flagged one, until a pass flags
+nothing — and was *"So slow that I could only group together 1 set of blocks per frame"*
+〔stella-list `200304/msg00064`〕. Julian Squires, warning he did not know the game: *"Looks less like
+TSP and more like flood fill to me"*; he posted a scan-line fill that keeps only the current, upward
+and downward horizontal ranges, *"not really tested"* — *"I think the worst case is a grid structure,
+where it performs worse than Algorithm 1"* (the sweep) 〔`200304/msg00066`〕. Tumber agreed it *"IS
+very floodfill"*, but flood fills *"tend to be rather recursive"*, and RAM was the limit whether for a
+stack or a list of points 〔`200304/msg00067`〕. Squires answered that: *"Right. The method I proposed
+should use only a handful of bytes"*, though *"I'm not sure how slow it would be once implemented in
+6502 assembly"* 〔`200304/msg00068`〕. Jentzsch then said Robot City's generator already runs *"some
+kind of floodfill"* (`CheckFill`) *"to avoid generating unreachable areas"* — *"small, dead simple and
+not very fast"* — and of Squires's: *"It should be very fast and efficient"* 〔`200304/msg00069`〕. Our
+reading: what the RAM rules out is the recursive fill; the sweep pays in time instead, and the
+scan-line fill was meant to need neither, by expectation rather than by any measurement in the
+thread. This repository's own fill (`mazesolvable_test.go`) is Go with an unbounded stack, off the
+console, and says nothing about that cost. **Cited only, not verified.**
