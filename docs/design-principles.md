@@ -154,6 +154,11 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     ball graphics to round out the edges."* 〔`199703/msg00101`〕 The 3 is the band step below; a write
     moved by one cycle on each line moves the edge 3 colour clocks a line (our reading of Saunders').
     **Cited only, not verified** — "supposedly" is his, and Radar Lock was not examined here.
+  - **In 1999 Saunders gave Radar Lock a second account.** Answering a question about what the missile
+    and ball objects are for, he wrote: *"In some games the ball, which is the same color as the
+    playfield, is used to fill in diagonal lines in the jaggy playfield.  For instance, Radar Lock."*
+    〔`199905/msg00027`〕 That is Bensema's 1997 remedy above rather than his own timing offset (our
+    reading). **Cited only, not verified** — neither account was checked against the ROM.
   - **How many colours a line holds depends on how the stores are fed, and a 2013 challenge counted
     the rungs.** Andrew Davie's thread on how much colour a still picture can carry, as the
     distillation notes record it: Tjoppen's kernel of consecutive zero-page `STA`/`STX`/`STY`/`SAX`
@@ -633,6 +638,27 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     after their visible position/use the delay registers for auto buffering"*, and nanochess's rewrite
     in the thread had *"a logic result serving double-duty as a bitmap value"*. 〔mining 275171
     p0-on-same-scanline-as-m0-nudges-it-up-or-down-slightly〕 **Cited only, not verified.**
+  - **A fast object may need only every other line, and comes out squarer for it.** Thomas Jentzsch,
+    2001, in a thread on whether an *Arkanoid* could compute its brick rows inside the kernel, answering
+    Manuel Polik, who listed the `LDX`/`TXS`/`CPY`/`PHP` sequence for three balls that he said would
+    cost cycles on both calculating lines 〔`200108/msg00336`〕: *"Not necessary, for fast moving objects
+    like the balls, every 2nd line should be enough (and give the balls a more square size)."*
+    〔`200108/msg00337`〕 Polik: *"Ack."* 〔`200108/msg00338`〕 With the wide pixel under Drawing craft, a
+    ball held for two lines is closer to square than one held for one (our reading). **Cited only, not
+    verified.**
+  - **Padded full-height sprites cost ROM that animation frames could use.** Lee Fastenau, 2004, had
+    page-aligned his *Reflex* sprites and padded each page with zeroes to avoid SkipDraw — *"Each sprite
+    took 256 bytes"* — and had since removed that code *"as it was quite memory hungry"*
+    〔`200409/msg00002`〕. Ben Larson, quoting him, had done the same: *"Wastes a lot of ROM, but can't be
+    beat speed-wise."* Thomas Boutell, replying to Larson: *"I just did a bit of arithmetic and found
+    that I'd need 1,792 bytes just for my padded page-aligned sprites... and I need a lot of ROM already
+    to unroll my kernel as much as I have. And the game doesn't look bad at all with the double-height,
+    non-padded versions of the sprites, which saves so much ROM that I could probably have multiple
+    versions and animate them. That might turn out to be a lot niftier to look at than full resolution
+    would be."* 〔`200409/msg00007`〕 1,792 is seven 256-byte pages (our arithmetic; he gives no count).
+    Fastenau, in the same thread, had already cut his ball sprite from *"an eighth of my 4K"* to *"only
+    a sixteenth of my ROM"* 〔`200409/msg00006`〕. **Cited only, not verified** — "probably" and "might"
+    are Boutell's, and no build is reported.
 - **★RESxx's internal draw delay (first suspect in any position mismatch)**: the `RESxx` strobe resets the counter immediately, but **the object actually starts drawing later = player +5 / missile and ball +4 colour clocks** (if RESP0 completes at cycle 46, X ≈ 75). Measured 2026-09-03 for strobes in the visible area, 1x player (`roms/litmus/litmus_respx_phase.asm`, `internal/emu/respxphase_test.go`); AtariAge 294398 reports the same from Stella's source (`renderCounterOffset`). **When a target X is off by ~5px, suspect this first.** RESxx granularity is 3 colour clocks. 〔mining 294398, 283075, 305780, 172089, 137739, 329611, 304182〕 (this is the quantity that explains the codified `X=3N−54/55` from behind; the measurement is recorded in `docs/fundamentals-audit.md`)
 - **Position formula and write window for multiple objects**: `RESxx` while the beam is visible is forbidden (the immediate reset bends the picture) = look ahead in HBLANK or on the previous line. A shared loop walks consecutive `RESP0,x`/`HMP0,x` with `DEX/BPL` (`design.shared_setxpos`, implemented). N objects cost N+1 scanlines only while every input stays inside a limit: 340965's PosWorldObjects caps X at 0..134 to guarantee it. Past the limit the next `sta WSYNC` spills onto the following line, and the code after the strobe sets the limit — 134 when the `sta WSYNC` comes right after the `rts` (308513), 89 when the next call of `shared_setxpos`'s loop comes first (measured, `docs/techniques/shared-setxpos.md`, where the loop's last object holds to 134). 340965 and 308513 are Cited only, not verified (mining notes). 〔mining 67045, 308513, 340965, 311795 (RESxx × HMOVE race = implemented in Gopher2600)〕
 - **Burn one cycle to land RESP where you want it**: when coarse positioning has no NOP to spare, `sta.wx HMP0,x` (dasm `.w`/`.FORCE` forces Absolute,X = 5cy; ZP,X is 4cy) adds 1cy so the RESP0 strobe lands on **the cycle you intended**. 〔mining blog SpiceWare 12538〕
@@ -766,6 +792,22 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     strobe's +8 with HMP0 = `$10`; that a zero nibble after HMCLR then gives exactly eight left is our
     reading of the same rule, and `$80` = right 8 is locked by `TestAllSixteenHmoveNibblesMoveByOnePixelEach`.
     **Cited only, not verified** — the kernel was not run here.
+  - **After `HMCLR` a late strobe was seen to move eight, and the list's "no motion" was `$80`.** Dennis
+    Debro, 2005, striking HMOVE at cycle 71 (*"ending at cycle 74"*) to avoid the HMOVE lines, saw his
+    sprites in a Z26 trace log go from 69 and 82 to 61 and 74 on a second HMOVE with no new positioning,
+    although he did an `HMCLR` two lines after the first 〔`200507/msg00124`〕. Minutes later he asked
+    whether, reading the timing chart, he had to set the fine motion to `#$80` 〔`200507/msg00125`〕.
+    Manuel Polik, answering the first post: *"all HMPX values are shifted 8 pixels when doing HMOVE @74,
+    so when the HMCLR writes a zero "0" to the movement registers, it's actually saying "shift 8 pixels
+    to the left". To effectively "clear" the motion registers for that trick, you'll have to
+    individually load all affected HMXX with $80..."* — or not strobe HMOVE until it is needed again
+    〔`200507/msg00126`〕. Debro chose `#$80` for now — *"Right now it's easier to do this versus not
+    hitting HMOVE when it's not needed. I'll look at it more down the line of development but it looks
+    as if it will take me less bytes to set HMxx to #$80 than it would be to bypass the HMOVE."*
+    〔`200507/msg00127`〕 The eight was read off an emulator's trace, not a console. The value is the one
+    the line above this one's parent already gives, *"For early-HMOVE (HMOVE before WSYNC), the "do not
+    move" value is HMPx $80 (= 8), not $00"*; band D measures the late +8 with `$10`, and `$80` plus
+    that eight giving no motion is our reading of it. **Cited only, not verified.**
   - **The price: an emulating console may not honour it.** Karl G, 2020, from making a version of his
     game for the Atari Flashback Portable — a machine that runs games by emulation, which nukey-shay in
     the same thread calls *"a flaky emulator"* — says kernels that use an early HMOVE to hide the HMOVE
@@ -1260,6 +1302,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     that kernel works nor what cartridge hardware it assumes. For scale, the widest line built here is
     24 characters at 50% flicker, two 12-character blocks on alternate frames (`techniques/text24.md`).
     **Cited only, not verified.**
+  - **Fewer characters can buy a free sprite.** Manuel Polik, 2003, proposed a variant of *"Roberts
+    technique of displaying 13 chars"* — the flicker-free 13-character routine R Mundschau had posted on
+    4 December 〔`200312/msg00011`〕, to which Polik had replied on 5 December asking for it (his reply is
+    quoted in `200312/msg00023`) (our reading) — *"to make it display 9 chars with his current technique
+    and a 10th with a sprite"*: *"mirrored PF ignoring PF0 (that's where we lose 3 chars)"*, *"using
+    M0/P0 to create 4 gaps right before the middle"*, *"creating all other gaps with the ball"*,
+    *"freely displaying one sprite anywhere on the screen"* 〔`200312/msg00103`〕. The missiles and ball
+    here cut the gaps between playfield letters rather than drawing anything, and the count is traded
+    against a sprite, an axis the count-only ladder above does not carry (our reading). He was *"99%
+    certain that it'll work, but I'm mostly uncertain wether the result is worth trying"*; the thread
+    holds no reply. About an hour before his post (11:47 −0600 against 19:49 +0100), Paul Slocum had
+    posted the opposite trade, *"13char + 2!"*, two more characters from the players' copies, told in
+    `techniques/text12.md` 〔`200312/msg00102`〕. **Cited only, not verified** — nothing was built.
   - **Six digits was the ceiling a player saw in 1997.** Erik Mooney, asking how high-resolution
     scores are drawn, guessed *"three copies of each player, rewriting GRP0 and GRP1 between display
     of each copy"*, and added: *"This would account for the six-digit limit on all 2600 games I've
@@ -1680,6 +1735,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     Andrew Davie with the coordinates instead of the latch 〔`200102/msg00327`, `200102/msg00338`〕. No
     flicker is involved here: the playfield is one object, so its regions share one latch bit (our
     reading). **Cited only, not verified.**
+  - **How much the latch misses under flicker depends on size and speed, and rectangles miss too.** Kirk
+    Israel, 2003, told by Thomas Jentzsch to draw four players and four missiles as two and two with
+    constant 30 Hz flicker 〔`200310/msg00051`〕, asked how any missile could still detect hits on any
+    player: *"Wouldn't you tend to miss certain events if the flickering was off?  Or would you suggest
+    using bounding rectangles and exact positioning or something?"* 〔`200310/msg00052`〕 Jentzsch: *"That
+    depends on the size and speed of the objects. The smaller and faster the objects are, the more
+    problems you will have with hardware collision detection."* Rectangles were *"the other option"*,
+    with faults of their own: wrong hits, since objects are not rectangular; misses *"if the missile
+    moves faster than the size of the bounding rectangles"*; and slower hits missed over the rectangle's
+    edge. *"A perfect detection would require to calculate and check \*all\* intermediate points for
+    both objects between two frames. But that's usually not necessary. As long as the player doesn't
+    notice wrong or missed collisions everything is just fine."* 〔`200310/msg00053`〕 Israel added that a
+    fixed split, players and bullets 1 and 2 on one frame and 3 and 4 on the other, would keep some from
+    ever meeting: *"1's bullets could never hit 3 I think"* 〔`200310/msg00054`〕. **Cited only, not
+    verified.**
 - **The object budget is counted per scanline, not per screen.** Living Room Arcade (2024) asked how
   *Star Wars: The Arcade Game* is possible with *"two players, two missiles and a ball"*. Verdant: *"It's
   doesn't become simple, but it does become less difficult, when you stop thinking so much in two
@@ -1772,6 +1842,12 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   paraphrase〕. Where the lines above price a repositioning, this avoids the price by the choice of
   subject (our reading). **Cited only, not verified.**
 - **Turn one sprite into many by rewriting GRP mid-scanline**: duplicate a single player with NUSIZ and re-`STA GRPx` just before each copy is drawn, and **every copy can be a different picture** (the shared basis of Space Invaders formations, 6-digit scores, and varied enemy rows). Keep `STA GRPx` strictly inside HBLANK. 〔mining 337131, 182923〕
+  - **A shot copy can be removed through the copy pattern.** In a 2006 AtariAge thread on Space
+    Invaders-style rows, as the distillation notes record it: when the leading invader of a three-copy
+    row is destroyed, switch that player's NUSIZ from three copies to a two-copy setting (two wide is
+    the notes' example) and move its RESPx start position, so the missing copy shows; the two players
+    can carry different NUSIZ settings 〔mining 93059 multiple-sprites-on-a-line; only the distillation
+    notes are held here, and they do not say who gave it〕. **Cited only, not verified.**
 - **A console switch can choose the TV standard, and the price is one switch.** A PAL frame needs
   more scanlines than an NTSC one, and that is a number the ROM decides — so a single build can serve
   both if the player tells it which television it is on. Piero Cavina listing what his 1997 demo does,
@@ -2228,6 +2304,16 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     say what looked wrong; this is a case of the "motion or damage" question above answered "damage"
     for hair flickered onto a small player (our reading). **Cited only, not verified** — the build was
     not run here.
+  - **Size again, from 2001: flicker on small objects was offered as the cheaper cost.** Manuel Polik,
+    weighing whether an *Arkanoid* could compute its brick rows inside the kernel — a problem he said he
+    admired with no intention of coding — listed the `LDX`/`TXS`/`CPY`/`PHP` sequence for three balls
+    that he said would cost cycles on both calculating lines 〔`200108/msg00336`〕. Thomas Jentzsch, after
+    two other savings: *"Or you could allow some flicker here (which is less annoying for small objects)
+    and draw only two balls per frame. Thrust is doing all those things, and nobody ever complained, it
+    should be acceptable."* 〔`200108/msg00337`〕 *Thrust* is his own game, and "all those things" covers
+    all three suggestions, not the flicker alone (our reading). Polik: *"If flicker is \*allowed\* I'd
+    go for a max of 6 balls anyway :-)"* 〔`200108/msg00338`〕 Size is the fourth item of Bensema's list
+    above. **Cited only, not verified.**
 - **Flickering more than 2 objects: list reordering REPLACED age-based, and it costs priority.**
   The older way is **age-based** — count how many times each object has been shown and display the
   oldest next. The newer one is **list reordering**: try each object in FLICKERLIST order, move the ones
@@ -3245,6 +3331,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
 
 ## Drawing craft (making the sprite/character pictures = the concrete rules of ⑥craft)
 - **Start from thumbnail legibility**: verify **first** that it is still identifiable when shrunk to about one dot, then add detail. Shrink without interpolation (nearest, halving each step). 〔326595, 106110〕
+  - **Moving text is also a matter of speed.** Eckhard Stolberg, 1999, posted two scrolling-text demos
+    and said the single-scanline one *"was a bit hard to read on a real VCS"*, so the second used
+    double-scanline letters 〔`199907/msg00006`〕. Kurt Woloch found that one hard to read as well: *"The
+    reason is that it scrolls relatively fast, and the color bars go by the scrolling message on the
+    left and right. Maybe it'd be better to have the message itself change the color (if possible)?"*
+    〔`199907/msg00010`〕 Stolberg: *"I think you are right. I slowed it down by half the speed and it is
+    much more readable now. Changing the text colour in every scanline would be very hard, since you
+    have to change two colour registers and the six-sprite routine is already pretty tight."* He offered
+    a colour per frame or per paragraph instead, and the source he posted adds *"code to slow down
+    shifting speed"* 〔`199907/msg00011`〕. A still-frame test like the one above cannot see this (our
+    reading). **Cited only, not verified** — the demos were not run here.
 - **A 2600 pixel is WIDE — one pixel covers about twice as much width as it does height, so a shape needs about HALF as many pixels across as it does down**: do not trust a square-dot preview. Decide letterforms and pictures at the real hardware aspect (player = thin out 1px horizontally, PF = 3–4× vertically to buy density). **→ draw previews with non-square pixels.** 〔326595〕 (there is no constant for this — see the note below)
   <!-- The Japanese original read 「横 ≒ 縦の約 1/2・≈2:1」 and looked self-contradictory in translation, because its two halves count different things: 「横 ≒ 縦の約 1/2」 is about how many PIXELS a shape needs across versus down, while 「≈2:1」 is the aspect of ONE pixel. Both say the same thing — the pixel is wide — and the English above now states it once. Resolved 2026-08-04. -->
   - **⚠★ WHY THE SOURCES DISAGREE, and what "measure it" can and cannot settle (2026-08-04).** The spread
@@ -3755,6 +3852,31 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     〔mining 198176 session-25-timeslicing; only the distillation notes are held here〕. Next to Colbert's
     worst-case rule above, this pays the worst case per task rather than per frame (our reading).
     **Cited only, not verified.**
+  - **One game where a per-item `INTIM` check was tried and then given up.** Christopher Tumber's
+    falling-block game *Big Dig*. In 2003 its routine that finds which blocks are anchored *"checks
+    INTIM before proceeding to the next block to try and make sure there's enough time left to process
+    that block. However, the time check is only a guestimate right now due to that variance (I haven't
+    figured that actual max time required yet) as well as trying to balance that with ensuring the whole
+    board gets processed every game cycle (If I really crank it down so it doesn't flicker then part of
+    the screen gets missed)."* The variance was the size of the group under test, *"1 block = very fast,
+    12 blocks = very slow"*, and the jobs were already spread over a 25-step frame counter
+    〔`200304/msg00174`〕; his release note gave the symptom as *"a roll/flicker problem depending upon
+    the layout of the screen"* 〔`200304/msg00159`〕. Eighteen months later Thomas Jentzsch asked whether
+    he reads the timer and aborts when running out of time 〔`200410/msg00079`〕; Tumber: *"I tried that
+    but I could never get it to "interrupt" elegantly."* Instead every routine became *"completely
+    modular and sectional"* behind a Status byte, one value per step (flag the blocks that may fall,
+    find the group, check whether it can fall, drop it, remove it if it has four or more), with the
+    group search run once a frame *"until the entire group is found (this can take several frames for a
+    large, complex group)"*; he adds that the values he lists are *"not neccessarily"* the ones he used
+    〔`200410/msg00083`〕. His release post of the same game, about eleven hours earlier (10 October 2004,
+    00:07 against 11:24, both −0400), which Jentzsch was answering: recursion was dropped for brute
+    force, because of RAM and because it *"would have been really difficult to make it possible to
+    execute multi-frame"*, and the dispatcher *"only took, what 2 years?"* 〔`200410/msg00073`〕. In that
+    post too, the *"virtual-playfield"* extends two rows above the visible one, so blocks can scroll up
+    and come back on screen, and spare RAM might extend it, though *"that might mess up the cpu time the
+    various block-handling routines take"* 〔`200410/msg00073`〕. Davie's queue above gates each task on a
+    counted worst case; Tumber's gate had no counted worst case (our reading). **Cited only, not
+    verified.**
   - **Wait for the timer without missing the moment it expires, and keep what was left.** Andrew
     Davie, 2021, as the distillation notes record it: `safeTimerWait` sets X to 0; `bit TIMINT` / `bmi`
     leaves at once if the timer has already expired; `lda INTIM` / `beq` / `bmi` leaves if the count
