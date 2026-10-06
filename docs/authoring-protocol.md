@@ -14,6 +14,11 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
   mock was made to find how to distribute the drawing over the objects, and *"It's not a complete
   mockup visually"* (AtariAge `topic/194635`; **Cited only, not verified** — read from distilled
   notes, not the thread).
+  Image-first is one way in, not the only one. Asked how they begin a project (AtariAge `topic/259052`,
+  2016), gemware-games: *"Generally, unlike most programmers, I know the exact gameplay beforehand. I
+  usually write a story board"*; gauauu: *"I usually start extremely simple (ie get a sprite showing on a
+  background) and very slowly iteratively transform it into the game that's in my imagination"*;
+  tschak909, of Dodgeball: *"the idea knocked me upside the head"*. **Cited only, not verified.**
 - **B. Bottom-up build order.** Build + verify in the canonical 14-step sequence (stable display → timers →
   score → 2-line kernel → VDEL → playfield → input → variations → RNG → ball → missiles → sound → animation →
   polish). → `docs/cookbook.md`.
@@ -47,7 +52,62 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
      that are windows of cycles, and copies that wrap past 160 — worked out by hand it comes back
      "impossible" for rows that place fine, which has now happened twice. It returns the bases,
      NUSIZ codes and strobe cycles, or the reason there are none. `docs/techniques/sprite-placement.md`.
+   - **Which resource to decide first** is a different order from B's order of building. Thomas
+     Jentzsch, 2004, answering Christian Bogey's question how to write an effective kernel: understand
+     the hardware; *"Then usually the first step is to think about the playfield graphics. Do you need
+     them and do they have to be asymmetrical? Do you have to draw them every scanline? Do you need all three PF registers (often PF0
+     is not used). How much RAM will you need for drawing the PF? Then you can calculate how much time is
+     left and how often you can update the sprites. This is the point where you should decide after how
+     many scanlines the kernel will repeat."* Then: repositioning sprites inside the kernel, VDEL, the
+     remaining cycles for missiles or colour changes, and *"sometimes"* a specialised kernel per
+     horizontal stripe (Pitfall) — and *"At any of those steps you will quite often go back to the
+     previous points, change your decision and restart the iteration again"* 〔stella-list
+     `200405/msg00048`〕. **Cited only, not verified.**
 3. **Author** — write the asm, cloning the nearest verified `roms/techniques/<name>.asm`.
+   - **Scope labels with `SUBROUTINE`.** Thomas Jentzsch, 2001, to Glenn Saunders' complaint that a
+     label does not show whether it starts a subroutine: *"There is a solution, use SUBROUTINE! (DASM
+     rocks!) Now you can give all local labels a name starting with ".". Only the subroutine labels and
+     the extra startpoints get a normal name without the point."* 〔stella-list `200110/msg00440`〕
+     DASM's manual, as SpiceWare quoted it: the directive *"logically separates local labels (starting
+     with a dot). This allows you to reuse label names (for example, .1 .fail) rather than think up
+     crazy combinations of the current subroutine to keep it all unique"* (AtariAge `topic/291397`);
+     joe-musashi quoted the same passage to a beginner (AtariAge `topic/198465`, read from distilled
+     notes, not the thread). The reuse is measured with DASM 2.20.14.1 in `docs/known-traps.md`
+     (*A `.label` used twice in one file is a "Label mismatch" until `SUBROUTINE` separates them*);
+     the rest is **Cited only, not verified**.
+   - **Write down what a routine takes and leaves.** Jentzsch, same post: *"Give every subroutine a
+     comment header where you describe the input and output parameters (registers, variables and
+     flags), and the functionality of course."* 〔`200110/msg00440`〕 Earlier that year, finding bytes in
+     Andrew Davie's Qb, he struck out an `lda #0` after `jsr MBlock` (*"MBlock returns a=0"*) and added:
+     *"If you document the state of registers and flags when returning you might find some more."*
+     〔`200103/msg00019`〕 **Cited only, not verified.**
+   - **Write a register's bits as bits.** Rodrigo Silva, 2003, of a template he offered to beginners:
+     *"I used binary notation when writing to addresses like VBLANK, to make clear that in theory im not
+     writing 2, but rather setting D1 bit"* 〔`200309/msg00290`〕. Two technique ROMs here write binary
+     immediates (`#%`) — `roms/techniques/shared_setxpos.asm` for the NUSIZ, CTRLPF and ENAxx bits and
+     `roms/techniques/rts_dispatch.asm` for a playfield pattern — and both still write VSYNC and VBLANK
+     as `#2`. Binary data is commoner: 15 `.asm` under `roms/` hold a `%` literal of four or more digits
+     (`rg -l '%[01]{4,}' roms/`, 2026-10-05). **Cited only, not verified.**
+   - **Have the assembler print sizes while you build.** Dennis Debro, 2003, answering Kirk Israel's
+     question whether he might have a 2K ROM on his hands: `echo "***", (*-Start), " BYTES OF ROM USED"`
+     before an `org` — *"The real work is done in* `(*-label)`*. This calculates the number of bytes used between the
+     current position and the label specified"*, read off DASM's output or the list file
+     〔`200309/msg00001`〕. Silva's template has `ECHO` lines for the RAM and ROM bytes used and left
+     〔`200309/msg00290`〕. An `ECHO` prints once per pass: `docs/known-traps.md` (*`ECHO` prints once
+     per pass, and a symbol defined after it makes it print once*). `internal/build.ROMBytesUsed` reads
+     the finished image instead, a lower bound. **Cited only, not verified.**
+   - **Put the deadline next to the cycle count.** Andrew Davie, 2001, explaining his Qb comments to
+     Glenn Saunders: `instruction ;cycles ->ends@time < must_start_before (now_starting@)`, so that
+     `sta PF0 ; 3 ->45 <49 (@42)` *"Tells ME that the instruction starts at cycle 42, SHOULD start
+     before cycle 49 (it does), and that it ends at cycle 45"* — *"a sort of shorthand that I use to
+     check that I'm doing everything allright"* 〔`200102/msg00019`〕. In the same post Davie asked
+     readers not to rely on the timing in his previously submitted code: *"I've only just tightened it
+     up"*. His count appears to include the `sta WSYNC` itself — after `sta WSYNC ; 3` and
+     `lda #%00000000 ; 2` the next store is marked `(@5)` — so his figures may sit 3 above a count that
+     starts at 0 when `WSYNC` releases (our reading). The comment is still hand arithmetic (iron rule 2): check the line with `prove_line_budget`, and
+     playfield writes with scenario `checks.pf_deadlines`, which uses neither count: it judges each write
+     by the beam clock it lands on. `cmd/framegen` writes a similar pair — the
+     landing clock and the limit — into the source it generates. **Cited only, not verified.**
 4. **Pre-flight** — `python3 scripts/check_traps.py <file.asm>` (the static "emu-passes/HW-fails" linter,
    spec = `docs/known-traps.md`). Walk the runtime-only traps (timer wraparound, HMOVE-24cy) by hand /
    `breakif`.
