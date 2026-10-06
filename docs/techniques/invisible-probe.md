@@ -62,6 +62,21 @@ registers with a barge-pole. Much more accurate to do it with simple software co
 〔stella-list `200102/msg00338`〕
 **Cited only, not verified.**
 
+**The software test itself needs no `CMP`.** The Stella mailing-list FAQ (updated October 2002 by
+Mark Graybill) reprints Manuel Polik's check for *"whether a single pixel hit an 8\*11 square"*. Each
+axis is two subtract-and-branch steps — `LDA bulletHorPos,Y` / `ADC #$08` / `SBC horPosP0,X` /
+`BMI NoHit` / `SBC #$08` / `BPL NoHit` — and the vertical pair is `LDA verPosP0,X` /
+`SBC bulletVerPos,Y` / `BMI NoHit` / `SBC #$0B` / `BPL NoHit`. For an invader only 6 pixels wide but
+aligned on the left of the sprite, *"all that was required to change in this code was adopting the
+height from #$0B to the invader height and replacing the hardcoded #$08 with a temporary variable."*
+〔stella-list `200210/msg00268`〕 Our reading of the excerpt, not stated in the FAQ: it contains no
+`CLC` or `SEC`, but traced one instruction at a time over positions 0–159 only the carry on entry is
+undetermined; every later one follows from the code. With bullet minus player as `d`, the horizontal
+window is `d` = −7..0 with that carry clear and −8..−1 with it set, so the whole 8-pixel window shifts
+by one. The vertical pair always starts with the carry clear (it is reached only when `SBC #$08` went
+negative, which clears it) and accepts player-minus-bullet 1..11, so the 11 rows do not shift.
+**Cited only, not verified.**
+
 ## The three ways to hide a probe, and what each costs
 
 **1 — Same colour (a missile on its own player).** Free: `M0` cannot be a different colour from

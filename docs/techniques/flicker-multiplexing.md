@@ -109,6 +109,31 @@ on different objects. Later that day he posted a last version: *"this is probabl
 this monster. Consider this the termination of an exploratory branch of the capabilities of the
 system."* 〔`200301/msg00164`〕 **Cited only, not verified.**
 
+**The colour use, for a whole picture.** In February 2003 Andrew Davie posted cover art converted to a
+*"colour bitmap for display"* — *"Takes me about 1 minute to convert an image for display"* — and
+Thomas Jentzsch answered with a demo of his own (*"let's see how it looks compared to my demo"*). Rob,
+replying to that post, wrote that *"this looks better in Stella"*, not yet having tried it on the
+Cuttle. Davie wrote *"it looks like Thomas has killed my new technique within a day of its creation"*
+and converted the clown picture of Jentzsch's demo as well, with a caveat: the original graphics were
+*"in a strange RGB line format - so this isn't strictly a like to like"*. Jentzsch credited the idea to
+ZylonBane on AtariAge. Both build the picture from three colour channels with one colour code chosen
+per channel: Jentzsch's *"($42,$c6,$86)"*, Davie's *"$34, $D6, $70"*. Rob, quoting that caveat, found
+Davie's clown *"more colorful somehow, albeit more noticeably flickery"*; Jentzsch's reply was that
+this *"may come from the different RGB color values Andrew and I ($42,$c6,$86) choose"*, and that
+differing emulator palettes may be a reason too. When Davie posted versions made from the original
+images, Jentzsch wrote *"I'll try to make such a demo myself too"*, adding that *"the channel splitting
+of the Clown seems to be a little incorrect right now"*; he later added that picture quality could
+improve *"by using different ways to generate the three color channels"*. Rob set the originals apart
+from versions *"munged into rolling RGB"*. 〔stella-list `200302/msg00069`, `200302/msg00071`,
+`200302/msg00073`, `200302/msg00074`, `200302/msg00075`, `200302/msg00078`, `200302/msg00079`,
+`200302/msg00080`, `200302/msg00081`, `200302/msg00085`, `200302/msg00087`〕 The words "RGB line format"
+and "rolling RGB" appear, but none of these posts explains how the channels are laid out over frames
+and lines. For the image in the next thread he started, "The Demo Image Series #0", Davie explained the
+layout on 12 February: *"each individual scanline alternatively displays RGB, GBR, BRG... and the lines
+are out-of-synch with each other"*, so that *"while one line is displaying the red values for that
+line, the next line is displaying it's green values, and the one after that displaying blue values"*
+〔stella-list `200302/msg00106`〕. None of these demos has been run here. **Cited only, not verified.**
+
 ★**A third use: flicker that mixes depth order.** Thomas Jentzsch, 2022, to the author of *Raptor*:
 *"you are using the same PF priority flicker trick for the shield which I came up with for the clouds
 in Aardvark. And in your game it is a key element."* (AtariAge `topic/332187`). The post names the

@@ -442,6 +442,16 @@ way, and that a Flashback 1 controller reads without an adapter: data on pin 2 (
 pin 3 (D6), clock on pin 4 (D7), which are the left port's lines 〔AtariAge `topic/159334`; held here as
 distilled notes〕. **Cited only, not verified.**
 
+A port can also be proposed as an incoming clock. Piero Cavina, 1997, replying to a plan for a
+drum-and-guitar demo that would *"use INTIM for all timing"*, imagined a 2600 sound generator and
+sequencer: *"it should be possible to use the input port to synchronize the sequencer running on the
+2600 to an external clock source, let's say a drum machine or even a Midi chain"* — *"Imagine your
+2600 playing the bassline of a thumping techno track in sync with a Roland 808"* — and then: *"I'm
+not even starting to think about how it could be done. Games come first."* 〔stella-list
+`199704/msg00006`〕 Our reading: the sequencer would step on a change seen at the port instead of on a
+frame count or `INTIM`. The post names no port, line or interface, and describes nothing built. **Cited only,
+not verified.**
+
 ## When the players multiply, the cost leaves the read (2026-09-30)
 
 Thomas Jentzsch's *Pac-Line Panic* (2024, 4K) takes up to eight players at once — *"up to 8 players

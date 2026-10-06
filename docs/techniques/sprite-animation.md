@@ -86,6 +86,17 @@ is our own arithmetic or reading, it says so.
 - **A hold time per cel.** Andrew Davie's *Fu-Kung!* v0.07 (January 2003) ran *"simple animation
   loops from lists of frame,duration animation"* — a duration per entry instead of one fixed
   `ANIM_RATE` 〔stella-list `200301/msg00426`〕.
+- **From a frame list to a small script.** By *Fu-Kung!* v0.11 (28 January 2003), *"Interaction is
+  done totally using the state-system and a simple macro programming language to control creature
+  movement/animations"*. An animation is a block of lines such as `LOCK EVENT_ATTACK_THROW` (commented
+  *"cause opponent to react"*), `SHOW FRAME_THROW1,4`, `MOVE -5,0` between frames, and a closing
+  `GOTO ANIMATION_STAND`; an attack routine is `ANIMATION ANIM_THROW` / `HANDLER NORMAL_STAND2` /
+  `rts`. *"Apart from getting the collision code in, most of the programming of the moves themselves
+  are simply variations of the above."* The frame names come from the filenames of the original
+  graphics, so *"it will assemble correctly, even if the frame table has extra frames added"*
+  〔stella-list `200301/msg00475`〕. That `SHOW`'s second operand is the v0.07 duration is our
+  reading; the post shows the macro calls, not the macros, so whether they expand to code or to data
+  for an interpreter is not known, and the post calls this interaction *"just a mockup"*.
 - **No clock at all.** In *Pac-Line Panic* Thomas Jentzsch writes that *"the animations are solely
   based on the positions. So we do not need any bytes for these"*, with the side effect that the
   Pac-Man animation *"is automatically in sync with the pellets he is eating"*; the death animation is
