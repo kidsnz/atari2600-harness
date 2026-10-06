@@ -69,6 +69,16 @@ structural state agrees — the diffs are boundary phase, not divergence. Conclu
 scope today is **frame-stable RAM** (`smoke` and `litmus_6502`: 128/128 PASS); ROMs with per-frame
 counters need sub-frame alignment (v2).
 
+**Where line 0 is can be an emulator setting.** In January 2000 Eckhard Stolberg reported that Stella said a
+demo drew *"265 scanlines"*; its author replied that PCAE put him *"on line 232"* at each VSYNC and asked how
+Stella counts. Erik Mooney took PCAE's line 0 to be the start of the displayable area and estimated 232+37 = 269
+(*"probably"*). Eckhard answered that he thought PCAE's line 0 was *"the first line that is displayed on the PC
+monitor"*, movable at runtime by shifting the screen, and that with autocenter on *"different games will start
+displaying at different scanlines (counting from the VSYNC)"* 〔stella-list `200001/msg00002`,
+`200001/msg00004`, `200001/msg00009`, `200001/msg00010`〕. The thread left the three figures unreconciled.
+**Cited only, not verified.** The pixel compare does not assume both sides start on the same row (the v2
+offset search below).
+
 ### v2 — ✅ pixel compare WORKING (v1.54.0)
 `stellacheck -pixels` (or `scripts/stella_oracle.sh <rom> <frames> pixels`) adds `savesnap` to the
 debugger autoexec, captures Stella's frame PNG, and compares it cell-by-cell against Gopher2600's
@@ -132,7 +142,7 @@ assertion, and every one is printed either way:
 |---|---|---|
 | sub-frame phase | 7 | our side holds Stella's exact value at some scanline of the next frame — `litmus_hmxx_freeze` sets `HMP0=$80` right after VSYNC and `HMCLR`s it later in the same frame, so the two emulators' frame boundaries fall either side of one store; likewise `shared_setxpos` (5 HM registers) and `two_line_vdel` (VDELP0) |
 | undefined at power-on | 10 | `litmus_cycles` and `uninit_trap` contain no `HMxx` or `HMCLR` write at all, and all five motion registers read Gopher2600's power-on nibble 8 (`HMxx=$80`, its zero-valued `(v^$80)>>4` field) against Stella's 0 — a real TIA leaves them undefined, so neither is the right answer |
-| power-on RAM | 2 | `uninit_trap` and `litmus_uninit_read` feed COLUBK from RAM reset never wrote. Stella randomises power-on RAM (`-plr.ramrandom`, on by default) and is therefore not reproducible: two consecutive captures of the same ROM at the same frame gave COLUBK `$fc` and `$02`. Stella is the one closer to hardware; our defined value is exactly the hazard those ROMs exist to demonstrate |
+| power-on RAM | 2 | `uninit_trap` and `litmus_uninit_read` feed COLUBK from RAM reset never wrote. Stella randomises power-on RAM (`-plr.ramrandom`, on by default) and is therefore not reproducible: two consecutive captures of the same ROM at the same frame gave COLUBK `$fc` and `$02`. Stella's random bytes are closer to a heavy sixer, our zeros to a 2600 Jr., and neither matches a 7800; our defined value is exactly the hazard those ROMs exist to demonstrate. In 2002 a ROM that puts RAM on screen at power-up, burned to EPROM, gave different bytes across power cycles on a heavy sixer (five dumps; the first two rows usually alike), all `00` over 20 power cycles on a 2600 Jr., and the same bytes every time on a 7800 modified with a dev OS (Albert Yarusso), and zeroes on a PAL Junior except where the program's own variables sit (Matthias Domin); Eckhard Stolberg on the 7800: *"all 7800 BIOS versions I have seen use the same code in RIOT RAM to switch the 7800 into 2600 mode. So on a 7800 you can't get random values from RIOT RAM."* 〔stella-list `200211/msg00175`, `200211/msg00181`, `200211/msg00183`, `200211/msg00191`〕. This engine starts all 128 bytes at 0 (`RAM.Reset` with `RandomState` false, which no harness tool sets; `internal/emu/randomstate_test.go` turns it on as a witness). **Cited only, not verified** on any console |
 
 The classifier is itself planted against: `TestTheClassifierCannotExcuseAPlantedDefect` feeds it a
 Stella value our side holds at no instant of the frame and requires the verdict `divergence`.
@@ -150,8 +160,8 @@ in both cases and RESMP1 in neither, so it is not a usable oracle for that regis
 reading matches what each ROM writes. `TestStella70MisreportsRESMP1` locks the behaviour so a fixed
 Stella makes the test fail and the register can be put back.
 
-**An outside case in the other direction.** The power-on RAM row above has Stella the one closer to
-hardware; here Gopher2600 was. Flap Ninja's demo went back to its title screen whenever the button was
+**An outside case in the other direction.** The power-on RAM row above has Stella closer to a heavy
+sixer and our zeros closer to a 2600 Jr.; here Gopher2600 was the one closer to hardware. Flap Ninja's demo went back to its title screen whenever the button was
 pressed, on a PAL light sixer with a Harmony cart (Bomberman94). MarcoJ found that Gopher2600 *"behaves like a
 console"* on that ROM, while *"Stella with developer mode"* could not be made to; the author (kikipdph) put it
 down to bank switching, replaced the binaries with ones that worked on Gopher2600, and MarcoJ confirmed they
@@ -184,6 +194,13 @@ Collected from forum threads. Where Stella 7.0's bundled manual (`Stella.app/Con
   `litmus_pal` and `litmus_pal_physics` — if Stella matches regardless of case, which was not checked
   (**Not verified**), and the captures do not record which format Stella chose. The engine's own PAL60
   inconsistency is a separate matter, pinned by `internal/emu/pal60rate_test.go`.
+  Stella also keys the format to the ROM's MD5. Asked in 2014 how a game could make Stella use PAL60, SpiceWare
+  answered that the author sends stephena the final ROM and settings, and the next release then uses *"the ROM's
+  MD5 value to automatically use PAL60"*; until then a user sets Game Properties → Display → Format from
+  Auto-detect to PAL60, and *"any time that ROM (as identified by the MD5 value) is loaded it will use PAL60"*
+  (AtariAge `topic/224967`). Our reading: a Format saved that way in the Stella on this machine would apply to
+  an oracle run without appearing on the command line `cmd/stellacheck` builds, and would not follow a rebuilt
+  ROM whose bytes, and so MD5, changed. **Cited only, not verified.**
 - **Jitter/roll.** The 7.0 manual: `-plr.tv.jitter` / `-dev.tv.jitter` — *"Enable TV jitter/roll effect, when
   there are too many or too few scanlines per frame"* (Alt+J / Cmd+J). stephena suggested it to an author whose
   game held steady on hardware except for a jump at the moment a wave was cleared, and barely showed it in
@@ -204,6 +221,15 @@ Collected from forum threads. Where Stella 7.0's bundled manual (`Stella.app/Con
   to be randomly driven high or low on a read/peek. If disabled, use the last databus value for those pins
   instead."* This engine returns the last bus byte (`internal/emu/floatbits_test.go`) — the model under which
   that bug usually reads back the intended value. **Not verified** — `-dev.tiadriven` was not run here.
+  reveng gave the flag alone in 2019, to a first-time homebrew author: *"It looks like you're relying on undriven bits to be
+  a certain value, which may work on most consoles, but isn't great for compatibility reasons. Run the game
+  in stella with the `-dev.tiadriven 1` option, which changes the undriven bits randomly, to see what I
+  mean."* (AtariAge `topic/283352`; held here only as distilled notes; year and wording not re-checked).
+  **Cited only, not verified.** This
+  engine's counterpart is the `RandomPins` preference, off by default and set by no harness tool;
+  `internal/emu/floatbits_test.go` turns it on only as a negative control, asserting that `litmus_floatbits`
+  then reads different bytes, and its comment records the same bytes on every run — a fixed pattern, not a
+  fresh draw.
 - **Four standing guards** (Bruce-Robert Pocock, AtariAge `topic/353053`):
 
   ```

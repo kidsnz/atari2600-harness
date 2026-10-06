@@ -39,6 +39,10 @@ with *"I vaguely remember"*, and the hedge was the accurate part — 104 is abou
 assigns each level a fixed hue. A picture designed here does not degrade on SECAM, **it is replaced**.
 Pinned in `internal/emu/palspec_test.go`, so if any of the three numbers moves, the work designed
 against it fails loudly.
+The count covers three of the engine's five standards: `SpecList`
+(`Gopher2600/hardware/television/specification/specifications.go`) also lists PAL60 and PAL-M, and neither
+`internal/emu/palspec_test.go` nor `internal/ceiling/palpalette_test.go` counts those two, so no colour
+budget for either is recorded here.
 
 **What SECAM replaces it with is a fixed table, by luminance only.** The Stella Programmer's Guide
 (*PAL/SECAM conversions*): `0` black, `2` blue, `4` red, `6` magenta, `8` green, `A` cyan, `C` yellow,
@@ -200,6 +204,15 @@ low-confidence multi-color band, the game is doing mid-line color splits — rea
 - An 8-px-wide, 4-clock-aligned shape is *undecidable* between playfield and sprite from pixels
   alone — extraction (M2/M3) emits confirmed data plus confidence-ranked candidates, and the
   final call stays with the author.
+- Narrower than a playfield column leans the other way. A playfield pixel is a whole 4-clock column, 1/40 of
+  the line, and `analyzeRowPF` (`internal/ingest/segment.go`) takes a column as playfield only when all four of
+  its pixels are one non-background colour, handing every other non-background pixel to the sprite layer. A
+  playfield column with a sprite over part of it fails the same test (the overlap repair above), so narrow is a
+  lean, not proof. Glenn Saunders gave the by-eye form in 1997: *"Any graphics you see narrower than 1/40th of
+  the screen is sprite usage. This includes the missile trails in Missile Command and the asteroids in
+  Asteroids."* — answering Erik Mooney, who had guessed, unsure, at playfield for the trails and for at least
+  the big rocks 〔stella-list `199703/msg00091`, `199703/msg00093`〕. **Cited only, not verified** for the two
+  games.
 - The playfield table comes out in **one layout**: a `byte` line per band holding every register
   (`PF0,PF1,PF2`, or six for an asymmetric band) — `DASMPlayfield` in `internal/ingest/emit.go`. The other
   common layout — **one labelled array per register** (`mountainsPF1: .byte …`) — is not emitted, and
@@ -208,6 +221,14 @@ low-confidence multi-color band, the game is doing mid-line color splits — rea
   by labeled arrays per playfield register, both for import and for export"*, AtariAge `topic/305741`;
   **Cited only, not verified**), and `tools/research-w1-tooling.md` records that shape as worth adopting.
   Here, transposing into it is done by hand.
+- **Sprite labels are numbers, not names.** `DASMSprites` (`internal/ingest/emit.go`) labels the tables
+  `Spr0Gfx`, `Spr1Gfx`, … by position in the report's sprite list; the input file's name does not reach the
+  emitted source. Andrew Davie took the other route for Fu Kung! in 2003: *"The frame 'names' come direct from
+  the filename of the original graphics, so I now don't need to worry about frame numbering - I just use the
+  mnemonic and it will assemble correctly, even if the frame table has extra frames added."* 〔stella-list
+  `200301/msg00475`〕. So a label pasted from this output names a position, and it moves to another shape
+  when one more or one fewer is found ahead of it; naming frames after the drawing files is done by hand.
+  **Cited only, not verified.**
 
 ## Fitting the picture to the machine — decisions that go back to the artwork
 
