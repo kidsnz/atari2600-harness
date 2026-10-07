@@ -1216,6 +1216,17 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     alone would take 24 bytes, *"leaving just 100 for the actual playing area - not enough"*, and three
     days later he was *"confident enough to claim the game is DEFINITELY doable with more RAM"*
     〔`200304/msg00070`〕. **Cited only, not verified** — the attached demos were not run here.
+  - **Or leave the playfield still and let objects carry the scroll.** Erik Mooney, 2004, asked by
+    Clay Halliwell whether the kernel of his *RRampage* demo supports a scrolling playfield: *"Not at
+    the moment, and I don't think it'll be possible, certainly not at single-scanline scrolling
+    resolution.  I'm planning to fake the scrolling, by using enemy graphics to display "stationary"
+    but scrolling objects, both in and outside the river.  Like River Raid's fuel tanks and buildings
+    on the river banks - those give a definite sense of movement even in the bright-green areas where
+    the playfield doesn't move."* 〔`200404/msg00236`〕 In his plan the playfield does not scroll, so
+    the three layers above are not needed for it and the motion is drawn by objects; in *River Raid*,
+    as he describes it, the objects carry the motion where the playfield does not move (our reading).
+    His is a plan, not a result.
+    **Cited only, not verified** — neither his demo nor *River Raid* was run here.
 - **PAL frames must have an even scanline count** — an odd total loses the colour in that frame, so a
   kernel that varies its line count must vary it in twos. The count is the whole frame's, not only the
   visible lines. Eckhard Stolberg, 1999: *"The major difference between PAL and NTSC is the colour
@@ -1554,6 +1565,19 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     half the kernal cycles on \*every single line\* just keeping the playfield updated.  It might work
     as a vertical scroller, though, with a symmetric playfield."* 〔`200204/msg00004`〕 **Cited only, not
     verified.**
+  - **Thrust's terrain, in its 1999 demo, is stored as border blocks of 4 bytes.** Thomas Jentzsch,
+    1999, on his *Thrust* demo's terrain: *"there is always one left and one right border. Each border
+    is stored as blocks with a x-starting point, a x-difference to the previous line, the height of
+    the block and the x-distance to the opposite border (this allows that it look as if both blocks
+    can start at the same line, which is not the case). This makes 4 bytes for each block"*
+    〔`199911/msg00033`〕. Asked how many blocks: *"There are between 4 and ~20 blocks used for each
+    border. (4..~20) \* 2[both borders] \* 4[bytes/block] = 32..~160 bytes/level"*; and among the
+    limits of his kernel at the time: *"the kernel is repeated every 4th line"*, *"the players and
+    missiles are changed every 2nd line"*, *"all missiles are only 2 lines high"*, *"one new PF-block
+    \_or\_ a multi-used-player can start every 4th line"* 〔`199911/msg00039`〕. One left and one right
+    border per line has the shape of the one hole per line he gave for his kernel in 2002 above;
+    neither post says the two kernels are one (our reading). **Cited only, not verified** — the demo
+    was not run here.
   - **Single-line sprites do not forbid a busy playfield; the two are paid for separately (our reading).** Glenn
     Saunders, 2000: *"I think most games released that had single line res tended to have relatively
     simple or nonexistent playfields.  For instance, Demon Attack."* 〔`200006/msg00090`〕 Erik Mooney
@@ -3967,6 +3991,28 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     with a line still to go, and that line is paid outside the wait (our reading). He
     also corrected the timer value, so the post does not separate which change cured it, and he does
     not say how his wait loop missed the zero. **Cited only, not verified.**
+  - **A timer suits work of unpredictable length, a counted delay can be more compact when the cycles
+    are known exactly, and a long job can draw frames from inside itself.** A 2005 AtariAge thread, as
+    the distillation notes record it. supercat: a timer suits code whose running time cannot be
+    predicted, where all that matters is that it finished early enough; when the cycles are known
+    exactly, a hand-written delay can be more compact. His example is an *Adventure*-style search for
+    the next two objects in the current room, whose worst case can be counted but which is short when
+    they are found at once; it could be made fixed-length, but he finds it more practical to have the
+    timer check only whether it finished early enough. For work with no fixed bound (a loop of unknown
+    count at 150 cycles a pass), the notes give a `doframe` routine (they do not name its author) that
+    waits for the timer to fall to 124, generates VSYNC and draws a frame, then reloads the timer so
+    that it reaches 124 again at the next VSYNC; it is called from inside the long work as well as
+    from the main loop — `bit INTIM` / `bmi .nothingnew` / `jsr doframe` — so sync holds however long
+    the work runs, though the picture may show it half done. A `maybeframe` version does the `bit`
+    test itself and returns at once while `INTIM` is 128 or more: 12 more cycles a call, 5 fewer bytes
+    a call site. Thomas Jentzsch's rule in the same thread: always a timer in VBLANK and overscan, in
+    VSYNC only when really needed, and in the display kernel only during early development 〔mining
+    74223 intim; only the distillation notes are held here〕 — as with his 2004 *"remove the timer
+    later"* above 〔`200408/msg00056`〕. Here the load is above `$7F` and bit 7 clearing is the signal,
+    the opposite of the `safeTimerWait` condition above, and the long work tests the count only
+    between the reload and 124, so it never meets the wrap after expiry — provided one pass between
+    tests (150 cycles in the notes' loop) is shorter than the count takes to fall from 128 to 124 (our
+    reading). **Cited only, not verified.**
 - **One wrap-around clear loop, reused with 4 seed values for 4 clear extents**: `ClearMem` is a single loop whose start index (X seed) is set 4 ways to wipe 4 regions — one routine, four callers, vs four clear loops. Cheap ROM-thrift for init/reset paths that wipe several ranges. 〔Combat `ClearMem`; comparison §2.8/§7〕
 - **Audit your OWN hand-tuned code for cargo-cult — hand-tuned ≠ optimal, even in a 2K master ROM**: the annotated Combat disassembly honestly inventories its own cruft (a redundant double `STA GRP0`, a stray `WSYNC`, a self-flagged "why not `LDA MVtable+1,Y`?" 2-cycle miss). Model this: keep a written inventory of your ROM's own redundancy rather than assuming your tuned code is tight. (Applied to our clone, this surfaced ~250–400 B of recoverable duplication unrelated to its provability trade.) 〔Combat — Williams' annotations; comparison §7〕
   - **Shipped is not correct either: a real defect can sit where nothing visibly reads it.** ChildOfCv,
