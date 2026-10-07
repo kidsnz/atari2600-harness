@@ -200,6 +200,9 @@ A seed saves the ROM a stored map would take. It does not, by itself, save RAM.
 - Enemy spawn positions/waves (starshot uses this for wave patterns).
 - Terrain/maze generation: step per row/cell; bidirectional variants (Pitfall's left/right
   stepping LFSR) let you scroll both ways — documented in `docs/fundamentals-audit.md`.
+- Terrain held as data instead of generated: one height byte per playfield column, changed by rules
+  and turned into PF bits by the kernel on every line, is a separate page, `column-height-pf.md`
+  (from notes on AtariAge `topic/33432` only; Cited only, not verified).
 - Scrolling banks (a river or road edge in PF): rather than rotating bits in a loop, batari
   indexes an 8-entry table of pre-shifted masks (`%00000001` … `%11111111`) with the LFSR
   `and #7`; one table serves the other side through `EOR #$FF` (cybergoth). A new shift every few
