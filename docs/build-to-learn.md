@@ -49,6 +49,16 @@
   creating a fixed scannline NTSC version is supported"* 〔stella-list `200212/msg00138`〕. A switch that
   still assembles the original keeps the table's `dasm -f3` check runnable after your edits (our
   reading). Cited only, not verified.
+- **When a modified copy was overwritten by someone unsure of what they were changing, disassemble the
+  original and diff.** glurk, 2024, to a ROM hacker who wanted new sound in his hack: *"load up the
+  ORIGINAL GAME - NOT THE HACK"*, then *"Probably you will also want to do a 'diff' between the
+  originsl [sic] ROM and the hack to isolate the differences"*. Asked by Karl G why not start from the
+  hack (*"I don't see how it would change the result"*), he answered: *"He said earlier that he
+  overwrote some of the binary, unsure of what he was modifying, and I really didn't want to try to
+  decipher a corrupted disassembly."* 〔AtariAge `topic/359993`; his advice to play the game first is
+  in `capability-gap-audit.md`, SD-\* section opening〕. In the same thread splendidnut found the audio
+  routines and the music data in the hack's own listing, and compared the two listings to see which
+  music data differed. Cited only, not verified.
 
 ## Reading a game that has no labels yet (your own distella listing, and its screen)
 - **Where to start.** Piero Cavina asked Thomas Jentzsch how he disassembles a game as complex as
@@ -91,6 +101,15 @@
   necessarily a repositioned sprite (our reading): in the same thread Nick Bensema notes that *"some games
   purposefully create this blankness down the entire screen for aesthetic purposes"* 〔stella-list
   `199703/msg00199`〕. Cited only, not verified.
+- **Where the comb sits as an object moves can show a kernel's re-use pattern.** Kurt Woloch, 2001,
+  answering Glenn Saunders's question on how single-line kernels calculate horizontal motion for
+  sprites at different horizontal positions: judging from where games trigger *"the HMOVE blank (indicating sprites are
+  re-used in that line, approximately), it seems they define a pattern where every fourth, eighth or
+  more line is one where a sprite re-use CAN or WILL occur. If an object moves smoothly up and down,
+  you can see the HMOVE blank jump across those positions, rather than moving smoothly with the
+  object."* He adds, as *"I think"*, that at that line the kernel decides whether to continue the
+  existing sprite or start a new one, which *"involves a computation process, but DOESN'T display the
+  sprite for a few lines"* 〔stella-list `200102/msg00093`〕. Cited only, not verified.
 
 ## Phase 0 — thorough scrutiny (always, before writing)
 1. **A manual ↔ code correspondence map** (`_casestudies/<game>/impl-map.ja.md`, clean-room prose only): map each section of the manual onto the disassembly's routines / RAM / tables. Format = a table (section | behaviour | code | RAM).
