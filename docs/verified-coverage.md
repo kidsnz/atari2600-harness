@@ -98,6 +98,15 @@ and not the reflected-mode 48 is measured; `TestAsymRightWindow` checks the cons
 machine. (`litmus_pf0_reflect`, outside this table, sweeps a second `PF0` write under reflection across
 the right-edge copy in five-cycle steps — a window the table does not list.)
 
+**Known limit: `litmus_pf_async`'s own conclusion is stronger than what it tests.** At the time of writing,
+line 11 of the header of `roms/litmus/litmus_pf_async.asm` still concludes, in a Japanese comment, that
+woodgrain's Playfield_Timing window table is exact on Gopher2600 (our translation), and the file is
+unchanged. What it supports of the table is the two points above: a `PF1` write inside the LPF1 window and
+one inside the RPF1 window land as the table says; the edges are covered above. Its regression lock,
+`scenarios/pf_async.json`, asserts `PF1` reads 0 at frame 2, checks a 262-line NTSC frame, and checks a
+video digest of the run (warm-up excluded) against `pf_async.golden`, which pins the picture as recorded
+but names no clock and has no edge in it. No edge is measured — **Not verified**.
+
 ## Collisions (CXxx)
 | Behavior | ROM | Evidence |
 |---|---|---|
