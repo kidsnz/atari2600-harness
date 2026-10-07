@@ -150,6 +150,24 @@ the original comments"* 〔stella-list `199808/msg00071`, `199808/msg00072`, `19
 are machine output and its comments were written a second time (our reading). **Cited only, not
 verified.**
 
+**A known limit, recorded 2026-10-07 and not fixed: the map's title claims more than the gate
+covers.** `docs/provenance.md` opens *"Provenance map — every harness element → its origin"*, and
+the script's docstring and its failure message use the same phrase. The check that an origin is
+recorded at all covers three kinds of file: each technique doc under `docs/techniques/` (README and
+roadmap excluded), each non-test `.go` file in `pkg/design/`, and `docs/design-principles.md`, by a
+count of at least 20 `〔` tags. The generated map lists those, plus `docs/mining-digest.md` and the
+raw per-thread notes, and nothing else. The MCP tools in `cmd/harness` are in neither, and nor are
+the rest of `cmd/` and `internal/`. The gate's two other passes reach further — the path check reads
+the backticked paths in `docs/` (skipping the `.ja.md` copies) that start at one of its fixed roots
+(`roms/`, `internal/`, `scripts/` and the like), leaving out any that contain `...`, a short list of
+strings it treats as not paths, and any name whose extension is not one it knows (a `.yml`, say);
+and the message check walks the tree's `.md`, `.py`, `.go`, `.asm` and `.txt` files for stella-list
+numbers, skipping the `Gopher2600`, `.git`, `build` and `bin` directories — but both ask whether a
+citation that is there resolves, not whether one is there (our reading of the script). The title is
+a string in `write_list` in `scripts/check_provenance.py`, and the map is regenerated from it, so it
+can be corrected only in the script. At the time of writing it is unchanged; whether the gate should
+grow to cover the MCP tools is a separate question and is not decided here.
+
 ### `check_memory.py` — 3 catches, and it was wired to nothing
 
 Added `34fedb4`. Four findings on its first run, **two of which were the checker itself** (raw
@@ -228,6 +246,26 @@ Found by the mailing-list distillation (helper-2), who aimed the gate at the wor
 findings, found the 2026-08-15 precedent, and measured the repair order. Re-measured here before
 each change.
 
+**A known limit, recorded 2026-10-07 and not fixed: the width of rule 3's band stands for a call
+depth that nothing states.** Rule 3 warns for a variable at `$F8`-`$FF`. That is eight bytes, which
+is what four nested `JSR`s write from `SP = $FF` at two bytes each — our reading of the width, since
+neither the rule's comment in `scripts/check_traps.py`, nor its message, nor `known-traps.md` says
+where it comes from. (The row "variable placed at `$FF`" in `known-traps.md` already says that how
+far the stack reaches is a function of call depth and that `$F5` is outside rule 3; what it does not
+say is that the band itself assumes a depth.) The band is therefore right for a nesting depth of
+exactly four, and wrong both for deeper programs and for shallower ones.
+Five nested calls write `$F6`-`$FF`, and the gate is silent on a variable at `$F6` or `$F7`; a
+program whose deepest nesting is one `JSR`, with no other push, writes only `$FE`-`$FF`, and the
+gate still warns for `$F8`-`$FD`. Both are arithmetic from the push size; no ROM has been built to
+show either — Not verified. The per-level figure is already in this repository, as the comment on
+`RAMBudgetCheck.Stack` in `internal/scenario/scenario.go`: *"2 bytes per level of JSR depth; there
+are no interrupts here"*. On the list in 2004, Eric Ball: *"How much RAM you allocate for the stack
+typically depends on the depth of subroutine calls in your code. (Typically no more than a level or
+two, i.e. 4 bytes)."* Christopher Tumber's three nested calls after `ldx #$ff` / `txs` give *"a stack
+that is 6 bytes long and the stack pointer points at $f9"* 〔stella-list `200405/msg00052`,
+`200405/msg00063`; Cited only, not verified〕. At the time of writing the rule is unchanged: the
+band is fixed in its pattern, and no depth is taken as an input.
+
 ## Reading this table
 
 The gate that has caught the most was added most recently, and the gate that has caught nothing
@@ -261,6 +299,23 @@ them to go ahead.
 **Cost:** one `git diff --quiet` per push. Negative-controlled both ways on the day it was written — a
 workflow-touching commit to `main` is blocked, the same commit to a branch passes and runs the full
 mirror.
+
+**A known limit of the same hook, recorded 2026-10-07 and not fixed: its fixture inventory checks
+only that each `.bin` in the local checkout also exists in the worktree, not that it assembled.**
+Before the tests, `scripts/git-hooks/pre-push` assembles the ROMs in its worktree with
+`dasm "$f" -f3 -o"${f%.asm}.bin" >/dev/null 2>&1`, which throws away both the exit status and the
+diagnostics, then compares the two trees' lists of `.bin` names with `comm -13` and blocks only on a
+name that is MISSING. DASM can leave an image behind when assembly fails:
+`internal/emu/romsize_test.go` records a 5887-byte partial output from a failed assembly, found in
+one of the works on 2026-09-05. A failed assembly that leaves its file behind therefore passes the
+inventory. The `go test -p 1 ./...` that follows may still stop it —
+`TestEveryBuiltROMIsACartridgeSize` in that file walks `roms/` and fails on any `.bin` that is not a
+power of two of at least 2048 bytes, other than its one named exception, `cart_dpc` (10240 bytes by
+design), whose size it does not check at all — but a partial image that happens to be a cartridge
+size passes that test, and so does any partial `cart_dpc.bin`, which the hook assembles from
+`roms/carts/cart_dpc.asm`; and the hook has not been run against a failing assembly to see what the
+later steps do (our reading of the script; Not verified). At the time of writing the hook is
+unchanged.
 
 
 ## Knowing a rule and enforcing it are different quantities (2026-09-06)
