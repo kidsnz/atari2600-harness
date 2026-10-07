@@ -6,6 +6,8 @@
 
 **Choosing between this and a driver.** The same thread has the choice made the other way. Erik Eid answered that he was *"not all that short on RAM"* (*"my primary concern now is ROM"*) and might instead borrow a song-playing routine from Bob Colbert's *Okie Dokie*, which *"would allow me to play a few tones in certain situations, such as multi-point scores, plus keep all the sound considerations in one place rather than scattering them throughout the already convoluted game logic"* 〔stella-list `200207/msg00309`〕. Our reading of the trade: folding sound into game state saves RAM; a separate driver buys tunes and one place to maintain sound, which matters when the game logic is already hard to follow. **Cited only, not verified.**
 
+**The disassembly's comments are not of one standard.** Roger Williams' post releasing it lists, among what it adds, *"learn how the SNDP sound pitch table is incorrectly documented in NBCOMBAT"* 〔stella-list `200203/msg00001`〕, the file he was overhauling. Of the kernel he said the next day that most of its documentation *"was already there when I began overhauling NBCOMBAT.ASM"*, and that *"I pulled out all the comments I knew were erroneous or uninformed, but I had the impression people had gone over the kernal stuff pretty thoroughly so I didn't pay a lot of attention there"* 〔`200203/msg00011`; the comment that prompted it is in `kernel-micro-idioms.md`〕. Which of the sound-routine comments beyond SNDP he checked is not said. **Cited only, not verified.**
+
 > Companion mental model — *sound-channel arbitration is last-writer-wins on a 1-object-per-channel bus* (no mixer; precedence is branch order): see `design-principles.md` "Combat deep-read".
 
 ## 1. The counter IS the audio register (free envelope)

@@ -59,6 +59,18 @@ extended `SetPanel` (now also `color` / `p0pro` / `p1pro`) and scenario panel in
     a press after release is measured here (`litmus_input`, `docs/verified-coverage.md`: INPT4 stays
     pressed ≥3 frames after release). The demo reads INPT4 every frame and its VBLANK writes are only
     `#2` and `#0`, so D6 is never set. When to use the latch is **Cited only, not verified.**
+  - **The archive also holds D6 the wrong way round, under a lesson's title.** Ruffin Bailey, July 2002,
+    *"Reading joystick buttons & VBLANK -- a lesson for a newbie"*: an Erik Mooney post from 1997, as he
+    read it, *"said VBLANK needs to have a 1 in D6 if you want to be able to read the joystick buttons"*,
+    so he changed the VBLANK write in Nick Bensema's *How to Draw a Playfield* to `#%01000000`
+    〔stella-list `200207/msg00034`〕. The 1997 post does not say that; its button test ran *"with zero in
+    bit 6 of VBLANK, so I'm not worrying about latching"* 〔`199703/msg00328`〕. Eckhard Stolberg's reply:
+    *"Actually it's the other way around. If you want to be able to read the joystick buttons, you need
+    to put a 0 in D6 of VBLANK. Otherwise the button ports get latched"* 〔`200207/msg00045`〕. Of that,
+    `litmus_input` measures only the latched side: its frame loop writes VBLANK only as `$42` and
+    `$40`, D6 set, and INPT4 stays pressed after release; it reads no button with D6 = 0. The
+    correction is a separate reply, so a search that finds only Ruffin's `200207/msg00034` gets D6
+    backwards (our reading). The rest is **Cited only, not verified.**
   - **Where an ARM runs the game, one call can both draw and read.** ZackAttack, 2023, sketching an API
     for the ELF support of UCA-based cartridges, had `draw_frame()` draw the frame and capture input.
     splendidnut: *"I would decouple the frame drawing from the input gathering. They are two different
