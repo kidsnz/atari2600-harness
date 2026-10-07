@@ -148,6 +148,11 @@ for Leatherface's weapon, and Seaquest's divers and bubbles are *"Just the 1-pix
 shifted and stretched"* (AtariAge `topic/293976`). **Cited only, not verified** — none of these ROMs
 was examined here.
 
+`big-character.md` collects a 1998 report of large or flicker-free fighters in commercial games,
+among them characters bent when lifted so that they *"seem about 20 pixels wide, but only 8 in each
+scanline"* — its author then wondered whether they were double-width, 16 〔stella-list
+`199804/msg00042`〕. **Cited only, not verified.**
+
 ## Neighbouring uses of NUSIZ (cited, not built here)
 
 - **A black quad-width player as a mask.** omegamatrix, hiding a railing where it wraps at the right
