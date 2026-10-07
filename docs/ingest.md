@@ -273,6 +273,14 @@ the threads were not seen.
   scenes to fit — *"it can't be too complex. The viewing pool scene I had to hack a lot of the detail out
   before it would compress small enough"*. Decompressing took more than 262 scanlines, so it was split
   up and paced by the timer to keep VSYNC (AtariAge `topic/338659`).
+  Asked what a scene holds, he broke the 448 down (June 2023): *"16 bytes used to describe the scene,
+  6\*48 bytes for the playfield, 48 bytes for foreground color, 48 bytes for the overlay, 48 bytes for
+  overlay color"*. The kernel they feed: *"a 40x48 asymmetric playfield. There is a fixed background
+  color, but each 4-scanline high line can have its own foreground color"*, overlaid by *"sprite1 that's
+  an 8x48 strip of blocks (each overlay line can be its own color)"*, plus one vertical line in the
+  pointer's colour from missile0 and an optional alternating background colour on the right side. A
+  few days earlier in the same thread he had put it at *"512 bytes"* per scene (AtariAge `topic/338659`).
+  **Cited only, not verified.**
 - **A lattice from copies.** grafixbmp (2011): one player at *"3 close"*, the other at *"2 close"*
   placed between its copies, both drawing a tall strip of hexagons with the two-copy one offset half a
   hexagon down, gives a honeycomb; the colours are two — *"either one color if both are set to the same

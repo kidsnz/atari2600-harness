@@ -81,6 +81,11 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
      Andrew Davie's Qb, he struck out an `lda #0` after `jsr MBlock` (*"MBlock returns a=0"*) and added:
      *"If you document the state of registers and flags when returning you might find some more."*
      〔`200103/msg00019`〕 **Cited only, not verified.**
+     Jentzsch's comment-header advice answered Glenn Saunders, who had written that *"there are no
+     rules for how to pass parameters to assembly subroutines. You can use the stack, use the
+     registers, or use general RAM."* 〔`200110/msg00435`〕 Our reading: with no convention to fall
+     back on, the header is where a routine's contract has to be written down. **Cited only, not
+     verified.**
    - **Write a register's bits as bits.** Rodrigo Silva, 2003, of a template he offered to beginners:
      *"I used binary notation when writing to addresses like VBLANK, to make clear that in theory im not
      writing 2, but rather setting D1 bit"* 〔`200309/msg00290`〕. Two technique ROMs here write binary
