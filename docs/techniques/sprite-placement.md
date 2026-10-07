@@ -238,6 +238,20 @@ With rule 4 on top, `NUSIZ0 = $26` (three copies 32 apart, missile 4 px wide) dr
 no HMOVE at all. The missile is solid, so the 4 px tail is all-on or all-off: a shape whose last
 four pixels are not uniform cannot use it.
 
+**On our reading, band C is also the two-character case, and it needs no rewrite.** Glenn Saunders,
+2001, supposed the 6-character (Dragster) and 4-character (Dragonstomper) displays could be contracted
+to two characters with a rewrite between; Erik Mooney: *"Actually, a 2-char doesn't need a rewrite
+between; it's one copy each of GRP0 and GRP1."* Saunders answered that this ties up both sprites — he
+had meant that maybe, if P0 were rewritten between its copies, there *"might still"* be time to
+display P1 and the 1-bit objects on the same line — and Mooney: *"You can't have two P0 copies
+immediately adjacent without the 8-pixel space inbetween, so the only way to get a 16-pixel wide
+sprite is to use one player double-width or two players single-width. (or use a player+missile
+mesh.)"* 〔stella-list `200102/msg00040`, `msg00043`, `msg00047`, `msg00048`〕. Two single-width players
+abutting is band C, measured above — "no rewrite" means no mid-line GRP write, not no correction:
+strobed back to back the pair lands 9 apart (band A), and band C closes the gap with one HMOVE step,
+`HMP1 = $10`. The 8-pixel gap between adjacent copies of one player and the double-width alternative
+are **Cited only, not verified** here.
+
 ## Strobes closer than a store — the stack as a strobe pointer (cited, nothing measured here)
 
 The three-cycle floor above is a property of the store, not of the TIA. Page 1 mirrors the TIA

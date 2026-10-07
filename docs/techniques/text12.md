@@ -80,7 +80,12 @@ and lost days to it; the one-way link (#36 pointed here, nothing pointed there) 
     well as in PCAE and z26 〔`msg00013`〕. The other way it went: the routine needs the ball drawn at
     its new position as soon as `RESBL` is written, and Stella for Mac drew it a line later; a first
     version that wrote a `RESBL` copy outside zero page gave a black screen there, and he rewrote it
-    〔`msg00011`, `msg00038`〕.
+    〔`msg00011`, `msg00038`〕. On the 3-px glyphs, a post signed Manuel from the `cybergoth` address (the
+    one Manuel Rotschkar's `200312/msg00111` and Manuel Polik's `200108/msg00398` carry) answered
+    Mundschau's 3-px line: *"That's the main problem I assume: W, U, Y & V and M & N"*
+    〔`200312/msg00028`〕; Paul Slocum: *"They look a little funny, but I think they'll be okay in the
+    context of words and sentences. I played with them in Photoshop earlier. Q is a little tricky too."*
+    〔`200312/msg00029`〕
   - *10 from the playfield.* Jim Nitchals, 1997: *"40/4 = 10 characters per line. It's done."*
     〔`199709/msg00299`〕. Roger Williams, 2001: *"6 lines of 10 characters, fairly readable, and with
     plenty of CPU time left"* 〔`200109/msg00220`〕.
@@ -126,6 +131,14 @@ and lost days to it; the one-way link (#36 pointed here, nothing pointed there) 
   - Width trades against spacing. Tumber, setting the 13-character routine against his flickering
     24: *"If 13 is enough then that's obviously the way to go, particularly since you can probably get
     almost as much text on screen given the fewer blank scanlines between rows"* 〔`msg00078`〕.
+  - How many lines that came to. Slocum in April 2004, recommending it for a multicart menu: *"13
+    chars with no flicker, can display 15 lines as is"* 〔`200404/msg00325`〕; the next day he said
+    the link he had given, `200312/msg00070`, was *"an earlier version of the routine that could only
+    display 14 lines"*, and pointed to `200312/msg00075`, the 7-blank-line version
+    〔`200404/msg00351`〕. In the same thread Adam Thornton, on the Stellar Track engine as used in his
+    Fellowship of the Ring (his hack of Greg Troutman's Dark Mage, with Thomas Jentzsch's improvements
+    to the engine): *"IIRC the resolution is 13 lines of 12 characters each"* 〔`200404/msg00323`〕.
+    **Cited only, not verified.**
   - B. Watson, 2001: 20 characters from two 5-digit routines on alternate frames. His non-optimised
     conversion of a string into the 25 display bytes takes about 30 scanlines; a text line is 5 bytes
     drawn twice plus one empty scanline, 11 in all. Advancing the message pointer every 4 frames
