@@ -62,6 +62,17 @@ The Fridge: with `f(x) = x^2/4`, *"a*b = f(a+b) - f(a-b)"*, two table reads and 
 `a+b` and `a-b` have the same parity (our arithmetic). **Cited only, not verified** — none of these
 was assembled here.
 
+A shorter loop builds only the high byte. In a 2013 thread on the code people were proudest of, roland-p
+posted an 8×8 multiply he called the farmer's (Russian peasant) multiply, result in A, which the notes
+call small and compact but somewhat slow: `rol` takes the first factor's bits into carry MSB-first,
+every step `lsr`s the second factor, and on a 1 bit `adc`s the halved factor into A with the bit just
+shifted out as the carry in; the loop ends on a step that does not add once the halved factor is 0 (our
+reading) 〔AtariAge `topic/215741`; held here only as distilled notes, so the wording is not checked〕. As
+the routine stands in those notes it is not `MulHi8`'s `(num*mul) >> 8`: over all 65536 operand pairs it
+returns floor(x·y/256) for 20010 and is off by −1 to +2 on the rest, and it matches x·y/256 rounded half
+up, `(x·y + 128) >> 8`, on 43674 (our arithmetic — a Python model of the listed instructions, not an
+assembled ROM). **Cited only, not verified.**
+
 ## CI — what the scenario proves
 
 `scenarios/divtable.json` asserts the exact RAM results at frame 3:

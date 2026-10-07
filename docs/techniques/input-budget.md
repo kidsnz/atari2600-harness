@@ -73,6 +73,15 @@ branches on `bmi` throughout, which is 3 + 2 + 3 × (1+2) = 14 bytes against 15.
 branches do not matter, because each `asl` sets N again before the next branch. That is our sum, and it
 was not assembled. **Not verified.**
 
+**Or read the stick into one number.** Nukey Shay's routine in a 2004 thread turns a stick into a
+direction value 0–3 in 43 bytes with no temporary byte: load `SWCHA` (for the second player, four
+`asl` first to bring that nibble up), `and #$F0` / `cmp #$F0` to find nothing held, then `cmp`
+against a table of three one-direction patterns with `Y` counting down from 3 to 1, the `Y` that
+matches being the direction; nothing held stores `$F0`. A `bit SWCHB` / `eor #$02` lets a difficulty
+switch exchange the left/right and up/down axes 〔AtariAge `topic/48954`; held here only as distilled
+notes, so the wording is not checked〕. Its cycle count, what a diagonal gives, and where the 0 comes
+from when none of the three patterns matches are not in those notes. **Cited only, not verified.**
+
 **The ratio is the point.** Over 192 visible lines the paddle costs **1,536–3,072 cycles a frame**
 against the joystick's 40–44 — **35× to 77×** — and an NTSC frame holds 262 × 76 = 19,912
 cycles in total. So the paddle spends **8–15% of the whole frame**, and it spends it in the one

@@ -463,6 +463,15 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
   little Romspace"* — and added a switch at the end of each bank to drop a duplicated score routine from
   the display bank (AtariAge `topic/289892`). How many bytes is not stated: **Cited only, not verified.**
   `docs/design-principles.md` puts hotspots at the highest addresses; that is not which bank holds what.
+- **A routine of the game's own can leave the game's bank.** sohl's *Immunity* (8K and F8 in the notes,
+  which also have code later moved to a Bank 3 — the notes disagree with themselves) kept the game in
+  the upper bank and the title and ending in the lower; moving the routine that prepares the score
+  digits into the lower bank freed a lot of room — how much is not in the notes (AtariAge
+  `topic/318868`, a 2022–2023 thread; held here only as distilled notes, so the wording is not checked).
+  The routine runs every frame but not while the picture is drawn, so the switch that reaches it falls
+  outside the kernel (our reading). The Defender II hack above took a *duplicated* score routine out of
+  the display bank; the notes do not say this one was duplicated, only moved. **Cited only, not
+  verified.**
 
 ## Choosing the cartridge type
 

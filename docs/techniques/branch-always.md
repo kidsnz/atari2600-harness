@@ -119,6 +119,22 @@ purpose is to build this exact shape for measurement** (`cb_deadpred:78`, `litmu
 **No production use here could be rewritten with the source's cheaper `lsr` seed**, because in all
 25 the accumulator value is the thing being stored; `lsr` would destroy it.
 
+**A seed with no other job: `clv` → `bvc` (V = 0).** A 2009 thread on how branches assemble gives `CLV`
+/ `BVC` as the stand-in for the unconditional branch the 6502 lacks — 5 cycles, and position independent
+as long as the branch and its target are moved together in one block, since a relative branch carries no
+absolute address — and, as our notes put it, one byte smaller than `JMP`; Nukey Shay's use is a display
+or positioning kernel that has exactly 2 cycles to burn, where it takes the place of a `NOP` and a `JMP`
+and saves a byte (our reading of the notes) 〔AtariAge `topic/140713`; held here only as distilled notes,
+so the wording is not checked〕. Against a bare `jmp abs` the table above gives no byte: `clv` is a seed
+added for the branch, 1 byte and 2 cycles in `definitions.json`, so `clv` + `bvc` is 3 bytes and 5
+cycles against 3 and 3 — the `lsr` row's ±0 bytes, +2 cycles. Against `nop` + `jmp`, 4 bytes and 5
+cycles, it is −1 byte at the same 5: when the 2 cycles are wanted, the `clv` is padding and so a seed
+needed anyway, as the `sec` in the `sec` → `bcs` arm above is (our arithmetic). Those 5 cycles are for a
+`bvc` that stays on its page; taken across one it is 4 (the crossing row of the first table), so the
+pair is 6, a cycle dearer than `nop` + `jmp` (our arithmetic). V stays clear only until an instruction
+that writes it — `ADC`, `SBC`, `BIT`, `PLP`, `RTI`, and some undocumented opcodes in
+`Gopher2600/hardware/cpu/cpu.go` — comes between (our reading). **Cited only, not verified.**
+
 ## The hazard
 
 **The branch's unconditionality is a property of the instruction ABOVE it, not of the branch.**
@@ -256,3 +272,8 @@ Both seeds are the same technique with a different flag:
   translation of that note — the original thread text has not been re-read〕
 - **`lda #0` → `beq`** (Z): our own kernels, e.g. `roms/techniques/vertical_pos_dcp.asm:105`
   ("14 (always taken)").
+
+A third seed and a third source, cited under *Economics* above, not under "both" here:
+
+- **`clv` → `bvc`** (V): AtariAge `topic/140713` (2009), held here only as distilled notes, so the
+  wording is not checked; the byte it saves holds against `nop` + `jmp`, not a bare `jmp`.
