@@ -307,6 +307,14 @@ is wrong for this one (87/95). The rest:
   uses a missile as well, with a playfield the background's colour on both sides of the score and
   playfield priority *"to hide the extra copies of the missile"*; with leading-zero blanking the
   playfield can hide unneeded commas too. Cited only, not verified.
+- **A seventh digit that is always 0, from the two missiles** (AtariAge `topic/308157`, 2020): h0trod
+  asked *"What technique generates a scoreboard like that?"*; just-jeff's answer is mostly about the
+  game's block colours and says *"The score is actually a 48 pixel display with the last zero being
+  drawn with 2 moving missiles."* spiceware showed it with Stella's Fixed Debug Colors — *"the clever
+  trick for a 7-digit score where the last digit is always 0"* — and pointed to a 2012 seven-digit
+  routine by omegamatrix that *"lets you use all 7 digits"*, possibly the one cited above (the post's
+  link is not in our copy). The posts' text does not say how the two missiles form the 0. Cited only, not
+  verified.
 - **A countdown in seconds** (AtariAge `topic/153968`): `dec frames / bne Done /
   dec seconds / beq Expired / lda #60 / sta frames`, once per frame in vertical blank (60 is NTSC);
   in that thread a check placed in the kernel ran on every scanline and the frame grew to 301 lines.

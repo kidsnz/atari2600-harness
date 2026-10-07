@@ -325,6 +325,17 @@ splits the screen in two with a mid-screen repositioning, so it *"can display si
 which is resulting in 12 stars with only 30Hz flicker"*. The Gyruss question is left open in the post.
 **Cited only, not verified** — his reading of those ROMs, not ours.
 
+**Why his own repositioned starfield flickered.** Earlier that day Polik had put a starfield back into
+Star Fire's kernel and judged it *"not acceptable at all. The flicker is maddening, probably worse than
+SW-TAG."* His reason: *"Repositioning an object takes a whole scannline. This \_can't\_ take place in a
+line where I'm repositioning or drawing a sprite."* So the stars could go only *"in the vertical gaps
+between the sprites"*, and *"A huge sprite can occupy enough vertical space to blank out 5 stars at
+once"*. He would not continue with that approach, though he thought it *"a little better on the
+TV"*, and floated nine stars from both missiles and the
+ball cycled at 20Hz — *"but that'll flicker again, of course. A little less probably"* 〔`200207/msg00325`〕.
+The field he went on to describe places each line's star 8 pixels along from the last instead
+(`procedural.md`, `200207/msg00367`). **Cited only, not verified.**
+
 **But flicker that comes and goes has its own cost.** The full form above flickers only the objects
 that collide on the same lines, which makes the flicker intermittent. Thomas Jentzsch: *"Personally I
 find on and off flicker more noticeable and annoying than high frequency, constant flicker"*
