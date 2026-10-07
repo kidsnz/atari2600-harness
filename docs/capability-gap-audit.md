@@ -4918,6 +4918,27 @@ prover's zero for it is pinned by a test that names it. **Gap:** a negative-cont
 an instruction straddling
 `$xxFF`/`$xx00`, against the same block inside one page. Size: S.
 
+What `litmus_pagealign` does not cover (added 2026-10-07). Thomas Jentzsch, 2015, replying to an author whose
+kernel read its tables through `(ptr),y` pointers and who thought he had aligned everything correctly: *"Its
+not the alignment alone. If your table starts at offset 0, but your pointer points e.g. at offset 100, then any
+Y value >= 156 will cause a page penalty."* (AtariAge `topic/233300`) Cited only, not verified. The rule
+`litmus_pagealign` pins — `$NN00 + idx` never leaves the base's page — is about the base the read starts
+from, so an aligned table settles it only for a read based at the table's first byte; from offset 100, Y = 156
+is the first index that lands on the next page (our arithmetic). At the time of writing the ROM has no such
+case: its only bases are `AlnTbl` at offset 0 and `SplitTbl` at offset 248 (`$F0F8`), every timed read is
+`lda Tbl,y`, and neither it nor `litmus_pagecross` has a `(ptr),y` read or a base inside an aligned table.
+The costing does not take the table's alignment as settling either form: `pagePenalty` returns 0 for an aligned
+base only when an `abs,X`/`abs,Y` operand has a zero low byte, so `Tbl+100,y` with an unknown index returns `+1`
+(`index-unknown`), and every `(ind),Y` read whose state is tracked returns `+1` (`indirect-or-other`; a store such
+as `sta (zp),y` is not page-sensitive and returns 0). `TestEveryPagePenaltyBranchHasAWitness` re-derives that
+value for every instruction in the corpus and compares (its 2026-07-30 counts over 123 ROMs are under "Why the
+page-cross bug survived a passing gate" above; run 2026-10-07 with `-v` it printed 202 ROMs, `index-unknown`
+142, `indirect-or-other` 52, `state-unknown` 1, `base-page-aligned` 49 — `-v` prints the current ones). The corpus also already holds the pointer form:
+`roms/techniques/score6.asm` reads `lda (p0),y` with the pointer built as `Font + digit*8` and `Font` at
+`$FE00`. **Gap:** a litmus that names a read based inside an aligned table — `Tbl+100,y`, or `(ptr),y` with
+the pointer holding `Tbl+100` — and compares it against the machine with an index that does cross and one that
+does not. Size: S.
+
 ### Every bank crossing here is written by hand (2026-10-02)
 
 `docs/techniques/bankswitching.md` keeps cross-bank calls as code an author writes — the trampoline at
