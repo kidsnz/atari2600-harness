@@ -130,6 +130,12 @@ No demo or test here covers this subsection; every cycle count is the source's o
   skip/switchdraw, but it neither requires a line counter (save lotsa cycles here!) nor occupies a
   register"*; the setup is `spriteOffset = spriteY` and a plain pointer to the art, no bias
   (stella-list `200508/msg00049`).
+  Fred Quimby, in the same thread, listed three advantages; the first two: *"You do not need to set
+  a pointer every time you move your sprite. Actually, you only need to set it once."*, and
+  *"Graphics data need not be aligned carefully - no more worries about wrapping page boundaries for
+  the whole vertical range of the sprite. As long as the graphics data itself doesn't cross a page
+  boundary, it will work."* (stella-list `200508/msg00053`). **Cited only, not verified** (the two
+  advantages above).
 - **The counting-up form uses `ISB` where this page uses `DCP`.** Steven Hugg's *Making Games for the
   Atari 2600* draws with `lda #SpriteHeight / isb YP0 / bcs .DoDraw / lda #0` (INC, then SBC). Andrew
   Davie's reading is that YP0 has to start as the **negative** of the sprite's Y; he says he has never

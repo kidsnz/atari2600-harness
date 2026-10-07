@@ -165,6 +165,15 @@ bullets); the last bullet is from AtariAge:
 - Kurt's proposal updates the buffer *"while the beam is offscreen"* 〔`199906/msg00102`〕. Our
   reading: the usual reason to precompute — cycles inside the beam race — does not bind while the
   rotation fits in the blank; whether it fits is the measurement to make.
+  The buffer as he laid it out: seven RAM bytes per scanline of the letters, six shown like a 6-digit
+  score and the seventh (`$96` in his example) *"not visible"*, shifted with one instruction per byte
+  rather than a loop — `ROL $96,X` / `ROL $95,X` / `ROL $94,X` and on, *"where X would be decreased
+  by 7 after each line"* — *"56 bytes of RAM"* for 8-pixel-high letters; he was unsure of the opcode
+  (*"I don't know if ROL was the right command, but I think so"*) 〔`199906/msg00102`〕. Our reading:
+  each `ROL` hands the byte's top bit through the carry to bit 0 of the byte on its left, so that
+  line moves one pixel, and the hidden seventh byte is where the next character comes in — the part
+  the C-64 intro he analysed gave to an offscreen buffer refilled every 8 shifts. Four days later he
+  added that with *"ROLling"* the zeros on each side *"could maybe"* go too 〔`199906/msg00123`〕.
 - **Every rotation from one table, when what rotates is whole bytes.** shazz rotated an 88-entry
   colour list in RAM each frame (one colour per scanline) and was at *"still 1222 cycles"*, *"16
   scanlines"*. SeaGtGruff: *"You don't need to double the ROM table, just almost-double it. If you make
