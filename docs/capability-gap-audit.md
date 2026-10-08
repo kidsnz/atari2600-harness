@@ -5245,3 +5245,97 @@ not (worked out from the code). The function takes any byte and nothing calls it
 2026-10-05). **Gap:** take the colour register value and derive the step inside, so a nibble cannot be passed;
 refusing values above 7 would catch a whole register value but not the nibble of the example. Size: S. Found by
 the mailing-list distillation (helper-3).
+
+### CI assembles with whatever DASM `apt` installs (2026-10-08)
+
+`.github/workflows/ci.yml` installs the assembler with `sudo apt-get install -y dasm`: no version is asked
+for, and no step prints `dasm`'s own version line or compares it with anything, while the same file pins
+Gopher2600 to a commit. The measurements of DASM's
+behaviour recorded here name one version, 2.20.14.1 — `scripts/check_traps.py` (*"Measured with DASM
+2.20.14.1 on 2026-09-04"*) and the measured notes in `internal/build/build.go` (the versions quoted from
+other people's reports are not counted) — and `docs/techniques/shared-setxpos.md` already says, of one dropped-index
+case, that *"CI installs whatever `dasm` apt provides"*. One part exists: `dasmVersion()` in
+`internal/cyclebound/certify.go` reads the local `dasm`'s version line into a `cmd/cpucert` certificate. CI has
+no `cpucert` step; its `go test` reaches `Certify()`, and so `dasmVersion()`, through
+`internal/cyclebound/certify_test.go`, where the value is neither printed nor asserted (read from the
+source). What the runner was given is in apt's own output: in the log of one run (37724180265, started
+2026-10-08 UTC) the install step shows `Unpacking dasm (2.20.15~20201109+really2.20.14.1-2)`. That is one
+run and a package version string; what that `dasm` calls itself was not looked at. Two posts from the list,
+set side by side and not tied to each other (the second is a report of a bug its author had introduced, and
+does not say which version it is about); that they bear on taking an assembler's version for granted is our
+reading. Rob, 2002, offering
+RPMs he had made for Linux: *"It's only 2.12.04 but I don't think there are any 2600-relevant changes since
+then."* 〔stella-list `200212/msg00243`〕 Andrew Davie, 2004: *"I have just discovered a bug I have introduced
+into dasm."* With `VALUE = $80`, `and #~VALUE` failed because *"~VALUE becomes 16-bits and then we get"*
+`and #$FF7F`; his quick fix was `and #(~VALUE)&$FF`, and *"until I find some time to correct this error,
+please either use an earlier version of DASM, or the above workaround. This, of course, means the current
+version of DASM may not be able to compile legacy code as-is."* 〔`200402/msg00277`〕 Cited only, not verified.
+(`known-traps.md`'s row on `~` then `>>` in an operand has `and #~%10111111` listing as `29 40` in a later
+2004 post, `200411/msg00006`.) **Gap:** have CI compare the version of the `dasm` it installed — its own
+version line, printed on the way — with the one the measurements name, or pin it. Whether to do either is
+undecided. Size: S.
+
+### Nothing searches for a shorter instruction sequence that does the same thing (2026-10-08)
+
+The static tools here analyse the program they are given — `prove_line_budget` bounds its cycles, `defuse`
+lists its writes — and none proposes a different one. A precedent from the list: Fred Quimby, 2005,
+*"So I've started on writing a 6502 superoptimizer from scratch"* (alpha 0.01, a DOS program). It *"takes a
+short (SHORT!) 6502 binary, terminated with an RTS as input (stdin) and outputs superoptimized code to the
+screen"*, assuming input and output in the accumulator. Among the limits he lists: *"Only zero-page,
+immediate and implied addressing, and forward branches are allowed"*, *"No decimal mode yet"*, *"Overflow
+flag not yet implemented"*, *"PHP/PLP not properly implemented"*, *"Only one immediate per code sequence"*,
+*"Only one Zero-page address"*, and *"Will take eons to calculate code sequences longer than about 7
+instructions."* Among the good things: *"All illegal opcodes implemented (that use the above addressing
+modes, that is.)"* and *"Useful and fast for very short chunks of code"*. His example input is `and #$f0` /
+`lsr` / `lsr` / `rts`, and the first sequence of the output he shows is `ASR #f0` / `LSR` (`4b f0`, `4a`)
+〔stella-list `200505/msg00186`〕. Two cautions on that example: `asr` is one of the mnemonics
+`scripts/check_traps.py` rejects as an unstable illegal opcode, and the output of that version is not to be
+copied as correct. Announcing alpha 0.02 he wrote: *"I found an amazing number of bugs in the first version
+of this I posted last week, and some of them were so bad that the program produced bogus results or
+overlooked results that should have been good."* The bugs fixed include *"The program did not set N and Z
+flags based on initial accumulator value"*, *"Carry flag was inverted in compare operations"*, *"Branches
+often jumped to wrong target address"* and *"Various other errors in 6502 core"*; the to-do list for the
+next version includes *"Skip tests that rely on undefined flags"*, *"Skip tests that rely on undefined
+zero-page loads"* and *"Skip tests that store undefined register values"* 〔`200505/msg00200`〕. Andrew
+Davie, replying: *"This is an extremely interesting idea, Fred. I had a quick play with it -- my computer
+is too slow to really let it have a good run at things."* 〔`200505/msg00202`〕 Of the build just posted, Quimby then wrote: *"Oops... I wrote in a very obvious
+bug into the last version which will send it into an infinite loop, so please don't use that one. The fixed
+version is attached."* 〔`200505/msg00207`〕 Cited only, not verified; none of the sequences was run here. That such a
+search is only as good as the 6502 model inside it is our reading of his bug list. **Gap:** for a short
+fragment with stated inputs and outputs, a search for a shorter or faster equivalent, kept to the opcodes
+`check_traps` accepts and dropping candidates that depend on undefined values (his three skips). Whether to
+build it is undecided. Size: M.
+
+### `TIMINT` is witnessed by our own litmus ROMs only (2026-10-08)
+
+`verified-coverage.md` gives the RIOT timer row (*"TIMINT D7 set"*) to `litmus_timer`, and
+`fundamentals-audit.md` adds `litmus_timint_pa7`; both ROMs were written here, and no commercial ROM is used
+as a second witness for `TIMINT` (`$285`). The list has a roster, given as test cases to someone building the
+chip. Adam Wozniak, 2004, of his FPGA RIOT: *"The code does not yet handle the RIOT PA7 flag, TIMER flag, or
+IRQ line. Can anyone recommend a game that is known to use these RIOT features (the flags; I know the IRQ
+line is not connected on the 2600) so I can test and develop?"* 〔stella-list `200409/msg00301`〕 Dennis
+Debro: *"Am I right in assuming you mean games that use the TIMINT register ($285)? If so then check
+out..."* — Dragonfire, Cosmic Ark, Riddle of the Sphinx, Moonsweeper 〔`200409/msg00328`〕. Wozniak:
+*"Precisely it, thank you."* 〔`200409/msg00329`〕 Those posts do not say how any of the four reads the
+register; `resources.md` carries Debro's separate account, from the same year, of a wait that tests `$285`
+with `BIT` / `BPL`, naming Moonsweeper and, *"IIRC"*, Dragonfire 〔`200405/msg00081`〕. Cited only, not verified: none of the
+four ROMs was looked at here. **Gap:** run one or more of the four under the engine and record where it
+reads `$285` and what the read returns, as a check of the litmus results against code not written here.
+Whether to do it is undecided. Size: S.
+
+### No tool here reads the engine's own log (2026-10-08)
+
+Gopher2600 reports through its `logger` package: 37 files under `Gopher2600/hardware/` call `logger.Log` or
+`logger.Logf` — `tia.go` and `riot.go` among them, each with *"memory altered to no affect"* — and no Go file of this
+repository outside the engine mentions `logger` (both searched in the local checkout, 2026-10-08), so what
+the engine logs during a run is not returned by any tool. A list post mentions, in passing, an emulator's log naming an
+unusual use. Manuel Polik, 2002, on his Star Fire kernel, after Glenn Saunders noticed that
+*"the double-sprites detach on the left side of the screen on StellaX"*: *"But as Eckhard says, this is very
+unusual treating the TIA in ways it was not really invented for -> "weird HMOVE" as the Z26 log would say"*
+〔stella-list `200209/msg00032`〕. "Would say": the post does not report that Z26 logged it, nor what Z26
+calls a weird HMOVE (Cited only, not verified). Gopher2600's log is not a source of that warning either —
+no `logger` call under `Gopher2600/hardware/` mentions HMOVE or the motion registers (searched 2026-10-08) —
+and the HMOVE check here is our own (`Emu.WatchHMOVEHazard`, T-2 above). **Gap:** collect the engine's log
+entries made during a run and return them with the result (the engine has `logger.Tail` and
+`logger.BorrowLog`; read from `Gopher2600/logger/central.go`), so that a diagnostic the engine already
+makes is seen. Whether to build it is undecided. Size: S.
