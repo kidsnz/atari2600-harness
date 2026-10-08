@@ -90,6 +90,14 @@
   not checked here. Cited only, not verified. (`cmd/dissect`'s own store trace folds a target below
   `$80` onto its register with `target&0x3F`, for stores to nine drawing registers only —
   `cmd/dissect/main.go`.)
+- **A range declared as graphics is listed with its picture.** For addresses that its configuration
+  declares as `GFX`, DiStella writes a picture as a comment — `|XXXXXXXX|` is how the notes show it
+  — which nukey-shay pointed out in a 2005–2006 thread on disassembling
+  an 8K image 〔AtariAge `topic/66892`; only the distillation notes are held here, and they give this
+  as a statement of his, not as a quotation〕. A shape in someone else's ROM can then be read off the
+  listing (our reading). The directive is in `capability-gap-audit.md` ("`dissect` does not hand
+  DiStella what the trace learnt"); `cmd/dissect` gives DiStella no configuration, and no DiStella was
+  run here to see the output. Cited only, not verified.
 - **The HMOVE comb shows where the kernel strobes HMOVE.** An `HMOVE` right after `WSYNC` blanks
   colour clocks 0-7 of that line (`known-traps.md`, "HMOVE comb on a visible line"). Piero Cavina,
   1997, in the thread he had opened asking why the line appears: *"What is sure is that when you see

@@ -127,6 +127,19 @@ is our own arithmetic or reading, it says so.
   were meant 〔stella-list `200207/msg00272`〕. Our arithmetic: a page holds sixteen 16-byte frames, so the low
   byte alone steps through at most sixteen, and unless the first frame starts a page the last one
   straddles the boundary (the `+1cy` read of the checklist).
+- **One `.word` table of cel addresses instead of two byte tables.** Manuel Polik, 2001, answering
+  Tempest, who had asked how to animate *"4 frames or so"*: read the shape with `LDA (spritePointer),Y` and reload the pointer from
+  two tables, `highpointer .byte #>shape1, #>shape2, #>shape3, #>shape4` and `lowpointer .byte
+  #<shape1, …`, indexed by `LDA frameCounter` / `LSR` / `LSR` / `LSR` (*"This'd update every 8
+  frames..."*) / `AND #$03` / `TAX` 〔stella-list `200105/msg00038`〕. Pointed back to that answer in
+  2003, he updated it — *"nowadays I'd simplify this mess"* — to one table, `shapetab .word shape1,
+  shape2, shape3, shape4`, with *"some access code like"* `LDA frameCounter` / `AND #%00000011` / `ASL`
+  / `TAX` / `LDA shapetab,X` / `STA spritePointer` / `LDA shapetab+1,X` / `STA spritePointer+1`
+  〔stella-list `200304/msg00198`〕. The 2003 listing has no `LSR`s, so copied as it stands it steps the
+  cel every frame (our reading; the post does not mention them). Comparing the lookups alone, the
+  single table adds the `ASL` — 1 byte and 2 cycles (our count; neither post counts anything).
+  `rts-dispatch.md` has the same pair of layouts for jump tables, where splitting into low and high
+  tables is what removes the doubling. **Cited only, not verified.**
 - **The kernel limits which lines a cel may change.** Erik Mooney's 1997 *Invaders* (invaders drawn
   in the playfield): *"the kernel can only handle modifying the base invader shape on two consecutive
   scanlines out of the six for each invader row"* 〔stella-list `199704/msg00197`〕. The same game also
@@ -154,6 +167,18 @@ is our own arithmetic or reading, it says so.
   off on a hit: *"Stuff like that is easy doable, when the player shapes are buffered in the RAM. Costs
   me only 8 byte instead of having a complete second set of player shapes in the ROM"*
   〔stella-list `200111/msg00001`〕.
+- **A proposal: rotate a mark instead of storing cels.** Joel Park, 2002, under the heading "NEWBIE
+  THOUGHT" in the *Marble Craze* thread, drew a marble with a reflection mark in one row and asked
+  *"Would it be possible"* that, *"instead of setting up a new animation, just use ROL to rotate the
+  mark each time the marble is redrawn. This wouldn't make it look like it was rolling, but it would
+  give it the appearance of spinning. You might even use ROR and ROL in response to the Paddle
+  position."* — *"Just a crazy thought"* 〔stella-list `200207/msg00028`〕. Paul Slocum's reply gives
+  the precondition, a shape held in RAM: *"since my Marble data is stored in ROM and not copied to RAM,
+  I can't use a ROL/ROR on it. And I don't have any cycles left to do it between reading it from ROM
+  and writing it to the TIA."* 〔stella-list `200207/msg00032`〕 Neither post reports it tried. Shifting
+  one RAM copy of a shape is in `integration-density-playbook.md` ("The same choice at the size of one
+  shape"), and `ROL`/`ROR` go through the carry (`known-traps.md`, *ROL/ROR rotate THROUGH the carry*).
+  **Cited only, not verified.**
 - **Diagonal facings are drawn, not derived.** `REFP` mirrors only horizontally, so a 45° (or 22.5°)
   view is a frame of its own. Rotating 8×8 art by a non-right angle in a paint program and snapping it
   back to the grid leaves a blob; the forum advice is to draw by hand, using the rotated image or a

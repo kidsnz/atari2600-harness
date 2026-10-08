@@ -109,6 +109,19 @@ on different objects. Later that day he posted a last version: *"this is probabl
 this monster. Consider this the termination of an exploratory branch of the capabilities of the
 system."* 〔`200301/msg00164`〕 **Cited only, not verified.**
 
+**The colour use, in the playfield.** Andrew Davie, 2002, to Billy Eno, whose 16x16 field of tiles
+needed four states for each tile: *"Have you considered the "4-colour playfield" system I posted so
+long ago? Basically this alternates playfield pattern and colour to achieve an effective 3-colours +
+BG. You could use this effectively to get the display you want.... at the expense of 30Hz flicker, but
+you'd get solid squares."* 〔stella-list `200208/msg00050`〕 "Alternates" is all the post says of the
+mechanism; that it alternates frame by frame is our reading of the 30 Hz. Eno *"found only one bin in
+the archive, and no source (the link to it is dead.)"* and put his understanding as a question — *"My
+impression is that you create the 4 colors using the two alternating playfield colors, the color the
+playfields create when overlapped, and the background?"* 〔`200208/msg00075`〕 — which no post in the
+thread answers. The demo's reception in 1998 is in `design-principles.md` and
+`integration-density-playbook.md`. No playfield doing this has been built here. **Cited only, not
+verified.**
+
 **The colour use, for a whole picture.** In February 2003 Andrew Davie posted cover art converted to a
 *"colour bitmap for display"* — *"Takes me about 1 minute to convert an image for display"* — and
 Thomas Jentzsch answered with a demo of his own (*"let's see how it looks compared to my demo"*). Rob,
@@ -336,6 +349,25 @@ ball cycled at 20Hz — *"but that'll flicker again, of course. A little less pr
 The field he went on to describe places each line's star 8 pixels along from the last instead
 (`procedural.md`, `200207/msg00367`). **Cited only, not verified.**
 
+**A rate one poster named, and what the copies cost a missile.** ZackAttack, 2015: *"I've been
+trying to"* draw a 160x192 single-colour image with 30 Hz flicker — in Stella only, *"waiting on some
+parts to arrive before I can test this on real hardware"*. He had all but 4 columns at 30 Hz, could
+fill those only with the ball, at 15 Hz, and asked whether that could be overlooked. Omegamatrix: *"I
+would keep trying to get 30Hz flicker."* Andromeda Stardust: *"IMO, flicker at less than 20Hz or so
+gets annoying fast..."* — one opinion each, on the side of the frequency reading of the 2021 comparison
+above (`topic/315322`). Asked whether he was out of missiles, ZackAttack: *"I'm using tripled players
+NUSIZ setting for both players and thus also both missiles. In the case where I did use the missile I
+had an extra write at just the right time to disable the missile before its 2 copies got drawn."* Two
+hours later he wrote *"Think I'm going to table this until I have the hardware to test with. That way I
+can be sure I'm not just fighting stella."*, and Omegamatrix answered *"I wouldn't use trust Stella
+fully in this area either."* He did not stop there: he posted twice more over the next two days, still
+with Stella results, of one of which he wrote *"I'm not really sure if stella is doing the right thing
+here"* (AtariAge `topic/245146`; the posts run from 2015-11-01 to 11-04 by the page's own dates). That
+a missile follows its player's NUSIZ copies is measured (`sprite-placement.md`, rule 4); the write that
+removes the later copies is not. Our reading of the rest: that write is a result seen in Stella only,
+by an author who doubted Stella on this, and since his kernel relied on bus stuffing the thread does
+not show that the write fits in a line without it. **Cited only, not verified.**
+
 **But flicker that comes and goes has its own cost.** The full form above flickers only the objects
 that collide on the same lines, which makes the flicker intermittent. Thomas Jentzsch: *"Personally I
 find on and off flicker more noticeable and annoying than high frequency, constant flicker"*
@@ -444,6 +476,19 @@ screen, *"decide if to branch out of the existing kernel IF THE FRAME COUNT IS O
 a few cycles"*, with a new kernel drawing the city on its frames, where *"you can IGNORE PF COLLISION of
 sprites"* (AtariAge `topic/289892`; read through our distillation note, the thread is not on disk here,
 and it is a suggestion, not a built kernel). **Cited only, not verified.**
+
+**The order of alternation, chosen for how it looks.** The rotation counter of the full form orders
+the turns so that no object starves. Christopher Tumber, 2003, tried ordering them for the picture. The
+rings of a *"Star Castle type game"*, drawn with both missiles in triplicate, left too little time on
+a scanline, *"So I thought if I went to single missle and alternated rings, but in a real pattern
+rather than just flicker (like a strobe or ripple effect emanating from the center) it might look
+pretty good."* His verdict on the result: *"Actually, it was kinda distracting"* — and he kept it as
+*"the start of a tunnel type effect"* instead 〔stella-list `200304/msg00235`〕. Of a version giving
+*"the effect of having two rings onscreen at a time"*: *"Any more than two rings actually hinders the
+effect as it gets too busy and too dififcult to track the "motion" of a ring (the extra flicker
+doesn't help..)."* 〔`200304/msg00237`〕 A day later he posted a cave-shaped one that *"uses a sequence
+that gives the impression of 3 polygons on screen at once, with a saturated colour so with all the
+movement I think flicker is not a problem.."* 〔`200304/msg00240`〕 These are his impressions of his own demos, and none of them has been run here. **Cited only, not verified.**
 
 **Brighten what flickers.** SpiceWare, who flickers the player's character "when needed" in Space Rocks,
 Draconian, Frantic and Timmy: *"One thing that does help is to LumaBoost flickering objects - basically increase the color

@@ -188,6 +188,17 @@ tables as `$14, $19, $1e …`, and the high byte is stored to `pointerP0Score` r
 (our reading of that listing; the high table needs `>`). `known-traps.md` has a DASM hang on
 `REPEAT`/`REPEND`. **Cited only, not verified.**
 
+**A bit-reversal table, generated.** A 2021 thread of Andrew Davie's, *Reverse bit-generation in C at
+compile-time*, wanted a 256-entry bit-reversal table built at build time without writing a tool. As the
+distillation notes record it, the thread has a chain of C `#define`s that expands into the 256
+initialisers of an array and, offered as alternatives, a one-line Python or Perl script that prints the
+256 values 〔AtariAge `topic/317294`; only the distillation notes are held here, so the wording is not
+checked, and they do not say who posted which〕. The notes describe the Python line's output as DASM
+source; run here as the notes give it, it prints C binary literals (`0b10000000,` for 1), so no DASM
+table comes out of this entry as it stands. `techniques/asymmetric-pf-score.md` has bit-reversed glyphs
+(PF2 is LSB-left), which is a use for reversed bits and not by itself a need for this table. **Cited
+only, not verified.**
+
 **Computing the table once, into RAM.** svolli, 2019, on *The Mating of the Colorworms*, a 512-byte demo:
 *"The trick was to use extra RAM. I chose the CommaVid 1k of extra RAM to PRECALC some tables I need for
 displaying the effects"* 〔AtariAge `topic/293632`; only the distillation notes are held here, and they say
@@ -287,6 +298,21 @@ otherwise jump: *"This is my optimal solution for that."* Where the flags must s
 Ladders of entry points used as delays are in `techniques/kernel-micro-idioms.md`. **Cited only, not
 verified.**
 
+**The argument after the call.** Another way to drop the parameter load is to put the data where the
+return address already points. As the distillation notes of a 2020 thread on DASM strings record it: place
+the zero-terminated string directly after `jsr printString`; the routine takes the return address from the
+stack, uses it as the string pointer, and puts the position after the end of the string back as the return
+address before `rts` — no `lda`/`ldx` passes an address at the call 〔AtariAge `topic/310926`; only the
+distillation notes are held here, so the wording is not checked, and they show no 2600 program that does
+it〕. `JSR` pushes the return address minus one (`techniques/rts-dispatch.md`); the notes do not show that
+arithmetic. The `BRK` form with one id byte is in §G ("The skipped byte as an argument"). The same notes
+have a macro that switches segment to collect the strings in one place, and it did not work there: under
+`SEG.U` the listing showed the space taken but the strings were not in the final image, and under `SEG`
+DASM stopped with *Origin Reverse-indexed* — so the notes end on the inline form. An uninitialised segment
+emits no bytes (`known-traps.md` has the 0-byte image an open `SEG.U` gives), and
+`techniques/kernel-micro-idioms.md` ("Layout") has the same error from an `ORG`. Neither form was
+assembled here. **Cited only, not verified.**
+
 **Digits on an 8-byte stride.** With a 5-line font the digit index is ×5 (`casebook.md` has Combat's
 `ASL`/`ASL`/`ADC`). Lee Fastenau, 2004, to someone *"very low on rom space"* 〔stella-list
 `200405/msg00092`〕: *"are you certain you can't spare the 30 bytes to make each digit take up 8 bytes
@@ -336,7 +362,12 @@ table reuse!"*), and one replaces a compare-branch section by computing the addr
 taking an indirect `JMP` (30). Together 99 bytes, about 36% of the 276 (our arithmetic). The largest item
 folds code *"repeated four times, differing only in the suit being examined"* into a loop (66). Dropping the
 duplicate J, Q, K and A images by moving the rank images into the letter table — the glyph sharing named
-above — saved 18. The instruction-level edits — an unneeded `clc`, an unneeded `sec` (*"If bcc is not taken,
+above — saved 18. Item 3 changes the data, and a piece of code goes with it: *"Changed the hard-coded image indexes to
+offsets (i.e. $00 to #<LetterImageJ). This enabled me to remove the multiplication by six in
+GetLetterImage, saving seven bytes."* A few days earlier he had said those offsets *"are calculated as
+multiples of six"*, his reason for doubting he could overlap glyphs 〔`200111/msg00344`;
+`design-principles.md`, "One saving can foreclose the next"〕; an offset held in the data has no stride to
+keep (our reading). The instruction-level edits — an unneeded `clc`, an unneeded `sec` (*"If bcc is not taken,
 carry must already be set"*), `lda`/`tax` and `lda`/`tay` folded into `ldx` and `ldy`, and an `eor` whose
 result was already the value needed — came to 9 (items 6–9; our grouping). One beginner's program; that it
 argues for restructuring before single instructions is our reading. **Cited only, not verified.**

@@ -190,7 +190,19 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   every frame. My example of the joystick was one of them. I even had my collision detection routines
   running every 3rd frame"* 〔`200103/msg00248`, `200103/msg00274`〕 — movement every frame, where the
   January post, about the *Sabotage* clone, put object movement in one frame of three; the March posts
-  do not name a game. Thomas Jentzsch, 2002, to a
+  do not name a game. The first March post drew an exchange about how much delay goes unnoticed. Rob
+  Kudla, replying to it: *"I've heard that humans can't detect delays less than 70ms"*
+  〔`200103/msg00254`〕 (his figure for 3 frames is not 3/60 s — our arithmetic — and is left out). Chris
+  Wilkson, answering him: *"Most people will react to a single frame glitch as "what? what was
+  that???""*, and *"people who are accustomed to watching video, will be able to conciously read things
+  that are there for only a single frame"* 〔`200103/msg00257`〕 — the post that Colbert's *"The screen
+  gets drawn every frame"* above answers. Kudla then narrowed his claim — *"I was
+  only referring to delays in control mechanisms. Most people can't tell, when they press a button or
+  turn a wheel, whether the device responded in 0ms or 70ms."* — said it was hearsay (*"I haven't tried
+  this"*; he had it from *"the FPS people (Carmack et al.)"*), and granted the other point: *"Visually,
+  you're right."* 〔`200103/msg00269`〕 So Kudla, in the end, set a delay in the controls apart from a
+  single frame on the screen; Wilkson's later posts in the thread do not take that distinction up, and
+  neither quantity is measured here. **Cited only, not verified.** Thomas Jentzsch, 2002, to a
   programmer running out of CPU time in his object handler: *"you could call some subroutines only in
   odd and other only in even frames. This is what I'm doing (though a bit more complicated) in Thrust
   too"*; Christopher Tumber, replying: *"you often don't really need to do all collision detections
@@ -1132,6 +1144,23 @@ backlog `capability-gap-audit.md`. Verified facts remain cataloged in `verified-
   stack, controller handling variables, generic temp variables, etc."* 〔stella-list `200411/msg00068`,
   quoted in `200411/msg00071`, where Eckhard Stolberg's reply disputes the 117 for saved levels, not
   the RAM〕. **Cited only, not verified** — no text routine's RAM was counted here.
+  📖 **One game's RAM, variable by variable.** Ben Larson, 2002, with *"RAM is pretty tight also"*, gave
+  a *"rundown of total usage so far"* for his game *Incoming*: *"75 bytes for the terrain (the
+  biggest chunk)"*; 12 *"to store memory index locations for the digit graphic lookups in the 6-digit
+  E-P-W readout"*; 8 for shot x/y position and velocity (each such variable *"stored using 2 bytes, to
+  simulate floating point numbers (actually fixed point)"*); 4 for the two players' x/y positions; 4
+  for the player graphic lookups; 4 for the players' elevation and power; 4 for *"the psuedo random
+  number register"*; 2 for health; and 1 each for wind, for *"shot wrapping off the top of the screen"*,
+  for game status and for score. *"So that leaves 12 bytes. 8 as it is right now, because I need 4 for
+  the stack on a certain 2-deep subroutine call"* 〔stella-list `200201/msg00063`〕. The twelve items add
+  to 117, which would leave 11 of 128 rather than his 12 (our arithmetic). Thomas Jentzsch, replying,
+  suggested three cuts: *"I don't think that you need a 4 byte random generator, 2 bytes should be enough
+  here"*; *"perhaps you can share some bytes for different purposes: E.g. the 4 bytes for the player
+  graphic lookups and the 12 bytes for the digit graphic lookups are temporary and never used a the
+  same time"* — the overlay condition quoted above; and *"perhaps, you don't
+  always need all bits (e.g wind or game status) so you could merge those bytes"* 〔`200201/msg00066`〕.
+  A budget from a game still being written, and neither post says which cuts he made. **Cited only,
+  not verified.**
 
 ## 10. Bank switching
 - 📖 Scheme landscape (Horton's doc + woodgrain + threads): F8 8K ($1FF8/9) → F6 16K ($1FF6–9) → F4 32K

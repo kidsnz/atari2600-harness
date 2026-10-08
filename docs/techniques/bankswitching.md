@@ -423,6 +423,25 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
   much space"*: *"The first bank would have all the game calculation bits, the second bank would have all the
   screen drawing bits"* 〔stella-list `199703/msg00113`〕. Panky above keeps logic and kernel in one bank,
   and this page's demo splits data from code. A plan, not a game: **Cited only, not verified.**
+- **On E0, how much to move is a choice, and keeping track is the price.** E0 has three 1K segments
+  that each take a slice, and a last quarter that never moves (`docs/capability-gap-audit.md`, "E0 — not
+  a bank switch"). Thomas Jentzsch, 2003, to Joe Grand: *"With standard Atari bankswitching you don't
+  have to remember which segment you are in (since there is only one) but you are very inflexible. With
+  E0 bankswitching you are very flexible and the more flexible you use the segments the more you have
+  to keep track of what slice is in which segment. Normally you won't swap slices too much, e.g.
+  keeping three segments constant all the time and only swap the fourth one to use different data (or
+  code) for different levels."* 〔stella-list `200304/msg00258`〕 In that mechanism line the fourth quarter is the fixed one, so his "fourth one" may
+  simply mean the remaining one; either way we read him as: keep most of the window constant and swap
+  one segment (our reading). Grand's own statement, that once a slice
+  is mapped *"that memory map will stay the same until another slice is later loaded into the
+  segment"*, got Adam Wozniak's *"Yes."* 〔`200304/msg00259`, `200304/msg00262`〕 In May Jentzsch
+  reported on *"a 8K Parker game"*, which he does not name: *"While it is theoretically possible to map
+  a slice into different segments, this would NOT work with code (absolute addresses!)."* Its mapping:
+  *"segment #0: slices 0, 3 and 4"*, *"segment #1: slices 1 and 5"*, *"segment #2: slices 2 and 6"* —
+  *"So NO slice is ever mapped to different segments!"* 〔`200305/msg00036`〕 That game, then, gives each
+  segment its own set of slices rather than holding three constant (our reading of that mapping). No E0
+  image was read here. **Cited
+  only, not verified.**
 - **Or put the code in both banks.** BiiggerBoing26 (2003) is an F8 image whose *"Code is mirrored in first
   1K of both banks"*, so *"this is effectively a 7K cart. It's like having two 3K 'banks' of unique data"*;
   its author called the switching *"'el cheapo'"* 〔stella-list `200307/msg00008`, `200307/msg00010`〕. The
@@ -482,6 +501,17 @@ the copy, which holds 8 of the thread's 33 posts and leaves the author of that l
   Beyond Castlevania began hoping that *"extra RAM wouldn't be necessary"*, found as the design grew that
   *"this didn't seem possible"*, and chose F4SC for *"the extra 128 bytes"* as a frame buffer for sprite
   data (AtariAge `topic/143390`). **Cited only, not verified.**
+- **RAM as the size of the map.** Andrew Davie, January 2005, on notBD 0.1: *"a very early testbed of
+  3E bankswitched bitmap graphics, implemented as a 10x10 character window into a 128 character x 20
+  character map. The map size is arbitrary, limited only by RAM. Speed is very slow, but I have some
+  major speedups coming (really!)."* The glitches on its screen were *"areas I'm avoiding writing for
+  now, for reasons to do with memory/access issues with RAM and page boundary crossing"* 〔stella-list
+  `200501/msg00015`〕 — the 3E write-port rule above is his, from that May. In the
+  next version's thread he had *"enough time left to be able to include a player sprite (maybe two!)"*,
+  and *"The system is designed so that I can have independant scrolling windows for a 2 player mode,
+  too."* 〔`200501/msg00022`〕 So the screen is a window on a map larger than itself, and what the
+  cartridge's RAM holds sets how large (our reading of "limited only by RAM"; 3E's RAM is in the table
+  below). A testbed by his own word, and not run here. **Cited only, not verified.**
 - **What each scheme adds in RAM.** Asked about 256 bytes, a 2022 thread pointed to an external table of
   the schemes with the ROM and RAM each provides, and added that most games with extra RAM used the
   SuperChip, *"which provided 128 bytes of RAM"*; svolli: it combines with 4K, F8, F6 and F4, and *"it

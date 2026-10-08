@@ -256,6 +256,17 @@ bit:  4 5 6 7 | 7 6 5 4 3 2 1  0  | 0  1  2  3  4  5  6  7
   from the original Programmer's Guide; **Cited only, not verified**). The Guide is not a safe source for spellings: the HTML copy in the
   umbrella's `reference/docs_atari/` has no `COLLUPPF`, but has both `COLUP0` and `COLUMP0`
   (`rg -o -i 'COLU[A-Z0-9]+'` over it).
+  **An older source can use other names again, so read it by address.** A sound utility *"found on Dennis
+  Caswell's source disk for Escape from the Mindmaster"*, posted by Jim Nitchals in 1996 〔stella-list
+  `199610/msg00017`; the tool is in `capability-gap-audit.md`〕, opens with 65 register equates (our count),
+  of which only `VSYNC` and `VBLANK` have `vcs.h`'s name at `vcs.h`'s address. Matched by address against DASM 2.20.14.1's `vcs.h` (our matching — the post gives
+  no other names and does not say whose these are): `P1CONT` (`$4`) is `NUSIZ0`, `RP1` (`$B`) is `REFP0`,
+  `PL1POS` (`$10`) is `RESP0`, `S1TYPE` (`$15`) is `AUDC0`, `PL1` (`$1B`) is `GRP0`, `SHIFT` (`$2A`) is
+  `HMOVE`, `CZERO` (`$2C`) is `CXCLR` and `TIME64C` (`$296`) is `TIM64T`. Players and sound voices are
+  numbered from 1 where `vcs.h` numbers from 0, and the read registers start at `$30` (`COLSN0`) where
+  `vcs.h` starts at `$00` (`litmus_cxclr.asm` reads `CXP0FB` at `$32`). ★Two names are in both sets at
+  different addresses: this table's `PF1` and `PF2` are `$D` and `$E`, which are `vcs.h`'s `PF0` and
+  `PF1`; its `PF3` (`$F`), a name `vcs.h` does not have, is `vcs.h`'s `PF2`. **Cited only, not verified.**
   **NO\$ is not a safe source either.** dirtyhairy, author of the TIA core in Stella 5 and 6502.ts, to an
   emulator writer in 2018 (AtariAge `topic/279416`): *"The nocash description of the VCS that you quote in
   your blog is a pretty dangerous resource, there is a lot of interpretation in it, and some parts are just
