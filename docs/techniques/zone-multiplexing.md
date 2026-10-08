@@ -280,6 +280,21 @@ Per-band X lives in RAM (`zx0`/`zx1`); the kernel walks bands top→bottom and p
   appearance"*, and *"The kernels would stack vertically to produce a full 192+ lines of visible screen"*
   〔AtariAge `topic/347047`〕 — pseudocode only in the thread. On a stock cartridge the same composition, with
   the zone order as data in RAM, is `rts-dispatch.md`. **Cited only, not verified.**
+- **Redrawing an object lower down: the cost named for one kernel.** Glenn Saunders, 2003, on the
+  Death Derby kernel Thomas Jentzsch was writing: *"I know Super Challenge Football used vertical
+  separation to do the rest"*, and so *"you could try to redraw the zombies further down the screen
+  like that so we could have pairs or triplets of zombies"*; *"If you HMOVED them inbetween you could
+  even get them staggered out a bit"* — with his own caveat, *"But I realize the current kernel
+  couldn't do this. It would have to be some kind of new trick."* 〔stella-list `200301/msg00241`〕
+  Jentzsch: *"That will only be
+  possible by doubling the kernel(s) for each additional zombie."* And on the stagger: *"HMOVEing
+  wouldn't be the big promblem, but enabling/disabling the zombies would. Therefore we would need the
+  replicated kernels."* 〔`200301/msg00246`〕 Saunders dropped it: *"Scratch that then"*
+  〔`200301/msg00259`〕. Two limits on reading this: the statement about Super Challenge Football is
+  Saunders' and that ROM was not looked at here; and Jentzsch is speaking of that one kernel, in a
+  game whose pedestrians Saunders planned in 2001 to make from missiles (`design-principles.md`,
+  〔`200108/msg00510`〕; *"the missile gremlins"* in `200301/msg00241`), not from players. **Cited only, not
+  verified.**
 
 ## Cycle-level craft (verified in our build)
 - HMOVE table placed so the lookup on the positioning line ALWAYS crosses a page (`LOOKUP = TABLE_END - 256`,

@@ -220,6 +220,28 @@ fixed-height form; the elastic-spacer form is a documented extension.)
   but I don't want to waste any cycles on conditional logic or JSR/RTS combos at the moment"*
   〔`200409/msg00264`〕. The same trade from its two ends, settled by whichever of ROM and cycles was
   short (our reading; neither of them links the two). **Cited only, not verified**.
+  Later in that thread Rotschkar put those kernels into macros: *"I also started packing all those
+  kernels into macros, so I can quickly reuse all learned techniques and it also will help a lot when
+  it's getting more complex (sprites, missiles), as all code has to be touched only once - per
+  macro..."* 〔`200409/msg00266`〕, and *"The kernel macros surely speed up the programming process"*,
+  one level taking *"only ~ 80 minute to create"* 〔`200409/msg00270`〕. His progress reports from 19
+  September to 24 October 2004 then list *"Kernel macros"* and *"Used ROM thus far"*: 7 macros and 3K
+  with 7 levels transferred, 8 and 6K with 15, 9 and 10K with 25 — the last also holding the title,
+  demo and secret level structures 〔`200409/msg00273`, `200410/msg00065`, `200410/msg00178`〕. The
+  second report adds *"At the moment I'm no longer sure wether the macro approach will help or hurt me
+  later... ;-)"* 〔`200410/msg00065`〕. Two days after it, of one level, *"by far the most complicated
+  level to transfer so far"*: *"you've seen one of the 9(!) macro calls"* 〔`200410/msg00101`〕 — nine
+  calls in that level, which is a different count from the 8 and 9 macros of the reports. What he had
+  shown is, by our reading, in his DASM bug-report thread of the day before, where two lines each
+  invoke a macro named `CUSTOMPF0PF1PF2JUMPMANKERNEL` with eight arguments (our count) built from
+  `FOLLOW_` labels. Of the first he wrote *"I got the impression that DASM can't handle code lines
+  that get longer than \*cough\* 255 chars..."* and *"it can't compile this line"*
+  〔`200410/msg00086`〕; Thomas Mathys pointed at `#define MAXLINE 256` in DASM's `main.c`, *"don't
+  know if this fixes the problem"* 〔`200410/msg00090`〕; and Rotschkar's reply has the second line,
+  *"working around this, by pre-calculating some values"* 〔`200410/msg00091`〕. Nobody in that thread
+  reports whether raising the limit cured it. No macro body is in the mails read for this entry, and
+  the attached sources were not read here.
+  **Cited only, not verified**.
 - **The list as a timeline.** The zone list here is spatial — one entry per band of the screen. In a
   2025 thread on growing stalactites drawn in the playfield, two replies made the list temporal.
   SplendidNut: treat *"each PF byte as its own unique stack of bitmap changes"*, each entry a pattern

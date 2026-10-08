@@ -379,6 +379,26 @@ separate binaries"* 〔`200211/msg00119`〕. One screen of the PAL build came ou
 312, which he put down to rounding in `TIM1024T` 〔`200209/msg00139`〕 — the line count has to be
 checked per build, not assumed from the NTSC one (our reading). **Cited only, not verified.**
 
+**That PAL build's colours were first picked on an emulator and re-picked after a report from a PAL
+set.** Eckhard Stolberg on the Euchre beta: it *"looks pretty much like on the newest version of z26
+(1.57) on my PAL system. That means that at least your choice of red is way to bright"*, while the
+green *"is a bit darker on my TV than on z26"* 〔stella-list `200209/msg00127`〕. Eid: *"It's very
+difficult to set the colors properly"* — the NTSC hue/luminance split *"doesn't seem to apply to PAL.
+At least, it didn't appear to when I was trying to find decent colors under Stella"*
+〔`200209/msg00130`〕. Stolberg: *"That is a bug in Stella up to version 1.1. It was corrected in
+version 1.2."*, attaching a test program that *"shows all 128 possible VCS colours on the screen at
+once"* 〔`200209/msg00131`〕. Eid: *"I originally selected the PAL colors under 1.1"*, and *"I used
+the latest Z26 and your color tester to try to get the colors in the PAL version closer to those in
+the NTSC version. Some subtle shades don't seem to be available in PAL, but that's fine."*
+〔`200209/msg00139`〕 Stolberg on the new build: *"The colours seem to be a bit on the dark side on
+my TV, but that probably has to do with my preferred TV settings. I think the new version looks good.
+You can leave it that way."* 〔`200209/msg00141`〕 The release candidate's change list has *"PAL
+colors darkened (thanks to Eckhard Stolberg for his testing!)"*, and seven colour constants in its
+`IFCONST PAL` branch carry an earlier value in a `; was` comment 〔`200209/msg00145`〕: five have a
+lower luminance digit than that earlier value and two keep the luminance and change the hue (our
+reading of the values; the mail does not say which build the `was` values are from). **Cited only,
+not verified.**
+
 **Or one cartridge, the mode chosen at run time.** Thrust (NTSC/PAL60) and Jammed (NTSC/PAL): *"Both
 switchable with right difficulty"* (Jentzsch, 2002) 〔stella-list `200211/msg00109`〕. Dennis Debro's
 released prototype changed *"the scan line count from 262 to 312 with the right difficulty switch"*

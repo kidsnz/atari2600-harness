@@ -224,6 +224,18 @@ verified**:
   than my "16 bits uncompressed""* 〔`199904/msg00005`, `199904/msg00006`〕 (log2 23 = 4.52). The loss is
   against his 4-bit absolute pitch per voice; against a 5-bit AUDF it would be 4.52 bits to 5, so the
   verdict depends on the baseline.
+- **A script interpreter where this driver has tables — a proposal, not a driver.** robert-m, 2011,
+  proposed driving each channel's three TIA registers from a stream of small commands 〔AtariAge
+  `topic/188586`; held here only as distilled notes, so the wording is not checked〕. Per channel, in
+  zero page: eight 8-bit virtual registers, a 2-byte script pointer and a 2-byte temporary pointer.
+  The commands cover end-of-frame, a duration count that re-runs itself each frame until it reaches
+  zero, move / add / xor / and from a register or an immediate, a truncating write that treats its
+  source as fixed point (4.4 for `AUDV`, 5.3 for `AUDF`), a halve, a jump and an indexed jump, a table
+  look-up, and decrement, zero and compare tests that skip the next command. His own estimates: 40 to
+  60 cycles a command and three to five scanlines of CPU per channel per frame, with ROM and RAM use
+  he called not optimal and acceptable on a bank-switched cartridge. By the notes it was a design
+  only, not implemented, and tjoppen objected that an ordinary 6502 driver might be smaller and
+  easier to use. **Cited only, not verified.**
 
 ## PAL: the tempo moves, not only the pitch
 
@@ -298,3 +310,9 @@ all three. The mixing is *"intelligent"*: a voice silent in a frame leaves the T
 and when none is silent a priority picks the voice(s) or the split is *"even"*. With it, 30 seconds of a
 Rob Hubbard song played *"in almost acceptable quality"* 〔stella-list `200309/msg00005`〕. **Cited
 only, not verified.**
+Five days later V1.4 changed the shape of the generated data: *"Instead of storing two chunks of
+data, I now generate the data alternating. Additionally I always display the third \*would be\* data,
+which was lost in the 3->2 mix."* In his example each `.byte` line holds two values and the third,
+the would-be data, is the comment at the end of that line; *"This simplified even the driver, which
+certainly had to be updated as well"* 〔`200309/msg00063`〕. Our reading: what the 3->2 mix lost stays
+beside its output, where whoever edits the data can see it. **Cited only, not verified.**

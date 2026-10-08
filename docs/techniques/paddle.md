@@ -39,6 +39,26 @@ VBLANK timer constant moved).
   either accept saturation (as here) or read across two frames. A third choice: a wrist turns only
   part of the knob's travel, so pick a range that always latches within one frame (Kirk Israel
   〔stella-list `200505/msg00092`〕). **Cited only, not verified.**
+- **Which way the count runs with the knob: two posters say clockwise is longer, one emulator
+  report read the other way, and the list did not settle it.** dee, May 1999: *"i'm not sure which way provides the most or least
+  resistance, clockwise or counter-clockwise"* 〔stella-list `199905/msg00040`〕; Eckhard Stolberg:
+  *"I'm not sure, but I think having the paddles turned all the way clockwise takes the longest to
+  recharge."* 〔`199905/msg00047`〕 dee again, August 1999: *"when the paddle is turned clockwise,
+  INPT# bit 7 is supposed to take more cycles before bit 7 is set to one, right?"*
+  〔`199908/msg00007`〕 Stolberg, this time without the hedge: *"This is correct."* — with a `LDA
+  INPTx/BMI/INC` loop *"the counter value would get bigger the further the paddle is turned
+  clockwise"* 〔`199908/msg00008`〕. Erik Mooney, July 1999, in
+  another thread: *"All the way counterclockwise should be very low resistance and therefore the
+  capacitors would recharge immediately. All the way clockwise, it's actually quite long. I tested
+  this a while back, don't remember the exact number but it was on the order of 1.5 frames
+  (400-something scanlines.)"* 〔`199907/msg00146`〕 The report the
+  other way is dee's own, earlier the same day as the August question: with a LDA-BMI-INC routine in
+  the PCAE emulator set to paddle controllers, *"the counter is actually less the further i would have turned
+  the pots clockwise"* 〔`199908/msg00006`〕. Stolberg asked whether the display routine's reference
+  counter counted upwards too; the thread ends on his *"Please post the whole code."*
+  〔`199908/msg00013`〕, so the two were not reconciled there. Nothing here
+  measures the direction: `set_input paddle` takes a fraction, not a knob angle. **Cited only, not
+  verified.**
 - **Resolution is the number of reads; range is the time they span; the two are independent.**
   Erik Mooney on Super Breakout's 128 positions: 128 evenly spaced reads give 128 steps whether they
   cover the whole screen (most of the knob's travel) or about 20 scanlines (perhaps 15–20 degrees of
@@ -50,6 +70,11 @@ VBLANK timer constant moved).
   with at most five choices, needed *"about a dozen times or so"*; he took a paddle over a joystick for
   the menu because an absolute position does not need the current choice kept track of
   〔stella-list `200107/msg00016`〕. **Cited only, not verified.**
+  In April 2002 Eid reported taking the paddle out again: *"I also dropped the paddle support in
+  favor of a joystick. I found that with the type of display I have - not very repetitive - and only
+  reading the paddle in a few locations, that the screen was never stable enough for my liking."*
+  〔`200204/msg00006`〕 He does not say what about the screen was unstable. **Cited only, not
+  verified.**
 - **A short polling window narrows the arc and pins it.** Thomas Jentzsch: possible in VBLANK
   *"only if you need only very few different values and are able to poll the hardware registers in
   constant intervalls"* — uneven spacing makes the control "strange", which is why the reads usually

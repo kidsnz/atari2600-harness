@@ -68,6 +68,10 @@ a missile side by side, both set to 8 clocks, 16 wide 〔AtariAge `topic/317569`
 two colours above (the ball draws in `COLUPF`), the bat is flat: neither object has a bitmap, so its
 face is a rectangle unless the kernel reshapes it line by line (`hmove-slope.md` moves a missile or the
 ball per line). **Cited only, not verified**.
+The way out karl-g raised in the same thread, by the distilled notes held here (the thread's wording
+is not checked): give the bat a kernel of its own at the bottom of the screen and reuse a player
+object there, so the bat can have any shape and a colour of its own — the per-band reuse of
+`zone-multiplexing.md`. **Cited only, not verified**.
 
 **Nor a size register of its own.** A missile's width is in its player's `NUSIZx` (bits 4-5,
 `zone-multiplexing.md`), so repositioning missiles as extra bullets rewrites a register the player
@@ -347,3 +351,16 @@ only known **after** the object rendered, so it's a 1-frame-delayed bump:
   its own tank reads `m0_p0=true, m0_pf=false` — don't mistake that for a wall hit (the bug that stalled
   the reflect prototype). — in-house: Combat 2026-07-18/19 (block shipped ∀-certified; reflect: vertical
   bounce verified via `read_motion`, full probe still has a spawn-inside-tank edge case).
+- **Revert, or look first: the trade as one poster put it.** The tank block above (restore the last
+  non-colliding position) is, by our reading, the first of two ways SeaGtGruff set side by side in a
+  2009 AtariAge thread about an adventure game's walls 〔AtariAge `topic/145243`; held here only as distilled notes, so the wording is not checked〕. Let the collision
+  occur and put the player back where it was: much easier, usually pretty simple to handle if you
+  do it right, and it needs no conversion between
+  playfield coordinates and player coordinates, but it tends to leave the player sticking to the wall,
+  at least while the joystick is still pushed in a direction that causes a collision. Or keep the
+  collision from happening by peeking at the place the player is about to move to: usually harder,
+  it does need that conversion, and any error or oversight can show as a glitch, but the player moves
+  smoothly through a maze. The game's author (beoran) tried the second and reported that it felt much
+  more comfortable to him and, as a bonus, allowed some overlap between the sprite and the playfield.
+  The look-first test and its coordinate conversion are in `maze.md` (*Wall test from the drawing
+  table, before the move*). **Cited only, not verified** — neither claim about feel was measured here.

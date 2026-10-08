@@ -431,6 +431,14 @@ verified** — not run here.
 The same ports carry the AtariVox and SaveKey (I2C EEPROMs on a controller port), and a 2022 copy
 utility drives one on each port at once — the source in the left port, the destination in the right
 〔AtariAge `topic/332726`〕. **Cited only, not verified.**
+The utility counts writes as a cost: its author (Karl G) has the default
+mode leave alone destination blocks *"that are not blank (all $FF value)"*, and *"In both modes, to
+save time and writes, blank blocks from the source device are not written to the destination
+device."* When a tester (Bruce-Robert Pocock) found a block reading `$00 $ff $ff` after an overwrite
+copy where he had expected all `$ff`, the answer was that *"the code skips any blocks that are all $FF
+on the source, even in overwrite mode. This is to minimize the number of writes on the target."*
+〔AtariAge `topic/332726`〕 The thread gives no endurance figure and no block size. **Cited only, not
+verified.**
 A 2021 thread (AtariAge `topic/322109`; held here as distilled notes) gives the conventions. The devices
 work electrically in either port, but the standard driver assumes the right one, so the left port needs
 the bit-banging part edited. Two can in theory be attached at once, but they are accessed in turn and

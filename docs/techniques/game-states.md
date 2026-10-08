@@ -143,6 +143,16 @@ extended `SetPanel` (now also `color` / `p0pro` / `p1pro`) and scenario panel in
   convention the title state here follows: *"My experience shows that Reset usually starts a new
   game, and oftentimes (depending on the game) the joystick button will do the same"*, where that
   game's Reset went to the splash screen 〔`200212/msg00355`〕. **Cited only, not verified.**
+- **A flag set while an effect is still running, carried into a state that never writes it** (our
+  reading) — the same kind as the *Space Treat* bug above, from AtariAge. In *Assault* (also *Sky
+  Alien*) a video showed a kill screen at Wave 13, with every enemy invisible and unkillable. Thomas Jentzsch,
+  2021, *"After looking into the code"*: *"The bug occurs if you hit the last alien just before it
+  becomes invisible (so that the invisible flag is set during its explosion) and the next wave is with
+  enemies jumping up and down."* *"During the jumping wave, the invisible flag isn't updated (or reset)
+  so that the invaders stay invisible forever."* He posted the wave table and wrote that it *"can
+  happen earliest in wave 13, then 15, 17, 19..."*, and of his patch: *"The attached ROM should fix the
+  bug. It resets the invisible flag during jumping waves."* 〔AtariAge `topic/325222`〕 Nobody in the
+  thread reports trying the patch. **Cited only, not verified** — the game was not run or disassembled here.
 
 ## Verified
 - Full lifecycle (11 asserts over ~1100 frames): variant select, both start paths, B vs Pro round

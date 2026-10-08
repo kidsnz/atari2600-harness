@@ -106,6 +106,26 @@ should keep `s10 k1 == 4` as the alignment check — it is what caught the misre
 mailing-list distillation (helper-2), who also left a prediction worth scoring: that 11 behaves like
 10 (climbs, then falls) rather than like 12.
 
+**Mooney on Galaxian's ROM: about half of the second bank is mostly one section repeated.** The
+question was not about the 11-cycle strobe but how Galaxian puts seven aliens on a row 〔stella-list
+`199708/msg00157`〕; tying his answer to that form is our reading (the same mail goes on to the
+`RESP0` snippet). His answer of 23 August 1997: *"Short answer: lots and lots of code :) It's an 8k
+game... disassembling the code shows about half of the second bank to be mostly the same section of
+code repeated over and over, except with small differences."* What the differences select he only
+guessed, two ways: *"May even be as much as a different routine for each possible combination of
+aliens present on any particular row.... either that or a different routine for each possible number
+of pixels for the leftmost alien to be offset from the left edge of the screen."*
+〔`199708/msg00162`〕 Eckhard Stolberg, the next day: *"Since the code snippet, that Eric posted, can
+draw most combinations of aliens but not move the whole row, I think it's the second possibility."*
+〔`199708/msg00169`〕 Mooney's mail of 25 August (`199708/msg00186`, the one this page cites for the
+11-cycle spacing) says how the aliens on a row are chosen — the eight cycles between strobes are
+*"not enough time to load and store GRP0 for each copy of the object, but it is enough to load and
+store a NUSIZ for each pair of objects. A NUSIZ of 1 will cause the first object of the pair to be
+displayed, 3 will cause both of the pair, and 2 or 6 (two-medium or three-medium) cause the second
+object of the pair. This is the way Galaxian does it."* — and does not return to which of his two
+guesses holds. **Cited only, not verified** — the Galaxian ROM was not counted here, and the NUSIZ
+rule belongs to the spacing this page has no measurement for.
+
 (A dash is a schedule this generator cannot build: a gap of exactly one cycle has no filler, and a
 store ending past cycle 74 runs out of scanline.)
 

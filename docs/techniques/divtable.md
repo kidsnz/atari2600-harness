@@ -206,6 +206,26 @@ on-screen value at `$B0` (÷15 of 90 = 6). 13 exact RAM asserts in total, `ntsc_
   the rotate chain runs `bcd_out2` → `bcd_out1` → `bcd_out0`, which makes `bcd_out0` the most
   significant byte, though its header comment says `bcd_out2`. **Not verified** — neither assembled nor
   run here; the post gives no cycle count.
+- **A signed input: the shift keeps the sign, the rounding is a separate question.** Every helper on
+  this page takes an unsigned byte. For a signed one divided by a power of two, the `cmp #$80` / `ror`
+  pair is already recorded in `design-principles.md` (*The signed shift on its own*); in a 2005
+  AtariAge thread Thomas Jentzsch's 8-bit answer for a `(px − ex)/8` chase step is that pair written
+  three times, one per halving, working `100 − 160 = −60 = $C4` down to `$F8 = −8` 〔AtariAge
+  `topic/73059`〕. vdub_bobby's objection there: after `lda #-1` / `cmp #$80` / `ror`, *"A holds -1,
+  not zero."* Jentzsch: *"That's a rounding problem."* vdub_bobby, quoting that: *"I'm just saying is
+  all. It's a slick routine, it just won't take a negative number to zero."* Four days later Jentzsch
+  came back to the first objection with *"Easy to fix"*, on the last shift only: `cmp #$80` / `ror` /
+  `bpl .pos` / `adc #0`, with the `bpl` commented *"not absolutely necessary"*. (Our arithmetic, not the thread's:
+  the unfixed chain rounds toward minus infinity, which is why −60/8 = −7.5 comes out −8 and −1 stays
+  −1.) supercat's `idiv8` in the same thread rounds instead of fixing up: `cmp #128` splits on the
+  sign and a bias is added before three `lsr` — `adc #4` on the positive side; on the negative side
+  `adc #$02` with the carry still set from the compare (*"so we're adding 3"*), then `ora #$E0` to put
+  the sign bits back, unless the add carried out, in which case the shifts alone leave 0. His own
+  caveat: *"Perhaps not quite optimal, but it should yield symmetrically-rounded results."* For a
+  16-bit value Jentzsch's *"16 bit div 8"* keeps the high byte in A and does `cmp #$80` / `ror` /
+  `ror lo` three times before storing it back. The asker (heaventqa) reported that the 8-bit chain and
+  later a 16-bit one worked in his test program, which is Atari 800 code; the routines themselves
+  are plain 6502. **Cited only, not verified** — none of them was assembled or run here.
 
 ## When the divisor is a runtime value
 

@@ -191,6 +191,17 @@ scanline"* — its author then wondered whether they were double-width, 16 〔st
   middle object became the leftmost object.)"* His plan was a ROM table indexed by NUSIZ values and
   the 8-pixel step of the X difference, 1296 bytes if limited to 64 pixels either way 〔stella-list
   `199805/msg00310`〕. **Cited only, not verified**.
+  Cavina's answer to Bensema was that *"000 means one copy only"*, so *"we need a
+  way to say that a sprite is missing"*, and with it a routine headed *"WARNING: UNTESTED CODE!!"*
+  〔`199703/msg00130`〕. Its state is `SCONF`, *"index to sprite configuration, 5 possible values"*:
+  0 to 3 stand for NUSIZ low bits 000, 001, 010 and 011, and `$4`, by his header comment, means that
+  the sprite does not exist. On a hit it subtracts the sprite's X from the missile's and divides by 16 to get which copy
+  (0..2) was struck — the missile must be 1 clock wide, and the second and third copies are taken to
+  sit at +16 and +32 — then indexes two 12-byte tables with copy × 4 + `SCONF`: one gives the new
+  `SCONF`, the other the amount to add to the sprite's X. `$FF` entries mark combinations that should
+  never be reached, and the routine returns on one without changing anything. The code ends with the
+  comment *"done. will it work?"* (the two tables and a worked example follow it), and the archive
+  held here has no reply under that subject. **Cited only, not verified**.
 - **Two 2x players shifted line by line, as one picture.** SpiceWare, 2024: *"Dolphin and Medieval
   Mayhem use the players in 2x size mode, and moves them left-right over successive scanlines"*, and
   *"Shifting the players line-by-line eliminates the blocky look you normally get when using 2x
