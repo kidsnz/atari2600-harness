@@ -6,6 +6,50 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — 1,062 more cited-only review rows; two new technique pages; five gaps in its tools and litmus ROMs recorded, not fixed (2026-10-05 to 2026-10-07)
+
+Documentation only: no code, ROM or scenario changed. Each row was written by one writer and checked by a
+separate reviewer before commit. A second review after commit found 16 errors in four early landings
+(overstatements, missing or misformatted citations, misdescribed checks); `53025ac` and `e7ebba8` correct
+them. Every claim not measured here is marked Cited only, not verified, or Not verified, or is called our
+reading, and each row was re-read against its source; where the review's summary disagreed with the source,
+the source is what was written.
+
+- **1,062 rows the review judged worth adding but had only cited (confidence B)** land in 66 documents,
+  two of them new (94 commits). 1,039 are additions and 23 are corrections; four of the corrections, with
+  one added row, are the five known limits below. Most are new paragraphs or items beside the text they
+  extend; some are appended inside existing table rows (`known-traps.md`), and 148 existing lines are
+  rewritten in place, in 46 of the commits. By rows landed, `design-principles.md` (191) and
+  `known-traps.md` (169) take the most, then `capability-gap-audit.md` (40).
+- **Two new technique pages**, both cited only and neither measured here: `techniques/big-character.md` (the
+  four tricks a 1998 mailing-list post listed for large or flicker-free fighting-game characters, each tied to
+  the games the post names) and `techniques/column-height-pf.md` (driving the playfield from a per-column
+  height array, from our notes on one AtariAge thread). Neither is added to the catalogue table;
+  `nusiz-shaping.md` and `procedural.md` point to them.
+- **Corrections to what the harness already said** (the main ones):
+  - `design-principles.md`: the `LAS` opcode is no longer listed among the stores; the 76-47 cycle budget
+    reads 76-48 (about 28 cycles).
+  - `audio-envelope-idioms.md`: the Combat disassembly its idioms came from is an annotated listing, so the
+    earlier claim that they were studied clean-room is withdrawn and the provenance paragraph says so.
+  - `fundamentals-audit.md`: one sentence about an unanswered `SWBCNT` question is corrected.
+  - `nusiz-shaping.md`: the limit on writing `COLUPx` once per line is scoped to the kernel budget.
+  - `pf-modes.md`: the claim that `COLUPF` is ignored is limited to the playfield.
+  - `zone-multiplexing.md`: the `HMOVE` table's lookup on the positioning line is placed so that it always
+    crosses a page (a constant 5 cycles), not so that it avoids one.
+  - `known-traps.md` and `sprite-placement.md`: several existing rows are corrected.
+- **Five gaps in the harness's own tools and litmus ROMs are recorded as known limits, and not fixed:**
+  `check_traps.py`'s `$F8-$FF` stack-collision band assumes four nested `JSR` levels and says so nowhere
+  (our reading; `gate-ledger.md`); the `pre-push` inventory check tests existence only, so a failed
+  assembly that leaves a partial `.bin` passes it (`gate-ledger.md`); the title `check_provenance.py`
+  generates says every harness element while its scope is narrower (`gate-ledger.md`); `litmus_pagealign` has
+  no pointer-into-an-aligned-table case (`capability-gap-audit.md`); `litmus_pf_async` makes two `PF1` writes
+  inside the windows and none at an edge, while its own header concludes the window table is exact on
+  Gopher2600 (`verified-coverage.md`).
+
+Not written: 57 rows were already covered by existing text, and 35 were left out — 14 belong in Go code or
+tests, five would need new litmus ROMs, and 16 could not be checked against their sources or were judged not
+to belong.
+
 ### Added — 240 more cited-only review rows; five standing errors corrected (2026-10-03)
 
 Each was written by one writer and checked by a separate reviewer before commit.
