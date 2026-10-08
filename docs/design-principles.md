@@ -93,6 +93,26 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
       `LDA #`/`STA` is the 5-cycle form and the parent's ~6 is the zero-page one (our arithmetic). The
       RAM-routine mechanism and its costs are under the asymmetric playfield (Tumber 2003, MarcoJ).
       **Cited only, not verified.**
+    - **Another guess in that thread: let the background colour show through (Stolberg), with the
+      colour writes hidden behind other objects (Jentzsch).** Eckhard Stolberg, 2002, on the same
+      prototype: *"My guess would be that it uses a reflected playfield with 12 bits and a quad-with
+      player graphics on each side"*, the three objects' colours preloaded, and *"You could even
+      change the background colour during the cube display and have it shine through where
+      nessessary."* 〔`200212/msg00280`〕 Thomas Jentzsch, the next day, to Tumber, whose demo's
+      diagonals he put at *"3\*4+3 = 15 pixels wide"* against the screenshots' 16: *"there is \*no\*
+      way to correct this, because 1 CPU cycle = 3 display pixels. So you can only change the colors
+      every n\*3 pixel. So most of the color writes have to happen hidden behind other currently
+      displayed objects."* His own view: *"IMO the solutions is much more complex, using PF, players
+      AND the background color to shine through (like Eckhard said)"*, with *"no code to prove this
+      (yet)"* 〔`200212/msg00286`〕. The day after, of the ROM-only demo cited above: *"The diagonals
+      are formed by the players. The other colors are coming from the playfield and the background
+      colors. In the vertical center I had to use the ball to get an exact color change timing."*
+      〔`200212/msg00301`〕 So where a colour edge has to fall off the CPU's 3-pixel steps, the write
+      is made under an object that is being drawn and that object's edge is the boundary the viewer
+      sees (our reading); the playfield-and-background source of colour is the one Stolberg
+      describes for *Trick12* under the stencil line below. **Cited only, not verified** — the
+      attached demo was not run here, and how the prototype itself was drawn stays a guess in these
+      messages (*"My guess"*, *"IMO"*).
   - **Missiles side by side, recoloured part-way along the line.** kiwi, on a ROM that shows the
     forum member Random Terrain's avatar: *"I used 2 quad size player to make the
     icon"*, and *"I'm using the middle-of-the-scanline color change technique to change the color of the
@@ -102,6 +122,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     in its player's `COLUPx` (`techniques/missiles-bullets.md`), so the colours come from mid-line `COLUPx`
     writes at the band widths counted above (our reading). **Cited
     only, not verified** — the attached source was not opened here.
+  - **The other way round for an icon: skip scanlines and offset it, without heavy use of mid-line
+    recolouring.** In a 2012 AtariAge thread on text, HUD and icon layout for an RPG inventory, as
+    the distillation notes record it: skip scanlines to offset the icons and give them a colour
+    different from the grid's — a way to separate the colours without heavy use of mid-line colour
+    changes 〔mining 197162 text-hud-icons; only the distillation notes are held here, so this is a
+    paraphrase, and they do not say who proposed it, which way the offset goes or where the colour
+    is written〕. It is the parent line applied to a HUD, where kiwi's line above pays for the
+    mid-line change instead (our reading). **Cited only, not verified** — the notes record it as
+    something considered in a design discussion, and record nothing built.
   - **Turning the screen 90 degrees was proposed once and rejected; among the reasons Polik gave is that "the colors are shifted 90° too".**
     Andrew Davie, 2001, in a brainstorm about a Gunfight game, said to *"turn the actual TV on its side"*
     — *"It has been known for games to require you to rotate your TV, and I don't think it's a real sin"*
@@ -226,6 +255,21 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
       would cost 〔`200212/msg00108`〕. He made the first build dark *"to avoid too heavy flicker"* and
       then sent a brighter one 〔`200212/msg00114`〕. **Cited only, not verified** — the demo was not
       run here.
+    - **In 2004 he named what the inversion is for — fewer colour-register writes — on a score.**
+      Glenn Saunders had challenged him to *"a Sea Wolf type score (2 digits left, two middle, two
+      right) where each pair of digits would have an independent color.  I told him I thought it would
+      be impossible to do, and Thomas found a way to do it."* 〔`200405/msg00116`〕 Jentzsch, explaining
+      the attached code: *"To reduce the number of writes to a color register I am using the same trick
+      as in the score display for Jammed. Instead of changing the colors of the two sprites, I am
+      setting them to black and invert the graphics data. Then I am putting playfield graphics behind
+      the sprites (which are static during the display loop) and change their color instead."* What it
+      cost him there: *"The timing is very critcal, so I had to remove WSYNC and to use VDELP0/1,
+      illegal opcodes (lax) and the stackpointer for temporarily storing values."* — and *"The colors
+      are hardcoded (one could be loaded from zp), but that should work in the majority of cases."*
+      〔`200405/msg00120`〕 The same three-pair layout is the one `techniques/multicolor48.md` records
+      Manuel Rotschkar counting out four months earlier, by `COLUP0`/`COLUP1` writes, as *"So I fear
+      it's not posible"*; this is a built answer to it by the other register (our reading). **Cited
+      only, not verified** — nothing in the attached `score3x2.zip` was measured here.
   - **Chronocolour need not rotate, and then it does not flicker.**
     Andrew Davie, 2004: Interleaved Chronocolour (ICC) shows each line's red, green and blue pixels in
     three successive frames; the variant he proposed keeps *"a single colour per line, with each
@@ -251,6 +295,27 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     line Chronocolour is a fake of horizontal colour but not necessarily a flickering one (our reading).
     **Cited only, not verified** — the single-field triad was described in 2004, not posted as a ROM;
     the 2003 nointerleave binaries were posted but not run here, and nothing else here was run.
+  - **One viewer counted "two levels of flicker" in a wide bitmap, and suspected a monochrome one
+    would have one.** Andrew Davie, February 2003, posted *"a super-wide bitmap"* — *"Won't look too
+    crash-hot on the emulators.  I'm suspecting it will look OK on the real thing.  Confirmation,
+    anyone?"* 〔`200302/msg00257`〕 Glenn Saunders, replying: *"I think the flicker might be a little
+    too much to take for this to be viable.  It's borderline.  I guess it depends on the
+    individual."* He wanted to see it with a monochrome image first, *"because I suspect that a
+    monochrome bitmap, in the end, might be more viable because you'd only have one level of
+    flicker.  In fact, you might then be able to stack three sprites next to eachother that way to
+    fill the full width of the screen and still have an acceptable amount of flicker."*
+    〔`200302/msg00259`〕 Asked by Davie *"Were you testing on hardware, or emulators?"*
+    〔`200302/msg00260`〕, he answered: *"Actual hardware.  Phosphor persistence can only do so much.
+    The two levels of flicker going on, for my taste, are too much for my eyes to bear."*
+    〔`200302/msg00262`〕 He does not name the two levels, and none of the five messages says how the
+    picture was coloured. One level reads as the two sides taking turns — his proposed interleave
+    was so that *"on every frame you'll have graphics on both sides"* 〔`200302/msg00259`〕 — and the
+    other as the colour, since monochrome is what he suspects would leave one (our reading). The
+    neighbouring case, where the colour use took the frames and left none for alternating objects,
+    is in `techniques/flicker-multiplexing.md` ("One case where the colour use took the frames from
+    the object use"). **Cited only, not verified** — one viewer's judgement, on hardware he does not
+    describe; the attached `genius.zip` was not run here, and the monochrome version was a
+    suggestion.
   - **The 'RGB interlaced' sprite was posted as one that moves.** Andrew Davie, 2003: *"This
     multicolour 'RGB interlaced' sprite can move around the screen at will.  I'm still amazed it works,
     but ... hey, it does!"*, asking NTSC owners how it looked 〔`200302/msg00183`〕. Paul Slocum,
@@ -1227,6 +1292,20 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     as he describes it, the objects carry the motion where the playfield does not move (our reading).
     His is a plan, not a result.
     **Cited only, not verified** — neither his demo nor *River Raid* was run here.
+    - **A variant makes sprites the gaps as well as the things.** gemintronic, in a post marked
+      *"Edited January 26, 2012 by theloon"*, answering a platform game's author who had written
+      *"horizontal smooth scrolling is not possible on the VCS"*: *"One possibility is using a
+      multi-sprite kernel and have static rows of playfield blocks. You could use sprites as the
+      empty area between platforms. Instead of moving the playfield you move the sprites
+      representing empty areas, power ups and ladders. Clipping is the only big issue I can think
+      of. You may be able to mitigate this by letting the playfield have foreground priority and
+      leave a black column at either side of the screen."* 〔mining 193297
+      blinky-goes-up-formerly-giana-bros〕 The black columns do the job of the edge band in Mooney's
+      own kernel ("An edge band hides what the kernel cannot switch off", below) (our reading). With
+      the playfield in front, a gap sprite is behind the rows it is meant to interrupt as well as
+      behind the columns, and the post does not say how the gap would then show (our reading).
+      **Cited only, not verified** — one post's *"possibility"*; no later post in the thread copy
+      held here takes it up, and nothing was built.
 - **PAL frames must have an even scanline count** — an odd total loses the colour in that frame, so a
   kernel that varies its line count must vary it in twos. The count is the whole frame's, not only the
   visible lines. Eckhard Stolberg, 1999: *"The major difference between PAL and NTSC is the colour
@@ -1702,6 +1781,14 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     background colour (iesposta's questions — missiles whose players are black). Which objects that
     costs depends on whether the wall is PF or background (our reading). `techniques/invisible-probe.md`
     hides an object the same way, for collisions. **Cited only, not verified.**
+  - **How VePseu decides what to draw, and the depth it stops at.** gip-gip, in the thread's opening
+    post (dated 2017, last edited April 22, 2018; the copy held here does not show which text is the
+    original), introducing the engine as an in-development project: *"It works by going through the
+    map and gathering a list of walls to draw, which are then rendered onto the screen. It (should
+    be) very predictable and fast, but also limited (the max. viewing distance is 4 walls away)."*
+    〔mining 263329 3d-engine-for-vanilla-cart〕 The *"(should be)"* is his. He sets the limit beside
+    the speed without saying which caused which, or whether the four is a matter of cycles or of
+    RAM. **Cited only, not verified** — a work in progress, not run here.
   - **A true 3D engine in 4K without ARM was designed; in the six posts held here it is not shown
     working.** bit-expander, 2014: rooms are convex zones joined by portals; the engine culls, rotates,
     translates, clips and projects into RAM, then draws *"up to 21 color-textured polygons on screen
@@ -1714,6 +1801,23 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     *"messing the polygon list"*. 〔mining 222981 3d-fps-engine-for-the-2600; the copy here holds 6 of 13
     posts, so how the thread ends is not known〕 The figures are a design's budget for a ceiling, not a
     frame anyone in those six posts has seen. **Not verified.**
+  - **Where the origin of a 3D world goes: an estimate from 2001, with nothing built.** Manuel Polik,
+    wondering how a *"real"* 3D *Star Fire* would work — a cube of 256×256×256 positions, three bytes
+    an object — asked whether (0/0/0) belongs in the centre (*"the coordinates would range from -127
+    to +128"*) or in a corner, and whether his own ship should sit at it 〔`200108/msg00468`〕. Thomas
+    Jentzsch, who began *"Real 3D inside a 2600, that sounds real hard to me"*: *"I'd go for -127 to
+    +128, could result in easier visibilty calculations, but I'm not sure. But you'd need a good
+    understanding of the overflow-flag :)"*; on the ship, *"Depends, I would say. If the ship is the
+    center of the world, all it's movements had to be added to all other objects. But you'd save 3
+    bytes of RAM for the ship coordinates."*; and *"Games like Elite did this on a 6510, so it's
+    possible. The extra limiting factors of the 6507 are RAM and cpu time, but that should only limit
+    the number of objects and/or framerate."* 〔`200108/msg00470`〕 (The range is as both wrote it; a
+    signed byte holds −128 to +127.) The thread then turned to spherical coordinates — Chris Wilkson
+    〔`200108/msg00497`〕, and Polik: *"Polar- (or Spherical) coordinates seem to be one of the keys to
+    success."* 〔`200108/msg00573`〕 — and Roger Williams answered that *"all the values are going to
+    have to be 16-bit to get the motion smooth enough"* 〔`200108/msg00585`〕. **Cited only, not
+    verified** — an estimate its author hedged, and none of the thread's thirteen messages carries
+    code or a binary.
 - **Vertically moving platforms use two zones of complementary height**: build the upper and lower band heights so that "when one grows the other shrinks by the same amount" and the total line count stays constant = a stable picture (mismatched, you get motion blur). 〔mining blog SpiceWare〕
 - **Visible delay on a PF register write**: an `sta` to PF0/PF1/PF2 takes effect **2–3 colour clocks late**
   (colour registers are immediate). Complete the centre boundary of a reflected PF at **exactly cycle 48**
@@ -1790,6 +1894,22 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
     position and reverse"* — since position minus velocity is the previous position (our reading).
     The in-house tank block there restores the last clear position and skips the frame's forward step
     instead of reversing. **Cited only, not verified.**
+    - **For the bounce itself the same thread offers a table of outcomes, and the game's author used
+      a formula.** dz-jay, 2016, who prefaced it with *"as a matter of fact, I'm not even a Stella
+      programmer"*: *"One alternative mechanism for ricocheting objects off walls is to consider a
+      table of outcomes for each possible state. This is very useful if your angle of incidence and
+      velocities is not arbitrary (e.g., you can only go at specific angles, say, 90, 180, 30, 45;
+      and at specific velocities)."* Thomas Jentzsch, the same day, answering tschak909 and not that
+      post: with only vertical and horizontal walls the correction is *"dead simple"* — reverse the
+      vertical speed at a horizontal wall and the horizontal speed at a vertical one. What tschak909
+      reported working that September is a third thing: *"Restore original position"*, *"add 8 to
+      the direction vector (which reflects it)"*, *"and #$0F to mask it off and keep it in bounds"*
+      — the reverse-both `(dir+8)&15` of `techniques/missiles-bullets.md`. The table he then meant
+      to write was for *"the direction to XY vector code"*, as reveng had advised (*"create 2
+      look-up tables for the X and Y adjustment for any given angle index"*), not a table of bounce
+      outcomes. 〔mining 253865 wip-dodgeball〕 **Cited only, not verified** — dz-jay's is two
+      sentences with no code, from someone who says he is not a Stella programmer, and it is not
+      taken up in the thread as held here.
   - **An animated sprite's collision shape changes with its frame, so a push-back sized on one frame
     can fall short on the next.** beoran, 2009, on his adventure game in progress, after trying
     seagtgruff's push-back demo code, as the distillation notes quote him: *"the hardware collision does
@@ -3373,6 +3493,15 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   `techniques/sound-effects.md` (2 bytes × duration per effect in ROM) and `techniques/music-driver.md`
   (5 zero-page bytes per channel); that sound is best planned with the kernel rather than after it is
   our reading of this one case. **Cited only, not verified.**
+- **In one game a script in the author's workflow fills the empty ROM with levels, each 256 bytes.**
+  gorillasapiens, 2022, asked by pat-brady how many levels his *Sokoban* has, as the distillation
+  notes quote him: *"i forget, my workflow has a script that just fills empty ROM with levels. Each
+  level is 256 bytes, so MAX on a 4K cart (no code!) would be 16. 'GAME SELECT' will cycle through the
+  levels."* 〔mining 332509 sokoban-2022-03-11; only the distillation notes are held here〕 The 256 is
+  this one game's level size; the 16 is his ceiling for a 4K cartridge holding no code (4096 ÷ 256,
+  our arithmetic), not the number of levels the game has, which he says he forgets. That the count is
+  thereby left open until the code has taken its share is our reading, not his words. **Cited only,
+  not verified.**
 - **A recording that fills RAM at a rate the game sets has a known size; one the player sets does
   not — one porter's preference in the thread.** Manuel Rotschkar,
   2004, converting a Jumpman level whose followers replay the player's recorded input: *"That effect
@@ -3646,6 +3775,18 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   〔`200209/msg00075`〕 No later message in the thread as held here takes up either point. The
   Multiplexing section's rule "add a missile rather than change the drawing" goes the other way; here the drawing, or the
   axis of motion, is what gives (our reading). **Cited only, not verified.**
+- **A deliberately uneven gap, where the rows could not line up with the keys.** SeaGtGruff, 2012, on
+  a test program for a music-composing project that draws a piano keyboard vertically beside a
+  playfield piano roll: *"the extra gap between the B and C keys is deliberate. I would have preferred
+  to have all the white keys be equally-spaced, but each row of the piano roll is 3 lines tall, so it
+  isn't possible to make the rows of the piano roll line up exactly with the black and white keys, and
+  the extra gap between B and C is to help make everything line up as much as possible. I think it
+  actually works out okay, since it helps make the different octaves stand out a little more--
+  although the different colors are also used to distinguish the octaves from each other."* 〔mining
+  201572 my-current-pipe-dream-project〕 The gap is there for the alignment; the octaves standing out
+  is what he found afterwards, hedged (*"I think"*, *"a little more"*), with colour doing that job as
+  well. That a mismatch between two grids is better gathered in one place than spread is not in the
+  post (our reading). **Cited only, not verified** — the picture was not looked at here.
 - **A walk cycle needs a minimum of 2 frames at 50:50**: one bit of the frame counter (`and #2^n`) gives even spacing with no reset, and runs **only while moving**. 〔301861〕 `→ design.WalkFrame`
   - **The `and #2^n` schedule is what an accelerated frame counter must not skip.** Thomas Jentzsch,
     on converting games to PAL-50: *"a NTSC to PAL-50 conversion based on a frame counter will slow
@@ -3826,6 +3967,32 @@ Distilled from an efficiency/structure comparison of a self-authored Combat clon
     and copying the graphics into RAM in the wanted order outside the kernel is the route above
     〔mining 214231 sprite-vertical-flip; only the distillation notes are held here〕. Counting up pays
     the `cpy` that counting down to `bpl` does not (our reading). **Cited only, not verified.**
+  - **Working out which rotation to show was called trivial; drawing shapes that hold up at the
+    other angles was not.** Roger Williams, 2001, planning *"a flyover game"*: *"Rotating the other
+    player is actually trivial.  Once you have a way to rotate the sprite at all, you just subtract
+    your orientation from his before orienting the sprite."* 〔`200111/msg00038`〕 Glenn Saunders:
+    *"I'm not talking about the coding.  It's not trivial because 8 bits of graphics are just
+    insufficient for resolving many degrees of rotation.  Your shapes are going to look like garbage
+    unless you stick to very primitive shapes (like the triangles in Asteroids)."* And: *"What I
+    learned with Death Derby is that shapes that look sufficiently detailed at 90' angles completely
+    fall apart in the other angles."* 〔`200111/msg00039`〕 Williams: *"Yeah, very true.  I'll probably
+    stick with Combat-like shapes which resolve to 22.5 degrees or 1/16 circle."* Of his viewpoint's
+    heading he said the reverse — *"Right now the first person orientation is only resolved to 1.4
+    degrees or 1/256 circle and it obviously isn't quite good enough, which is why the "linear" motion
+    as you move forward is so jumpy."* 〔`200111/msg00040`〕 Thomas Jentzsch, on the player's ship in
+    *Thrust*: *"I wanted to watch the aspect ratio (8:5), the symmetry and the size of the sprites. I
+    did a lot of tries, where I counted and weighted pixels (left and right of center and total)."*
+    Then: *"But I didn't liked the results, until I decided that the aspect ratio is 2:1 for me. Then
+    it became much easier, because I only needed three good looking different shapes for 0, 22.5 and
+    45 degrees. The others can be simply generated by mirroring."* And: *"Finally the ship became
+    nearly triangle shaped, because that was the only good looking graphic I found."* Of *"other
+    games, were the sprites are rotated"* he says *"There aren't many"*: *"Asteroids, Indy 500 and
+    Sprintmaster (and soon Death Derby) are the only ones (I can remember now) with 16 directions."*
+    〔`200111/msg00042`〕 His 8:5 is the figure Erik Mooney gives under the
+    wide-pixel line (Drawing craft). Three is fewer than the five of the quarter-turn above, and the
+    post does not say which mirroring makes the rest (our reading). `techniques/sprite-animation.md`
+    ("Diagonal facings are drawn, not derived") holds the forum's advice on the same problem. **Cited
+    only, not verified** — *Thrust*'s shapes were not looked at here.
 - **One interleaved HIRES buffer can feed BOTH players (P0 = even bytes / P1 = odd)**: a single 16-byte RAM buffer serves both sprites — pick a player's bytes with `AND #$FE` / `ORA #$01`, no shape math. Halves the RAM vs two separate buffers (~16 B) = a RAM-thrift move to hold in reserve for when 128 B is tight. 〔Combat shared 16B HIRES, P0/P1 interleaved; comparison §2.1/§2.2/§7〕
   - **Inside a kernel line, one index walking an interleaved list pays in cycles.** Eckhard
     Stolberg, 1998, after disassembling Ruffin Bailey's kernel: *"You seem to have the data for PF1 and
@@ -4075,6 +4242,16 @@ A second pass over Combat (1977) through 5 lenses BEYOND round-1's efficiency/st
 - **Overload one control with a contextual second meaning (control economy on a 1-button machine).** In guided-missile variants, rotating your body continuously copies your CURRENT bearing into the missile's — so after firing you steer the missile by continuing to turn, no separate control. Trades aim for vulnerability (the same stick turns your body). Depth without extra buttons. 〔Combat `ROT` (BIT GUIDED / STY DIRECTN+2,X); manual Fig E; deep-read harvest 2026-07-23〕
 - **Fixed short match + a diegetic end-game telegraph rendered THROUGH the score itself — no separate UI.** A ~2-minute timer ticks ~1/sec; the last ~1/8 is telegraphed by BLINKING the score (no timer widget). Short fixed sessions keep 2-player play snappy; communicate urgent state by animating an element you already draw. 〔Combat `GSGRCK` (GameTimer / CMP #$F0 / CLOCK&$30 flash / KLskip=$0E); deep-read harvest 2026-07-23〕
 - **Minimal-UI: attract == menu == play, and the score doubles as the variation selector.** No separate menu — in attract, Select increments the variation number straight into SCORE, shown by the normal score kernel (right score hidden so only the game number reads); the idle match-timer drives a color-cycle anti-burn-in. Reuse gameplay display elements as menu/attract UI. 〔Combat `SelGO` (STA SCORE / SHOWSCR) / `LDSTEL` color cycle; deep-read harvest 2026-07-23〕
+  - **A chooser for two players where neither can land on the other's value.** In an AtariAge thread
+    that the distillation notes head "hornpipe2, 2008", as they record it: each player cycles
+    through eight colours (0–7) with left and right, wrapping at the ends, and the colour the other
+    player is on is skipped. The increment routine as seagtgruff tidied it steps the value, wraps it
+    with `AND #$07`, compares it with the other player's value and, when they are equal, branches
+    back to its own entry to step once more; the decrement is the same with `DEC` for `INC`. Folding
+    increment/decrement or P0/P1 into one routine is recorded as costing more bytes — a direction
+    value and the variables to set up — so the four dedicated routines stayed the smallest, which
+    the notes give as the two posters' agreement 〔mining 124106 unique-constrained-selection; only
+    the distillation notes are held here, so this is a paraphrase〕. **Cited only, not verified.**
 - **Rule-layering & productive imprecision as design moves.** (a) Billiard adds a scoring PRECONDITION (must-bounce-first) over the unchanged bounce engine → a bank-shot game with a higher skill ceiling from the same physics. (b) The faked Pong reflection is imprecise ON PURPOSE (guesses the wall normal, jiggers +22.5°) so bounces are never perfectly axis-aligned → livelier, unsolvable. (c) Removing "reverse" from tanks is control-limitation-as-identity. New modes come from preconditions/constraints/omissions, not new systems. 〔Combat `Launch`/`COLIS` billiard gate / `COLMPF` reflection SM / `CTRLTBL` "No reverse"; deep-read harvest 2026-07-23〕
 - **★SOUND PRIORITY in Combat = last-writer-wins on a 1-object-per-channel bus — arbitration is BRANCH ORDER, not a mixer.** Combat's audio mental model (only 2 channels). Each object owns one channel; precedence (explosion > shot-boom > engine > pong) is decided purely by which routine writes `AUDx0,X` LAST, via the branch order of the sound dispatch. A state flag can "steal" a channel (nonzero → emit the bounce tone INSTEAD of engine). Combat decides precedence by ORDERING writes, not comparing volumes — zero bytes of priority logic. 〔Combat MisLife dispatch (MisFly/MotMis/BoomSnd order) / `MOTORS` AltSnd hijack; deep-read harvest 2026-07-23〕 **Branch order is one way, not the only one.** Thomas Jentzsch, 2001, disassembling *Lord of the Rings*, found the sound calls going through `BRK` with an id byte; the handler compares the new id with the lower of two held ids, replaces it only when the new one is larger, and loads that sound's table values — *"Each sound has it's own priority and only the highest two are played."* 〔`200112/msg00093`〕 That is precedence held as a number and compared at run time, paid for in bytes and cycles, where Combat's order costs none (our reading). **Cited only, not verified** — LOTR was not disassembled here.
 - **★Live game data overlaid on the CPU IRQ/BRK vector slot = a 2K→4K port booby-trap.** A 2-byte pitch table sits at the IRQ/BRK vector address because a 2K cart mirrors $F000-$F7FF into $F800-$FFFF, so the "vector" bytes ARE read as an ordinary data table (`LDA table,X`). It survives only because the code never takes BRK — `SEI` would not help, since BRK ignores the I flag. A 2K→4K port silently breaks. Never overlay meaningful data on $FFFA-$FFFF unless you fully model the bank mirror. (harness-warn candidate → capgap CMB-6.) 〔Combat ORG $F7FC / AudPitch $0F,$11 at $F7FE; deep-read harvest 2026-07-23〕
