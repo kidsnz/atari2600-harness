@@ -33,7 +33,7 @@ setting of this one.
 ★★★**Sampling one frame hides half of this.** One frame of `text24` shows one 48-px band and invites
 the conclusion that 24 characters are squeezed into the same span at 2 px each. Both phases have to be
 read — the same trap `scripts/phase_probe.py` exists for. Raised by the mailing-list distillation
-(helper-2) from a 2003 thread where three people took apart David Crane's routine and disagreed over
+(helper-2) from a 2003 thread where two people took apart David Crane's routine and disagreed over
 whether letters could be 7 px or 8 px wide 〔`200309/msg00212`, `msg00216`, `msg00218`〕.
 
 **Before designing anything wider, read [`restrobe-copies.md`](restrobe-copies.md) (technique #36).**

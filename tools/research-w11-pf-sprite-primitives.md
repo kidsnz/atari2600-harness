@@ -361,7 +361,7 @@ Reinforces existing: "missile/ball = 線・縁・縦枠". No new principle.
 ### 9a. 6-Digit Score (P0+P1, NUSIZ $06, VDEL, SP-as-Temp)
 
 **What it does**: Displays six decimal or hex digits across the top of the screen using P0 and P1 each
-set to NUSIZ = $06 (two medium copies, 2× wide). P0 shows three digits (left player), P1 shows three
+set to NUSIZ = $06 (three copies, medium). P0 shows three digits (left player), P1 shows three
 (right player). VDELP0 and VDELP1 are enabled. During the score zone, the kernel sequences GRP writes
 to emit each digit column using the VDEL pipeline.
 

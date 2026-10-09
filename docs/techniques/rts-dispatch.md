@@ -2,7 +2,7 @@
 
 > **Placement: see `sprite-placement.md`'s rule table before trusting where anything lands.**
 > Rule 12 in particular — a copy past clock 160 wraps to the left edge and draws there on the
-> same line — applies here because its fixture writes `NUSIZ0 = $06` — three copies at the wide spacing — so a base past ~96 puts the last copy over the edge. That rule was measured and CI-locked on 2026-08-21 and
+> same line — applies here because its fixture writes `NUSIZ0 = $06` — three copies at the medium spacing — so a base past ~96 puts the last copy over the edge. That rule was measured and CI-locked on 2026-08-21 and
 > re-derived from scratch anyway on 2026-09-03, which is why these pointers exist.
 
 > Also known as: **modular kernel** (vitoco, AtariAge topic 313777). The **dynamic** sibling of zone

@@ -6,6 +6,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — five small errors of fact in documents and comments (2026-10-08)
+
+Found while the confidence-C rows were being re-reviewed. Each was re-checked against the tree, the tool's
+own output or the cited mails before the change, and a separate reviewer checked the diff. No code changed:
+the two Go files change in comments only.
+
+- `internal/build/build.go` (comment): said a DASM behaviour "does not reproduce on the version we pin". No
+  DASM version is pinned anywhere; the comment now names the version it was measured on, DASM 2.20.14.1.
+- `docs/known-traps.md`, the `#<LabelA - LabelB` row: gave the error text as "Value must be <$100". DASM
+  2.20.14.1 prints `Value in '…' must be <$100.`, with the instruction echoed inside the quotes; the row now
+  gives that text, re-read on 2026-10-08.
+- `tools/research-w11-pf-sprite-primitives.md`: described `NUSIZ = $06` as "two medium copies, 2× wide". It
+  is three copies, medium, as `internal/emu/elemcopy_test.go` and the engine have it.
+- `docs/techniques/rts-dispatch.md`: called the same value "three copies at the wide spacing". It is the
+  medium spacing; the numbers in that sentence are unchanged.
+- `docs/techniques/text12.md` and a comment in `internal/emu/textwidth_test.go`: said "three people"
+  disagreed over the letter width in the 2003 thread. It was two, Manuel Polik and Paul Slocum.
+
+Two earlier entries of this file repeat two of these wordings; they are left as they were written.
+
 ### Added — 53 more cited-only review rows, from a re-review of rows adopted at confidence C (2026-10-08)
 
 Documentation only: no code, test, ROM or scenario changed, and no page is new. The four commits

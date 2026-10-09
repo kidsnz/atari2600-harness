@@ -29,7 +29,7 @@ import (
 // A 10-px letter needs the 48-px block used as a picture (`bitmap48`), where it is one of roughly
 // four shapes on the line, not one of twelve.
 //
-// Found by the mailing-list distillation (helper-2), from a 2003 thread in which three people took
+// Found by the mailing-list distillation (helper-2), from a 2003 thread in which two people took
 // apart David Crane's routine and disagreed about whether letters could be 7 px or 8 px wide
 // 〔`200309/msg00212`, `msg00216`, `msg00218`〕 — a width axis that this repository never recorded.
 func TestTextLadderIsCountNotWidth(t *testing.T) {

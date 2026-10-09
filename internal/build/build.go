@@ -112,7 +112,7 @@ func AssembleWithListing(asmPath, binPath string) (output, lst, sym string, err 
 // prevents is silent and permanent, and because someone reported the opposite behaviour on the list.
 // Manuel Polik, stella-list `200306/msg00003`: *"Should a source producing that `error: Branch out of
 // range (135 bytes).` compile into a working binary or not? **Well I'm asking because it does...**"*
-// That does not reproduce on the version we pin — but if any DASM diagnostic ever prints `error:`
+// That does not reproduce on DASM 2.20.14.1 — but if any DASM diagnostic ever prints `error:`
 // and exits zero, the `.bin` would be accepted, a `golden_frame` would be recorded **from the broken
 // image**, and every run afterwards would compare the damage against itself and pass.
 //
