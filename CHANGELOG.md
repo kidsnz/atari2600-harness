@@ -6,6 +6,35 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — 53 more cited-only review rows, from a re-review of rows adopted at confidence C (2026-10-08)
+
+Documentation only: no code, test, ROM or scenario changed, and no page is new. The four commits
+(`829731e`, `ba51906`, `140377f`, `b3a3f00`) touch 23 files, each an existing document under `docs/`. Each
+commit's rows were checked against the sources by two independent reviewers in turn, and the corrections
+made after the second review were compared with the sources once more.
+
+- **The re-review.** 100 rows the review had judged worth adding at confidence C (the lowest of the
+  review's three grades) were reviewed again on 2026-10-08 against their sources and the current tree. 53
+  were kept, 30 of them now at confidence B and 23 still at C. Not written: 38 were found to be covered by
+  existing text, and 9 were left out.
+- **The 53 rows land in 23 documents**, eight top-level documents and 15 technique pages.
+  `design-principles.md` takes 12; `known-traps.md` 6 (three new rows and three additions inside existing
+  rows); `capability-gap-audit.md` 5, as four new entries that state what the tree does not do today and
+  decide nothing; the other 30 go to the technique pages and to `integration-density-playbook.md`,
+  `fundamentals-audit.md`, `resources.md`, `build-to-learn.md` and `casebook.md`.
+- **What they are.** The quoted material is mailing-list posts and forum threads. Claims not measured here
+  are marked Cited only, not verified. The posters' own hedges are kept, and our own readings and
+  arithmetic are marked as ours. Where only our distilled notes of a thread are held, the text says so.
+  Three examples: `paddle.md` gives both sides of which way a paddle's count runs with the knob and says
+  the list did not settle it; `capability-gap-audit.md` records that CI installs whatever DASM `apt`
+  provides, with no version asked for or compared; `known-traps.md` adds, from a distilled note, a second
+  cause to its row on DASM's "must be <$100" error.
+- **Existing wording is kept.** 646 lines are added and 5 removed. The five are the three `known-traps.md`
+  rows extended in place and two lines re-wrapped where new sentences were inserted mid-paragraph
+  (`fundamentals-audit.md`, `integration-density-playbook.md`). A word-level diff shows no existing word
+  removed; the one change to existing text is a semicolon after the last citation in the Source cell of two
+  `known-traps.md` rows, where a new citation follows it.
+
 ### Added — 1,062 more cited-only review rows; two new technique pages; five gaps in its tools and litmus ROMs recorded, not fixed (2026-10-05 to 2026-10-07)
 
 Documentation only: no code, ROM or scenario changed. Each row was written by one writer and checked by a
