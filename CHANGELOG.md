@@ -6,6 +6,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — four landed passages that carried no pointer back to their source (2026-10-12)
+
+Every landed row was checked for whether the text written for it names the thread or the mail it came from.
+47 looked bare to a mechanical match; read one by one, 37 already carried the number in a form the match did
+not recognise, 5 are rows whose sourced claim was never written (the text there is this repository's own
+measurement, so a number would credit the source with something it did not say), and one is already cited
+and reconciled in `docs/design-principles.md`. The remaining four gain their pointer; nothing else changes.
+A separate reviewer opened each source and checked the diff.
+
+- `docs/integration-density-playbook.md`, the anti-gaming caveat: stella-list `200211/msg00069`.
+- `docs/techniques/vertical-positioning.md`, DASM accepting the undocumented mnemonics: AtariAge
+  `topic/124320`. The thread shows that DASM takes them; the version number in the sentence is measured here.
+- `docs/techniques/multicolor48.md` and `docs/techniques/score-kernel.md`, the note on the last `GRP0`
+  write: AtariAge topic/281539.
+- `docs/8bitworkshop-crosscheck.md`, `-o` taking no space before the file name: AtariAge topic/318210.
+
 ### Fixed — five small errors of fact in documents and comments (2026-10-08)
 
 Found while the confidence-C rows were being re-reviewed. Each was re-checked against the tree, the tool's

@@ -535,8 +535,8 @@ Each metric is measurable *with the harness*, and compared to a reference ROM (e
 > progress = moving one axis toward target **without regressing** the others. Collapsing them into one index
 > that can't be gamed by a resource trade is unsolved (§G). For one flag a practitioner gave every arrow:
 > a byte per flag is faster and uses less ROM, packed flags save RAM and cost slower, longer code
-> (Christopher Tumber, quoted in `techniques/kernel-micro-idioms.md`, "The trade has three sides").
-> **Cited only, not verified.**
+> (Christopher Tumber, quoted in `techniques/kernel-micro-idioms.md`, "The trade has three sides"
+> 〔stella-list `200211/msg00069`〕). **Cited only, not verified.**
 
 **Four rows added 2026-09-06, and two of them are honest about having no instrument.** The
 distillation of the stella-list archive produced a classification of the resources a 2600 design
