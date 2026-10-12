@@ -545,8 +545,9 @@ var MeasuredSpectra = map[int][]float64{
 }
 
 // PitchedWaveforms are the AUDC values MeasuredSpectra covers, in a fixed order so that any
-// tool listing them lists them the same way. 0, 11 and 13 are silence or DC and 3, 5, 8, 9,
-// 10 are noise: none of them has a repeating shape to have a spectrum of.
+// tool listing them lists them the same way. Of the rest: 0 and 11 are silence/DC; 8 is the
+// 511-bit noise; 5, 9, 10 and 13 duplicate 4, 7, 6 and 12 (Canonical); and 3 does repeat, every
+// 465 ticks (Divisor), but no spectrum is pinned for it here.
 var PitchedWaveforms = []int{1, 2, 4, 6, 7, 12, 14, 15}
 
 // SpectrumDistance compares a reference harmonic series against a waveform's, after

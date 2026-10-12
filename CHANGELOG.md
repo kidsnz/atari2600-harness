@@ -6,6 +6,22 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Fixed — three statements that disagreed with the tree (2026-10-12)
+
+Found by readers distilling forum threads against this repository, then confirmed by a separate reviewer who
+opened each file. Two documents sentences and one comment change; no behaviour changes.
+
+- `docs/known-traps.md`, the `RandomState` row: said the RIOT timer's reset randomises "the divider and
+  INTIM". `Reset()` sets `divider` to `T1024T` on both branches; what is random is INTIM and
+  `ticksRemaining`, the tick count inside the interval. The row now says that.
+- `docs/known-traps.md`, the 3E paragraph: said "there is no 3E fixture here either".
+  `roms/carts/cart_3e.asm` has been in the tree since August. The claim it qualifies is still only read, not
+  run, and the sentence now says so without denying the fixture.
+- `pkg/audio/audio.go`, the comment on `PitchedWaveforms`: called AUDC 3, 5, 9, 10 and 13 noise or DC. In the
+  same file `Canonical` maps 5, 9, 10 and 13 onto 4, 7, 6 and 12, and `Divisor` gives 3 a period of 465. The
+  comment now says which values are silence, which is noise, which are duplicates, and that 3 repeats but has
+  no spectrum pinned.
+
 ### Fixed — four landed passages that carried no pointer back to their source (2026-10-12)
 
 Every landed row was checked for whether the text written for it names the thread or the mail it came from.
