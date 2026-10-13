@@ -8,6 +8,24 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — `cmd/still -hold`: a frame drawn with buttons held down (2026-10-13)
+
+`still -frame N -hold fire,left@60 <rom> <out.png>` keeps buttons of the left joystick down while
+the ROM runs — a name alone from power-on, `name@N` from frame N on — in both of the command's modes.
+The line it prints says what was held. Until now `still` pressed nothing, so a ROM whose picture
+answers to its buttons could only be drawn at rest, and two works had written a tool of their own for
+it (`roms/260816_transistor/tools/shot_held.py`, which says so in its first lines; one work's
+measuring driver).
+
+Tested on a ROM the test builds (`cmd/still/hold_test.go`): the background is red while fire is down
+and half the playfield is lit while the stick is left; seven rows — nothing held, each button, both,
+a hold that has not begun yet, one that has — and with the pressing taken out five of the seven fail.
+The first version of that test had its background probe under the playfield's second copy and failed
+for that reason; the comment at the probe says where. Against the work's own tool, on
+`sleeve-half-pitfall.bin` at frame 203 with fire, up, left and down held: no pixel differs over the
+192 picture lines (left and down change 406 and 112 pixels from the idle picture; fire and up change
+none on that frame, in both tools).
+
 ### Added — a way in for "the ROM is full" (2026-10-13)
 
 `docs/integration-density-playbook.md` opens with a paragraph that says where the knowledge on
