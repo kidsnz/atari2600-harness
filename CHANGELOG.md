@@ -6,6 +6,51 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+## [Unreleased]
+
+## [3.0.0] - 2026-10-13
+
+Everything since 2.0.0 (2026-07-31): 638 commits before the one that cut this version.
+
+**This is a major version because two things changed incompatibly.** The number is produced by the rule, as
+the 2.0.0 entry says, and was first written here as 2.1.0 until a reviewer found these:
+
+- `pkg/design`, which `README.md` lists among the public packages, lost `MaxMultiSprite`, `FitsMultiSprite`,
+  `PixelAspectRatio` and `ScanlinesForSquare`, and `InterlaceColorsSafe` was renamed `SameLuminance`. The
+  entries below say why each went; in short, each stated something measurement did not support.
+- `cmd/vismatch -genpf` no longer defaults `-region`, `-arena-top` and `-table-len`. At 2.0.0 they
+  defaulted to `122-185`, `74` and `112`, which were one game's geometry; now the command exits 2 without
+  them.
+
+No MCP tool or command that existed at 2.0.0 was removed or renamed: the 41 tools and 32 commands of 2.0.0
+are all still here under the same names, alongside 2 new tools and 14 new commands. A comparison of the Go
+struct declarations found that the inputs and outputs of those 41 tools only gained fields; their behaviour
+was not compared call by call, and the JSON schemas the server emits were not run. Nothing else in this
+workspace was found using the five `pkg/design` names or calling `-genpf` without the three flags.
+
+What grew, counted with `git ls-tree` at the two tags:
+
+| | 2.0.0 | 3.0.0 |
+|---|---|---|
+| technique pages (`docs/techniques/`, without `.ja.md`, `README.md`, `roadmap.md`) | 34 | 46 |
+| documents under `docs/` | 61 | 76 |
+| bytes under `docs/` | 785,525 | 3,340,400 |
+| litmus ROM sources (`roms/litmus/*.asm`) | 103 | 172 |
+| scenarios (`**/scenarios/*.json`) | 102 | 122 |
+| Go test files | 139 | 290 |
+| gate scripts (`scripts/check_*.py`) | 5 | 6 |
+
+Most of the growth in `docs/` is sourced knowledge rather than new machinery. Between 2026-09-25 and
+2026-10-08, 2,138 reviewed rows from the Stella mailing list and the AtariAge forums were written into the
+repository (all but five of them into `docs/`), each commit naming its rows in a `Land-Key:` trailer
+(`git log --format=%B v2.0.0..v3.0.0 | grep '^Land-Key:' | sort -u | wc -l`). Much of that text is marked
+"Cited only, not verified" where it stands: it records what a named person said, not something measured here.
+
+The entries below are the ones written as the work happened, newest first, unedited. They are not regrouped
+by kind. The last 49 were opened before 2026-08-26 and collected under the old Unreleased heading; from there
+down they use undated headings, mostly plain `### Added` / `### Fixed` / `### Changed`.
+
+
 ### Added — `scripts/recall.py`: ask the documents a question (2026-10-13)
 
 `python3 scripts/recall.py "the scene change frame is one scanline too long"` prints the passages of
@@ -5395,7 +5440,6 @@ queued since 2026-08-23, was captured in the same pass at 37/37.
 
 
 
-## [Unreleased]
 
 ### Added
 - **Indirect-jump object positioning** (`docs/design-principles.md`,
