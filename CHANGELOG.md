@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed — a 12 MB build product committed at the repository root (2026-10-13)
+
+`mixmatch`, a Mach-O arm64 executable, was committed on 2026-08-15 in the same change that added its source,
+`cmd/mixmatch`. It is the output of `go build ./cmd/mixmatch` and nothing referred to it. The tool is
+unchanged: its source and `internal/mixmatch` are untouched, and `go build ./cmd/mixmatch` reproduces the
+binary. `/mixmatch` is now in `.gitignore` beside the other command names that were already there. The file
+is still in history and in the tree the 3.0.0 tag points at; a reviewer checking that release found it.
+
 ### Changed — `scripts/recall.py`: tool-roster entries are passages of their own; three questions it cannot answer (2026-10-13)
 
 Each entry of `CLAUDE.md`'s tool roster (a `cmd/x` entry, a bold MCP tool name) is now one passage, titled
