@@ -12,6 +12,8 @@
 //
 // Prints the full report as JSON on stdout (a human summary on stderr); exits
 // non-zero when the kernel is not certified (a violation or an unbounded region).
+//
+// Answers: Is every scanline of this kernel proven to fit its cycle budget on all paths?
 package main
 
 import (

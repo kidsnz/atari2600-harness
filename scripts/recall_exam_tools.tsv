@@ -1,0 +1,23 @@
+# Questions for the TOOLS half of `recall.py --exam`: "is there a command or MCP tool that does this?"
+# question <TAB> the command(s) or MCP tool(s) that answer it (any of, |), or `none` when the right answer is that nothing here does.
+#
+# Where the questions come from. A question a tool's author writes after reading the tool's description is a
+# question the description already answers. So these are sentences that were written BEFORE this file, by
+# someone who needed the thing and did not find it here: the first sentence of the docstring of a tool a work
+# wrote for itself (roms/261011_edo/tools, roms/260816_transistor/tools), copied verbatim on 2026-10-13, and
+# three questions typed into recall.py that day while checking those tools against this repository. The
+# expected answers are from the works' own reviews (which command came nearest); `none` is a correct answer.
+# Frozen before any command was given an "Answers:" line. Add questions; do not reword one to make it pass.
+Picture of the current ROM against the original's, zone by zone, aligned at zone bottoms.	vismatch|framesim
+Does a build show the same scenes, in the same order, moving the same way, as the original?	trajdiff|behavmatch|ramtrace
+Re-record the pins of scenarios/fire-held.json from the current ROM.	scenario
+Run a source under each of the fourteen shipped settings (tools/settings.py) and count what the frame loop does	scenario
+How good is the scene generator's randomness?	none
+Render one frame of a ROM with controller actions HELD, as a PNG.	still
+Dump a ROM's TIA audio registers, one frame at a time, as JSON.	read_audio_trace
+Render a ROM to the pictures Shinji can actually look at, and `open` them.	still|crtview
+Which key and which voices make this figure LOW and DARK, not bright.	keyfit
+What does the TIA's NOISE actually put in each frequency band?	none
+compare the RAM of two ROMs frame by frame to show a rewrite did not change behaviour	trajdiff|behavmatch|ramtrace
+press the fire button at random times and see whether a frame is ever not 262 lines	guidedfuzz
+is the picture my build draws the same as the original ROM's, pixel by pixel	vismatch|framesim|refdiff

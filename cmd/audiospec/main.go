@@ -8,6 +8,8 @@
 //	go run ./cmd/audiospec -a cand.bin -b ref.bin -frames 30 -ch 0
 //
 // Exit 1 if spectral distance exceeds -max (a regression gate); 0 otherwise.
+//
+// Answers: Do two ROMs sound the same -- how far apart are their spectra and their loudness envelopes?
 package main
 
 import (

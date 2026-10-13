@@ -12,6 +12,8 @@
 //
 // It is ROM-blind on purpose: the input is a .bin and an input script, never a
 // symbol map or a disassembly.
+//
+// Answers: What does each byte of a ROM's RAM do over time under a given input, and how far down does the stack reach?
 package main
 
 import (

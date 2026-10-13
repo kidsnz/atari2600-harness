@@ -20,6 +20,8 @@
 //
 // It does NOT choose. It reports the error at every tonic and leaves the musical decision —
 // drop a degree, displace it an octave, accept the register change — to whoever can hear it.
+//
+// Answers: In which key, and on which waveform, can the TIA play this set of notes in tune?
 package main
 
 import (

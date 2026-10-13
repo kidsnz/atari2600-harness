@@ -4,6 +4,8 @@
 // docs/ram-maps.md の自動生成元（実ゲームの変数マップ調査・自作 ROM の RAM 監査の両方に）。
 //
 //	go run ./cmd/rammap -rom game.bin [-frames 300] [-warmup 10]
+//
+// Answers: Which RAM bytes does a ROM change, how often and over what range? (a map of its variables)
 package main
 
 import (

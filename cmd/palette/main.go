@@ -31,6 +31,8 @@
 // Found by the mailing-list distillation (helper-2), who located the 2001 thread and noticed that
 // this repository's ingest side is already safe (`internal/ingest` uses the 128 EVEN codes, and
 // `pkg/design/color_test.go` machine-locks D0 as invalid) while the drawing side had nothing.
+//
+// Answers: Write the machine's colours out as a palette an artist can load.
 package main
 
 import (

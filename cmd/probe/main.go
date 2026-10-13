@@ -2,6 +2,8 @@
 // 駆動できることを「数値で」確認する（鉄則: 判定はスクショでなく数値）。
 //
 //	go run ./cmd/probe [rom.bin]   (default: roms/litmus/smoke.bin)
+//
+// Answers: Can the emulator be driven with no display at all? (a plumbing check)
 package main
 
 import (

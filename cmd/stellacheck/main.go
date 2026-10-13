@@ -11,6 +11,8 @@
 //  3. dump writes straight to a file (~/Desktop/<rom>_dbg_<hash>.dump, measured). Poll for its
 //     appearance → parse.
 //  4. Run the same ROM for N frames on the harness side → compare RAM → report match/diffs.
+//
+// Answers: Does Stella agree with this emulator on the ROM's RAM after N frames?
 package main
 
 import (

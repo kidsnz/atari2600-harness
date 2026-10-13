@@ -6,6 +6,8 @@
 //	go run ./cmd/refdiff -rom mine.bin -ref original.bin
 //
 // exit 0 if every feature matches the reference, 1 if any differs.
+//
+// Answers: Is my ROM's layout -- wall positions, ball width -- the same as the original's?
 package main
 
 import (

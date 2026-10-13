@@ -16,6 +16,8 @@
 // no importer — nothing could reach it, while harness/CLAUDE.md described it as one of
 // three pillars of audio reproduction. Measured 2026-08-15: 2 of 34 internal packages were
 // unreachable, and this was the other one. `cmd/drumfit` is the sibling this follows.
+//
+// Answers: How far is a ROM's balance of bass, middle and treble from the recording's, band by band?
 package main
 
 import (

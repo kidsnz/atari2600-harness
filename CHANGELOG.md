@@ -8,6 +8,32 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — every command says which question it answers, and `recall.py` lists the ones that do (2026-10-13)
+
+Each `cmd/<name>/main.go` now carries one line in its header, `// Answers: ...`: the question the
+command answers, in the words of someone who needs it and does not know it exists.
+`scripts/check_wiring.py` fails if a command has no such line (shown failing with one removed).
+`scripts/recall.py` prints, under the passages, the commands and MCP tools whose own words answer the
+question — or says that none does, when fewer than two of the question's words are in any tool's
+name or line. MCP tools have no line of their own yet; their entry in `CLAUDE.md`'s roster stands in.
+
+Why: one work wrote twelve tools for itself; for six of them a command here came near, and the work's
+record shows it was not found. The roster describes each tool in its builder's words.
+
+Measured on `scripts/recall_exam_tools.tsv`, thirteen questions frozen BEFORE any line was written:
+ten are the first sentence of the docstring of a tool some work wrote for itself (verbatim, written
+earlier, two works), three were typed into `recall.py` the same day by the author of the lines. The
+right command in the first three, or "none" when none is right: 9 of 13 (6 of the ten earlier
+sentences, all 3 of the same-day ones — which are the weaker evidence, since their author also wrote
+the lines). Before, with only the passages to go on and counting a tool's name anywhere in the first
+five as a hit: 4 of 13. The four it still gets wrong are in the file as they were: a question whose
+answer is a capability no command has ("under each of the fourteen settings"), `read_audio` returned
+for `read_audio_trace`, a question about key and voices that shares one word with `keyfit`, and a
+question about noise bands that should get "none" and gets `bandsplit`.
+
+Found on the way: the word stemmer turned "press" into "pres" and "presses" into "press", so the two
+never met. Fixed; the knowledge exam is unchanged by it (15 of 21 in the first 5).
+
 ### Added — scenario check `no_stack_overlap`: a RAM byte that is both stack and variable (2026-10-13)
 
 `"no_stack_overlap": N` runs a ROM from reset for N frames with no input and fails on the first RAM

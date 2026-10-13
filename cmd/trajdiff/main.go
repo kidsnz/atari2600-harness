@@ -8,6 +8,8 @@
 //	go run ./cmd/trajdiff -a a.bin -b b.bin -fields ram.0x85,ram.0x9B -held fire
 //
 // Prints JSON; exit 1 on divergence, 0 on MATCH.
+//
+// Answers: Do two ROMs behave the same over time -- at which frame, and in which RAM byte, do they first differ?
 package main
 
 import (

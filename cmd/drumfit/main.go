@@ -7,6 +7,8 @@
 //
 // -t0/-bpm/-every give the onsets: the first beat, the tempo, and how many beats apart
 // the hits are. Read them off cmd/audioingest, which fits them to the kick track.
+//
+// Answers: What TIA envelope reproduces the drum in this recording?
 package main
 
 import (

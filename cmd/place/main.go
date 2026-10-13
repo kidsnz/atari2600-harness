@@ -10,6 +10,8 @@
 //
 // This answers PLACEMENT only -- where the objects go. Whether the line then has the cycles to
 // write every shape's bytes is the kernel's own question; prove_line_budget answers that one.
+//
+// Answers: Can a row of shapes be drawn at these x positions on one scanline, and how must the objects be strobed?
 package main
 
 import (

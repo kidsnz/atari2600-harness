@@ -5,6 +5,8 @@
 // but the hardware-grade member dissents." Exit 1 on dissent or no majority.
 //
 //	go run ./cmd/oraclevote -rom x.bin -frames 10
+//
+// Answers: Do independent emulators agree on this ROM's RAM after N frames?
 package main
 
 import (

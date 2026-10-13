@@ -440,6 +440,30 @@ def dangling_doc_references():
     return sorted(set(problems))
 
 
+def answers_lines():
+    """Every command says, in one line of its own header, which question it answers.
+
+    `scripts/recall.py` lists the commands that say they do what was asked, and reads that from a
+    `// Answers:` line in cmd/<name>/main.go. Why the line is in the source and required here
+    (measured 2026-10-13): of twelve tools one work wrote for itself, six had a command in this
+    repository that came near and was not found -- the roster describes each tool in its builder's
+    words, and a question put in the asker's words found none of them in the first ten passages.
+    A command added without the line is a command the next asker will not find either.
+    """
+    out = []
+    for d in sorted(os.listdir(os.path.join(HARNESS, "cmd"))):
+        main_go = os.path.join(HARNESS, "cmd", d, "main.go")
+        if not os.path.isfile(main_go):
+            continue
+        head = open(main_go, encoding="utf-8", errors="replace").read().split("\npackage main", 1)[0]
+        lines = [l for l in head.split("\n") if l.startswith("// Answers:")]
+        if len(lines) != 1 or len(lines[0]) < len("// Answers:") + 20:
+            out.append("cmd/%s/main.go has %d `// Answers:` line(s) in its header (needs exactly one, a "
+                       "sentence): the question this command answers, in the words of someone who "
+                       "needs it and does not know the command exists." % (d, len(lines)))
+    return out
+
+
 def main():
     entry_text = ""
     for e in ENTRYPOINTS:
@@ -502,7 +526,7 @@ def main():
         print("ROM nobody runs makes that sentence false for the reader who trusts it.")
         sys.exit(1)
 
-    tool_problems = tool_reachability()
+    tool_problems = tool_reachability() + answers_lines()
     if tool_problems:
         print("TOOLS THAT CANNOT BE REACHED OR CANNOT BE FOUND:")
         for t in tool_problems:
@@ -550,7 +574,7 @@ def main():
     n_cmd = len([d for d in os.listdir(os.path.join(HARNESS, "cmd"))
                  if os.path.isdir(os.path.join(HARNESS, "cmd", d))])
     print(f"tools OK — all {n_int} internal packages are imported by something, and all {n_cmd} "
-          f"commands are named in CLAUDE.md.")
+          f"commands are named in CLAUDE.md and say which question they answer.")
 
 
 if __name__ == "__main__":

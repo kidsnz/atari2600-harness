@@ -1,6 +1,8 @@
 // ingest — スクリーンショット → TIA データの解析 CLI。
 // 使い方: go run ./cmd/ingest -in shot.png -out report_dir/
 // 出力: report_dir/overlay.png（TIA 実座標グリッド付き）+ report_dir/report.json
+//
+// Answers: What TIA data would this screenshot take -- colours, playfield and sprite shapes?
 package main
 
 import (

@@ -7,6 +7,8 @@
 //	go run ./cmd/spritepos -x 96 -object P0
 //	go run ./cmd/spritepos -x 96 -json
 //	go run ./cmd/spritepos -object BL -all      # solve every X for one object
+//
+// Answers: What do I store and strobe to put a sprite at exactly x, and where does it really land?
 package main
 
 import (

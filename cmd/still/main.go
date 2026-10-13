@@ -41,6 +41,8 @@
 //
 //	still [-single] [-scale N] [-trigger 0x83] [-lo 3] [-hi 6] <rom.bin> <out.png>
 //	still -frame N [-scale N] <rom.bin> <out.png>
+//
+// Answers: Render one frame of a ROM as a PNG, the frame chosen by the machine's own state.
 package main
 
 import (

@@ -10,6 +10,8 @@
 //
 // Prints JSON. With -inputs, a fixed action is held each frame (a cheap way to
 // drive past a title screen); for real input timelines use a scenario.
+//
+// Answers: Which instructions and which sides of each branch did a run execute, and which never ran?
 package main
 
 import (

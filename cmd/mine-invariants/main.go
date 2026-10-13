@@ -6,6 +6,8 @@
 //
 // By default prints only "interesting" candidates (non-zero constants, monotonic,
 // or non-trivial ranges); -all includes always-zero cells.
+//
+// Answers: Which values never change, or only ever grow, during a run? (proposes invariants for a scenario)
 package main
 
 import (

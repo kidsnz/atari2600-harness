@@ -4,6 +4,8 @@
 //
 //	go run ./cmd/calibrate [rom.bin] [lo] [hi]
 //	  default: roms/litmus/litmus_pos.bin 2 14
+//
+// Answers: What is the measured relation between a delay loop and a sprite's horizontal position?
 package main
 
 import (

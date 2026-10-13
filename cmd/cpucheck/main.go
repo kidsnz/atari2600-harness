@@ -15,6 +15,8 @@
 //	0  agreement (modulo expected divergences), or harness not built (note)
 //	1  at least one UNEXPECTED divergence (a Gopher bug or a harness artifact)
 //	2  usage / runtime error
+//
+// Answers: Does the emulator's CPU agree with the transistor-level 6502, instruction by instruction?
 package main
 
 import (

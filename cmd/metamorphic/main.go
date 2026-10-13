@@ -5,6 +5,8 @@
 //	go run ./cmd/metamorphic -a short.json -b long.json -field ram.0x85 -rel "<="
 //
 // exit 0 if the relation holds, 1 if it is violated.
+//
+// Answers: Does a relation hold between two scenario runs (for example: a longer run never scores less)?
 package main
 
 import (

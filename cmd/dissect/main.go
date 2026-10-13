@@ -10,6 +10,8 @@
 // Clean-room policy: analysis results of commercial ROMs are for study/analysis only (confined to
 // inbox/reference, never committed to the public repo). Only what is generalized into a technique
 // goes into the techniques catalog, in our own implementation.
+//
+// Answers: Where in a ROM are its graphics and tables? (found by matching what the program wrote to the TIA)
 package main
 
 import (

@@ -21,6 +21,11 @@ passage's heading or bold lead counting double, and the pages written to be acte
 table of 2600 synonyms widens the question ("too long" also looks for "scanline"). No
 model, no index file: it reads the documents as they are now, in about a second.
 
+Under the passages it lists the commands and MCP tools that SAY they do what was asked -- from
+the `// Answers:` line every cmd/*/main.go carries -- or says that none does. That half exists
+because the first half cannot do it: the roster describes a tool in its builder's words, and of
+twelve tools one work wrote for itself, six had a command here that came near and was not found.
+
 -work DIR also appends the question and what was returned to DIR/build/recall.log, which
 is the record of what the knowledge was asked while that work was made.
 
@@ -37,6 +42,8 @@ the honest floor. Three questions of a different kind were added the same day ("
 does X") and found nothing in the first 10; making each entry of CLAUDE.md's tool roster its
 own passage did not move them, because the roster says what a tool is and the question says
 what one wants. Run --exam for today's numbers; never reword a question to make it pass.
+The tools half is scored on scripts/recall_exam_tools.tsv (13 questions frozen before any
+command had an Answers: line): 9 of 13 on 2026-10-13.
 """
 import json, math, os, re, sys, time
 from pathlib import Path
@@ -66,8 +73,8 @@ def words(text):
         if w in STOP or len(w) < 2:
             continue
         for end in ("ing", "ed", "es", "s"):
-            if len(w) > len(end) + 3 and w.endswith(end):
-                w = w[:-len(end)]
+            if len(w) > len(end) + 3 and w.endswith(end) and not (end == "s" and w.endswith("ss")):
+                w = w[:-len(end)]                             # "presses" -> "press"; "press" stays "press"
                 break
         out.append(w)
     return out
@@ -110,6 +117,51 @@ def passages(root):
             rel_, line_, title_, text_ = out[first]
             out[first] = (rel_, line_, "PAGE " + path.stem.replace("-", " ") + " " + title_, text_)
     return out
+
+
+def tools(root):
+    """(name, the question it says it answers, the start of its description) for every command
+    and every MCP tool. A command's question is the `// Answers:` line of cmd/<name>/main.go --
+    kept in the source, next to the thing it describes, and required by check_wiring.py. An MCP
+    tool has no such line yet: its entry in CLAUDE.md's roster stands in for both."""
+    out = []
+    for main in sorted((root / "cmd").glob("*/main.go")):
+        head = main.read_text(errors="replace").split("\npackage main", 1)[0]
+        lines = [l[2:].strip() for l in head.split("\n") if l.startswith("//")]
+        answers = " ".join(l[len("Answers:"):].strip() for l in lines if l.startswith("Answers:"))
+        doc = " ".join(l for l in lines if l and not l.startswith("Answers:"))
+        out.append(("cmd/" + main.parent.name, answers, doc[:700]))
+    claude = root / "CLAUDE.md"
+    if claude.exists():
+        for m in re.finditer(r"\*\*`([a-z_]+)`\*\* \((.*?)\)(?= /|\n\n|\n\s*\*\*`|$)", claude.read_text(errors="replace"), flags=re.S):
+            out.append((m.group(1), "", " ".join(m.group(2).split())[:700]))
+    return out
+
+
+def ask_tools(root, question, n=3):
+    """The commands and tools whose own words answer the question, best first; [] when none does.
+    A tool qualifies only if at least two of the question's words are in its name or its Answers:
+    line (or in the opening of an MCP tool's entry) -- otherwise the honest answer is "nothing
+    here says it does that", and a list of three unrelated names would hide it."""
+    q = set(words(question))
+    extra = set(words(" ".join(x for w in re.findall(r"[a-z0-9_$]+", question.lower()) for x in ALSO.get(w, []))))
+    items = tools(root)
+    docs = [(set(words(name.replace("/", " ").replace("_", " ") + " " + (ans or doc[:240]))), set(words(doc))) for name, ans, doc in items]
+    df = {}
+    for strong, weak in docs:
+        for w in strong | weak:
+            df[w] = df.get(w, 0) + 1
+    N = len(items)
+    scored = []
+    for (name, ans, doc), (strong, weak) in zip(items, docs):
+        hit = q & strong
+        if len(hit) < min(2, len(q)):
+            continue
+        s = sum(math.log(1 + N / df[w]) * 3 for w in hit) + sum(math.log(1 + N / df[w]) for w in (q & weak) - hit)
+        s += 0.4 * sum(math.log(1 + N / df[w]) for w in (extra & (strong | weak)) - q)
+        scored.append((s, name, ans or doc[:160]))
+    scored.sort(reverse=True)
+    return scored[:n]
 
 
 class Index:
@@ -212,6 +264,17 @@ def exam(path):
         return r
 
     print(f"{len(ix.items)} passages from {len({i[0] for i in ix.items})} files; {len(qs)} questions")
+    tq = Path(__file__).with_name("recall_exam_tools.tsv")
+    if tq.exists():
+        tqs = [l.rstrip("\n").split("\t") for l in open(tq) if l.strip() and not l.startswith("#")]
+        right, rows = 0, []
+        for q, want in tqs:
+            got = [name.split("/")[-1] for _, name, _ in ask_tools(ROOT, q)]
+            ok = (not got) if want == "none" else any(w in got for w in want.split("|"))
+            right += ok
+            rows.append(f"    {'ok ' if ok else 'NO '} wanted {want:28s} got {', '.join(got) or 'none':34s} {q[:70]}")
+        print(f"tools: the right command or tool in the first 3 (or 'none' when none is right) for {right} of {len(tqs)}")
+        print("\n".join(rows))
     for name, f in (("recall", ix.ask), ("recall without the synonym table", bare), ("a plain count of shared words", plain)):
         ranks = [rank(f(q[0], 10), q[1], q[2] if len(q) > 2 else "") for q in qs]
         print(f"{name:34s} first: {sum(r == 1 for r in ranks):2d}   in the first 5: {sum(bool(r) and r <= 5 for r in ranks):2d}   in the first 10: {sum(bool(r) for r in ranks):2d}   of {len(qs)}")
@@ -244,6 +307,14 @@ def main():
         title = title[5:] if title.startswith("PAGE ") else title
         print(f"{k}. {rel}:{line}  [{title}]")
         print("   " + text[:420] + (" ..." if len(text) > 420 else ""))
+    found = ask_tools(ROOT, question)
+    print()
+    if found:
+        print("Commands and tools that say they do this (read the command's own header before writing a new one):")
+        for s, name, what in found:
+            print(f"   {name} -- {what}")
+    else:
+        print("No command or MCP tool here says it does this. If you write one for a work, say in its first lines what was missing here.")
     if work:
         log = work / "build" / "recall.log"
         log.parent.mkdir(parents=True, exist_ok=True)

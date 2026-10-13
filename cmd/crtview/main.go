@@ -6,6 +6,8 @@
 // and the 2600's own style leans on the blur.
 //
 //	go run ./cmd/crtview -rom roms/.../x.bin -out /tmp/x.png [-frames 2] [-luma 1] [-chroma 3]
+//
+// Answers: What does this ROM look like on something like a television? (for looking at artwork, not for measuring)
 package main
 
 import (

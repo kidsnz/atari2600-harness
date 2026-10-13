@@ -8,6 +8,8 @@
 //	go run ./cmd/behavmatch -target Outlaw.bin -mine build/outlaw.asm -scenario all
 //
 // Exit 1 when any scenario's behaviour differs; 0 on match.
+//
+// Answers: Does my build move like the target ROM -- the same speeds, limits and reactions to input, object by object?
 package main
 
 import (

@@ -2,6 +2,8 @@
 // MCP (stdio). Claude observes "what it did = the result" numerically via
 // load_rom → step → read. Spec: docs/mcp-tools.md (every API verified against the
 // source). Numbers first = images are Phase 2.3.
+//
+// Answers: Serve the emulator tools to Claude over MCP: load a ROM, step it, read registers, RAM and the screen.
 package main
 
 import (

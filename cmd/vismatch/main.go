@@ -11,6 +11,8 @@
 //	    -target-frames 28 -mine-frames 12 -elem PF -diff overlay.png
 //
 // Exit 1 when any compared element cell differs (a reproduction gate); 0 on match.
+//
+// Answers: Is the picture my build draws the same as the target ROM's, object by object and pixel by pixel?
 package main
 
 import (

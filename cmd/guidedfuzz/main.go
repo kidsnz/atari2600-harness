@@ -6,6 +6,8 @@
 //	go run ./cmd/guidedfuzz -rom x.bin -iters 4000 -maxlen 16 -actions left,right,fire
 //
 // Prints JSON. Deterministic for a fixed -seed (the found sequence replays).
+//
+// Answers: Which sequence of button presses reaches the most code? (searches inputs automatically, to drive a ROM into rare states)
 package main
 
 import (

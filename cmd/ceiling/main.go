@@ -11,6 +11,8 @@
 //
 // The number is NOT a score for a kernel. It is the denominator a kernel's own
 // error (cmd/vismatch, cmd/framesim) should be read against.
+//
+// Answers: What is the best picture the 2600 could draw of this image, under each set of constraints?
 package main
 
 import (

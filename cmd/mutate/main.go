@@ -5,6 +5,8 @@
 //	go run ./cmd/mutate -rom x.bin -count 30 -seed 1        scen.json ...   # batch: report kill rate
 //
 // docs/testing-playbook.md (DeMillo/Offutt). MCP-free, CI-friendly.
+//
+// Answers: Would my scenarios notice if a byte of the ROM were wrong?
 package main
 
 import (

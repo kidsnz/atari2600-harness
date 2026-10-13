@@ -25,6 +25,8 @@
 //     only when the loop is one bar long.
 //
 // It reports; it does not write a pattern. Feed the numbers to audioingest and drumfit.
+//
+// Answers: Where does the music in a recording start, how fast is it, and how long is the repeating pattern?
 package main
 
 import (

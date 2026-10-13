@@ -8,6 +8,8 @@
 //
 // Prints JSON. Track the rendered top over a window where the object moves on a
 // uniform background; the X axis (HmovedPixel) is always exact.
+//
+// Answers: How smoothly does an object move from frame to frame -- is there judder?
 package main
 
 import (

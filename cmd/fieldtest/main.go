@@ -8,6 +8,8 @@
 //
 // -auto: 動的オブジェクトが採れるまで RESET → fire → fire+右入力保持 の順に試す
 // （タイトル画面・アトラクト・待機キャラ対策。何で開始できたかを報告）。
+//
+// Answers: Run a ROM by itself, with optional button presses, and analyse several frames automatically.
 package main
 
 import (

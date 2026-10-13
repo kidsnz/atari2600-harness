@@ -8,6 +8,8 @@
 //	go run ./cmd/timinglint -asm roms/techniques/multicolor48.asm
 //
 // Exit 0 = no warnings; 1 = warnings; 2 = error.
+//
+// Answers: Before running it: does this kernel have an HMOVE timing mistake?
 package main
 
 import (

@@ -30,6 +30,8 @@
 // The page embeds decoded audio and needs no network. It is written for one listener with
 // headphones, not for publishing: the excerpt is the source recording, so treat the output the
 // way the source is treated.
+//
+// Answers: Which of the sounds in this recording do you mean? (a page that plays each frequency band, or each stem, to point at)
 package main
 
 import (

@@ -10,6 +10,8 @@
 // fitted — a fitted anchor is an anchor that has already absorbed the drift the
 // check exists to find. Exits 1 if any graded frame is not clean, so it is usable as
 // a gate. See docs/techniques/tia-pcm.md and G3 in docs/capability-gap-audit.md.
+//
+// Answers: Does a digitised-sound ROM write the samples it means to, at the moments it means to?
 package main
 
 import (

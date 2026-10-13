@@ -20,6 +20,8 @@
 // measured from a mix is the mix's, not the instrument's — band-limit to the part, and read
 // the f0 warning, because a harmonic series measured on the wrong fundamental is a series of
 // the wrong thing.
+//
+// Answers: Which TIA waveform sounds most like this recorded sound?
 package main
 
 import (

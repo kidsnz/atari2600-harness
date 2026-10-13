@@ -8,6 +8,8 @@
 // 音色は声部毎に auto-pick。総フレーム長が違う場合は短い方を休符で自動パディング（ループ同期）。
 // 生成物は単独 4K ROM（黒画面・262行・overscan でドライバ tick・曲はループ）。
 // dasm が PATH にあれば .bin まで作る。
+//
+// Answers: Turn a melody written as note names into a ROM that plays it.
 package main
 
 import (

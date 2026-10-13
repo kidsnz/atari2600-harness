@@ -8,6 +8,8 @@
 //	go run ./cmd/framesim -a cand.bin -b golden.png
 //
 // Exit 1 if SSIM falls below -min (a tolerant regression gate); 0 otherwise.
+//
+// Answers: How similar are two pictures (frames of two ROMs, or PNGs), tolerantly, and where do they differ?
 package main
 
 import (

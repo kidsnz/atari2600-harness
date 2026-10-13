@@ -14,6 +14,8 @@
 //	go run ./cmd/cpucert -asm roms/litmus/smoke.asm -json     # JSON artifact
 //
 // Exit 0 = certified; 1 = not certified; 2 = error.
+//
+// Answers: Give me a citable certificate of a kernel's proven worst-case cycles per scanline.
 package main
 
 import (

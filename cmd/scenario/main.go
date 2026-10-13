@@ -4,6 +4,8 @@
 //	go run ./cmd/scenario <scenario.json> [more.json ...]
 //
 // 全アサーション pass で exit 0、1 つでも fail / エラーで exit 1。
+//
+// Answers: Run a ROM through scripted input and checks and say pass or fail; -update re-records the pinned picture and sound.
 package main
 
 import (

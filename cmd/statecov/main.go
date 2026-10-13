@@ -4,6 +4,8 @@
 // missile/ball size, vertical-delay flags, playfield reflect/score/priority, and
 // bank switches. An axis stuck at its reset value is a verification blind spot.
 // This is orthogonal to PC/branch coverage (VV-3, cmd/cover).
+//
+// Answers: Which TIA modes (copies, sizes, delays, playfield modes, banks) did a run actually use?
 package main
 
 import (

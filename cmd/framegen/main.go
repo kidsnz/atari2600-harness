@@ -10,6 +10,8 @@
 //	go run ./cmd/framegen -rom Outlaw.bin -reset -frames 28 -out clone/outlaw_clone.asm
 //
 // Verify the result with: vismatch -target Outlaw.bin -mine clone/outlaw_clone.asm
+//
+// Answers: Reproduce a target ROM's static frame as a new, self-contained assembly source.
 package main
 
 import (

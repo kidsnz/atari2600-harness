@@ -52,6 +52,8 @@
 // 60-1000), and it called another record's full mix a single source. More to the point: if the
 // right move is always to separate — and at ten seconds it is — then a tool that tells you
 // whether to separate has no decision to inform. The knowledge belongs here, not in a command.
+//
+// Answers: Is the pitch I measured in a recording the fundamental, or a harmonic?
 package main
 
 import (

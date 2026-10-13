@@ -8,6 +8,8 @@
 //	go run ./cmd/beamtrace -rom game.bin -json
 //
 // Clock convention: HBLANK = -68..-1, visible = 0..159 (Gopher2600).
+//
+// Answers: Where on the scanline does each TIA write land, and which pixels does it govern?
 package main
 
 import (
