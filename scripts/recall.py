@@ -29,6 +29,15 @@ twelve tools one work wrote for itself, six had a command here that came near an
 -work DIR also appends the question and what was returned to DIR/build/recall.log, which
 is the record of what the knowledge was asked while that work was made.
 
+    python3 scripts/recall.py --detect frame_lines_stable "262x699 263x1"
+
+--detect CHECK is for the moment a scenario check has just failed. It does not search by
+likeness: it returns the passages that NAME that check -- first the rows of known-traps.md,
+which say what the check catches, then what scenarios.md says the check does, then the rest --
+and puts them in the order of what the failure said, if anything was passed after the name. A
+check no document names gets told so, and the ordinary search of what the failure said.
+-full prints whole passages instead of their first 420 characters.
+
     python3 scripts/recall.py --selftest     known-answer test on a corpus the test builds
     python3 scripts/recall.py --exam [FILE]  how often the right passage comes back, for the
                                              questions in scripts/recall_exam.tsv: a measurement
@@ -176,7 +185,8 @@ class Index:
                 self.df[w] = self.df.get(w, 0) + 1
         self.avg = sum(len(x[0]) for x in self.toks) / max(1, len(self.toks))
 
-    def ask(self, question, n=6):
+    def scored(self, question):
+        """[(score, index)] of every passage that shares a word with the question, best first."""
         q = words(question)
         extra = [x for w in re.findall(r"[a-z0-9_$]+", question.lower()) for x in ALSO.get(w, [])]
         terms = {w: 1.0 for w in q}
@@ -205,8 +215,11 @@ class Index:
                 s *= 1.0 + 0.2 * named + (0.4 if page else 0.0)
             scored.append((s, i))
         scored.sort(reverse=True)
+        return scored
+
+    def ask(self, question, n=6):
         out, per_file = [], {}
-        for s, i in scored:
+        for s, i in self.scored(question):
             rel = self.items[i][0]
             if per_file.get(rel, 0) >= 3:                     # no more than three passages of one file
                 continue
@@ -215,6 +228,35 @@ class Index:
             if len(out) == n:
                 break
         return out
+
+
+DETECT_ORDER = ("known-traps.md", "scenarios.md", "authoring-protocol.md", "techniques/", "cookbook.md", "testing-playbook.md")
+
+
+def detect(ix, check, said="", n=6):
+    """Passages that name a scenario check: what it catches first, then what it does, then the rest."""
+    if "_" in check:
+        pat = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(check) + r"(?![A-Za-z0-9_])")
+    else:                                                     # a check whose name is an ordinary word (`motion`) counts only when quoted as a name
+        pat = re.compile(r"[`\"]" + re.escape(check) + r"[`\"]")
+    like = dict((i, s) for s, i in ix.scored(said)) if said.strip() else {}
+    named = []
+    for i, (rel, line, title, text) in enumerate(ix.items):
+        if pat.search(text):
+            group = next((k for k, frag in enumerate(DETECT_ORDER) if frag in rel), len(DETECT_ORDER))
+            named.append((group, -like.get(i, 0.0), i))
+    named.sort()
+    out, per_file = [], {}
+    for group, neg, i in named:
+        rel = ix.items[i][0]
+        cap = 4 if "known-traps.md" in rel else 2
+        if per_file.get(rel, 0) >= cap:
+            continue
+        per_file[rel] = per_file.get(rel, 0) + 1
+        out.append((-neg, *ix.items[i]))
+        if len(out) == n:
+            break
+    return out, len(named)
 
 
 def selftest():
@@ -236,6 +278,19 @@ def selftest():
         (root / "docs" / "known-traps.md").write_text("# traps\n\n| trap | what happens |\n|---|---|\n| **a sprite drawn one line low** | VDEL shifts the copy by a line |\n")
         a2 = Index(root).ask("the frame is one scanline too long after the timer wait")
         ok = ok and not any("leaves a line late" in x[3] for x in a2)
+        # --detect: by the check's name, not by likeness; the row that says what it catches comes first
+        (root / "docs" / "known-traps.md").write_text(
+            "# traps\n\n| trap | what happens | detect |\n|---|---|---|\n"
+            "| **a frame of 263 lines** | the picture rolls | runtime: `frame_lines_stable` |\n"
+            "| **a frame that is long, stable or not** | words alike, another check | runtime: `ntsc_frame_lines` |\n"
+            "| **a sprite that moves** | the word motion is not the check | manual |\n")
+        (root / "docs" / "scenarios.md").write_text("# scenarios\n\n- `frame_lines_stable` counts the lines of every frame of a window.\n- `\"motion\"` pins how far an object moves.\n")
+        ix = Index(root)
+        d, total = detect(ix, "frame_lines_stable", "262x699 263x1")
+        ok = ok and total == 2 and [x[1] for x in d] == ["docs/known-traps.md", "docs/scenarios.md"] and "263 lines" in d[0][4]
+        m, total = detect(ix, "motion")
+        ok = ok and total == 1 and "pins how far" in m[0][4]                  # the row that only uses the word is not returned
+        ok = ok and detect(ix, "no_such_check")[1] == 0
     print("recall selftest:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 
@@ -290,23 +345,41 @@ def main():
         return selftest()
     if args and args[0] == "--exam":
         return exam(args[1] if len(args) > 1 else Path(__file__).with_name("recall_exam.tsv"))
-    n, work = 6, None
-    while args and args[0] in ("-n", "-work"):
+    n, work, check, full = 6, None, None, False
+    while args and args[0] in ("-n", "-work", "--detect", "-full"):
+        if args[0] == "-full":
+            full = True
+            args = args[1:]
+            continue
+        if len(args) < 2:
+            sys.exit(__doc__)
         if args[0] == "-n":
             n = int(args[1])
+        elif args[0] == "--detect":
+            check = args[1]
         else:
             work = Path(args[1])
         args = args[2:]
-    if not args:
+    if not args and not check:
         sys.exit(__doc__)
     question = " ".join(args)
-    hits = Index().ask(question, n)
-    if not hits:
-        print("nothing in the documents shares a word with that. Say it another way; if it still finds nothing, this is knowledge the harness does not have -- write it down when you have it.")
+    ix = Index()
+    if check:
+        hits, total = detect(ix, check, question, n)
+        if hits:
+            print(f"{total} passage(s) name `{check}`" + (f"; the first {len(hits)}, what it catches first:" if total > len(hits) else ":"))
+        else:
+            print(f"No passage of the documents names `{check}`." + (" What the failure said, searched the ordinary way:" if question else " Say what the failure said after the name, or ask in your own words."))
+            hits = ix.ask(question, n) if question else []
+        question = f"{check} fails: {question}".strip()
+    else:
+        hits = ix.ask(question, n)
+        if not hits:
+            print("nothing in the documents shares a word with that. Say it another way; if it still finds nothing, this is knowledge the harness does not have -- write it down when you have it.")
     for k, (s, rel, line, title, text) in enumerate(hits, 1):
         title = title[5:] if title.startswith("PAGE ") else title
         print(f"{k}. {rel}:{line}  [{title}]")
-        print("   " + text[:420] + (" ..." if len(text) > 420 else ""))
+        print("   " + (text if full or len(text) <= 420 else text[:420] + " ..."))
     found = ask_tools(ROOT, question)
     print()
     if found:

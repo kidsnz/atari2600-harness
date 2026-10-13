@@ -46,6 +46,13 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
    used: in the first work made after it was written down (2026-10), it was read once, at the plan, and
    not again in two days — seven of the problems met afterwards were already answered here. Reading the
    five documents below from the top is for the plan; `recall` is for the two days after it.
+   **When a scenario check has just failed, ask by its name:**
+   `python3 scripts/recall.py --detect frame_lines_stable "262x699 263x1"` returns the passages that
+   NAME the check — the rows of `known-traps.md` that say what it catches, then what `scenarios.md`
+   says it does — in the order of what the failure printed. That is a look-up, not a search: for the
+   17 checks, a question made of the failure's own words put a `known-traps` row naming the check in
+   its first three passages for 4 of them, the look-up for 13 (`ram_budget`, `golden_frame`, `motion`
+   and `score_equals_ram` have no such row).
    - `docs/cookbook.md` → the recipe for this game-type (technique stack + traps + checks).
    - `docs/casebook.md` → how a real commercial game solved this situation (situation → technique, evidence-backed by disassemblies).
    - `docs/mining-digest.md` / `docs/design-principles.md` → the rules for the feature at hand.

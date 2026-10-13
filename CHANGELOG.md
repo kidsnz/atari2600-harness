@@ -8,6 +8,36 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — `recall.py --detect <check>`: what a failed scenario check catches, by its name (2026-10-13)
+
+`scripts/recall.py` ranks passages by likeness to a question. A check that has just failed is not a
+question: it has a name, and the documents already say what that check catches — in the `detect`
+column of `docs/known-traps.md` and in `docs/scenarios.md`. `--detect <check> ["what the failure
+printed"]` returns the passages that NAME the check: the `known-traps` rows first, then
+`scenarios.md`, then the rest, and inside each group in the order of what the failure printed. A
+check whose name is an ordinary word (`motion`) counts only where it is quoted as a name. A check no
+passage names is said to be unnamed, and what the failure printed is searched the ordinary way.
+`-full` prints whole passages (a `known-traps` row's `detect` cell is at its end, past the 420
+characters shown by default).
+
+Measured on the 17 scenario checks, the first three passages returned, read whole: with the
+failure's own words as a question (`"<check> fails: <what it printed>"`, which is what the authoring
+hook asked until today) a `known-traps` row naming the check was among them for 4 checks; with
+`--detect`, for 13. Ten of those rows already named their check. Three did not, and the look-up
+showed it: the rows on `HMxx` written within 24 cycles of an `HMOVE`, on RAM read before anything
+wrote it (two rows), and on a line over 76 cycles named the MCP tool or nothing, not the scenario
+check that fails on them. Their `detect` cells now say `no_hmove_hazard`, `no_uninit_read` and
+`max_line_budget`. Four checks — `ram_budget`, `golden_frame`, `motion`, `score_equals_ram` — have
+no trap row; for those the look-up returns what `scenarios.md` says the check does.
+
+One replay: the frame that grew to 263 lines when a longer music player was put in front of the
+timer wait (`frame_lines_stable`, "262x699 263x1"). The row that explains it — the `INTIM` wait
+ending on either side of a line — is the second passage returned.
+
+`--selftest` gains three cases on a corpus it builds: the row naming the check ahead of the page
+that describes it, a row that only uses the word `motion` not returned, an unknown check finding
+nothing.
+
 ### Fixed — the RIOT timer wrap race: the engine does reproduce it, and the detector missed the second lap (2026-10-13)
 
 Twelve statements in six files said the embedded engine "does not reproduce" the timer-wrap write
