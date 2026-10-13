@@ -8,6 +8,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — `scripts/recall.py`: tool-roster entries are passages of their own; three questions it cannot answer (2026-10-13)
+
+Each entry of `CLAUDE.md`'s tool roster (a `cmd/x` entry, a bold MCP tool name) is now one passage, titled
+with the tool's name, instead of part of one long paragraph. On the exam's 18 knowledge questions this
+moved the right passage into the first 5 for one more (15 of the 21 now in the file, from 14).
+
+`scripts/recall_exam.tsv` gains three questions of a kind the first 18 did not have: "which command does
+X" (compare the RAM of two ROMs frame by frame; press fire at random times and watch the frame length; is
+my picture the original's, pixel by pixel). They were asked for real, while checking whether a work's own
+tools duplicated a command here, and all three find nothing in the first 10 — before and after the roster
+change. The roster says what each tool is, in its builder's words; the question says what one wants. That
+is a gap in the documents, and the questions stay in the exam as written until it is closed.
+
 ## [3.0.0] - 2026-10-13
 
 Everything since 2.0.0 (2026-07-31): 638 commits before the one that cut this version.

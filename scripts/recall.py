@@ -29,12 +29,14 @@ is the record of what the knowledge was asked while that work was made.
                                              questions in scripts/recall_exam.tsv: a measurement
                                              of this tool against these documents, not a gate
 
-What it scored when it was written (2026-10-13, 18 questions taken from the problems of one
-work and written down before the tool was): the answer in the first 5 for 14, in the first
-10 for 16; a plain count of shared words gets 10 and 15; without the synonym table, 12 and
-13. The synonym table was written AFTER the questions were, by the same author, so that
-last pair is the honest floor. Of the two it never finds, one is knowledge the documents
-did not have in an author's words.
+What it scores (2026-10-13). On the 18 questions it was written against -- the problems of one
+work, written down before the tool was -- the answer is in the first 5 for 14 and in the first
+10 for 16; a plain count of shared words gets 10 and 15; without the synonym table, 12 and 13.
+The synonym table was written AFTER those questions, by the same author, so that last pair is
+the honest floor. Three questions of a different kind were added the same day ("which command
+does X") and found nothing in the first 10; making each entry of CLAUDE.md's tool roster its
+own passage did not move them, because the roster says what a tool is and the question says
+what one wants. Run --exam for today's numbers; never reword a question to make it pass.
 """
 import json, math, os, re, sys, time
 from pathlib import Path
@@ -88,7 +90,9 @@ def passages(root):
                 text = " ".join(block).strip()
                 if len(text) > 40:
                     lead = re.match(r"[|\-*\s]*\*\*(.+?)\*\*", text)
-                    out.append((rel, start, (lead.group(1) if lead else heading)[:160], text))
+                    tool = re.match(r"\**((?:`[A-Za-z0-9_./-]+`(?:\s*[+/&,]\s*)?)+)", text)      # a roster entry: `cmd/x` + `cmd/y` (what it is for)
+                    title = lead.group(1) if lead else tool.group(1).replace("`", " ") if tool else heading
+                    out.append((rel, start, title[:160], text))
             block = []
 
         for n, line in enumerate(path.read_text(errors="replace").split("\n"), 1):
@@ -97,7 +101,7 @@ def passages(root):
                 flush(); heading = s.lstrip("# ").strip(); continue
             if not s or re.fullmatch(r"\|[\s:|-]+\|?", s):
                 flush(); continue
-            new = s.startswith("|") or re.match(r"([-*]|\d+\.)\s", s) or (s.startswith("`") and block and len(" ".join(block)) > 600)
+            new = s.startswith("|") or re.match(r"([-*]|\d+\.)\s", s) or re.match(r"\**`(cmd|internal|pkg|scripts)/", s) or re.match(r"\*\*`[a-z_]+`\*\*", s)
             if new or not block:
                 flush(); start = n
             block.append(s)

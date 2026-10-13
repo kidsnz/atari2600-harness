@@ -20,3 +20,9 @@ read what the sound registers do over many frames	CLAUDE.md|mcp-tools.md	read_au
 place a sprite at an exact horizontal position	sprite-placement.md|shared-setxpos.md	
 8-bit LFSR taps that never reach zero	procedural.md	never-zero|never zero
 waiting for INTIM to reach zero in a loop leaves the loop a whole interval early	known-traps.md	exits one whole interval early
+# Asked on 2026-10-13 while looking for an existing command before promoting a work's own tool. All three
+# found nothing in the first 10 on the day they were added: the roster describes tools in the builder's
+# words, not the asker's.
+compare the RAM of two ROMs frame by frame to show a rewrite did not change behaviour	CLAUDE.md|reproduce-loop.md|tool-landscape.md	ramtrace|behavmatch|trajdiff
+press the fire button at random times and see whether a frame is ever not 262 lines	CLAUDE.md|testing-playbook.md	guidedfuzz|fuzz
+is the picture my build draws the same as the original ROM's, pixel by pixel	CLAUDE.md|reproduce-loop.md	vismatch|refdiff
