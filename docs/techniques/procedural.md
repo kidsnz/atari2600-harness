@@ -196,6 +196,41 @@ A seed saves the ROM a stored map would take. It does not, by itself, save RAM.
   generator still saves the rest of the screen, a design in which any block can be broken leaves the
   rule nothing to save. Cited only, not verified.
 
+## What a generated scene gets wrong for one seed in many
+
+Three faults of one work (a landscape generator, `roms/261011_edo`), none of which any check of the
+shipped seeds had found, and one way of narrowing a draw. All four are measured there; what was run
+is in `roms/261011_edo/steps/README.md`, rows 13, 14 and 20.
+
+- **A loop that hands things out until a total is reached needs its own count.** The scene builder
+  gave out zone heights (24 to 64) while the total was 192 or less and stored one array entry per
+  zone. A total of exactly 192 followed by a zone of 64 is 256, which is 0 in a byte: the loop went
+  on past the fifth zone, storing at its index each time — into the kernel's variables at 15, the
+  stack at 18, the return address at 22. A seed was found (`B0 63 18 0E`) that stopped the ROM at
+  power-on; no check of the shipped settings had shown it. The total was the only exit,
+  and a total can wrap. Stop on the count as well (here: throw the scene out when the sum carries),
+  and when the exit is "redraw until it fits", see `design-principles.md`, *"Picking a free square by
+  redrawing until one is free may never end"*.
+- **Two colours drawn apart will sometimes be the same colour.** With an object's colour and its
+  background's each drawn from the 128, one object in 128 was drawn in exactly its background's colour
+  and could not be seen; the original it was derived from has the same. Compare after
+  drawing and move one of them (the next hue, same luminance; bit 0 of a colour byte is not a colour
+  bit, so compare with `%11111110`). Where one of the two is a gradient that runs through every
+  luminance, the same hue is already too close: compare the hue alone (`%11110000`).
+- **A fault of the first scene only shows where the first scene has something to show.** For eleven
+  steps the sprites of the power-on scene were one step off in 10 of the 14 shipped settings, and
+  every check passed, because the checks ran the one setting in which nothing moves in the first
+  scene. A generator's settings (seed, speed, limits) are states like any other: run the checks
+  under each one that ships, or the value measured in one cannot be told from a constant.
+- **To take entries out of a table draw, clear bits of the draw, and write down what else moves.**
+  A thickness was drawn as `table[r & 7]` with the table `0, 1, 2, 0, 1, 2, 0, 1`. Keeping the
+  objects to thickness 0 and 1 without a second table took two bytes: `and #%11111001` on the random
+  byte before the look-up, which leaves indices 0 and 1. The draw count does not change, so the rest
+  of a scene stays where it was — but the look-up is not the identity on what is kept: of the 8
+  indices, the two that gave 2 now give 0 and 1, and two more (3 and 4) trade 0 and 1. Leaving every
+  kept value where it was needs the look-up taken apart, about 7 bytes in that ROM. Write the table
+  out for all 8 indices before saying which objects change.
+
 ## Uses
 - Enemy spawn positions/waves (starshot uses this for wave patterns).
 - Terrain/maze generation: step per row/cell; bidirectional variants (Pitfall's left/right

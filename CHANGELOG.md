@@ -8,6 +8,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — four things one work's generator got wrong or needed, and a verdict the stack check could not give (2026-10-13)
+
+`docs/techniques/procedural.md` gains a section, *What a generated scene gets wrong for one seed in
+many*. A review of the first work made after the landing (`roms/261011_edo/REVIEW.md`) classed
+seventeen problems by whether the documents already answered them; these are the ones they did not,
+each as measured in that work: a loop that hands out heights until a total is reached and has no
+count of its own (a total of 256 is 0 in a byte, and the loop wrote past its arrays into the stack);
+two colours drawn apart that come out the same one time in 128, so that an object cannot be seen; a
+fault of the power-on scene that eleven steps of checks passed because they ran the one setting in
+which nothing moves in it; and how to take entries out of a table draw by clearing bits of the draw
+(two bytes) — with what else that moves. Asked in other words than the page's, each of the four
+questions now returns its passage first (`scripts/recall.py`). Asked of the documents as they were
+one commit earlier, none of the four had a passage about its problem in the first two returned; the
+nearest were a page on same-coloured objects used as probes and the row on what the emulator's own
+answer depends on besides the ROM.
+
+`docs/scenarios.md`, on `no_stack_overlap`: the 21 flagged images of one work (ten programs that
+`PHA` and also write a table up to `$FF`) were looked at and are harmless. The check can say that a
+byte is used both ways; whether it matters took a measurement: over 2,400 frames of each program,
+a copy without the table stores has the same picture and sound registers on every frame, a copy
+with the push replaced by a register transfer differs in no RAM byte but `$FF`, and a copy with the
+pull removed — the control — differs in sound on 2,359 to 2,400 frames.
+
 ### Added — `recall.py --detect <check>`: what a failed scenario check catches, by its name (2026-10-13)
 
 `scripts/recall.py` ranks passages by likeness to a question. A check that has just failed is not a

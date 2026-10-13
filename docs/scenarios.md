@@ -227,7 +227,15 @@ recognised (an X-indexed zero-page access while X equals SP) and those are clean
 one work's ROMs that write a table up to `$FF` and also `PHA` (21 images of ten programs), three
 test ROMs that re-enter their reset code or run from RAM, two bank-switch test cartridges and one
 finished game: uses of one byte both ways that may be deliberate or harmless, which a scenario's
-author has to look at before turning the check on. What it deliberately does not count: where the
+author has to look at before turning the check on. The ten programs were looked at the same day and are
+harmless, which is the kind of answer the check cannot give by itself: the push and its pull stand two
+instructions apart with nothing between them that writes `$FF`, and the table that reaches `$FF` is
+written but not shown in those builds. Measured over 2,400 frames of each, against copies of the ROM:
+with the three table stores removed, no frame's picture and no frame's sound registers differ; with
+the push replaced by a transfer to X (and, again, to Y), picture, sound and every RAM byte but `$FF`
+are the same on every frame; with the pull removed — the control — the sound differs on 2,359 to 2,400
+frames and the picture on 10 to 915. The source's own comment had gone stale (*"The stack is unused
+... so $FF is free"*, written before the `PHA` was added), and nothing had come of it. What it deliberately does not count: where the
 stack POINTER went (a `TXS` writes nothing; a kernel may park SP on a TIA register and store with a
 push — `roms/litmus/litmus_stack_trick.asm` is clean), pushes below `$80`, accesses spelled through page
 1, and everything before the first frame boundary (the usual clear pushes a zero through every byte).
