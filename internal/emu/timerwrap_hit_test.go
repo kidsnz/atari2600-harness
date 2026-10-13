@@ -6,9 +6,17 @@ package emu
 // `WatchTimerDividerHazard` reports a write to TIM1T/TIM8T/TIM64T/T1024T whose own
 // cycles straddle the counter's underflow — on real hardware the RIOT's divider drops
 // to 1T at that instant, the requested divider is lost, and the interval comes out
-// 64x or 1024x short. Gopher2600 does not reproduce the race (its `Update` assigns
-// the divider unconditionally), which is why this is a detector rather than a test:
-// the consequence is invisible here, only the hazard can be reported.
+// 64x or 1024x short. That is the claim about hardware, and nothing here measures it.
+//
+// What Gopher2600 does is measured, in timerwrap_state_test.go. Its `Update` assigns
+// the divider unconditionally, as this comment used to say, but it also keeps the
+// expired flag when the write lands exactly one CPU cycle after the counter goes
+// 0x00 -> 0xff, and the engine then counts one per cycle whatever the divider. In
+// `litmus_timerwrap_hit` that is rows 5 and 9 of the six this detector reports per
+// frame; after rows 3, 4, 6 and 10 the engine takes the requested interval. So this
+// is a detector rather than a test of the consequence: it reports a four-cycle
+// window, the engine reacts to one cycle of it, and which cycles hardware reacts to
+// is not known here.
 //
 // Until now nothing in the repository satisfied its condition.
 // `litmus_timerwrap_nearmiss` writes just AFTER a wrap — the ordinary safe shape —

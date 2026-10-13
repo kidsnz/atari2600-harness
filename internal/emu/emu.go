@@ -995,8 +995,8 @@ func (e *Emu) WatchTimerWrap(frames int) (*TimerWrapHit, error) {
 }
 
 // TimerDividerHazard records a write to a timer divider register that lands on the
-// counter's wraparound — the classic "passes in every emulator, rolls on real
-// hardware" trap (G8).
+// counter's wraparound — the trap AtariAge thread 303277 reports as "Stella
+// passes, real hardware rolls" (G8; cited, neither half is measured here).
 //
 // On the real RIOT the divider internally drops to 1T when INTIM underflows. A
 // write to TIM8T/TIM64T/T1024T on that exact cycle loses the race: the requested
@@ -1004,11 +1004,26 @@ func (e *Emu) WatchTimerWrap(frames int) (*TimerWrapHit, error) {
 // intended to last hundreds of scanlines ends almost immediately — the frame comes
 // out short and the picture rolls.
 //
-// Gopher2600 does NOT reproduce it. Read timer.go's Update: it assigns the
-// requested divider unconditionally and resets ticksRemaining to 0, with no
-// wraparound race. That is exactly why this needs a detector rather than a test —
-// the consequence is invisible in the emulator, so the HAZARD is what gets
-// reported, not the failure.
+// What the embedded engine does was first decided by reading, and the reading was
+// wrong. timer.go's Update does assign the requested divider unconditionally and
+// reset ticksRemaining to 0 — but it also KEEPS the expired flag when the write
+// arrives with ticksRemaining == 0 and INTIM == 0xff, and Step counts one per cycle
+// for as long as that flag stands, whatever the divider says. Measured
+// (timerwrap_state_test.go, TestTimerWrapWriteStateSweep): a write to TIM64T or
+// T1024T landing exactly ONE CPU cycle after the counter goes 0x00 -> 0xff leaves
+// the engine counting one per cycle with the flag set, until a bus read of INTIM
+// ends it (measured for a read four cycles in; by timer.go's Step a read arriving
+// while INTIM is 0xff leaves the flag set — not measured); every other offset from -6 to +6 takes the requested interval, and the same
+// single cycle recurs one lap of the counter later (+257).
+//
+// So the engine reacts to ONE cycle and this detector reports a WINDOW — every
+// divider write whose own cycles contain the underflow, four offsets (0..+3) for a
+// 4-cycle store. On the sweep (58 rows, T1024T stores) it fires on 24: the 6 where
+// the engine goes fast and 18 where the engine takes the interval. That is
+// deliberate. It is a warning about a shape a builder should not ship, not a model
+// of this engine, and nothing measured here says which cycles real hardware reacts
+// to. A report therefore does NOT mean the emulated run misbehaved, and a ROM whose
+// run looks right under emulation can still be reported.
 type TimerDividerHazard struct {
 	Frame    int    // frame on which it occurred
 	Scanline int    // beam position of the write
@@ -1020,8 +1035,11 @@ type TimerDividerHazard struct {
 	// consequence: a T1024T interval running at 1T is 1024x too short.
 	Divider int
 	// INTIM and TicksRemaining are the counter state sampled BEFORE the store, and
-	// UntilWrap is the cycles from there to the underflow. The hazard is
-	// UntilWrap <= StoreCycles: the write and the divider's drop to 1T coincide.
+	// UntilWrap is the cycles from there to the underflow: TicksRemaining +
+	// INTIM*Divider while the expired flag is clear, INTIM+1 while it is set and
+	// TicksRemaining is 0 (one per cycle). The
+	// hazard is UntilWrap <= StoreCycles: the write and the divider's drop to 1T
+	// coincide.
 	INTIM          uint8
 	TicksRemaining int
 	UntilWrap      int
@@ -1081,7 +1099,27 @@ func (e *Emu) WatchTimerDividerHazard(frames int) ([]TimerDividerHazard, error) 
 		// CPU cycles away, and the store spans its instruction's cycle count. If the
 		// underflow falls inside that span, the write and the divider's drop to 1T
 		// coincide, which is the race.
+		//
+		// That distance holds only until the first wrap. Once the counter has wrapped
+		// (Expired) the engine no longer counts by the divider: timer.go's Step ends
+		// with `if tmr.expired { tmr.ticksRemaining = 0 }`, so the next Step's
+		// `ticksRemaining--` is again <= 0 and INTIM drops on every cycle. The next
+		// 0x00 -> 0xff is then INTIM+1 cycles away — measured on all 27 already-wrapped
+		// rows of TestTimerWrapWriteStateDetectorDistance. INTIM*divider, used here
+		// until 2026-10-13, was wrong in both directions: too long by a factor of up
+		// to the divider after TIM8T/TIM64T (16320 against 256), one short after TIM1T
+		// (4 against 5). It left the detector silent on a write one lap after the wrap
+		// that the engine answers with one-per-cycle counting (the +257 rows armed with
+		// TIM8T and TIM64T).
+		//
+		// TicksRemaining == 0 is part of the condition because the flag alone is not
+		// that state: Timer.Reset does not clear it, so a second LoadROM on the same
+		// Emu can start with the flag set and TicksRemaining at 1024, where the old
+		// sum is the distance. That path is read from timer.go, not run.
 		untilWrap := pre.TicksRemaining + int(pre.INTIM)*pre.Divider
+		if pre.Expired && pre.TicksRemaining == 0 {
+			untilWrap = int(pre.INTIM) + 1
+		}
 		span := int(lr.Defn.Cycles)
 		if untilWrap < 0 || untilWrap > span {
 			continue

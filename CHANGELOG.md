@@ -8,6 +8,77 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — the RIOT timer wrap race: the engine does reproduce it, and the detector missed the second lap (2026-10-13)
+
+Twelve statements in six files said the embedded engine "does not reproduce" the timer-wrap write
+race and that "the consequence is invisible here" — the comment on `emu.TimerDividerHazard`, two
+tests, two litmus sources and the G8 entry of `docs/capability-gap-audit.md`. All of them rested on
+one reading of `Timer.Update`: it assigns the requested divider unconditionally. It does. It also
+keeps the expired flag when the write arrives with `ticksRemaining == 0` and INTIM at `0xff`, and
+`Step` counts one per cycle for as long as that flag stands. Nobody had run it.
+
+Measured, `internal/emu/timerwrap_state_test.go` (new, four tests). Cartridges built in the test arm a
+timer, wait a counted number of CPU cycles and store 40 to TIM64T or T1024T; the offset between that
+write and the counter's `0x00→0xff` is moved one cycle at a time from −6 to +6, then +100 and
++255..+259, under three arming dividers (TIM1T, TIM8T, TIM64T), with one row 600 cycles early: 58 rows
+per store register. A write landing exactly ONE cycle after the wrap leaves the engine counting one
+per cycle with the expired flag still set — INTIM 39 falls to 231 in 64 cycles where the interval
+would leave 38 (TIM64T) or 39 (T1024T) — and so does +257, one lap of the counter later: 6 rows of 58, for either store. The
+other 52 take the requested interval. A bus read of INTIM ended the fast state where it was tried, four
+cycles in; by `timer.go`'s `Step`, a read arriving while INTIM is `0xff` would leave the flag set (not measured).
+
+Three things keep the measurement honest. The offset of every row is MEASURED on a control run
+(identical code, the second store sent to RAM) and the row fails if it differs from the one
+intended. The timer is read through `Emu.TimerState`, which goes to `Timer.PeekState` and never
+through the bus, because a bus read of INTIM is the very thing that ends the fast state: one test
+shows 232 peeks and 1 peek arriving at the same state, and then that a single `lda INTIM` four
+cycles in returns the engine to one per 64. A probe reading through the bus would have reported the
+requested interval at every offset. And the existing ROM is checked as it stands:
+`litmus_timerwrap_hit` reaches the cycle on rows 5 and 9, after which the engine counts one per
+cycle; `litmus_timerwrap_nearmiss` does not reach it.
+
+**The detector, `emu.WatchTimerDividerHazard` — a behaviour change.** It fires when the distance from
+the state before the store to the next wrap is within the store's own cycles, and it computed that
+distance as `ticksRemaining + INTIM*divider` in every state. Before the first wrap that is the
+measured distance on all 31 such rows. After it the engine is counting one per cycle whatever the
+divider, the measured distance is INTIM+1 on all 27 such rows, and the old sum was wrong in both directions:
+too long by a factor of up to the divider after TIM8T/TIM64T (16320 against 256), one short after TIM1T
+(4 against 5). The distance is now `INTIM + 1` when the timer's expired flag is set and `ticksRemaining` is 0,
+and the old sum otherwise; nothing else in the detector moved, and its signature and report are the same. On the 58
+T1024T rows:
+
+| armed | offsets fired one lap on, before | after |
+|---|---|---|
+| TIM1T | +255 +256 +257 +258 +259 | +256 +257 +258 +259 |
+| TIM8T | +259 | +256 +257 +258 +259 |
+| TIM64T | +259 | +256 +257 +258 +259 |
+
+Rows where the engine went fast and the detector said nothing: 2 before (+257 armed with TIM8T and
+with TIM64T), 0 after. One row stopped firing: +255 armed with TIM1T, five cycles from the wrap
+against a four-cycle store, which the old sum put at four. Around the first wrap nothing changed
+(offsets 0..+3 under all three dividers). With the fix removed the new assertions fail on exactly
+the thirteen lap rows above and pass again with it restored. No other expectation moved: 6 hazards per frame
+on `litmus_timerwrap_hit`, 0 on `litmus_timerwrap_nearmiss`, `game_states` and `litmus_lastline`.
+The distance printed for the near-miss ROM in three places, "255*8 = 2040", is corrected to
+255+1 = 256.
+
+The detector still reports a WINDOW and the engine reacts to ONE cycle of it, and that is left as it
+is: 24 of the 58 rows fire, 6 where the engine goes fast and 18 where it takes the interval (15
+before). It is a warning about a shape, not a model of this engine. Its comment now says so with
+these numbers.
+
+What is NOT claimed. Nothing here is a measurement of real hardware, and the engine reacting on one
+cycle is not evidence of which cycles a RIOT reacts to. Nothing here is a measurement of Stella: the
+three statements that Stella passes while hardware rolls (`docs/known-traps.md`,
+`docs/design-principles.md`, `litmus_timerwrap_hit.asm`) are now attributed to AtariAge thread
+303277 and neither asserted nor denied; "every emulator passes" is gone from the three places that
+said it. Not covered by the sweep: a store to TIM1T or TIM8T as the second write; any store form
+other than `sta` absolute (four cycles, writing on the last); a stored value other than 40; laps
+beyond the second; a wrap reached from T1024T; the engine's random-state reset; what a ROM polling INTIM
+would see, since the poll itself can end the fast state; and a second `LoadROM` on the same `Emu` —
+`Timer.Reset` does not clear the expired flag, so it can stand with `ticksRemaining` at 1024, which is why
+the new distance also requires `ticksRemaining == 0` (read from `timer.go`, not run).
+
 ### Added — every command says which question it answers, and `recall.py` lists the ones that do (2026-10-13)
 
 Each `cmd/<name>/main.go` now carries one line in its header, `// Answers: ...`: the question the

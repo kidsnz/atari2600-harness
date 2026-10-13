@@ -7,27 +7,34 @@
 ; intended to last hundreds of scanlines ends almost at once — the frame comes out
 ; short and the picture rolls.
 ;
-; Gopher2600 does NOT reproduce it. Its `Timer.Update` assigns the requested
-; divider unconditionally and resets ticksRemaining to 0, with no wraparound race.
-; So this ROM runs correctly under emulation, which is the whole point: it is the
-; "passes in every emulator, fails on hardware" shape the harness exists to catch,
-; and what a detector can report is the HAZARD, not the failure.
+; Gopher2600 was first READ as not reproducing it: its `Timer.Update` assigns the
+; requested divider unconditionally and resets ticksRemaining to 0. Both are true
+; and the conclusion was not. `Update` also keeps the expired flag when the write
+; lands exactly one CPU cycle after the counter goes $00 -> $FF, and the engine then
+; counts one per cycle whatever the divider — measured one cycle at a time in
+; internal/emu/timerwrap_state_test.go, where every other offset from -6 to +6
+; takes the requested interval. This ROM's store is not on that cycle and, measured
+; in the same file, takes its interval: it runs correctly under emulation. It was
+; BUILT as the "passes in emulation, fails on hardware" shape the harness exists to
+; catch, where what a detector can report is the HAZARD, not the failure.
 ;
 ; It was built to land the store ON the underflow. It does not, and the measurement
-; says so: at the store the timer reads INTIM=255, ticksRemaining=0, divider=8, so
-; the underflow is 255*8 = 2040 cycles away against a 4-cycle store. The polling
+; says so: at the store the timer reads INTIM=255, ticksRemaining=0, divider=8 with
+; the expired flag set — it has wrapped and is counting one per cycle, so the next
+; underflow is 255+1 = 256 cycles away against a 4-cycle store (this line said
+; 255*8 = 2040 until 2026-10-13, as the detector's own distance did). The polling
 ; loop's exit plus the intervening `lda` take longer than the ticks that remained,
 ; so the counter has already wrapped by the time the write happens.
 ;
 ; That makes this the NEGATIVE control, and a useful one: a divider write shortly
 ; after a wrap is the ordinary, safe shape, and a detector that flagged it would be
 ; crying wolf on every timer-driven kernel in the corpus. The positive case — a
-; store whose own cycles straddle the wrap — has NO ROM witness yet; arranging it
-; needs cycle-level tuning of the poll exit.
+; store whose own cycles straddle the wrap — is litmus_timerwrap_hit.
 ;
 ;   lda #1 / sta TIM64T     arm a short interval
 ;   wait   INTIM != 0       poll until the counter reaches 0
-;   sta    T1024T           <-- the hazardous write, on the underflow
+;   sta    T1024T           <-- built to be the hazardous write; measured 256
+;                               cycles before the next underflow
 ;
 ; A ROM that instead waits for the timer to expire and THEN writes is safe, and the
 ; detector must stay silent on that shape — litmus_timerwrap_clean is that control.

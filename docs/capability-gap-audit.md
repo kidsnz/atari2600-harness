@@ -289,10 +289,16 @@ the wording is coarse.
   the counter's underflow, folding every RIOT mirror through `memorymap.MapAddress` and taking the register
   addresses from the engine's own table (`cpubus`: `$0294`..`$0297`) rather than a literal.
 
-  **Confirmed first that the emulator does not reproduce the bug**, which is why a detector is needed rather
-  than a test: `Gopher2600/hardware/riot/timer/timer.go` `Update` assigns the requested divider
-  unconditionally and resets `ticksRemaining` to 0, with no wraparound race. The consequence is invisible
-  here, so only the hazard can be reported.
+  **The emulator was first reported here as not reproducing the bug, from reading its source; measured
+  2026-10-13, it does, on one cycle.** `Gopher2600/hardware/riot/timer/timer.go` `Update` does assign the
+  requested divider unconditionally and reset `ticksRemaining` to 0 — and it keeps the expired flag when the
+  write arrives with `ticksRemaining == 0` and INTIM at `0xff`, while `Step` counts one per cycle for as long
+  as that flag stands. `internal/emu/timerwrap_state_test.go` moves a TIM64T/T1024T write across the wrap one
+  CPU cycle at a time: landing exactly one cycle after `0x00→0xff` it leaves the engine counting one per cycle
+  until a bus read of INTIM ends it (measured four cycles in), at every other offset from −6 to +6 the requested interval takes, and
+  the same single cycle recurs one lap later (+257). A detector is still what is needed rather than a test of
+  the consequence, for a narrower reason than the one given: it reports a four-cycle window, the engine
+  reacts to one cycle of it, and which cycles hardware reacts to is not measured here.
 
   **The condition took two measurements to get right, and the first was wrong.** "INTIM == 0 with the
   decrement due" fires on nothing, because at instruction granularity that instant is almost never observed:
@@ -300,6 +306,9 @@ the wording is coarse.
   ticksRemaining=0, divider=8** — it had already wrapped, the polling loop's exit plus one `lda` taking longer
   than the ticks that remained. The computable condition is instead whether the store's cycles CONTAIN the
   underflow: `ticksRemaining + INTIM*divider ≤ storeCycles`. On that ROM that is **2040 against 4**.
+  (Corrected 2026-10-13: that sum is the distance only before the first wrap. This store comes after one,
+  where the engine counts one per cycle, so the distance is INTIM+1 = **256 against 4** — still far outside
+  the store, and the detector now computes it that way.)
 
   **So the litmus is named for what it measured as, not what it was built as.** `litmus_timerwrap_nearmiss`
   writes a divider just AFTER a wrap — the ordinary, safe shape — and is the negative control: a detector that

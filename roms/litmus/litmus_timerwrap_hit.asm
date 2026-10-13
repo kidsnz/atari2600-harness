@@ -3,14 +3,26 @@
 ; `emu.WatchTimerDividerHazard` reports a write to TIM1T/TIM8T/TIM64T/T1024T whose
 ; own cycles straddle the counter's underflow. On real hardware the RIOT's divider
 ; internally drops to 1T at that moment, so the requested divider is lost and the
-; interval comes out ~64x or ~1024x short — the ROM rolls on hardware while every
-; emulator passes. Gopher2600 does not reproduce the race (its `Update` assigns the
-; divider unconditionally), which is exactly why a DETECTOR is needed rather than a
-; test: the consequence is invisible here, only the hazard can be reported.
+; interval comes out ~64x or ~1024x short — the ROM rolls on hardware while Stella
+; passes, as AtariAge thread 303277 reports it (cited; neither half is measured here).
+;
+; What Gopher2600 does IS measured (internal/emu/timerwrap_state_test.go). Its
+; `Update` assigns the divider unconditionally, but it also keeps the expired flag
+; when the write lands exactly one CPU cycle after the counter goes $00 -> $FF, and
+; the engine counts one per cycle while that flag stands. In this ROM that is rows 5
+; and 9: after their stores INTIM falls once per CPU cycle (32 cycles measured). The
+; other rows the detector reports — 3, 4, 6, 10 — take the requested interval here.
+; So a DETECTOR is still what is needed rather than a test of the consequence: it
+; reports a four-cycle window, the engine reacts to one cycle of it, and which cycles
+; hardware reacts to is not known here.
 ;
 ; The detector's condition is
 ;
 ;       TicksRemaining + INTIM * Divider  <=  the store's own cycle count
+;
+; (That is the distance before the first wrap, which is the state of every row of
+; this ROM that fires. Once the counter has wrapped it counts one per cycle and the
+; detector uses INTIM + 1 instead.)
 ;
 ; and until now NOTHING in the repository satisfied it. `litmus_timerwrap_nearmiss`
 ; is the negative control — it writes JUST AFTER a wrap, the ordinary safe shape, and

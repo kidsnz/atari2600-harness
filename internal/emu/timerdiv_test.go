@@ -7,21 +7,27 @@ import "testing"
 // real hardware: the requested divider does not take, the timer keeps running at
 // 1T, and an interval meant to last hundreds of scanlines ends almost at once.
 //
-// Gopher2600 does not reproduce it — Timer.Update assigns the requested divider
-// unconditionally — so the consequence is invisible here and only the HAZARD can
-// be reported.
+// Gopher2600 was read as not reproducing it, because Timer.Update assigns the
+// requested divider unconditionally. It does assign it; it also keeps the expired
+// flag when the write lands exactly one CPU cycle after the counter goes
+// 0x00 -> 0xff, and Step counts one per cycle while that flag stands. Measured in
+// timerwrap_state_test.go: on that one cycle the engine ignores the requested
+// interval, at every other offset from -6 to +6 it takes it. So the consequence
+// shows here on one cycle of the four the detector reports, and on the rest only
+// the HAZARD can be reported.
 //
 // What this test locks is the NEGATIVE direction, which is the one with a witness.
 // litmus_timerwrap_nearmiss was built to land its store on the underflow and,
 // measured, does not: at the store the timer reads INTIM=255, ticksRemaining=0,
-// divider=8, putting the wrap 255*8 = 2040 cycles away against a 4-cycle store.
+// divider=8 with the expired flag set — already wrapped and counting one per cycle,
+// putting the next wrap 255+1 = 256 cycles away against a 4-cycle store (this line
+// said 255*8 = 2040 until 2026-10-13, as the detector's own distance did).
 // A divider write shortly after a wrap is the ordinary safe shape, and a detector
 // that flagged it would cry wolf on every timer-driven kernel in the corpus.
 //
-// The POSITIVE case has no ROM witness yet, and that is stated rather than implied
-// by a passing test: arranging a store whose cycles contain the wrap needs
-// cycle-level tuning of the polling exit. Until then the detector is code without a
-// witness, which is why its silence must not be read as "no hazards exist".
+// The POSITIVE case has a ROM witness, litmus_timerwrap_hit, locked by
+// TestTimerDividerHazardFiresOnAStoreThatStraddlesTheWrap. This test is the negative
+// half only, and the detector's silence here must not be read as "no hazards exist".
 func TestTimerDividerHazardDoesNotCryWolf(t *testing.T) {
 	roms := []string{
 		"../../roms/litmus/litmus_timerwrap_nearmiss.bin", // writes just AFTER a wrap
