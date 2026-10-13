@@ -1,0 +1,22 @@
+# Questions for `recall.py --exam`: what an author types in the middle of a job, and where the answer is.
+# question <TAB> file (any of, |) <TAB> a phrase the returned passage must contain (any of, |; empty = any passage of that file)
+# The first 18 are the problems met while one work was made (roms/261011_edo, 2026-10), written down on
+# 2026-10-13 BEFORE recall.py existed. Add a question when a work meets a problem; do not reword one to make it pass.
+the scene change frame is one scanline too long after I added code before the timer wait	known-traps.md	subroutine called mid-line|ends anywhere inside one pass of its loop
+building a new scene takes thousands of cycles and the picture rolls, do the work over several frames	blank-a-frame.md|rts-dispatch.md	
+the random number generator repeats the same scenes, how long is its period	procedural.md	period
+subroutine calls nest too deep and the stack overwrites variables at the top of RAM	known-traps.md	function of call depth
+the ROM is full, I need to save some bytes	kernel-micro-idioms.md|integration-density-playbook.md|branch-always.md	
+play a melody of plucked notes with the volume dying away every frame, and store the notes compactly	music-driver.md	
+which key can the TIA play this tune in so that it is in tune	music-driver.md|CLAUDE.md|tool-landscape.md	keyfit|HOW MANY pitches
+it was only checked in the default setting and the bug shows in the other settings	gate-ledger.md|testing-playbook.md|known-traps.md	single state|one state|only state
+the playfield register is written too late and the mountain is drawn shifted	known-traps.md|authoring-protocol.md|scenarios.md	pf_deadlines|playfield was rewritten|PF
+a frame is 266 scanlines instead of 262	known-traps.md	262
+two sprites in a horizontal band and the same two reused in the next band	zone-multiplexing.md	
+skip the next two bytes with a BIT absolute opcode	known-traps.md|kernel-micro-idioms.md|branch-always.md	BIT
+jump to a subroutine instead of jsr then rts, to save stack and cycles	kernel-micro-idioms.md	tail call
+how do I record the golden frame hash of a scenario again	scenarios.md	-update
+read what the sound registers do over many frames	CLAUDE.md|mcp-tools.md	read_audio_trace
+place a sprite at an exact horizontal position	sprite-placement.md|shared-setxpos.md	
+8-bit LFSR taps that never reach zero	procedural.md	never-zero|never zero
+waiting for INTIM to reach zero in a loop leaves the loop a whole interval early	known-traps.md	exits one whole interval early

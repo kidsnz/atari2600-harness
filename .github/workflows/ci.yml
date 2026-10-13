@@ -95,6 +95,7 @@ jobs:
           python3 scripts/check_tests.py
           python3 scripts/check_instruments.py --selftest
           python3 scripts/check_instruments.py
+          python3 scripts/recall.py --selftest
 
       - name: Wiring check (no orphaned knowledge — every doc reachable from an entrypoint)
         run: python3 scripts/check_wiring.py

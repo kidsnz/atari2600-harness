@@ -38,7 +38,14 @@ Distilled from real homebrew dev diaries (SpiceWare et al.) — the way an exper
 
 ## The 6 steps (run for every kernel/feature)
 
-1. **Retrieve** — before writing, pull the relevant knowledge:
+1. **Retrieve** — before writing, **and again every time the job changes or something fails**, pull the
+   relevant knowledge. Ask it in your own words first:
+   `python3 scripts/recall.py "what you are about to do, or what just went wrong"` prints the passages
+   of these documents that answer it, with file and line, in about a second; `-work <work dir>` also
+   logs the question to that work's `build/recall.log`. This step is where the knowledge stops being
+   used: in the first work made after it was written down (2026-10), it was read once, at the plan, and
+   not again in two days — seven of the problems met afterwards were already answered here. Reading the
+   five documents below from the top is for the plan; `recall` is for the two days after it.
    - `docs/cookbook.md` → the recipe for this game-type (technique stack + traps + checks).
    - `docs/casebook.md` → how a real commercial game solved this situation (situation → technique, evidence-backed by disassemblies).
    - `docs/mining-digest.md` / `docs/design-principles.md` → the rules for the feature at hand.

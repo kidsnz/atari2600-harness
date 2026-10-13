@@ -211,6 +211,7 @@ round trip. Also return `png_path` in JSON.
 | Step | Read |
 |---|---|
 | **0. START HERE** — the authoring loop (retrieve→plan→author→preflight→verify→feedback) | **`docs/authoring-protocol.md`** |
+| **0b. ASK FIRST, and again whenever the job changes or a check fails** — the passages of all of these documents that answer a question put in your own words, in a second | **`python3 scripts/recall.py "..."`** (`--exam`: how often it finds the right one) |
 | 1. pick the recipe — game-type → technique stack + traps + checks + 14-step build order | `docs/cookbook.md` |
 | 1b. case studies — how real commercial games solved a situation (situation → technique, evidence-backed by disassemblies) | `docs/casebook.md` |
 | 1c. build-to-learn — reusable template for reproducing a real game mechanic-by-mechanic to turn "can read" into "can author" | `docs/build-to-learn.md` |

@@ -6,6 +6,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Added — `scripts/recall.py`: ask the documents a question (2026-10-13)
+
+`python3 scripts/recall.py "the scene change frame is one scanline too long"` prints the passages of
+`docs/**/*.md` and `CLAUDE.md` that answer it — every table row, list item and paragraph is one passage,
+ranked by BM25 with a passage's heading or bold lead counting double — with file, line and the passage's
+own first words. Standard library only, no index file, about a second. `-work DIR` appends the question
+and what came back to `DIR/build/recall.log`.
+
+Why: the first work made after the forum knowledge was landed (`roms/261011_edo`, 2026-10) read these
+documents once, at the plan, and not again in two days of work. Looked up afterwards, seven of the
+problems it met were already answered here. The documents are about 20,000 lines and 77 technique
+pages; the authoring protocol's first step said to read five of them, and nothing made that cheap
+enough to do twice. The protocol now says to ask before writing and again whenever the job changes or
+a check fails, and `CLAUDE.md`'s routing table has the command as step 0b.
+
+How well it finds things is measured, not assumed: `--exam` runs the questions in
+`scripts/recall_exam.tsv` (18 so far, the problems of that work, written down before the tool was) and
+reports where the right passage came back. Today: in the first 5 for 14 of 18, in the first 10 for 16; a
+plain count of shared words gets 10 and 15. The synonym table in the script was written after the
+questions, by the same author; without it the score is 12 and 13, and that is the floor to compare a
+later change against. One of the two questions it never answers ("it was only checked in the default
+setting") found no passage because the documents say that only in the gate ledger's words, not an
+author's. `--selftest` (run in CI) builds its own corpus, asserts the known answers, and asserts that
+a corpus with the answer removed does not return it.
+
 ### Documentation — notes taken before 2026-10-12 may rest on truncated threads (2026-10-12)
 
 `docs/provenance.md` now says so where it names the per-thread notes, and names the tool that checks one
