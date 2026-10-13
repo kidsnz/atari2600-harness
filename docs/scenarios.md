@@ -77,7 +77,8 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
     "no_timer_wrap": 3,                // VV-10 T-1: watch N frames; fail if INTIM is read after the timer wrapped (G8)
     "no_hmove_hazard": 2,              // VV-10 T-2: watch N frames; fail if HMxx is written within 24cy of HMOVE
     "score_equals_ram": {"ram": "ram.0x80", "frames": 4}, // VV-9: OCR the rendered 2-digit BCD score == RAM (font from <scenario>.font)
-    "no_uninit_read": 2                // VV-10 T-3: from reset, fail if a RAM byte is read before it was ever written
+    "no_uninit_read": 2,               // VV-10 T-3: from reset, fail if a RAM byte is read before it was ever written
+    "no_stack_overlap": 700            // from reset for N frames, no input: fail if a RAM byte is both written by a push and used through zero page
   }
 }
 ```
@@ -206,6 +207,34 @@ ROM (our count, 2026-10-06), so it has not happened here. **Not verified.**
 `max_line_budget` (`RunUntilBudget`) /
 `golden_frame` (render-chain hash, below) / `golden_audio` (audio-chain hash, same mechanism via
 Gopher2600 `digest.Audio`, compared against `<scenario>.audio.golden`).
+
+## `no_stack_overlap` — a byte that is both stack and variable
+
+The 2600 has 128 bytes of RAM for variables and stack together and nothing marks where one ends.
+A program in which they meet does not crash and does not change its picture in any way a pinned
+frame would notice: a variable is just no longer what was stored. `"no_stack_overlap": N` runs the
+ROM from reset on a fresh emulator for N frames, **with no input**, instruction by instruction, and
+fails on the first RAM byte that a push (`JSR`, `PHA`, `PHP`, `BRK`) wrote and that an instruction
+also reached through zero page. The failure names the byte and both instructions. The description
+says "from reset, no input" every time, because a path only a button reaches is not covered.
+
+It is not on by default, and the reason is measured (2026-10-13, 686 ROM images under this
+umbrella, 300 frames each): 32 were flagged. Three were what the check is for — the planted
+`roms/litmus/stack_overlap_trap.asm` and two steps of a real work whose scene builder ran eight bytes
+deep under variables it set again for every zone, which every other check had passed. Three were
+batari Basic's bank-switch stub reading its own stack with `tsx / lda $04,x`; that idiom is now
+recognised (an X-indexed zero-page access while X equals SP) and those are clean. The other 26 are
+one work's ROMs that write a table up to `$FF` and also `PHA` (21 images of ten programs), three
+test ROMs that re-enter their reset code or run from RAM, two bank-switch test cartridges and one
+finished game: uses of one byte both ways that may be deliberate or harmless, which a scenario's
+author has to look at before turning the check on. What it deliberately does not count: where the
+stack POINTER went (a `TXS` writes nothing; a kernel may park SP on a TIA register and store with a
+push — `roms/litmus/litmus_stack_trick.asm` is clean), pushes below `$80`, accesses spelled through page
+1, and everything before the first frame boundary (the usual clear pushes a zero through every byte).
+
+Twin ROMs: `roms/litmus/stack_overlap_trap.asm` (a counter at `$FD` under a two-deep call: flagged
+at `$FD`) and `stack_overlap_clean.asm` (the same program with the counter at `$80`: clean);
+`internal/emu/stackoverlap_test.go`.
 
 ## Golden-frame regression (D-3, v0.19.0)
 

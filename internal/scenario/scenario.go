@@ -123,6 +123,7 @@ type Checks struct {
 	NoHMOVEHazard    *int                   `json:"no_hmove_hazard,omitempty"`    // VV-10 T-2: HMOVE 後 24cy 以内の HMxx 書き込みが無いことをゲート
 	ScoreEqualsRAM   *ScoreCheck            `json:"score_equals_ram,omitempty"`   // VV-9: 描画された2桁BCDスコア == RAM の値
 	NoUninitRead     *int                   `json:"no_uninit_read,omitempty"`     // VV-10 T-3: reset から N frame、未初期化 RAM 読みが無いことをゲート
+	NoStackOverlap   *int                   `json:"no_stack_overlap,omitempty"`   // from reset for N frames, no input: no RAM byte is both pushed to and used through zero page
 	NoBeamRace       *BeamRaceCheck         `json:"no_beam_race,omitempty"`       // AT-3: object の pixel-data 書込が指定 scanline 範囲で毎行ビーム到達前か（意図を著者が宣言＝健全）
 }
 
@@ -912,6 +913,34 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				got = int64(hit.Addr)
 				desc = fmt.Sprintf("no_uninit_read over %d frames: uninitialized RAM 0x%04X read @frame %d pc 0x%04X",
 					*s.Checks.NoUninitRead, hit.Addr, hit.Frame, hit.PC)
+			}
+			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
+			if !ok {
+				res.Pass = false
+			}
+		}
+		if s.Checks.NoStackOverlap != nil {
+			// A RAM byte that is both stack and variable. Like no_uninit_read this is a property from
+			// reset, so it runs on a fresh emulator -- and with NO input, which the description says
+			// every time: a path only a button reaches is not covered by this run.
+			fe, ferr := emu.New(spec)
+			if ferr != nil {
+				return nil, ferr
+			}
+			if ferr := fe.LoadROM(romPath); ferr != nil {
+				return nil, ferr
+			}
+			hit, ferr := fe.WatchStackOverlap(*s.Checks.NoStackOverlap)
+			if ferr != nil {
+				return nil, ferr
+			}
+			ok := hit == nil
+			got := int64(0)
+			desc := fmt.Sprintf("no_stack_overlap over %d frames from reset, no input: clean", *s.Checks.NoStackOverlap)
+			if hit != nil {
+				got = int64(hit.Addr)
+				desc = fmt.Sprintf("no_stack_overlap over %d frames from reset, no input: RAM $%02X is written by a push @pc 0x%04X and used through zero page @pc 0x%04X (frame %d)",
+					*s.Checks.NoStackOverlap, hit.Addr, hit.PushPC, hit.VarPC, hit.Frame)
 			}
 			res.Asserts = append(res.Asserts, AssertResult{Desc: desc, Got: got, Pass: ok})
 			if !ok {

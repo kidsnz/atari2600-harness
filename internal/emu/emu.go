@@ -1198,6 +1198,116 @@ func (e *Emu) WatchUninitRead(frames int) (*UninitReadHit, error) {
 	return nil, nil
 }
 
+// StackOverlapHit records a RAM byte that was used both as stack and as a variable.
+type StackOverlapHit struct {
+	Frame  int    // frame on which the second of the two uses happened
+	Addr   uint16 // the RAM address, $80-$FF
+	PushPC uint16 // an instruction whose push (JSR, PHA, PHP, BRK) wrote the byte
+	VarPC  uint16 // an instruction that reached the byte through zero page
+}
+
+// WatchStackOverlap steps the ROM instruction by instruction for `frames` frames and flags the
+// first RAM byte that a push wrote AND an instruction reached through zero page -- a byte that is
+// both stack and variable. The 2600 has 128 bytes for both, nothing marks where one ends, and a
+// program in which they meet does not crash: the variable is just no longer what was stored.
+//
+// Why it looks at USES and not at how far the stack pointer travelled: the pointer passing an
+// address writes nothing (a TXS is not a push; ramgate.go records where treating it as one led),
+// and the low-water mark alone cannot tell a deep call from a kernel that parks SP on a TIA
+// register. A byte that a push really wrote and a zero-page instruction really touched is the
+// fault itself. Pushes below $80 land on TIA registers (the stack trick) and are not RAM.
+//
+// What counts as "through zero page": the operand of a read, write or modify whose effective
+// address is $0080-$00FF, and the two bytes an indirect mode reads its pointer from. An access
+// spelled through page 1 ($0180-$01FF, `lda $0101,x` after a TSX) is the program looking at its
+// own stack and does not count; neither does the zero-page spelling of the same thing, `lda $04,x`
+// while X still equals SP.
+//
+// The reset code is skipped: watching starts at the first frame boundary. The usual clear
+// (`dex / txs / pha / bne`) pushes a zero through every byte of RAM, which is the opposite of
+// a fault. Nothing is said about the frames before that boundary.
+//
+// It sees the paths these frames take, with the input the caller applied, and no others.
+func (e *Emu) WatchStackOverlap(frames int) (*StackOverlapHit, error) {
+	first := e.Coords().Frame
+	for e.Coords().Frame == first {
+		if err := e.StepInstruction(); err != nil {
+			return nil, err
+		}
+	}
+	start := e.Coords().Frame
+	var pushed, used [128]bool
+	var pushPC, varPC [128]uint16
+	for e.Coords().Frame-start < frames {
+		if err := e.StepInstruction(); err != nil {
+			return nil, err
+		}
+		lr := e.VCS.CPU.LastResult
+		d := lr.Defn
+		if d == nil {
+			continue
+		}
+		n := uint16(0)
+		switch d.Operator {
+		case instructions.JSR:
+			n = 2
+		case instructions.PHA, instructions.PHP:
+			n = 1
+		case instructions.BRK:
+			n = 3
+		}
+		if n > 0 {
+			sp := uint16(e.VCS.CPU.SP.Address()) & 0xFF // after the push: the bytes are just above it
+			for k := uint16(1); k <= n; k++ {
+				a := (sp + k) & 0xFF
+				if a < 0x80 {
+					continue
+				}
+				i := a - 0x80
+				pushed[i], pushPC[i] = true, lr.Address
+				if used[i] {
+					return &StackOverlapHit{Frame: e.Coords().Frame, Addr: a, PushPC: lr.Address, VarPC: varPC[i]}, nil
+				}
+			}
+			continue
+		}
+		if d.Effect != instructions.Read && d.Effect != instructions.Write && d.Effect != instructions.Modify {
+			continue
+		}
+		var touched []uint16
+		base := lr.InstructionData
+		switch d.AddressingMode {
+		case instructions.PreIndexed:
+			p := (base + uint16(e.VCS.CPU.X.Value())) & 0xFF
+			touched = append(touched, p, (p+1)&0xFF)
+		case instructions.PostIndexed:
+			p := base & 0xFF
+			touched = append(touched, p, (p+1)&0xFF)
+		}
+		// `tsx / lda $04,x` reads the stack through zero page on purpose: page 0 and page 1 are
+		// the same RAM here and the zero-page form is a byte shorter. batari Basic's bank-switch
+		// stub does exactly this (measured: it was 3 of the 32 images this watch first flagged
+		// out of 686). An X-indexed zero-page access while X still equals SP is the program
+		// looking at its own stack, like the page-1 spelling, and does not count.
+		stackRelative := d.AddressingMode == instructions.AbsoluteX && d.Bytes == 2 &&
+			uint16(e.VCS.CPU.X.Value()) == uint16(e.VCS.CPU.SP.Address())&0xFF
+		if eff, isMem := e.effectiveAddr(); isMem && d.AddressingMode != instructions.Implied && eff < 0x0100 && !stackRelative {
+			touched = append(touched, eff)
+		}
+		for _, a := range touched {
+			if a < 0x80 {
+				continue
+			}
+			i := a - 0x80
+			used[i], varPC[i] = true, lr.Address
+			if pushed[i] {
+				return &StackOverlapHit{Frame: e.Coords().Frame, Addr: a, PushPC: pushPC[i], VarPC: lr.Address}, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
 // HMOVEHazardHit records an HMxx motion-register write too soon after an HMOVE (T-2).
 type HMOVEHazardHit struct {
 	Frame       int    // frame on which it occurred

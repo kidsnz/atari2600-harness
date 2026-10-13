@@ -247,7 +247,9 @@ findings, found the 2026-08-15 precedent, and measured the repair order. Re-meas
 each change.
 
 **A known limit, recorded 2026-10-07 and not fixed: the width of rule 3's band stands for a call
-depth that nothing states.** Rule 3 warns for a variable at `$F8`-`$FF`. That is eight bytes, which
+depth that nothing states.** (2026-10-13: still true of rule 3, which reads source. The
+scenario check `no_stack_overlap` now measures the thing itself at run time, for the paths a scenario
+runs: `docs/scenarios.md`.) Rule 3 warns for a variable at `$F8`-`$FF`. That is eight bytes, which
 is what four nested `JSR`s write from `SP = $FF` at two bytes each — our reading of the width, since
 neither the rule's comment in `scripts/check_traps.py`, nor its message, nor `known-traps.md` says
 where it comes from. (The row "variable placed at `$FF`" in `known-traps.md` already says that how

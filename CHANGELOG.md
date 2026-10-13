@@ -8,6 +8,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — scenario check `no_stack_overlap`: a RAM byte that is both stack and variable (2026-10-13)
+
+`"no_stack_overlap": N` runs a ROM from reset for N frames with no input and fails on the first RAM
+byte that a push wrote and that an instruction also reached through zero page
+(`Emu.WatchStackOverlap`). The fault it is for does not crash and does not move a pixel: in
+`roms/261011_edo` a scene builder ran eight bytes deep under two kernel variables for two steps and
+every check passed; it was found by a separate driver that happened to record the stack pointer.
+`ramtrace activity` already printed the stack's low-water mark for those steps (`$F7` against `$F9`),
+but nothing turned it into a failure, and a low-water mark cannot be a gate by itself — `TXS` moves
+the pointer without writing, and kernels park it on TIA registers. This check looks at uses instead:
+a byte really pushed to and really touched through zero page.
+
+Measured before deciding the default (686 ROM images under the umbrella, 300 frames each): 32
+flagged, of which the planted trap and the two faulty steps of that work are the true positives; 3
+were batari Basic's `tsx / lda $04,x` stack read, now recognised; 26 are uses of one byte both ways
+in other ROMs that nobody has looked at yet. So it is opt-in. Replayed on that work's steps 13 to
+19 at 700 frames: steps 15 and 16 fail at `$F8`, the others are clean. Twin litmus ROMs
+`stack_overlap_trap` / `stack_overlap_clean`; `docs/scenarios.md` has what it does and does not count.
+
 ### Removed — a 12 MB build product committed at the repository root (2026-10-13)
 
 `mixmatch`, a Mach-O arm64 executable, was committed on 2026-08-15 in the same change that added its source,
