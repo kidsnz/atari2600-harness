@@ -8,6 +8,18 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — a way in for "the ROM is full" (2026-10-13)
+
+`docs/integration-density-playbook.md` opens with a paragraph that says where the knowledge on
+saving bytes is — its own §A.6, `techniques/kernel-micro-idioms.md`, `techniques/branch-always.md` —
+and how to count the free bytes before cutting (assemble twice with two fill values). It is a
+signpost, written because the pages could not be found from the problem: asked "the ROM is full, I
+need to save some bytes", `scripts/recall.py` returned none of the three among its first four
+passages, and one work met a full ROM three times without opening any of them. With the paragraph
+the question returns it second, and "the assembler stops with Origin Reverse-indexed" returns it
+first. `--exam` goes from 15 to 16 of 21 in the first five; that question is one of the exam's, so
+the one point is this paragraph and nothing more general.
+
 ### Added — four things one work's generator got wrong or needed, and a verdict the stack check could not give (2026-10-13)
 
 `docs/techniques/procedural.md` gains a section, *What a generated scene gets wrong for one seed in

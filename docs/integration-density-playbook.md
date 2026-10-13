@@ -16,6 +16,15 @@ turns a working ROM into a **dense** one. This doc is the design-time reference 
 > Key sources are listed in §F. Grounded against our own Combat clean-room build and the
 > `casebook.md` disassembly mining.
 
+**When the ROM is full, and bytes have to be saved** (the assembler stops with `error: Origin
+Reverse-indexed`, or the last free bytes are gone): the knowledge on saving bytes is in three places.
+§A.6 below, *Byte-level idioms are the composition primitives* — tables shared and overlapped, the
+`BIT` skip, code that is also data. `techniques/kernel-micro-idioms.md` — instruction-level idioms,
+each with what it saves. `techniques/branch-always.md` — a `jmp` that can be a branch, one byte each,
+and the condition under which it cannot. Count before cutting: assemble twice with two different
+fill values and compare the two ROMs — the bytes that differ are the free ones. One work's notes said
+4 where that count gave 3 (`roms/261011_edo`, 2026-10-13).
+
 ---
 
 ## A. The eight transferable principles (adopted · adapted · rated)
