@@ -79,7 +79,7 @@ jobs:
       - name: CPU conformance — Klaus + Tom-Harte subset (external authoritative suites)
         # Certifies the embedded Gopher2600 CPU core against suites the harness does NOT author:
         # Klaus 6502 functional+decimal (embedded in the clone) + a Tom-Harte/SingleStepTests subset
-        # (per-cycle bus; fetched on demand, MIT, not vendored). Full 256-opcode run is local-only (1GB).
+        # (per-cycle bus; ships in the clone, fetched only if missing; MIT, not vendored here). Full 256-opcode run is local-only (1GB).
         env:
           CGO_ENABLED: "0"
         run: bash scripts/check_cpu_conformance.sh

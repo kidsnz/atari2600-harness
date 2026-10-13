@@ -2782,7 +2782,8 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   stable): **magic** on `$8B ane` and `$AB lax #imm` — the two this line already names as XAA/LXA —
   and **unstable** on six more that the map never mentioned. Five of them are *stores*:
   **`$93 sha (zp),Y`, `$9B tas abs,Y`, `$9C shy abs,X`, `$9E shx abs,Y`, `$9F sha abs,Y`**.
-  They AND the high byte of the target address into the value, so what they write
+  They AND the high byte of the target address plus one into the value (the engine's four cases
+  compute `uint8(address>>8) + 1` on the address after the index is added), so what they write
   depends on where they write. The sixth, **`$BB las abs,Y`**, is a different kind: the table files
   it under `"category": "read"`, and the engine ANDs the operand with SP and loads the result into A,
   X and SP, with no address term (`case instructions.LAS` in `Gopher2600/hardware/cpu/cpu.go`). Treat all six as denied.

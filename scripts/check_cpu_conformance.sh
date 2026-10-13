@@ -6,8 +6,8 @@
 #       embedded as .bin inside the Gopher2600 clone (committed upstream) -> always runs, no provisioning.
 #   - Tom Harte / SingleStepTests 65x02             (MIT; https://github.com/SingleStepTests/65x02)
 #       per-opcode, ~10k cases each, CYCLE-BY-CYCLE bus (addr/data/read|write) + final state + cycle count.
-#       The ~1GB JSON corpus is NOT in the Gopher2600 repo (its .gitignore excludes it); fetched on demand,
-#       never vendored into this repo (no redistribution).
+#       At the pinned Gopher2600 commit the ~1GB JSON corpus is tracked there and arrives with the clone;
+#       fetch_subset below downloads only a file that is missing. Never vendored into this repo.
 #
 # Run from harness/ (or anywhere — it cd's to the harness root). Usage:
 #   scripts/check_cpu_conformance.sh             # Klaus + Harte smoke subset (12 opcodes; fetch if missing)

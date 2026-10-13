@@ -6,8 +6,9 @@
 # for the embedded Gopher2600 CPU core (internal/cpudiff, cmd/cpucheck) — see
 # docs/capability-gap-audit.md VV-7. It is a CPU-only model (no TIA/RIOT), so it
 # is NOT a member of the full-system RAM vote (cmd/oraclevote); it cross-checks at
-# the instruction layer, covering undocumented opcodes / decimal edges that the
-# Tom Harte corpus (VV-1) excludes.
+# the instruction layer, covering the opcodes -- every undocumented one among
+# them -- that the Tom Harte subset run in CI (VV-1) does not exercise. The corpus
+# itself has all 256 opcodes.
 #
 # Like the Gopher2600 upstream clone, the perfect6502 source is NOT vendored into
 # this repo (gitignored); it is fetched on demand and pinned to a known commit.

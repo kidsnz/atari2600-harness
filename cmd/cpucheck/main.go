@@ -5,8 +5,10 @@
 // divergence in registers, cycle count, or memory writes. This is a CPU-LAYER
 // oracle: it is NOT part of the full-system RAM vote (cmd/oraclevote), because
 // perfect6502 has no TIA/RIOT and cannot run a 2600 ROM. Its value is catching a
-// CPU bug shared by the software emulators, and covering undocumented opcodes /
-// decimal edges that the fixed Tom Harte corpus (VV-1) excludes.
+// CPU bug shared by the software emulators, and covering the opcodes -- every
+// undocumented one among them -- that the Tom Harte subset run in CI (VV-1: twelve
+// documented opcodes) does not exercise. The corpus itself has all 256 opcodes,
+// with decimal-flag cases; Gopher2600's own runner lists six as not working.
 //
 // Requires bin/p6502step (scripts/install_perfect6502.sh). Exit codes:
 //

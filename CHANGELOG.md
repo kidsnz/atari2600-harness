@@ -31,6 +31,62 @@ setting") found no passage because the documents say that only in the gate ledge
 author's. `--selftest` (run in CI) builds its own corpus, asserts the known answers, and asserts that
 a corpus with the answer removed does not return it.
 
+### Fixed — two descriptions that named the wrong operation (2026-10-13)
+
+Both were found by readers distilling forum threads against this repository and then checked by a separate
+reviewer who opened the files. Documentation only.
+
+- `docs/design-principles.md`, the unstable stores (`sha`, `tas`, `shy`, `shx`): said they AND "the high
+  byte of the target address" into the value. The engine's four cases compute `uint8(address>>8) + 1`, and
+  `address` there is the one after the index has been added. The sentence now says "plus one" and says
+  which address. Followed literally, the old sentence gave a value one short: `SHX $1200,Y` with
+  X = `$FF` would write `$12` where the engine writes `$13`. That example is arithmetic on the source, not a
+  run. What real hardware does when the index crosses a page is not claimed here. An older entry below
+  repeats the old wording and is left as written.
+- `docs/techniques/score-kernel.md`: called 6502.org's `BINBCD8` "the classic shift-and-add-3". The
+  routine as posted in AtariAge `topic/330847` has no add of 3 and no compare against 5; it sets decimal
+  mode, shifts the binary input left one bit at a time and adds the BCD accumulator to itself with carry.
+  The BCD value after each bit is the same in both — decimal mode's correction after the add does the work
+  of adding 3 before the shift — but the name belongs to the other form, which `docs/techniques/divtable.md`
+  describes under Kevin Horton's routine. The sentence now describes what `BINBCD8` does. 6502.org itself
+  was not opened; the copy read is the one quoted in the thread.
+
+### Fixed — what the Tom Harte corpus does and does not leave out (2026-10-13)
+
+Several comments and two sentences of `docs/capability-gap-audit.md` said the Tom Harte corpus (VV-1)
+"excludes" the undocumented or unstable opcodes, and three of them added decimal edges. It does not. Three
+different things had been collapsed into one word:
+
+- **The corpus** holds one file per opcode, all 256, the unstable ones included (`93`, `9b`, `9c`, `9e`,
+  `9f`, `8b`, `ab` are there), 10000 cases each; about half of the cases start with the D flag set (4962 in
+  `69.json`).
+- **Gopher2600's own runner** of it, `thomharte_test.go`, names six opcodes in `notWorking`: `93 9f 9b 9c
+  9e ab`. ANE (`8b`), ANC, ALR, ARR and LAS are not on that list. In the checkout opened here both callers
+  pass `force` as true, so the list changes a log line and skips nothing; its `doc.go` describes a skip.
+- **CI here** runs twelve documented opcodes (`a9 69 e9 d0 4c 6c 20 b1 9d fe 00 ca`). That subset, not the
+  corpus, is why the silicon differential reaches opcodes the Harte step in CI does not — and `69` and `e9`
+  mean decimal ADC and SBC are not outside it.
+
+Changed: the comments in `internal/cpudiff/gen.go` (on `expectedDivergence`), `internal/cpudiff/cpudiff.go`
+(the package comment, which also called the corpus "vendored" — it arrives with the gitignored Gopher2600
+clone and is not committed to this repository),
+`cmd/cpucheck/main.go` and `scripts/install_perfect6502.sh`, and the VV-7 table row and VV-7 paragraph of
+`docs/capability-gap-audit.md`. One neighbouring comment was wrong in the same direction: `pMask` said
+it drops status bits 4 and 5 "as measure.c / Harte do"; `measure.c` compares under `0xCF`, the Harte
+runner under `0xef`, bit 4 only.
+
+Checked by listing the corpus directory, counting the cases in it, and opening `thomharte_test.go`,
+`doc.go`, `measure.c`, `scripts/check_cpu_conformance.sh` and `ci.yml`. No test was run: no claim is made
+that the opcodes outside the CI subset pass.
+
+The same reading turned up a second stale statement, fixed in the same change. Four places said the Harte
+corpus is gitignored upstream and fetched on demand. At the commit CI pins, the 256 files are tracked in the
+Gopher2600 repository and arrive with the clone; the fetch in `scripts/check_cpu_conformance.sh` runs only
+for a file that is missing. `docs/capability-gap-audit.md`, `docs/verified-coverage.md`, the script's
+header and the comment on the CI step now say so, and the two places in the audit that called the suites
+"vendored" no longer do. The v1.91.0 entry below repeats the old wording and is left as written. Comments and
+documents only; no behaviour changes.
+
 ### Documentation — notes taken before 2026-10-12 may rest on truncated threads (2026-10-12)
 
 `docs/provenance.md` now says so where it names the per-thread notes, and names the tool that checks one

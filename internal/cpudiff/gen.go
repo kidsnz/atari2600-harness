@@ -117,8 +117,10 @@ func ExpectedDivergence(op byte) (string, bool) {
 // expectedDivergence lists the ONLY opcodes on which the silicon netlist and the
 // embedded Gopher2600 CPU are permitted to disagree. Established empirically by
 // sweeping all 256 opcodes across many seeds (cmd/cpucheck): every divergence is
-// an illegal/undocumented opcode, never a documented one. These fall in two
-// classes, both of which the Tom Harte corpus (VV-1) likewise excludes:
+// an illegal/undocumented opcode, never a documented one. The Tom Harte corpus
+// (VV-1) has a file for every one of them; Gopher2600's own runner of that corpus
+// lists five of them ($93 $9B $9C $9E $9F) as not working, and the subset CI runs
+// here contains none of the eleven. These fall in two classes:
 //
 //   - "unstable": magic-constant / analog opcodes whose result is not even
 //     deterministic on real hardware (ANE and the SH* high-byte stores).

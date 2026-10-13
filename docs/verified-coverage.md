@@ -210,7 +210,7 @@ harness does **not** author. Runner: `scripts/check_cpu_conformance.sh` + two CI
 | Suite | What it proves | Evidence |
 |---|---|---|
 | **Klaus Dormann 6502 functional + decimal** (GPL) | end-to-end functional + NMOS-decimal correctness (run-to-success-trap PC=`$347D` / RAM `$000B==0`) | `go test …/klaus2m5` PASS — embedded `.bin`, always-on, no provisioning |
-| **Tom Harte / SingleStepTests 65x02** (MIT) | per-opcode **cycle-by-cycle bus** (addr/data/read-write) + final registers + cycle count | `go test …/thomharte` PASS — 12-opcode smoke subset in CI (fetched on demand); full 256 local-only |
+| **Tom Harte / SingleStepTests 65x02** (MIT) | per-opcode **cycle-by-cycle bus** (addr/data/read-write) + final registers + cycle count | `go test …/thomharte` PASS — 12-opcode smoke subset in CI (the files ship in the Gopher2600 clone; fetched only if missing); full 256 local-only |
 
 The gate is **self-validated** (`--selftest`): a planted-wrong expected value must make the run go RED, so
 it can never be vacuously green. Src: Klaus2m5 `https://github.com/Klaus2m5/6502_65C02_functional_tests`;

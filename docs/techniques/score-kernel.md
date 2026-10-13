@@ -80,7 +80,8 @@ drawn. The 26 assumes `BcdTab,X` does not cross a page. Cited only, not verified
 AtariAge `topic/330847` collects the alternatives: a 100-entry table read with `lda Table,x` in 4
 cycles (al_nafuur); batari's 0–99 routine, which omegamatrix cut by one byte to 16 by loading X
 with `#$F8`, the opcode of `SED`, and branching back to the label plus one, so each pass executes that
-operand as `SED` and `INX` counts up to 0; and the classic shift-and-add-3 (6502.org's `BINBCD8`).
+operand as `SED` and `INX` counts up to 0; and 6502.org's `BINBCD8`, which shifts the input out one
+bit at a time and adds the BCD result to itself in decimal mode.
 The thread's advice when the value fits in a byte: keep it in decimal mode from the start and
 convert nothing. Cited only, not verified.
 

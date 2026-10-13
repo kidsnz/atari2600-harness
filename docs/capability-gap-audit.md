@@ -419,7 +419,7 @@ carts) → G4 (oracle)**, not more mining. A **finite backlog**, not infinite mi
 > catches an injected diff). Provenance per item = `feedback-provenance-always`.
 
 **Cross-cutting finding:** the three highest-leverage items need **almost no new infrastructure** — the
-substrate is already vendored. Klaus + Tom-Harte CPU suites + their Go runners are already in the embedded
+substrate is already in the Gopher2600 clone. Klaus + Tom-Harte CPU suites + their Go runners are already in the embedded
 Gopher2600 tree (just never run by harness CI); the exact 256-opcode cycle table is in-tree (`instructions.
 Definitions`) for the static prover; PC/branch coverage is a few lines inside the existing `emu.stepInstr()`
 loop. Much of the highest-value verification is **activation + ownership**, not new building.
@@ -428,13 +428,13 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 
 | ID | Capability | New class it adds | Source | Size | Tier |
 |---|---|---|---|---|---|
-| **VV-1** ✅v1.78.0 | Activate vendored **Klaus + Tom-Harte 65x02** CPU suites in CI (gated) | external, exhaustive, all-256-opcode + **per-cycle bus** certification of the engine | B-C1 | S–M | ★1 |
+| **VV-1** ✅v1.78.0 | Activate the **Klaus + Tom-Harte 65x02** CPU suites in CI (gated; Harte as a 12-opcode subset) | external, exhaustive, all-256-opcode + **per-cycle bus** certification of the engine | B-C1 | S–M | ★1 |
 | **VV-2** ✅v1.80.0 | **Static per-scanline cycle-budget PROVER** (`cmd/cyclebound`) | **proof over ALL paths** (∀) vs observe-one-run — the only ∀-claim member; attacks gap B | C-1 | M | ★1 |
 | **VV-3** ✅v1.83.0 | **PC/branch coverage map** (`cmd/cover`) → **coverage-guided fuzzing** (`cmd/guidedfuzz`) | test-adequacy axis + AFL-style feedback fuzz (today's fuzz is blind) | D-1→D-2 | S→M | ★1 |
 | **VV-4** ✅v1.79.0 | **Motion-smoothness / jerk metric** (`cmd/motion` + `read_motion` MCP + `checks.motion`) | per-frame motion-jerk NUMBER = "judder" (the user's word, *buruburu*) automated (closes the Breakout hand-trace) | E-1 | S–M | ★1 |
 | **VV-5** ✅v1.82.0 | **Temporal-logic trace assertions** (`temporal` block: eventually-within-K/response/never-for-N; `always`=existing invariant) | properties over a **sequence** of frames (per-frame invariants can't) | F-1 | M | ★1 |
 | **VV-6** ✅v1.90.0 | **MAME headless cross-oracle** (`internal/oracle.Mame` + `cmd/oraclevote`) | a **3rd independent** full-system oracle, **fully headless** (no keypress unlike Stella) | A1 | M | 2 |
-| **VV-7** ✅v1.91.0 | **perfect6502 silicon CPU differential** (`internal/cpudiff` + `cmd/cpucheck`) | transistor-netlist truth at the **CPU layer** (catches a CPU bug ALL software emulators could share); covers undocumented/decimal opcodes Harte (VV-1) excludes | A2/A3/B-C3 | M | 2 |
+| **VV-7** ✅v1.91.0 | **perfect6502 silicon CPU differential** (`internal/cpudiff` + `cmd/cpucheck`) | transistor-netlist truth at the **CPU layer** (catches a CPU bug ALL software emulators could share); covers the undocumented opcodes the Harte subset run in CI (VV-1) does not include | A2/A3/B-C3 | M | 2 |
 | **VV-8** ✅v1.84.0 | **Behavioral trajectory diff vs original ROM** (`cmd/trajdiff`) | full **time-extended** state-trajectory diff (refdiff is a static snapshot) | F-2 | M | 2 |
 | **VV-9** ✅v1.87.0 | **Score/lives OCR semantic oracle** (displayed digits == RAM) | ties **display ↔ program meaning** (template-match, pure-Go, no Python) | E-2 | M | 2 |
 | **VV-10** ✅v1.88.0 (T-1/T-2/T-3) | **HW-divergence trap detectors** (timer-wrap=G8 ✅, HMOVE-latch ✅, uninit-RAM-read ✅) | runtime monitors for "passes-in-emu / fails-on-HW" (siblings of `assert_line_budget`) | F-3 | M | 2 |
@@ -444,7 +444,7 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
 | **VV-14** ◑v1.96.0 | **`cmd/cpucert`** ✅ · `@lines` real kernels ✅ · **interprocedural JSR/RTS + divide-loop bounding** ✅ (2A/2B) · ILP/SMT(Z3) + external TIA/Sim2600 ROMs (defer) | citable cert + prover scope expansion done; no false-positive violations remained as of 2026-07-30 (**15/31 certified** — re-measured 2026-07-30; recorded as 14 and moved when SD-6 removed the two-call-shared-subroutine false positive, which greened `game_states`. **13/31 from 2026-10-02**, and two false-positive violations are back on purpose: `hscroll` (79) and `two_line_vdel` (78) had certified only through `@lines 2` on regions the machine runs in one line, which also certified copies that render 263-line frames; declared at one line, the prover refuses them — `TestLinesDeclarationIsNotSlack`); rest are honest UNBOUNDED scope limits | B-C2/C-2/B-C3 | M–L | 3 (partial) |
 
 ## Tier ★1 — recommended pilots (highest value × feasibility, substrate mostly in-tree)
-- **VV-1 ✅ DONE (v1.78.0):** the suites are run via the full import path `go test github.com/jetsetilly/gopher2600/hardware/cpu/tests/{klaus2m5,thomharte}/...` (resolved through go.mod's `replace`; `cd Gopher2600` is wrong — go binds the harness module). **Klaus** always-on (embedded .bin committed upstream, no provisioning). **Harte** runs a 12-opcode smoke subset in CI — `a9 69 e9 d0 4c 6c 20 b1 9d fe 00 ca` — fetched on demand from SingleStepTests (the 1GB corpus is `.gitignore`'d upstream); full 256 is local-only (`scripts/check_cpu_conformance.sh full`). New `scripts/check_cpu_conformance.sh` (+ `--selftest`) + two CI steps. **Self-test (mandatory):** corrupt one expected `final.a` in a Harte case → the gate must go RED (proven live, not vacuous). **Src:** Klaus2m5 repo; SingleStepTests/65x02 (MIT).
+- **VV-1 ✅ DONE (v1.78.0):** the suites are run via the full import path `go test github.com/jetsetilly/gopher2600/hardware/cpu/tests/{klaus2m5,thomharte}/...` (resolved through go.mod's `replace`; `cd Gopher2600` is wrong — go binds the harness module). **Klaus** always-on (embedded .bin committed upstream, no provisioning). **Harte** runs a 12-opcode smoke subset in CI — `a9 69 e9 d0 4c 6c 20 b1 9d fe 00 ca` — from SingleStepTests (at the pinned commit the corpus ships in the Gopher2600 clone; the fetch is a fallback); full 256 is local-only (`scripts/check_cpu_conformance.sh full`). New `scripts/check_cpu_conformance.sh` (+ `--selftest`) + two CI steps. **Self-test (mandatory):** corrupt one expected `final.a` in a Harte case → the gate must go RED (proven live, not vacuous). **Src:** Klaus2m5 repo; SingleStepTests/65x02 (MIT).
 - **VV-2 ✅ DONE (v1.80.0; precision S0–S3 v1.81.0):** `internal/cyclebound`+`cmd/cyclebound` recursive-descent-decode the ROM from its
   reset/IRQ/NMI vectors (so inline data isn't misdecoded), cost each instruction from in-tree
   `instructions.Definitions` (exact cycles + branch-taken/page penalty), cut the CFG at every `STA WSYNC` ($02),
@@ -567,7 +567,8 @@ loop. Much of the highest-value verification is **activation + ownership**, not 
   (`cmd/oraclevote`) — forcing it in would mean hand-writing a 2600 around it, defeating the point. Instead it
   cross-checks at the **instruction layer**, where Gopher2600 and MAME (both software) could share a CPU bug no
   software-vs-software vote would catch, and it is **generative** (random states, all 256 opcodes incl. the
-  unstable undocumented ones Harte excludes). `internal/cpudiff/p6502step/p6502step.c` runs one instruction on the
+  unstable undocumented ones, which the Harte corpus also holds but the 12-opcode CI subset does not
+  run). `internal/cpudiff/p6502step/p6502step.c` runs one instruction on the
   netlist (register injection via a measure.c-style prologue; instruction boundary from the **SYNC line**, node
   539, so it is robust even when control flow returns to the instruction; writes via memory diff). `internal/cpudiff`
   runs the SAME image+prologue on the embedded Gopher2600 CPU (`cpu.NewCPU`) — **symmetric**, so both reach

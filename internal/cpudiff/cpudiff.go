@@ -8,9 +8,10 @@
 // full-system RAM vote (cmd/oraclevote). It cross-checks at the instruction
 // layer — the layer where Gopher2600 and MAME (both software) could share a CPU
 // bug that no software-vs-software vote would ever catch. It is also generative
-// (random states, undocumented opcodes, decimal-mode edges) where the vendored
-// Tom Harte corpus (VV-1) is a fixed set that explicitly excludes the unstable
-// undocumented opcodes.
+// (random states, undocumented opcodes, decimal-mode edges) where the
+// Tom Harte corpus (VV-1) is a fixed set. That corpus holds all 256 opcodes, but
+// CI here runs twelve documented ones, and Gopher2600's own runner lists six
+// undocumented opcodes ($93 $9B $9C $9E $9F $AB) as not working.
 //
 // Symmetric execution. Rather than inject CPU state directly (perfect6502
 // exposes no register writers), both engines run an identical 64K image from
@@ -164,7 +165,8 @@ type Field struct {
 
 // pMask clears bits 4 (B) and 5 (unused) of the status register: these are not
 // real register flip-flops and the two models represent them by different
-// conventions, so they are excluded from comparison (as measure.c / Harte do).
+// conventions, so they are excluded from comparison (as measure.c does;
+// Gopher2600's Harte runner masks bit 4 only).
 const pMask = 0xCF
 
 // Compare returns the fields on which the two results disagree. g is the
