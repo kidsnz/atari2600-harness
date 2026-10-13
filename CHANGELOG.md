@@ -6,6 +6,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 > Entries from v0.17.0 and earlier are condensed; the full detailed history (in Japanese) is kept locally
 > in `CHANGELOG.ja.md`.
 
+### Documentation — notes taken before 2026-10-12 may rest on truncated threads (2026-10-12)
+
+`docs/provenance.md` now says so where it names the per-thread notes, and names the tool that checks one
+thread. The forum fetcher used to drop the text a poster wrote after a quote block; it was fixed on
+2026-10-12 and the hand-saved threads were re-imported, but the older notes were written from the shorter
+text and most of the original pages were not kept. One thread refetched as a test, `topic/241103`, came back
+at 11,117 words against 5,180, with 27 of 53 posts longer. The three documents here that quote from that thread
+(`known-traps.md`, `stella-oracle.md`, `techniques/sprite-placement.md`) were not re-read against the longer
+text; the sentence `known-traps.md` quotes is present in it. Nothing else in this
+repository changed.
+
 ### Fixed — three statements that disagreed with the tree (2026-10-12)
 
 Found by readers distilling forum threads against this repository, then confirmed by a separate reviewer who

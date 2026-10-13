@@ -56,6 +56,16 @@ Recording is the strict part (CI-enforced); this list is just the consolidated l
 - **`pkg/design` functions** → source comment in each `pkg/design/*.go`.
 - **Mined AtariAge threads** → `docs/mining-digest.md` (topic_id + URL → what it feeds).
 - **Raw per-thread notes** → `reference/atariage/<id>-*/notes.ja.md` (provenance, not committed).
+  **A note written before 2026-10-12 may have been written from a truncated thread.** Until that day the
+  fetcher dropped whatever a poster wrote *after* a quote block, so a reply of the form "quote, then answer"
+  reached the note-taker as the quote alone. One thread refetched as a test (`topic/241103`) went from
+  5,180 words to 11,117, with 27 of its 53 posts longer; that is one sample and says nothing about the rate
+  elsewhere. The corpus is not being refetched wholesale. Before trusting such a note — when tracing a row
+  here back to its thread, or when a claim here turns out wrong — run
+  `python3 reference/atariage/_tools/aa_recheck.py <topic_id>`: it says whether the note is on the list of
+  affected ones, and with `-fetch` pulls the thread again from the Wayback Machine and reports which posts
+  grew. A claim cited from an affected thread is more likely to be missing a later qualification than to be
+  misquoted.
 
 
 ## How this repository cites the mailing list — and why a checker cannot follow it
