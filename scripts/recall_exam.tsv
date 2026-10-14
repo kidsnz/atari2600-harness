@@ -40,6 +40,6 @@ prove_line_budget reports 277 cycles on the sprite positioning loop	known-traps.
 set T1024T to 18 and the frame comes out 247 lines	known-traps.md	exits one whole interval early
 which frame is the golden_frame picture hash taken from	scenarios.md	frame-chain hash
 how many bytes of the ROM are still free	integration-density-playbook.md	gap by gap|the bytes that differ are the free ones
-how deep does the stack go while the scene is built, does it reach my variables	known-traps.md|scenarios.md	function of call depth|a byte that is both stack and variable
+how deep does the stack go while the scene is built, does it reach my variables	known-traps.md|scenarios.md	function of call depth|eight bytes deep|variables and stack together
 is there any seed that crashes the ROM or stops it at power-on	procedural.md	needs its own count
 the RAM value ramtrace gives for a frame is not the one the scenario reads at the same at_frame	scenarios.md	after warmup
