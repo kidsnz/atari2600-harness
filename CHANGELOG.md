@@ -25,7 +25,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 Reported by the same agent and NOT fixed here: `no_timer_wrap` reported clean, over 250 frames with
 right and fire held, on a kernel that reads `INTIM` after the wrap on every frame (four other input
 patterns flagged it); `frame_lines_stable` runs after the timeline with the last inputs still held,
-which `docs/scenarios.md` does not say; no scenario field gives the line count of each frame.
+which `docs/scenarios.md` did not say (it does now, and the `no_uninit_read` line there says what it reads); no
+scenario field gives the line count of each frame.
 
 ### Changed — the documents say three things in the words of whoever needs them (2026-10-13)
 

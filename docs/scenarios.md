@@ -78,6 +78,7 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
     "no_hmove_hazard": 2,              // VV-10 T-2: watch N frames; fail if HMxx is written within 24cy of HMOVE
     "score_equals_ram": {"ram": "ram.0x80", "frames": 4}, // VV-9: OCR the rendered 2-digit BCD score == RAM (font from <scenario>.font)
     "no_uninit_read": 2,               // VV-10 T-3: from reset, fail if a RAM byte is read before it was ever written
+                                       //   (INC/DEC/ASL/LSR/ROL/ROR on memory count as a read; until 2026-10-13 they did not)
     "no_stack_overlap": 700            // from reset for N frames, no input: fail if a RAM byte is both written by a push and used through zero page
   }
 }
@@ -152,7 +153,11 @@ ROM (our count, 2026-10-06), so it has not happened here. **Not verified.**
 - **`frame_lines_stable`** = the ∀-over-frames sibling of `ntsc_frame_lines`. That check samples **one**
   frame and therefore certifies nothing about the next one; this one steps `frames` frames (continuing on the
   emulator the timeline drove) and requires every frame to report the same scanline count, optionally equal to
-  `lines`. A frame total that changes between frames rolls the whole picture by that many lines on a CRT —
+  `lines`. **Nothing is released first: whatever the timeline last held is still held through the window**, and
+  no frame inside the timeline is measured. So to measure the frame under an input, press it in the timeline and
+  never release it (a held direction goes on moving the object through the window — one task's checker pressed
+  right on frame 0 and caught a frame one line long that only appeared at large X); to measure it at rest,
+  release everything before the timeline ends. A frame total that changes between frames rolls the whole picture by that many lines on a CRT —
   invisible to a single-frame check and to a golden hash, both of which happily stayed green while a
   reproduction breathed 261/262. Verdicts print the full histogram (`262x129 264x1`), so the measurement is
   in the output whether it passes or fails.
