@@ -26,3 +26,16 @@ waiting for INTIM to reach zero in a loop leaves the loop a whole interval early
 compare the RAM of two ROMs frame by frame to show a rewrite did not change behaviour	CLAUDE.md|reproduce-loop.md|tool-landscape.md	ramtrace|behavmatch|trajdiff
 press the fire button at random times and see whether a frame is ever not 262 lines	CLAUDE.md|testing-playbook.md	guidedfuzz|fuzz
 is the picture my build draws the same as the original ROM's, pixel by pixel	CLAUDE.md|reproduce-loop.md	vismatch|refdiff
+# Added 2026-10-13 from the second pass of roms/261011_edo/REVIEW.md, by a reviewer that did not make the work: the
+# words it gave for rows the first review lacked, and two it wrote for existing rows whose question already held the
+# diagnosis (the stack; a seed that stops the ROM). The pins question is the first reviewer's and was written after
+# the diagnosis. None was tried against recall before being put here.
+a sprite too tall for its zone is drawn again until one fits, how long can that take	design-principles.md	may never end
+I changed when a scene is built: which inputs reach that code, and does a scenario press them	testing-playbook.md	Coverage
+prove_line_budget reports 277 cycles on the sprite positioning loop	known-traps.md|mcp-tools.md	@amax|@lines 2
+set T1024T to 18 and the frame comes out 247 lines	known-traps.md	exits one whole interval early
+which frame is the golden_frame picture hash taken from	scenarios.md	frame-chain hash
+how many bytes of the ROM are still free	integration-density-playbook.md	gap by gap
+how deep does the stack go while the scene is built, does it reach my variables	known-traps.md	function of call depth
+is there any seed that crashes the ROM or stops it at power-on	procedural.md	needs its own count
+the RAM value ramtrace gives for a frame is not the one the scenario reads at the same at_frame	scenarios.md	after warmup

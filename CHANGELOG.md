@@ -8,6 +8,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — the recall exam gained nine questions nobody had tried first (2026-10-13)
+
+A reviewer that did not make the work went over one work's review and gave, for the problems the
+review lacked or had worded with the diagnosis already in them, the words one would have typed at
+the time. They are in `scripts/recall_exam.tsv` as they came. On those nine `recall.py` returns the
+passage in the first five for three (first, first, fourth), in the first ten for five, and not at
+all for four ("how many bytes of the ROM are still free", "how deep does the stack go while the
+scene is built, does it reach my variables", and two more). The whole exam reads 20 of 30 in the
+first five; it read 17 of 21 on the questions written by the person who already knew each answer.
+Nothing was tuned to them.
+
 ### Added — `scripts/mcp_call.py`: the MCP server's tools from a script or a shell (2026-10-13)
 
 `python3 scripts/mcp_call.py load_rom '{"path":"x.bin"}' step_frame '{"count":30}' read_tia '{}'`
