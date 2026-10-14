@@ -198,9 +198,22 @@ A seed saves the ROM a stored map would take. It does not, by itself, save RAM.
 
 ## What a generated scene gets wrong for one seed in many
 
-Three faults of one work (a landscape generator, `roms/261011_edo`), none of which any check of the
-shipped seeds had found, and one way of narrowing a draw. All four are measured there; what was run
-is in `roms/261011_edo/steps/README.md`, rows 13, 14 and 20.
+Faults of one work (a landscape generator, `roms/261011_edo`), three of which no check of the
+shipped seeds had found, and one way of narrowing a draw. All are measured there; what was run is in
+`roms/261011_edo/steps/README.md`, rows 02, 13, 14 and 20.
+
+- **Something drawn again until it fits takes as long as the draws say: there is no upper limit.**
+  A sprite too tall for its zone was chosen again until one fitted, so how long a scene takes to
+  build depends on the seed, and the question "how long can that take" has no answer in cycles.
+  The original built the scene inside the vertical blank and the picture rolled for about a dozen
+  frames. What held: the builder can STOP — at the start, at the top of each zone and inside each
+  choose-again loop — when the timer is low, write down its place (and the carry flag, which the
+  next random draw depends on) and pick up on the next frame, which stays black. Measured over
+  fourteen settings, 30,000 frames each: 1,058 scenes in 1,191 black frames, 133 scenes (12.6%)
+  needing a second one, the timer never run out. `design-principles.md` has the general rule
+  (*"Picking a free square by redrawing until one is free may never end; a random start plus a
+  walk does"*, and *"Read `INTIM` as the time left, and queue the work"*); `blank-a-frame.md` says
+  when to split the work with the picture on instead of blanking several frames in a row.
 
 - **A loop that hands things out until a total is reached needs its own count.** The scene builder
   gave out zone heights (24 to 64) while the total was 192 or less and stored one array entry per

@@ -34,7 +34,10 @@ is the picture my build draws the same as the original ROM's, pixel by pixel	CLA
 # says how to count them ("assemble twice with two different fill values ... the bytes that differ are the free ones"),
 # which answers the question though it is not the passage the reviewer cited; for the stack, the check that measures
 # exactly this (`no_stack_overlap` in scenarios.md) came back third. Before the widening: 3 of these 9 in the first five.
-a sprite too tall for its zone is drawn again until one fits, how long can that take	design-principles.md	may never end
+# The other two misses were of wording, and the DOCUMENTS were changed for them the same day (a new item in
+# procedural.md, a sentence in testing-playbook.md's coverage row); the first of them names its new home in the key.
+# So these nine no longer measure recall on questions it has not seen: the next unseen ones have to come from a new work.
+a sprite too tall for its zone is drawn again until one fits, how long can that take	design-principles.md|procedural.md	may never end
 I changed when a scene is built: which inputs reach that code, and does a scenario press them	testing-playbook.md	Coverage
 prove_line_budget reports 277 cycles on the sprite positioning loop	known-traps.md|mcp-tools.md	@amax|@lines 2
 set T1024T to 18 and the frame comes out 247 lines	known-traps.md	exits one whole interval early

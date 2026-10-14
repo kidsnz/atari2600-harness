@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — the documents say three things in the words of whoever needs them (2026-10-13)
+
+- `docs/techniques/procedural.md`, "What a generated scene gets wrong": a new first item, **something
+  drawn again until it fits has no upper limit** — what one work did about a sprite chosen again until
+  it fitted its zone (a builder that can stop and pick up on the next, black, frame; 1,058 scenes in
+  1,191 black frames), with the two rules of `design-principles.md` it rests on. The question "a
+  sprite too tall for its zone is drawn again until one fits, how long can that take" found nothing
+  before; the passage that answered it speaks of free squares.
+- `docs/testing-playbook.md`, the coverage row: when a change moves when or whether some code runs,
+  which inputs reach it and does a scenario press them (`cmd/cover`).
+- `docs/known-traps.md`: the two rows that `check_traps.py` now flags say so; the row "total
+  scanlines not constant" named `ntsc_frame_lines`, which reads one frame, and names
+  `frame_lines_stable` now; the note that counted 7 detectors gives today's count and the command.
+
 ### Added — two trap rows became detectors in `check_traps.py` (2026-10-13)
 
 A reader went through all 192 rows of `docs/known-traps.md` asking of each whether a check could
