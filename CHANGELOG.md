@@ -8,6 +8,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — two trap rows became detectors in `check_traps.py` (2026-10-13)
+
+A reader went through all 192 rows of `docs/known-traps.md` asking of each whether a check could
+fire on it without the row being read: 22 are enforced today, 74 more could be (50 from the source
+text or the cycle analysis, 24 from a run), and 96 cannot (30 need a console or a model the
+emulator lacks, 66 are advice or facts with no crisp violation). Two of the cheapest are in:
+
+- **a signed branch straight after a compare** — `cmp #150 / bmi` reads bit 7 of the difference, and
+  is wrong whenever the two values are 128 or more apart. WARN; `@signed-ok` on the branch line says
+  it is meant. Over the 501 sources of the three repositories it fires on 12 places: one line of one
+  work, carried unchanged from that work's original ROM (a height that can go below zero, so the
+  signed test may be the intended one), and eleven in two disassembled commercial games, which use
+  it on small values. None in this repository's own ROMs.
+- **a forgotten `#`** — a bare `%binary` operand on an instruction that reads, or a name the file
+  defines as a number below `$80` used bare on one: it reads TIA space, not the value. WARN;
+  `@address-ok` says the address is meant. Fires on nothing in the 501 sources.
+
+Both have a firing line in the selftest's bait and silent twins in its counter-bait (the unsigned
+branch, a declared signed one, `BPL` after `DEX`, a literal with its `#`, a RAM address, `INPT4`).
+The bait also gained an odd colour: the row for that detector said both controls ran, and the
+firing one did not exist. The selftest reads 15 detectors.
+
 ### Added — a trap row: the sound hash fails and every sound register is what it was (2026-10-13)
 
 `docs/known-traps.md`. Code put in front of a sound routine moves when in the frame the registers are

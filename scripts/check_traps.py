@@ -481,6 +481,60 @@ def scan_text(asm):
                                  "without CLEAN_START). Real instance: `200302/msg00012`, 2003"
                               % (m.group(2), reg.upper(), other.upper(), reg.upper(), other.upper())))
 
+    # A signed branch straight after a compare. `CMP` sets N from bit 7 of the DIFFERENCE, so
+    # `BMI`/`BPL` after it answer "is A - M negative as a signed byte", which is "A < M" only
+    # while the two are less than 128 apart. A scanline counter compared against a value on the
+    # other side of $80 takes the wrong branch, and it assembles, runs and mostly looks right.
+    # The unsigned tests are BCC (<) and BCS (>=). 〔known-traps "`BPL`/`BMI` after `CMP` is a
+    # SIGNED test on an unsigned compare"〕 A signed compare that is MEANT says so: `@signed-ok`
+    # at the end of the branch line.
+    prev = None                                              # the previous instruction: (line, mnemonic)
+    for n, raw in enumerate(asm.split("\n"), 1):
+        code = strip_comment(raw).strip()
+        m = re.match(r"(?:[A-Za-z_.][\w.]*:?\s+)?\b(cmp|cpx|cpy|bpl|bmi)\b", code, re.I)
+        first = re.match(r"(?:[A-Za-z_.][\w.]*:?\s+)?([A-Za-z]{3})\b", code)
+        if m and m.group(1).lower() in ("bpl", "bmi") and prev and prev[1] in ("cmp", "cpx", "cpy") \
+                and "@signed-ok" not in raw:
+            warns.append((n, "`%s` straight after `%s` (line %d) is a SIGNED test: it reads bit 7 of the "
+                             "difference, so it is wrong whenever the two values are 128 or more apart (right only while both stay below 128). "
+                             "Unsigned is BCC (<) / BCS (>=); if signed is meant, end the line with @signed-ok"
+                          % (m.group(1).upper(), prev[1].upper(), prev[0])))
+        if code and not re.match(r"^[A-Za-z_.][\w.]*:?$", code) and first:      # a label alone is not an instruction
+            prev = (n, first.group(1).lower())
+
+    # A forgotten `#`. `and %00001111` is not "mask with 15": it reads zero-page address $0F,
+    # which is TIA space, and what comes back is a collision latch or the last byte on the bus.
+    # It assembles, and in an emulator it often returns something plausible. Two shapes are
+    # certain enough to say: a bare `%binary` operand on an instruction that reads, and a name
+    # this file defines as a number below $80 (so not RAM) used bare on such an instruction.
+    # 〔known-traps "A forgotten `#` turns an immediate into a zero-page read"〕 A read of that
+    # address that is MEANT says so: `@address-ok` at the end of the line.
+    reads = r"lda|ldx|ldy|and|ora|eor|adc|sbc|cmp|cpx|cpy|bit"
+    consts = {}
+    for raw in asm.split("\n"):
+        m = re.match(r"\s*([A-Za-z_][\w.]*)\s*(?:=|\bequ\b)\s*(\$[0-9A-Fa-f]+|%[01]+|\d+)\s*$", strip_comment(raw), re.I)
+        if m:
+            lit = m.group(2)
+            v = int(lit[1:], 16) if lit[0] == "$" else int(lit[1:], 2) if lit[0] == "%" else int(lit)
+            consts[m.group(1)] = v
+    tia_read = set(MIRROR_READ.values())
+    for n, raw in enumerate(asm.split("\n"), 1):
+        if "@address-ok" in raw:
+            continue
+        code = strip_comment(raw)
+        m = re.match(r"(?:\s*[A-Za-z_.][\w.]*:?)?\s+(%s)\s+(%%[01]+)\b" % reads, code, re.I)
+        if m:
+            warns.append((n, "`%s %s` has no `#`: it reads ADDRESS $%02X (TIA space), not the value. "
+                             "Write `%s #%s`" % (m.group(1), m.group(2), int(m.group(2)[1:], 2) & 0xFF, m.group(1), m.group(2))))
+            continue
+        m = re.match(r"(?:\s*[A-Za-z_.][\w.]*:?)?\s+(%s)\s+([A-Za-z_][\w.]*)\s*$" % reads, code, re.I)
+        if m and m.group(2) in consts and consts[m.group(2)] < 0x80 and m.group(2).upper() not in tia_read \
+                and m.group(2).upper() not in TIA_WRITE_ONLY:
+            warns.append((n, "`%s %s` has no `#`: %s is defined here as the number $%02X, and without `#` this "
+                             "reads ADDRESS $%02X (TIA space, not RAM). Write `%s #%s`, or end the line with "
+                             "@address-ok if the address is meant"
+                          % (m.group(1), m.group(2), m.group(2), consts[m.group(2)], consts[m.group(2)], m.group(1), m.group(2))))
+
     return errors, warns
 
 
@@ -506,6 +560,13 @@ flag    = $ff             ; var in stack-collision zone...
         lda GRP0          ; read of a write-only TIA register
         sta $F123         ; write into cartridge ROM, undeclared
         sta $1F00,x       ; ★indexed store: the phantom read sweeps the whole ROM page
+        lda #$45          ; ★an odd colour: D0 does nothing
+        sta COLUBK
+MASK    = %00001111       ; ★a number below $80, so not a RAM address...
+        and MASK          ; ★...read as an address: the `#` is missing
+        and %11110000     ; ★the same with the literal written out
+        cmp #150
+        bmi Start         ; ★a signed test after an unsigned compare
         ; (intentionally no CLD / CLEAN_START)
         org $FFFC         ; ★and this file IS a program: it defines the reset vector, so the
         .word Start       ; ★power-up rules apply to it. An include has no vector of its own.
@@ -529,7 +590,22 @@ Start
         sta COLUP0
         jsr Sub           ; ★there IS a push here, so nothing is passing for want of one
         SLEEP 4           ; even SLEEP is plain NOPs
+LIMIT   = 150             ; ★a number used WITH its `#`, and a RAM address used without one
+count   = $91
+        lda count
+        cmp #LIMIT
+        bcc Start         ; ★the unsigned branch after a compare
+        cmp #LIMIT
+        bmi Start         ; @signed-ok ★a signed test that says it is meant
+        and #%00001111    ; ★a binary literal with its `#`
+        lda INPT4         ; ★a TIA address that is there to be read
+        bit SWITCH        ; @address-ok ★and one this file names itself, declared
+        lda #$44
+        sta COLUBK
+        dex
+        bpl Start         ; ★BPL after DEX is the ordinary loop, not after a compare
         rts
+SWITCH  = $0C
 Sub     rts
 """
 
@@ -612,7 +688,8 @@ QUIET_VECTOR_INCLUDE = """
 def selftest():
     errors, warns = scan_text(BAIT)
     want = ["lxa", "LAX #imm", "bankswitch", "variable at $FF", "no CLD", "WRITE-ONLY TIA register",
-            "cartridge ROM", "BIT $2C", "raw byte", "`SLEEP 3` is ODD", "PHANTOM READ"]
+            "cartridge ROM", "BIT $2C", "raw byte", "`SLEEP 3` is ODD", "PHANTOM READ",
+            "D0 of a colour register", "`and MASK` has no `#`", "`and %11110000` has no `#`", "is a SIGNED test"]
     blob = " ".join(m for _, m in errors + warns)
     missing = [w for w in want if w not in blob]
     if missing:
