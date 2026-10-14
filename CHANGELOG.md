@@ -34,6 +34,13 @@ scene is built, does it reach my variables", and two more). The whole exam reads
 first five; it read 17 of 21 on the questions written by the person who already knew each answer.
 Nothing was tuned to them.
 
+Looked at afterwards, the four misses are two kinds. For two the answer HAD come back, third, in a
+passage the key did not name (how to count free bytes; the `no_stack_overlap` check), and their keys
+are widened, which the file says: 5 of the 9, 22 of 30. For the other two the passage exists and
+shares two and three words with the question ("redrawing until one is free may never end" for a
+sprite drawn again until it fits; the coverage section for "which inputs reach that code"): it is
+the documents' wording that has to meet the asker's, and that is not done yet.
+
 ### Added — `scripts/mcp_call.py`: the MCP server's tools from a script or a shell (2026-10-13)
 
 `python3 scripts/mcp_call.py load_rom '{"path":"x.bin"}' step_frame '{"count":30}' read_tia '{}'`
