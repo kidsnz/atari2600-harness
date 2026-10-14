@@ -8,6 +8,17 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — MCP `set_input` keeps what was already held (2026-10-14)
+
+Pressing a second input let go of the first: the liveness probe a press runs leaves the machine
+with nothing down, and only the input just asked for was pressed again. Measured on a test task's
+kernel: left held, then fire pressed — the player stopped where it was and the missile flew.
+Reported by both contestants of the second test task, who tested fire with a direction through
+the scenario runner instead. The server now remembers what is held on each port of the current
+machine and presses all of it again after the probe; a different machine starts with nothing
+held. `TestSetInputKeepsWhatWasAlreadyHeld` (left and fire together ten of ten frames; fire let
+go, left still down; a new ROM, nothing down) fails with only the pressed input re-applied.
+
 ### Changed — `no_timer_wrap` no longer depends on where the wrap falls (2026-10-14)
 
 Two agents building test tasks reported the same thing from opposite ends: a wait of the form

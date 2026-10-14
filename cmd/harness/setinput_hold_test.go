@@ -18,7 +18,9 @@ VSYNC   = $00
 VBLANK  = $01
 WSYNC   = $02
 INPT4   = $3C
+SWCHA   = $0280
 Held    = $80
+Left    = $81
         org $F000
 Start:  sei
         cld
@@ -38,7 +40,11 @@ Frame:  lda #2
         bit INPT4
         bmi Up              ; bit 7 set = not pressed
         inc Held
-Up:     ldx #37
+Up:     lda SWCHA
+        and #%01000000      ; bit 6 clear = left pushed
+        bne NoLeft
+        inc Left
+NoLeft: ldx #37
 Vb:     sta WSYNC
         dex
         bne Vb
@@ -119,5 +125,54 @@ func TestSetInputHoldsWhatItSaysItHolds(t *testing.T) {
 	}
 	if n := held(10); n != 0 {
 		t.Errorf("after the release, fire was still down on %d of 10 frames", n)
+	}
+}
+
+// Held inputs add up. The liveness probe that a press runs let go of everything when it
+// finished, and only the input just asked for was pressed again, so fire pressed while left
+// was held let go of left -- reported by two agents who wanted fire and a direction at once
+// and tested that through the scenario runner instead.
+func TestSetInputKeepsWhatWasAlreadyHeld(t *testing.T) {
+	dir := t.TempDir()
+	asm, bin := filepath.Join(dir, "held.asm"), filepath.Join(dir, "held.bin")
+	if err := os.WriteFile(asm, []byte(heldROM), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := build.Assemble(asm, bin); err != nil {
+		t.Skipf("dasm is not available: %v\n%s", err, out)
+	}
+	ctx := context.Background()
+	if _, _, err := handleLoadROM(ctx, nil, LoadROMIn{Path: bin}); err != nil {
+		t.Fatal(err)
+	}
+	count := func(frames int) (fire, left int) {
+		mu.Lock()
+		defer mu.Unlock()
+		before, _ := current.CurrentRAM()
+		for i := 0; i < frames; i++ {
+			current.StepFrame()
+		}
+		after, _ := current.CurrentRAM()
+		return int(after[0]) - int(before[0]), int(after[1]) - int(before[1])
+	}
+	count(5)
+	for _, a := range []string{"left", "fire"} {
+		if _, _, err := handleSetInput(ctx, nil, SetInputIn{Action: a, Pressed: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if fire, left := count(10); fire != 10 || left != 10 {
+		t.Errorf("left, then fire, pressed: over 10 frames fire was down on %d and left on %d, want 10 and 10", fire, left)
+	}
+	handleSetInput(ctx, nil, SetInputIn{Action: "fire", Pressed: false})
+	if fire, left := count(10); fire != 0 || left != 10 {
+		t.Errorf("fire released, left still held: fire on %d, left on %d of 10 frames, want 0 and 10", fire, left)
+	}
+	if _, _, err := handleLoadROM(ctx, nil, LoadROMIn{Path: bin}); err != nil {
+		t.Fatal(err)
+	}
+	handleSetInput(ctx, nil, SetInputIn{Action: "fire", Pressed: true})
+	if _, left := count(10); left != 0 {
+		t.Errorf("a new ROM loaded: left, held on the old machine, was down on %d of 10 frames", left)
 	}
 }

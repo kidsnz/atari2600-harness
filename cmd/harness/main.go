@@ -52,6 +52,11 @@ func locate(pc uint16) string { return curMap.Locate(pc) }
 var (
 	mu      sync.Mutex
 	current *emu.Emu
+	// held is what set_input has been asked to keep down, per port, on the current machine.
+	// The liveness probe a held direction runs leaves the machine with nothing pressed, so
+	// after it everything here is pressed again -- not only the input just asked for.
+	held   = map[int]map[string]bool{}
+	heldOn *emu.Emu // the machine `held` is about; a different machine starts with nothing held
 )
 
 // get returns the loaded Emu. Errors when nothing is loaded.
@@ -874,6 +879,22 @@ func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn
 		if err := e.SetInput(in.Player, in.Action, in.Pressed); err != nil {
 			return nil, SetInputOut{}, err
 		}
+		if heldOn != e {
+			held, heldOn = map[int]map[string]bool{}, e
+		}
+		if held[in.Player] == nil {
+			held[in.Player] = map[string]bool{}
+		}
+		switch {
+		case in.Action == "center" || in.Action == "centre":
+			for _, d := range []string{"left", "right", "up", "down"} {
+				delete(held[in.Player], d)
+			}
+		case in.Pressed:
+			held[in.Player][in.Action] = true
+		default:
+			delete(held[in.Player], in.Action)
+		}
 	}
 	out := SetInputOut{Coords: coordsOf(e)}
 	// Only a HELD joystick direction makes the question meaningful: a release, a
@@ -887,12 +908,18 @@ func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn
 			if live, why, lerr := e.RespondsToInput(in.Player, in.Action, 20); lerr == nil {
 				out.Responds, out.Liveness = &live, why
 			}
-			// The probe leaves the stick centred, which is right for a caller who only
-			// asked the question and wrong here: this caller asked for the button to be
-			// HELD. Until 2026-10-13 the hold was lost at this point, so that set_input
-			// followed by step_frame ran with nothing pressed (TestSetInputHoldsWhatItSaysItHolds).
-			if err := e.SetInput(in.Player, in.Action, true); err != nil {
-				return nil, SetInputOut{}, err
+			// The probe leaves the stick centred and the button up, which is right for a
+			// caller who only asked the question and wrong here: this caller asked for the
+			// input to be HELD, and may be holding others. Until 2026-10-13 the hold was lost
+			// here (TestSetInputHoldsWhatItSaysItHolds); until 2026-10-14 the other held
+			// inputs were (fire pressed while left was held let go of left;
+			// TestSetInputKeepsWhatWasAlreadyHeld). Everything held is pressed again.
+			for p, actions := range held {
+				for a := range actions {
+					if err := e.SetInput(p, a, true); err != nil {
+						return nil, SetInputOut{}, err
+					}
+				}
 			}
 		}
 	}
