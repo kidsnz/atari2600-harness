@@ -8,6 +8,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — two holes found by an agent that was building a test task on these tools (2026-10-13)
+
+- **MCP `set_input` did not hold.** Its description says "pressed=true holds". The liveness probe that
+  runs on a held direction ends by releasing what it pressed, and the handler did not press again, so
+  `set_input` followed by `step_frame` ran with nothing down — measured: fire asked for, ten frames
+  stepped, the button down on none of them. It holds now (`cmd/harness/setinput_hold_test.go`, on a
+  ROM the test builds; ten of ten, and none after the release). The agent that met it had written a
+  Go program of its own to get a held button.
+- **`no_uninit_read` passed an increment of a byte nothing had written.** INC, DEC, ASL, LSR, ROL and
+  ROR on memory read the byte and write it back, and the detector looked only at pure reads and pure
+  writes. All six are a read first now (`internal/emu/uninit_rmw_test.go`: each flagged on a ROM the
+  test builds, and silent when a store comes first; the test fails on the old code for all six).
+  The 161 scenarios in the three repositories that use the check still pass it.
+
+Reported by the same agent and NOT fixed here: `no_timer_wrap` reported clean, over 250 frames with
+right and fire held, on a kernel that reads `INTIM` after the wrap on every frame (four other input
+patterns flagged it); `frame_lines_stable` runs after the timeline with the last inputs still held,
+which `docs/scenarios.md` does not say; no scenario field gives the line count of each frame.
+
 ### Changed — the documents say three things in the words of whoever needs them (2026-10-13)
 
 - `docs/techniques/procedural.md`, "What a generated scene gets wrong": a new first item, **something

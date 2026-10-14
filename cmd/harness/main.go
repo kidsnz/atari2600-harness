@@ -887,6 +887,13 @@ func handleSetInput(ctx context.Context, req *mcp.CallToolRequest, in SetInputIn
 			if live, why, lerr := e.RespondsToInput(in.Player, in.Action, 20); lerr == nil {
 				out.Responds, out.Liveness = &live, why
 			}
+			// The probe leaves the stick centred, which is right for a caller who only
+			// asked the question and wrong here: this caller asked for the button to be
+			// HELD. Until 2026-10-13 the hold was lost at this point, so that set_input
+			// followed by step_frame ran with nothing pressed (TestSetInputHoldsWhatItSaysItHolds).
+			if err := e.SetInput(in.Player, in.Action, true); err != nil {
+				return nil, SetInputOut{}, err
+			}
 		}
 	}
 	return nil, out, nil

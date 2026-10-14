@@ -1213,23 +1213,27 @@ func (e *Emu) WatchUninitRead(frames int) (*UninitReadHit, error) {
 			continue
 		}
 		isRead := lr.Defn.Effect == instructions.Read
-		if !isRead && lr.Defn.Effect != instructions.Write {
+		// INC, DEC, ASL, LSR, ROL and ROR on memory read the byte and write it back: a
+		// read first, then a write. Until 2026-10-13 they were neither here, so `inc Count`
+		// on a byte nothing had written -- the commonest way to read power-on rubbish --
+		// passed as clean (TestUninitReadSeesAnIncrementOfAByteNothingWrote).
+		isModify := lr.Defn.Effect == instructions.Modify
+		if !isRead && !isModify && lr.Defn.Effect != instructions.Write {
 			continue
 		}
 		eff, isMem := e.effectiveAddr()
 		if !isMem {
 			continue
 		}
-		canon, area := memorymap.MapAddress(eff, isRead)
+		canon, area := memorymap.MapAddress(eff, isRead || isModify)
 		if area != memorymap.RAM {
 			continue
 		}
 		idx := canon & 0x7F
-		if isRead {
-			if !written[idx] {
-				return &UninitReadHit{Frame: e.Coords().Frame, PC: lr.Address, Addr: canon}, nil
-			}
-		} else {
+		if (isRead || isModify) && !written[idx] {
+			return &UninitReadHit{Frame: e.Coords().Frame, PC: lr.Address, Addr: canon}, nil
+		}
+		if !isRead {
 			written[idx] = true
 		}
 	}
