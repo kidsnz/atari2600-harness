@@ -8,6 +8,42 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — `cmd/sound`: what a ROM plays, as a WAV and as the registers frame by frame (2026-10-13)
+
+`sound [-frames N] [-skip N] [-hold fire,left@60] [-regs FILE] <rom.bin> <out.wav>` runs a ROM and
+writes what the two channels put out as a 16-bit mono WAV, and with `-regs` the six sound registers
+at the end of every frame as text. Until now the registers over time were reachable only through
+the MCP tool `read_audio_trace`, whose answer a script cannot hold, and nothing here made a file one
+could listen to; two works had each written a tool for it (`roms/261011_edo/tools/sound`,
+`roms/260816_transistor/tools/trace_audio.py`, whose header tells of 240 frames transcribed by hand
+with three of six series the wrong length).
+
+- The gain is fixed, so two ROMs' files compare in loudness as the ROMs do. A recording in which
+  both channels hold one level throughout is refused rather than written.
+- The line it prints gives the frame length in samples (524 for 262 lines) and says when the frames
+  were not all one length.
+- Frames are the emulator's, counted from 1 as `still -frame` counts them. This is one more than
+  `trace_audio.py`'s index (its `left@60` is `left@61` here), and one frame off the Edo tool, which
+  cut the sample stream into 524s from power-on.
+
+Moved to make room for it, with nothing left behind: `cmd/bandsplit`'s WAV writer is now
+`internal/audioingest.EncodeWAV`, beside the decoder it is the inverse of (it had no test; it has
+one now), and `cmd/still`'s `-hold` reading is `internal/hold`, used by both commands.
+
+Tested on a ROM the test builds (`cmd/sound/sound_test.go`: a square wave that goes up an octave
+while fire is down, a second channel that sounds while the stick is left). Nine faults put into the
+code one at a time — the press taken out, the press a frame early, the skipped frames kept, frame
+numbers off by one, a channel left out of the mix, silence judged on one channel, the registers not
+read, the WAV's data size and its rate wrong in the header — each fail at least one test. Against
+the works' own tools: on `edo-sakura.bin`, 3,600 frames, the WAV correlates 1.000000 with the Edo
+tool's over 1,865,400 samples and all 3,599 overlapping register lines agree; on
+`sleeve-half-pitfall.bin`, 599 frames, every register line agrees with `trace_audio.py` with nothing
+held, with left held from power-on, and with left, fire, up and down pressed at frame 61 (which
+change 509 to 553 of the 599 frames from the idle run, so the agreement is not of two idle runs).
+
+`scripts/recall_exam_tools.tsv`: one key gained the new command and one question was added (the Edo
+tool's own first sentence); the tools half reads 11 of 14, from 9 of 13.
+
 ### Added — `cmd/still -hold`: a frame drawn with buttons held down (2026-10-13)
 
 `still -frame N -hold fire,left@60 <rom> <out.png>` keeps buttons of the left joystick down while

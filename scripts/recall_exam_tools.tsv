@@ -8,16 +8,21 @@
 # three questions typed into recall.py that day while checking those tools against this repository. The
 # expected answers are from the works' own reviews (which command came nearest); `none` is a correct answer.
 # Frozen before any command was given an "Answers:" line. Add questions; do not reword one to make it pass.
+# Changed since, and why: 2026-10-13, `cmd/sound` was written because two works had each built a tool for it. The
+# key of "Dump a ROM's TIA audio registers ..." gained `sound` (the question's words are untouched; the command
+# writes them as text, not JSON), and the last question was added -- the first sentence of the header of
+# roms/261011_edo/tools/sound/main.go, verbatim, written two days before the command.
 Picture of the current ROM against the original's, zone by zone, aligned at zone bottoms.	vismatch|framesim
 Does a build show the same scenes, in the same order, moving the same way, as the original?	trajdiff|behavmatch|ramtrace
 Re-record the pins of scenarios/fire-held.json from the current ROM.	scenario
 Run a source under each of the fourteen shipped settings (tools/settings.py) and count what the frame loop does	scenario
 How good is the scene generator's randomness?	none
 Render one frame of a ROM with controller actions HELD, as a PNG.	still
-Dump a ROM's TIA audio registers, one frame at a time, as JSON.	read_audio_trace
+Dump a ROM's TIA audio registers, one frame at a time, as JSON.	read_audio_trace|sound
 Render a ROM to the pictures Shinji can actually look at, and `open` them.	still|crtview
 Which key and which voices make this figure LOW and DARK, not bright.	keyfit
 What does the TIA's NOISE actually put in each frequency band?	none
 compare the RAM of two ROMs frame by frame to show a rewrite did not change behaviour	trajdiff|behavmatch|ramtrace
 press the fire button at random times and see whether a frame is ever not 262 lines	guidedfuzz
 is the picture my build draws the same as the original ROM's, pixel by pixel	vismatch|framesim|refdiff
+run a ROM on the Gopher2600 engine and write down what it plays.	sound

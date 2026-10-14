@@ -52,7 +52,9 @@ does X") and found nothing in the first 10; making each entry of CLAUDE.md's too
 own passage did not move them, because the roster says what a tool is and the question says
 what one wants. Run --exam for today's numbers; never reword a question to make it pass.
 The tools half is scored on scripts/recall_exam_tools.tsv (13 questions frozen before any
-command had an Answers: line): 9 of 13 on 2026-10-13.
+command had an Answers: line): 9 of 13 on 2026-10-13. Later the same day cmd/sound was
+written for one of the four it missed; that question's key gained the new command and one
+question was added, as the file's header says, and it read 11 of 14.
 """
 import json, math, os, re, sys, time
 from pathlib import Path

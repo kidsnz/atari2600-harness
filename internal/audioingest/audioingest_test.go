@@ -64,6 +64,25 @@ func wav(x []float64, rate int) []byte {
 	return b
 }
 
+// EncodeWAV and DecodeWAV are each other's inverse to within one step of 16 bits, and a
+// sample outside -1..1 is clipped rather than wrapped round to the other sign.
+func TestEncodeWAVReadsBackAsItWasWritten(t *testing.T) {
+	in := []float64{0, 0.5, -0.5, 0.25, -1, 1, 1.7, -3}
+	want := []float64{0, 0.5, -0.5, 0.25, -1, 1, 1, -1}
+	got, rate, err := DecodeWAV(EncodeWAV(in, 31400))
+	if err != nil {
+		t.Fatalf("DecodeWAV of what EncodeWAV wrote: %v", err)
+	}
+	if rate != 31400 || len(got) != len(in) {
+		t.Fatalf("read back %d samples at %d Hz, want %d at 31400", len(got), rate, len(in))
+	}
+	for i := range want {
+		if math.Abs(got[i]-want[i]) > 2.0/32768 {
+			t.Errorf("sample %d: wrote %v, read %v, want %v", i, in[i], got[i], want[i])
+		}
+	}
+}
+
 func TestDecodeWAVReadsRateAndLength(t *testing.T) {
 	b := synth(44100, 120, []float64{80, 80, 0, 0}, 4)
 	s, rate, err := DecodeWAV(b)

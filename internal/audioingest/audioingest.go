@@ -26,7 +26,37 @@ import (
 	"github.com/kidsnz/atari2600-harness/pkg/audio"
 )
 
-// ---------------------------------------------------------------- WAV decoding
+// ---------------------------------------------------------------- WAV, both ways
+
+// EncodeWAV writes 16-bit mono PCM from samples in -1..1 (anything outside is clipped).
+// DecodeWAV reads the same format and nothing else, on purpose, so a file written here
+// can be fed straight back into the tools that measure a recording.
+func EncodeWAV(x []float64, rate int) []byte {
+	n := len(x)
+	buf := make([]byte, 44+2*n)
+	copy(buf[0:], "RIFF")
+	binary.LittleEndian.PutUint32(buf[4:], uint32(36+2*n))
+	copy(buf[8:], "WAVEfmt ")
+	binary.LittleEndian.PutUint32(buf[16:], 16)
+	binary.LittleEndian.PutUint16(buf[20:], 1)
+	binary.LittleEndian.PutUint16(buf[22:], 1)
+	binary.LittleEndian.PutUint32(buf[24:], uint32(rate))
+	binary.LittleEndian.PutUint32(buf[28:], uint32(rate*2))
+	binary.LittleEndian.PutUint16(buf[32:], 2)
+	binary.LittleEndian.PutUint16(buf[34:], 16)
+	copy(buf[36:], "data")
+	binary.LittleEndian.PutUint32(buf[40:], uint32(2*n))
+	for i, v := range x {
+		s := v
+		if s > 1 {
+			s = 1
+		} else if s < -1 {
+			s = -1
+		}
+		binary.LittleEndian.PutUint16(buf[44+2*i:], uint16(int16(s*32767)))
+	}
+	return buf
+}
 
 // DecodeWAV reads a 16-bit PCM RIFF/WAVE file and returns mono samples in -1..1.
 // Only 16-bit PCM is accepted, and deliberately so: anything else should be converted

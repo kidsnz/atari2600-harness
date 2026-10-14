@@ -60,10 +60,9 @@ import (
 	"image/png"
 	"math"
 	"os"
-	"strconv"
-	"strings"
 
 	"github.com/kidsnz/atari2600-harness/internal/emu"
+	"github.com/kidsnz/atari2600-harness/internal/hold"
 )
 
 const (
@@ -79,51 +78,7 @@ const (
 // grab runs the ROM and returns (clean, glitch) pictures plus the frame numbers
 // they came from. clean is a frame with the kick envelope well past its head;
 // glitch is the first frame with k0i < 3.
-// A hold is one button of the left joystick, down from a frame on.
-type hold struct {
-	action string
-	from   int // the first frame it is down for; 1 = from power-on
-}
-
-// parseHold reads "fire,left@60": names SetInput knows, each with an optional first frame.
-func parseHold(spec string) ([]hold, error) {
-	var out []hold
-	for _, part := range strings.Split(spec, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		h := hold{action: part, from: 1}
-		if name, at, ok := strings.Cut(part, "@"); ok {
-			n, err := strconv.Atoi(at)
-			if err != nil || n < 1 {
-				return nil, fmt.Errorf("-hold %q: the frame after @ has to be a number from 1 up", part)
-			}
-			h = hold{action: name, from: n}
-		}
-		switch h.action {
-		case "fire", "left", "right", "up", "down":
-		default:
-			return nil, fmt.Errorf("-hold %q: want fire, left, right, up or down (the left joystick)", part)
-		}
-		out = append(out, h)
-	}
-	return out, nil
-}
-
-// press puts down every button whose first frame is f. Called before frame f is stepped.
-func press(e *emu.Emu, holds []hold, f int) error {
-	for _, h := range holds {
-		if h.from == f {
-			if err := e.SetInput(0, h.action, true); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func grab(rom string, trigger, lo, hi int, holds ...hold) (clean, glitch *image.RGBA, cf, gf int, err error) {
+func grab(rom string, trigger, lo, hi int, holds ...hold.Hold) (clean, glitch *image.RGBA, cf, gf int, err error) {
 	e, err := emu.New("NTSC")
 	if err != nil {
 		return nil, nil, 0, 0, err
@@ -132,7 +87,7 @@ func grab(rom string, trigger, lo, hi int, holds ...hold) (clean, glitch *image.
 		return nil, nil, 0, 0, err
 	}
 	for f := 1; f <= warmup+search; f++ {
-		if err := press(e, holds, f); err != nil {
+		if err := hold.Press(e, holds, f); err != nil {
 			return nil, nil, 0, 0, err
 		}
 		if _, err := e.StepFrame(); err != nil {
@@ -210,7 +165,7 @@ const blankFloor = 0.5
 // asks the machine nothing -- which is the point, because a still picture has no
 // state to ask about -- so the check that the picture is actually there has to be
 // made on the pixels.
-func grabFrame(rom string, n int, holds ...hold) (*image.RGBA, error) {
+func grabFrame(rom string, n int, holds ...hold.Hold) (*image.RGBA, error) {
 	img, err := grabFrameUnguarded(rom, n, holds...)
 	if err != nil {
 		return nil, err
@@ -225,7 +180,7 @@ func grabFrame(rom string, n int, holds ...hold) (*image.RGBA, error) {
 
 // grabFrameUnguarded is grabFrame without the blank check, so a test can look at the
 // frame the guard exists to reject.
-func grabFrameUnguarded(rom string, n int, holds ...hold) (*image.RGBA, error) {
+func grabFrameUnguarded(rom string, n int, holds ...hold.Hold) (*image.RGBA, error) {
 	e, err := emu.New("NTSC")
 	if err != nil {
 		return nil, err
@@ -234,7 +189,7 @@ func grabFrameUnguarded(rom string, n int, holds ...hold) (*image.RGBA, error) {
 		return nil, err
 	}
 	for f := 1; f <= n; f++ {
-		if err := press(e, holds, f); err != nil {
+		if err := hold.Press(e, holds, f); err != nil {
 			return nil, err
 		}
 		if _, err := e.StepFrame(); err != nil {
@@ -290,7 +245,7 @@ func main() {
 		"for a ROM with no moving state; a blank frame is refused, not written")
 	holdSpec := flag.String("hold", "", "buttons of the left joystick to keep down: fire,left@60 (a name alone = from power-on; @N = from frame N on)")
 	flag.Parse()
-	holds, herr := parseHold(*holdSpec)
+	holds, herr := hold.Parse(*holdSpec)
 	if herr != nil {
 		fmt.Fprintln(os.Stderr, herr)
 		os.Exit(2)
@@ -322,7 +277,7 @@ func main() {
 			os.Exit(1)
 		}
 		mean, sd := bandStats(img)
-		fmt.Printf("%s  frame=%d  band luminance mean %.2f sd %.2f%s\n", outPath, *frame, mean, sd, heldNote(*holdSpec))
+		fmt.Printf("%s  frame=%d  band luminance mean %.2f sd %.2f%s\n", outPath, *frame, mean, sd, hold.Note(*holdSpec))
 		return
 	}
 
@@ -352,15 +307,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-// heldNote says in the tool's one line of output which buttons were down, so that a
-// picture taken with a button held cannot be mistaken for the ROM's idle picture.
-func heldNote(spec string) string {
-	if strings.TrimSpace(spec) == "" {
-		return ""
-	}
-	return "  held: " + spec
 }
 
 func writePNG(path string, img *image.RGBA) error {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kidsnz/atari2600-harness/internal/build"
+	"github.com/kidsnz/atari2600-harness/internal/hold"
 )
 
 // holdROM is built here, so the test says what it needs: a picture that answers to the
@@ -122,7 +123,7 @@ func TestHoldPressesTheButtonItNamesFromTheFrameItNames(t *testing.T) {
 		{"fire@30,left@35", 33, true, false},
 	}
 	for _, c := range cases {
-		holds, err := parseHold(c.spec)
+		holds, err := hold.Parse(c.spec)
 		if err != nil {
 			t.Fatalf("-hold %q: %v", c.spec, err)
 		}
@@ -135,16 +136,5 @@ func TestHoldPressesTheButtonItNamesFromTheFrameItNames(t *testing.T) {
 			t.Errorf("-hold %q at frame %d: background red %v (want %v), left playfield lit %v (want %v)",
 				c.spec, c.frame, red, c.wantRed, lit, c.wantLit)
 		}
-	}
-}
-
-func TestHoldRefusesWhatItDoesNotKnow(t *testing.T) {
-	for _, bad := range []string{"jump", "fire@0", "fire@soon", "left@-3"} {
-		if _, err := parseHold(bad); err == nil {
-			t.Errorf("-hold %q was accepted", bad)
-		}
-	}
-	if h, err := parseHold(" fire , left@60 "); err != nil || len(h) != 2 || h[1].from != 60 || h[0].from != 1 {
-		t.Errorf("-hold with spaces: %v %v", h, err)
 	}
 }

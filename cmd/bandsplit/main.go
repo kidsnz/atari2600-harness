@@ -36,7 +36,6 @@ package main
 
 import (
 	"encoding/base64"
-	"encoding/binary"
 	"flag"
 	"fmt"
 	"html"
@@ -181,36 +180,7 @@ func normalise(x []float64) {
 }
 
 func dataURI(x []float64, rate int) string {
-	return "data:audio/wav;base64," + base64.StdEncoding.EncodeToString(encodeWAV(x, rate))
-}
-
-// encodeWAV writes 16-bit mono PCM. DecodeWAV reads the same format and nothing else, on
-// purpose, so a page written here can be fed straight back into the tools that made it.
-func encodeWAV(x []float64, rate int) []byte {
-	n := len(x)
-	buf := make([]byte, 44+2*n)
-	copy(buf[0:], "RIFF")
-	binary.LittleEndian.PutUint32(buf[4:], uint32(36+2*n))
-	copy(buf[8:], "WAVEfmt ")
-	binary.LittleEndian.PutUint32(buf[16:], 16)
-	binary.LittleEndian.PutUint16(buf[20:], 1)
-	binary.LittleEndian.PutUint16(buf[22:], 1)
-	binary.LittleEndian.PutUint32(buf[24:], uint32(rate))
-	binary.LittleEndian.PutUint32(buf[28:], uint32(rate*2))
-	binary.LittleEndian.PutUint16(buf[32:], 2)
-	binary.LittleEndian.PutUint16(buf[34:], 16)
-	copy(buf[36:], "data")
-	binary.LittleEndian.PutUint32(buf[40:], uint32(2*n))
-	for i, v := range x {
-		s := v
-		if s > 1 {
-			s = 1
-		} else if s < -1 {
-			s = -1
-		}
-		binary.LittleEndian.PutUint16(buf[44+2*i:], uint16(int16(s*32767)))
-	}
-	return buf
+	return "data:audio/wav;base64," + base64.StdEncoding.EncodeToString(audioingest.EncodeWAV(x, rate))
 }
 
 func parseBands(s string) ([]band, error) {
