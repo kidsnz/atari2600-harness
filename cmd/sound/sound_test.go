@@ -227,3 +227,106 @@ func TestSilenceIsToldApart(t *testing.T) {
 		t.Error("channel 1 at volume 6 was called silent")
 	}
 }
+
+// envROM writes a volume that changes every frame (the frame counter's low four bits),
+// after PAD two-cycle instructions that do nothing.
+const envROM = `
+        processor 6502
+VSYNC   = $00
+VBLANK  = $01
+WSYNC   = $02
+AUDC0   = $15
+AUDF0   = $17
+AUDV0   = $19
+Count   = $80
+        org $F000
+Start:  sei
+        cld
+        ldx #$FF
+        txs
+        lda #0
+Clr:    sta $00,x
+        dex
+        bne Clr
+Frame:  lda #2
+        sta VSYNC
+        sta WSYNC
+        sta WSYNC
+        sta WSYNC
+        lda #0
+        sta VSYNC
+        inc Count
+        repeat PAD
+        nop
+        repend
+        lda #4
+        sta AUDC0
+        lda #15
+        sta AUDF0
+        lda Count
+        sta AUDV0
+        ldx #37
+Vb:     sta WSYNC
+        dex
+        bne Vb
+        lda #0
+        sta VBLANK
+        ldx #192
+Pic:    sta WSYNC
+        dex
+        bne Pic
+        lda #2
+        sta VBLANK
+        ldx #30
+Os:     sta WSYNC
+        dex
+        bne Os
+        jmp Frame
+        org $FFFC
+        .word Start
+        .word Start
+`
+
+// The claim, and the reason the register file and the WAV are two outputs: code put in
+// front of a sound routine moves WHEN in the frame the registers are written, which
+// changes the samples -- and so a hash of the sound -- while every value written, frame
+// by frame, is what it was. Ten idle instructions (20 cycles) stand in for the code.
+func TestCodeInFrontOfTheSoundMovesTheSamplesAndNotTheRegisters(t *testing.T) {
+	build := func(pad string) *recording {
+		dir := t.TempDir()
+		asm, bin := filepath.Join(dir, "env.asm"), filepath.Join(dir, "env.bin")
+		if err := os.WriteFile(asm, []byte("PAD = "+pad+"\n"+envROM), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if out, err := build.Assemble(asm, bin); err != nil {
+			t.Skipf("dasm is not available: %v\n%s", err, out)
+		}
+		return mustRecord(t, bin, 5, 120, "")
+	}
+	a, b := build("0"), build("10")
+	moved := 0
+	for i := range a.regs {
+		if a.regs[i] != b.regs[i] {
+			t.Fatalf("frame %d: the registers differ, %+v against %+v", a.first+i, a.regs[i], b.regs[i])
+		}
+		if i > 0 && a.regs[i].Channel0.Volume != a.regs[i-1].Channel0.Volume {
+			moved++
+		}
+	}
+	if moved < 100 {
+		t.Fatalf("the volume changed on %d of 119 frames; the test needs it to change on most", moved)
+	}
+	if len(a.ch0) != len(b.ch0) {
+		t.Fatalf("%d samples against %d", len(a.ch0), len(b.ch0))
+	}
+	differ := 0
+	for i := range a.ch0 {
+		if a.ch0[i] != b.ch0[i] {
+			differ++
+		}
+	}
+	if differ == 0 {
+		t.Error("20 cycles in front of the writes changed no sample")
+	}
+	t.Logf("registers equal on %d frames; %d of %d samples differ", len(a.regs), differ, len(a.ch0))
+}

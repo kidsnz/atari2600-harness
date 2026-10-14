@@ -8,6 +8,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — a trap row: the sound hash fails and every sound register is what it was (2026-10-13)
+
+`docs/known-traps.md`. Code put in front of a sound routine moves when in the frame the registers are
+written; `golden_audio` fails, `golden_frame` holds, and `sound -regs` of the two builds agree. The
+row says to make that comparison before the hash is recorded again, and where to call the routine so
+that it cannot move. Measured by `cmd/sound`'s
+`TestCodeInFrontOfTheSoundMovesTheSamplesAndNotTheRegisters` (20 cycles in front of the writes: the
+registers equal on 120 frames, 3,699 of 62,880 samples differ). It is the first trap row that names
+`golden_audio`; `recall.py --detect golden_audio` returns it first.
+
+### Fixed — `recall.py` no longer answers from the local `*.ja.md` reading copies (2026-10-13)
+
+They are git-ignored, so a clone has none; on a machine that has them, two of the first four
+passages for one check were a copy's. The exam reads the same with and without them.
+
 ### Changed — the recall exam gained nine questions nobody had tried first (2026-10-13)
 
 A reviewer that did not make the work went over one work's review and gave, for the problems the

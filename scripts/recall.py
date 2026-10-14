@@ -93,7 +93,9 @@ def words(text):
 
 def passages(root):
     """(file, line, title, text) for every table row, list item and paragraph."""
-    files = sorted((root / "docs").rglob("*.md")) + [root / "CLAUDE.md"]
+    # *.ja.md are local reading copies, git-ignored: a clone has none, and where they exist they
+    # answered in place of the page they copy (two of the first four passages for one check).
+    files = [f for f in sorted((root / "docs").rglob("*.md")) if not f.name.endswith(".ja.md")] + [root / "CLAUDE.md"]
     out = []
     for path in files:
         if not path.exists():
