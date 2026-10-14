@@ -8,6 +8,28 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — `no_timer_wrap` no longer depends on where the wrap falls (2026-10-14)
+
+Two agents building test tasks reported the same thing from opposite ends: a wait of the form
+`lda INTIM / bpl` (wait until the count goes negative) was flagged under four input patterns and
+passed under a fifth. The detector flagged a read of `INTIM` when the timer had wrapped BEFORE the
+instruction began; when the wrap fell inside the load, the read saw the wrapped count and passed.
+So one program's verdict depended on the phase of its own timing.
+
+What is flagged now is what the check exists for: a read of the wrapped count that is the second
+since that wrap (a poll that missed the zero and goes on waiting) or that comes more than about a
+scanline after it (the count read as time left when there is none). The single read that sees the
+wrap and ends a wait for a negative count is not flagged, in any phase: that is the wait that
+cannot step over the zero. Time since the wrap is counted on the beam, because `TotalCycles` does
+not count the cycles a `WSYNC` holds the CPU.
+
+`internal/emu/timerwrap_phase_test.go` builds four waits and runs each at 41 phases (0..40 NOPs in
+front): the negative-count wait and the same polled once a line are never flagged, the zero wait
+with a 64-cycle tick never, a single read long after the timer ran out always. The planted
+`timerwrap_trap` is still flagged and `timerwrap_clean` still not; the 57 scenarios in the three
+repositories that use the check still pass it. `docs/scenarios.md`'s line for the check still says
+"fail if INTIM is read after the timer wrapped" and is to be brought in line.
+
 ### Fixed — two holes found by an agent that was building a test task on these tools (2026-10-13)
 
 - **MCP `set_input` did not hold.** Its description says "pressed=true holds". The liveness probe that

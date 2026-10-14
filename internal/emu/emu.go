@@ -973,21 +973,84 @@ const intimCanonical = 0x0284 // INTIM の正規アドレス（全ミラーを�
 // Expired は各命令の**実行前**に標本化し、「直前から Expired だった状態で INTIM を読んだ」を検出する
 // （ポーリングが wrap をまたいで回り続けていれば次の反復で必ず捕捉される）。
 func (e *Emu) WatchTimerWrap(frames int) (*TimerWrapHit, error) {
+	// What is flagged (2026-10-13): a read of INTIM in the post-wrap regime that is either
+	// the SECOND read since that wrap (a poll that missed the zero and goes on waiting, as
+	// timerwrap_trap does) or LATER than timerWrapGrace cycles after it (a value read as the
+	// time left when there is none). Not the one read that sees the wrap and ends a wait
+	// for a negative INTIM (`lda INTIM / bpl`): that is the wait that cannot miss the zero.
+	//
+	// Before, a read was flagged when the timer was Expired as the instruction BEGAN. That
+	// made the verdict on one program depend on the phase of the wrap: the `bpl` wait's
+	// exit read was flagged when the wrap fell before the LDA and passed when it fell
+	// inside it, so one wrong answer of a test task was reported under four input patterns
+	// and passed under the fifth (TestTimerWrapVerdictDoesNotDependOnPhase).
+	const timerWrapGrace = 100 * 3 // colour clocks: a scanline of a WSYNC poll (228) and the read, with room
+	// Time is the beam's, not the CPU's: TotalCycles does not count the cycles a WSYNC
+	// holds the CPU, and a wait that polls once a line spends most of its time there.
+	// A running count of colour clocks, carried across frame boundaries by the length the
+	// last frame actually had (a frame is not always 262 lines).
+	var elapsed int64
+	last := e.Coords()
+	lastLines := 262
+	beam := func() int64 {
+		c := e.Coords()
+		if c.Frame == last.Frame {
+			elapsed += int64(c.Scanline-last.Scanline)*228 + int64(c.Clock-last.Clock)
+		} else {
+			elapsed += int64(lastLines-last.Scanline+c.Scanline)*228 + int64(c.Clock-last.Clock)
+			lastLines = last.Scanline + 1
+		}
+		if c.Scanline+1 > lastLines && c.Frame == last.Frame {
+			lastLines = c.Scanline + 1
+		}
+		last = c
+		return elapsed
+	}
 	start := e.Coords().Frame
+	wrapAt, readsSince := int64(-1), 0
 	for e.Coords().Frame-start < frames {
-		preExpired := e.TimerState().Expired
+		pre := e.TimerState()
 		if err := e.StepInstruction(); err != nil {
 			return nil, err
 		}
+		post := e.TimerState()
+		now := beam()
 		lr := e.VCS.CPU.LastResult
-		if lr.Defn == nil || lr.Defn.Effect != instructions.Read {
+		readsINTIM := false
+		if lr.Defn != nil && lr.Defn.Effect == instructions.Read {
+			canon, area := memorymap.MapAddress(lr.InstructionData, true)
+			readsINTIM = area == memorymap.RIOT && canon == intimCanonical
+		}
+		// A wrap inside this instruction: the flag went up, or -- when this instruction
+		// is the read, which clears the flag again -- the counter went up from 0.
+		wrapped := !pre.Expired && (post.Expired || (readsINTIM && post.INTIM > pre.INTIM))
+		if wrapped {
+			wrapAt, readsSince = now, 0
+		}
+		if !readsINTIM || wrapAt < 0 {
 			continue
 		}
-		canon, area := memorymap.MapAddress(lr.InstructionData, true)
-		if area != memorymap.RIOT || canon != intimCanonical {
+		// Did the READ see the wrapped counter? Before the instruction, yes if the flag was
+		// already up. Inside it, the counter may wrap on a cycle after the one that read it:
+		// for a load the value it took says which (it read 0, or it read the wrapped count).
+		seen := pre.Expired
+		if !seen && wrapped {
+			switch lr.Defn.Operator {
+			case instructions.LDA:
+				seen = e.A() > pre.INTIM
+			case instructions.LDX:
+				seen = e.XReg() > pre.INTIM
+			case instructions.LDY:
+				seen = e.YReg() > pre.INTIM
+			default:
+				seen = true // BIT/CMP/AND keep no copy of what they read: count it, as before
+			}
+		}
+		if !seen {
 			continue
 		}
-		if preExpired {
+		readsSince++
+		if readsSince >= 2 || now-wrapAt > timerWrapGrace {
 			return &TimerWrapHit{Frame: e.Coords().Frame, PC: lr.Address}, nil
 		}
 	}
