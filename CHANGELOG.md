@@ -27,8 +27,7 @@ not count the cycles a `WSYNC` holds the CPU.
 front): the negative-count wait and the same polled once a line are never flagged, the zero wait
 with a 64-cycle tick never, a single read long after the timer ran out always. The planted
 `timerwrap_trap` is still flagged and `timerwrap_clean` still not; the 57 scenarios in the three
-repositories that use the check still pass it. `docs/scenarios.md`'s line for the check still says
-"fail if INTIM is read after the timer wrapped" and is to be brought in line.
+repositories that use the check still pass it. `docs/scenarios.md`'s line for the check says this now.
 
 ### Fixed — two holes found by an agent that was building a test task on these tools (2026-10-13)
 

@@ -74,7 +74,10 @@ Scenarios live under a `scenarios/` directory; the ROM path is relative to the d
                                        //   ALONE, so a ROM's second voice is invisible to it (measured:
                                        //   byte-identical with channel 1 silent, half and full). Use this
                                        //   whenever a ROM sounds two voices.
-    "no_timer_wrap": 3,                // VV-10 T-1: watch N frames; fail if INTIM is read after the timer wrapped (G8)
+    "no_timer_wrap": 3,                // VV-10 T-1: watch N frames; fail on a read of the WRAPPED count of INTIM (G8) that is
+                                       //   the second since that wrap (a poll that missed the zero) or later than about a scanline
+                                       //   after it (read as time left). The one read that sees the wrap and ends a wait for a
+                                       //   negative count (`lda INTIM / bpl`) is not flagged, in any phase (since 2026-10-14)
     "no_hmove_hazard": 2,              // VV-10 T-2: watch N frames; fail if HMxx is written within 24cy of HMOVE
     "score_equals_ram": {"ram": "ram.0x80", "frames": 4}, // VV-9: OCR the rendered 2-digit BCD score == RAM (font from <scenario>.font)
     "no_uninit_read": 2,               // VV-10 T-3: from reset, fail if a RAM byte is read before it was ever written
