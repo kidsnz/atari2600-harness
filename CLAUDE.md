@@ -231,6 +231,7 @@ round trip. Also return `png_path` in JSON.
 | Tool selection rationale / alternatives | `docs/tool-landscape.md` |
 | Implementation spec (Gopher2600 API / MCP / Stella flags) / source of constants | `docs/resources.md` |
 | MCP tool implementation spec (go-sdk API, per-tool I/O) | `docs/mcp-tools.md` |
+| **An MCP tool from a script or a shell** — every tool the server has, with its state carried from call to call, answers as JSON lines; builds the server from the source as it is now, never `bin/harness` | `python3 scripts/mcp_call.py --list [word]` · `--describe <tool>` · `<tool> '{json}' ...` · `from mcp_call import Harness` |
 | harness backlog — capability gaps (G1–G14) + verification-variety (VV-*); **the single live backlog** (ex improvement/hardening-roadmap folded in) | `docs/capability-gap-audit.md` |
 | 8bitworkshop sample cross-check (book techniques vs our library) | `docs/8bitworkshop-crosscheck.md` |
 | the visual CEILING — best the hardware could do for a picture (the denominator `vismatch` lacks) | `docs/visual-ceiling.md` |

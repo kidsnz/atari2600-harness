@@ -134,7 +134,10 @@ def tools(root):
     """(name, the question it says it answers, the start of its description) for every command
     and every MCP tool. A command's question is the `// Answers:` line of cmd/<name>/main.go --
     kept in the source, next to the thing it describes, and required by check_wiring.py. An MCP
-    tool has no such line yet: its entry in CLAUDE.md's roster stands in for both."""
+    tool's is the description the server itself gives (the `Description:` of its `mcp.Tool` in
+    cmd/harness/*.go), with its entry in CLAUDE.md's roster after it when it has one. Until
+    2026-10-13 only the roster was read, and the roster names 27 of the 43 tools in bold:
+    read_row and decompose_row, which a work then rebuilt for itself, were not among them."""
     out = []
     for main in sorted((root / "cmd").glob("*/main.go")):
         head = main.read_text(errors="replace").split("\npackage main", 1)[0]
@@ -142,10 +145,23 @@ def tools(root):
         answers = " ".join(l[len("Answers:"):].strip() for l in lines if l.startswith("Answers:"))
         doc = " ".join(l for l in lines if l and not l.startswith("Answers:"))
         out.append(("cmd/" + main.parent.name, answers, doc[:700]))
+    roster = {}
     claude = root / "CLAUDE.md"
     if claude.exists():
         for m in re.finditer(r"\*\*`([a-z_]+)`\*\* \((.*?)\)(?= /|\n\n|\n\s*\*\*`|$)", claude.read_text(errors="replace"), flags=re.S):
-            out.append((m.group(1), "", " ".join(m.group(2).split())[:700]))
+            roster[m.group(1)] = " ".join(m.group(2).split())
+    served = {}
+    lit = r'"(?:[^"\\]|\\.)*"'
+    for src in sorted((root / "cmd" / "harness").glob("*.go")):
+        if src.name.endswith("_test.go"):
+            continue
+        for m in re.finditer(r'mcp\.Tool\{\s*Name:\s*"([a-z_]+)",\s*Description:\s*((?:' + lit + r'\s*\+?\s*)+)', src.read_text(errors="replace")):
+            try:
+                served[m.group(1)] = "".join(json.loads(x) for x in re.findall(lit, m.group(2)))
+            except ValueError:
+                served[m.group(1)] = ""
+    for name in sorted(set(served) | set(roster)):
+        out.append((name, "", (served.get(name, "") + " " + roster.get(name, "")).strip()[:900]))
     return out
 
 
@@ -388,6 +404,8 @@ def main():
         print("Commands and tools that say they do this (read the command's own header before writing a new one):")
         for s, name, what in found:
             print(f"   {name} -- {what}")
+        if any(not name.startswith("cmd/") for s, name, what in found):
+            print("   (a name without cmd/ is an MCP tool; from a script or a shell: python3 scripts/mcp_call.py --describe <tool>)")
     else:
         print("No command or MCP tool here says it does this. If you write one for a work, say in its first lines what was missing here.")
     if work:

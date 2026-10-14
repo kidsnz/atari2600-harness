@@ -8,6 +8,38 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — `scripts/mcp_call.py`: the MCP server's tools from a script or a shell (2026-10-13)
+
+`python3 scripts/mcp_call.py load_rom '{"path":"x.bin"}' step_frame '{"count":30}' read_tia '{}'`
+runs the calls in order on ONE server, so the state carries, and prints each answer as a line of
+JSON; `-` reads the calls from standard input, `--list [word]` and `--describe <tool>` show what
+there is, and `from mcp_call import Harness` gives a loop the same thing. It builds the server from
+the source as it is now into a directory of its own (never `bin/harness`, which is shared and only
+as new as its last rebuild — on this day it answered as version 2.0.0 while the source was 3.0.0)
+and keeps the saved picture out of the shared preview path. Until now a tool's answer reached only
+the conversation, and works wrote Go programs against `internal/emu` for what `read_row`,
+`decompose_row` or `read_audio_trace` already return.
+
+- `--selftest`: the tool list, two calls whose state must carry (frame 3, then 7), a tool that does
+  not exist and a ROM that does not exist both refused, nothing left behind.
+- Checked against `cmd/sound`: `read_audio_trace` over 600 frames of one ROM, fetched through the
+  script, equals `sound -regs` on all 600 (its index i is frame i+1 there).
+- `scripts/mcp_smoke.py` now uses the same client and takes the binary to test as an argument.
+  **Its `beamtrace` line had been failing since 2026-07-30** (`ab201fe` made the answer one entry a
+  frame; the line still asked for the older shape) — found because the script was run, which nothing
+  does on its own. It passes again, against `bin/harness` and against a server built today.
+
+### Changed — `recall.py` reads every MCP tool from the server's own source (2026-10-13)
+
+The "commands and tools that say they do this" half of `recall.py` knew an MCP tool only by its
+bold entry in `CLAUDE.md`'s roster: 27 names, three of them spelled so that they matched nothing the
+server registers under that reading, against the 43 tools the server has. `read_row`,
+`decompose_row`, `set_input`, `breakif`, `step_frame`, `read_ram` and ten more could not be an
+answer to any question. It now takes each tool's `Description:` from `cmd/harness/*.go`, with the
+roster entry after it where there is one, and says under an MCP tool's name how a script reaches it.
+The tools exam reads 11 of 14 before and after; inside the first three, `read_audio_trace` moved to
+first place on its question and `trajdiff` and `guidedfuzz` from first to second on theirs.
+
 ### Added — `cmd/sound`: what a ROM plays, as a WAV and as the registers frame by frame (2026-10-13)
 
 `sound [-frames N] [-skip N] [-hold fire,left@60] [-regs FILE] <rom.bin> <out.wav>` runs a ROM and

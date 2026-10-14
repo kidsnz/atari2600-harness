@@ -1,30 +1,22 @@
 #!/usr/bin/env python3
-"""Sequential smoke test of bin/harness (the go-sdk is concurrent, so wait for each response before sending the next).
-Usage: python3 scripts/mcp_smoke.py  (run from harness/)"""
-import subprocess, json, sys
-p = subprocess.Popen(["./bin/harness"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-def call(i, name, args):
-    p.stdin.write(json.dumps({"jsonrpc":"2.0","id":i,"method":"tools/call","params":{"name":name,"arguments":args}})+"\n"); p.stdin.flush()
-    while True:
-        line = p.stdout.readline()
-        if not line: sys.exit("server died")
-        try: d=json.loads(line)
-        except: continue
-        if d.get("id")==i: return d
-p.stdin.write(json.dumps({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}})+"\n")
-p.stdin.write(json.dumps({"jsonrpc":"2.0","method":"notifications/initialized"})+"\n"); p.stdin.flush()
-while True:
-    d=json.loads(p.stdout.readline())
-    if d.get("id")==1: print("initialize OK", d["result"]["serverInfo"]["version"]); break
+"""Sequential smoke test of bin/harness -- the binary the editor's MCP connection runs.
+Usage: python3 scripts/mcp_smoke.py [path/to/harness]   (run from harness/; default ./bin/harness)
+
+The client is scripts/mcp_call.py's (one request at a time: the go-sdk answers concurrently).
+A call the server refuses raises there, so a line below that only calls a tool is a check
+that the tool answered."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mcp_call import Harness
+h = Harness(binary=sys.argv[1] if len(sys.argv) > 1 else "./bin/harness")
+print("initialize OK", h.version)
+def call(_i, name, args):
+    return {"result": {"structuredContent": h.call(name, args)}}
 r=call(2,"load_rom",{"path":"roms/litmus/smoke.bin"})
-assert not r["result"].get("isError"), r
 r=call(3,"step_frame",{"count":30})
 r=call(4,"analyze_screen",{})
-assert not r["result"].get("isError"), r
 r=call(5,"watch_ram",{"addr":0x80,"max_frames":2})
-assert not r["result"].get("isError"), r
 r=call(6,"trace_clocks",{"max_instructions":4})
-assert not r["result"].get("isError"), r
 r=call(7,"run_scenario",{"paths":["roms/litmus/scenarios/hmove_mid.json"]})
 assert r["result"]["structuredContent"]["all_pass"], r
 # U-M9: srcmap — via assemble_and_load, a budget overrun's `at` carries the source location
@@ -38,9 +30,9 @@ assert "at" in r["result"]["structuredContent"]["trace"][0], r
 # AT-2/3/4: authoring aids (beamtrace timeline / beam_race advisory / spritepos solver)
 r=call(11,"load_rom",{"path":"roms/litmus/smoke.bin"})
 r=call(12,"beamtrace",{"frames":1})
-assert not r["result"].get("isError") and "rows" in r["result"]["structuredContent"], r
+sc=r["result"]["structuredContent"]
+assert sc["frames"] and sc["frames"][0]["rows"], str(sc)[:300]  # one entry a frame since ab201fe (2026-07-30); this line asked for the older shape until 2026-10-13
 r=call(13,"beam_race",{"frames":1})
-assert not r["result"].get("isError"), r
 r=call(14,"spritepos",{"x":96,"object":"P0"})
 sc=r["result"]["structuredContent"]
 assert sc["solution"]["exact"] and sc["solution"]["achieved_x"]==96, sc
@@ -64,4 +56,4 @@ r=call(18,"defuse",{"asm_path":"roms/litmus/litmus_uninit_clean.asm"})
 assert not (r["result"]["structuredContent"]["report"].get("uninit_reads") or []), r
 
 print("smoke OK (load/step/analyze_screen/watch_ram/trace_clocks/run_scenario/srcmap/beamtrace/beam_race/spritepos/defuse/beam_intervals)")
-p.terminate()
+h.close()
