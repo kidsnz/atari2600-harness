@@ -13,5 +13,3 @@
 #
 # Format: <rom path>  # YYYY-MM-DD  why it is queued rather than captured
 # Drain with: scripts/stella_oracle.sh <rom> 5 tia   (then delete the line)
-roms/litmus/stack_overlap_trap.bin  # 2026-10-13 — a counter at $FD under a two-deep call (no_stack_overlap flags it); queued: the author was at the machine
-roms/litmus/stack_overlap_clean.bin  # 2026-10-13 — the same program with the counter at $80 (clean twin); queued with it

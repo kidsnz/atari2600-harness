@@ -1,0 +1,39 @@
+# stella-tia-oracle capture
+# rom: roms/litmus/stack_overlap_clean.bin
+# binsha256: 8b374652736ef5f5bf53d39fef39ff2dff6efb45ec4b627eee6179a55fbe15e8
+# binsha256-source: captured
+# frames: 5
+# stella: 
+# captured: 2026-10-13
+Stella 7.0
+> autoExec():
+
+Executed 2 commands from "~/Library/Application Support/St
+ella/autoexec.script"
+script file '~/Desktop/stack_overlap_clean.script' not fou
+nd
+config file '~/Library/Application Support/Stella/cfg/stac
+k_overlap_clean.cfg' not found
+list file 'roms/litmus/stack_overlap_clean.lst' not found
+symbol file 'roms/litmus/stack_overlap_clean.sym' not foun
+d
+> tia
+scanline=#0   vsync vblank
+Collisions: p0_pf p0_bl m1_p0 m0_p0 p0_p1 p1_pf p1_bl m1_p
+1
+            m0_p1 m0_pf m0_bl m0_m1 m1_pf m1_bl bl_pf
+COLUxx: P0=$00/      P1=$00/      PF=$00/      BK=$04/
+
+P0: GR=%00000000 pos=#69  HM=$0 1 copy               refl
+delay
+P1: GR=%00000000 pos=#39  HM=$0 1 copy               refl
+delay
+M0: disabled pos=#8   HM=$0 size=#0 reset
+M1: disabled pos=#2   HM=$0 size=#0 reset
+BL: disabled pos=#2   HM=$0 size=#0 delay
+PF0: %00000000/$00 PF1: %00000000/$00 PF2: %00000000/$00
+     reflect score priority
+inpt0 inpt1 inpt2 inpt3 INPT4 INPT5 dump_gnd_0123
+AUDF0: $00/31440.0Hz AUDC0: $0 AUDV0: $0
+AUDF1: $00/31440.0Hz AUDC1: $0 AUDV1: $0
+> saveSes
