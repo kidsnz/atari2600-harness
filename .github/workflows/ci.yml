@@ -17,6 +17,27 @@ jobs:
     steps:
       - name: Checkout harness
         uses: actions/checkout@v5
+        with:
+          # The whole history, so the leak check can read every commit a push carries.
+          fetch-depth: 0
+
+      - name: Leak check (nothing private in what this push carries)
+        # This repository is public. The works' private words live in the private works
+        # repository, which CI has not got, so here the check runs gitleaks' credential rules
+        # and .gitleaks.toml (home and session-temp paths) only; the hooks on the authoring
+        # machine add the private words. Pinned release, checked against its published sum.
+        run: |
+          curl -sSfL -o /tmp/gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tgz" | sha256sum -c -
+          sudo tar -xzf /tmp/gitleaks.tgz -C /usr/local/bin gitleaks
+          python3 scripts/check_leaks.py --selftest
+          python3 scripts/check_leaks.py --tree
+          BEFORE="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "push" ] && [ -n "$BEFORE" ] \
+             && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+             && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            python3 scripts/check_leaks.py --range "$BEFORE..${{ github.sha }}"
+          fi
 
       - name: Set up Go (from go.mod)
         uses: actions/setup-go@v6

@@ -26,6 +26,9 @@ Not one was a copied file; every one was a sentence saying where something had b
   are published with the code, so `--message` and `--range` pass them through `gitleaks stdin`.
 - **Where it runs.** New `pre-commit` and `commit-msg` hooks beside `pre-push`, which now checks
   every commit a push carries before anything else. A missing gitleaks fails the gate.
+- **And in CI**, with the public rules only (CI has not got the private works repository): a
+  pinned gitleaks release checked against its published sum, the selftest, the whole tree, and
+  the commits of the push.
 - **The selftest is shown to go red**: 4 of 8 cases with the private words emptied, 1 of 8 with
   push messages unread, a refusal with the public config missing.
 - **The 91 lines are reworded** to "one of the works" and the like; `--tree` reports 0. Two tests
