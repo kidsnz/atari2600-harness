@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# commit-msg — a commit message is published with the code, so it gets the same leak check as the
+# lines (scripts/check_leaks.py). gitleaks' own git mode does not read messages.
+exec python3 "$(git rev-parse --show-toplevel)/scripts/check_leaks.py" --message "$1"

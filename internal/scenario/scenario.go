@@ -989,7 +989,7 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 				// cyclebound's `Certified` covers the VISIBLE regions only, and this gate
 				// used to pass it straight through. A BLANK region over budget is not a
 				// visible tear, but the WSYNC after it waits for the next line, so the
-				// frame gains a scanline — measured 2026-08-09 on technojacket, where a
+				// frame gains a scanline — measured 2026-08-09 on one of the works, where a
 				// 77-cycle VBLANK line made 5 frames in 300 come out 263 lines long.
 				// prove_line_budget was green on that ROM and ntsc_frame_lines was the
 				// only thing that caught it. A ∀-over-all-paths gate that cannot see a
@@ -1013,7 +1013,7 @@ func Run(s *Scenario, updateGoldens bool) (*Result, error) {
 			// write land before the beam reaches the pixels it governs". A cover kernel
 			// proved 75 of 76 and was certified while its picture sat two and a half
 			// columns to the right with the previous line wrapping in at the left
-			// (measured 2026-08-09, technojacket cover-tear-speck). The witness pair
+			// (measured 2026-08-09, an in-house cover kernel). The witness pair
 			// roms/litmus/pf_ontime.asm and pf_late.asm both certify; only this separates
 			// them.
 			if !strings.EqualFold(filepath.Ext(s.Rom), ".asm") {

@@ -39,7 +39,9 @@ func covered(t *testing.T, rom, mode string, frames int) int {
 // but that SetPanel has stopped pressing anything — which has happened once already, when
 // SetInput was used for a console switch and its error ignored.
 func TestExploreReachesCodeHoldingInputsDoesNot(t *testing.T) {
-	const rom = "/Users/shinji/Documents/2D/260609_atari2600-dev/reference/pizza-boy/Samples for Pizza Boy/Seaquest.bin"
+	// Relative to this package, like every other reference to the umbrella's reference/ folder:
+	// an absolute path only ever worked on the one machine it named.
+	const rom = "../../../reference/pizza-boy/Samples for Pizza Boy/Seaquest.bin"
 	if _, err := os.Stat(rom); err != nil {
 		t.Skip("commercial cartridge not present — it lives outside this repo")
 	}

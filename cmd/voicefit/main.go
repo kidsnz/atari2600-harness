@@ -7,7 +7,7 @@
 //
 // WHY IT EXISTS. Choosing a voice by TUNING and choosing it by TIMBRE are different searches
 // and they disagree. cmd/keyfit answers the first: which key can this machine play the figure
-// in. Nothing answered the second. On the Transistor Dub work a lead was fitted by tuning
+// in. Nothing answered the second. On one of the works a lead was fitted by tuning
 // alone, landed on AUDC 12, and the author's first words on hearing it were that the timbre
 // was nothing like the record — AUDC 12 is a squarewave with NO even harmonics, and the
 // record's line rolls off 1.00 .40 .16 .06, so it was the furthest of the eight from what was

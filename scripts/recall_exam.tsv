@@ -1,6 +1,6 @@
 # Questions for `recall.py --exam`: what an author types in the middle of a job, and where the answer is.
 # question <TAB> file (any of, |) <TAB> a phrase the returned passage must contain (any of, |; empty = any passage of that file)
-# The first 18 are the problems met while one work was made (roms/261011_edo, 2026-10), written down on
+# The first 18 are the problems met while one work was made (2026-10), written down on
 # 2026-10-13 BEFORE recall.py existed. Add a question when a work meets a problem; do not reword one to make it pass.
 the scene change frame is one scanline too long after I added code before the timer wait	known-traps.md	subroutine called mid-line|ends anywhere inside one pass of its loop
 building a new scene takes thousands of cycles and the picture rolls, do the work over several frames	blank-a-frame.md|rts-dispatch.md	
@@ -26,7 +26,7 @@ waiting for INTIM to reach zero in a loop leaves the loop a whole interval early
 compare the RAM of two ROMs frame by frame to show a rewrite did not change behaviour	CLAUDE.md|reproduce-loop.md|tool-landscape.md	ramtrace|behavmatch|trajdiff
 press the fire button at random times and see whether a frame is ever not 262 lines	CLAUDE.md|testing-playbook.md	guidedfuzz|fuzz
 is the picture my build draws the same as the original ROM's, pixel by pixel	CLAUDE.md|reproduce-loop.md	vismatch|refdiff
-# Added 2026-10-13 from the second pass of roms/261011_edo/REVIEW.md, by a reviewer that did not make the work: the
+# Added 2026-10-13 from the second pass of that work's REVIEW.md, by a reviewer that did not make the work: the
 # words it gave for rows the first review lacked, and two it wrote for existing rows whose question already held the
 # diagnosis (the stack; a seed that stops the ROM). The pins question is the first reviewer's and was written after
 # the diagnosis. None was tried against recall before being put here.

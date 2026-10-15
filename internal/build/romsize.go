@@ -33,7 +33,7 @@ import (
 // $FF. The two numbers disagree about a ROM full of solid sprite rows, and that disagreement is
 // information rather than noise.
 //
-// The author's works are why this exists. Twelve of `260809_technojacket`'s cover ROMs have **10
+// The author's works are why this exists. Twelve of one work's cover ROMs have **10
 // bytes** of trailing fill out of 4096, and 35 of 188 built work ROMs have under 512.
 func ROMBytesUsed(binPath string) (used, trailingFF, capacity int, err error) {
 	b, err := os.ReadFile(binPath)

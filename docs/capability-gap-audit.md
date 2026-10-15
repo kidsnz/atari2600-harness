@@ -1,7 +1,7 @@
 # Capability Gap Audit — mined techniques × harness capabilities
 
 > Date: 2026-06-13. Turns "can the harness be strengthened more?" into a finite, prioritized
-> list. Cross-references the mined corpus (72 AtariAge threads + research `tools/research-w1..w11`
+> list. Cross-references the mined corpus (72 AtariAge threads + the early research memos w1..w11, kept outside this repository since 2026-10-15,
 > + Pizza Boy dissection) against what the harness can currently verify/support. Status cells cite
 > `docs/fundamentals-audit.md`, `docs/verified-coverage.md`, `docs/stella-oracle.md`,
 > `docs/techniques/hscroll.md`, `CHANGELOG.md`.
@@ -4402,7 +4402,7 @@ Both reduce to the same arithmetic, and the arithmetic settles it.
 | **one voice** | **29-34** |
 | the DAC write itself (`ldx out`, two linearisation fetches, two `sta AUDVx`) | 17 (+2 on a page cross) |
 
-**Against our own kernel.** `roms/260809_technojacket/src/kernel-cover.asm` costs **57 of 76**
+**Against our own kernel.** an in-house cover kernel costs **57 of 76**
 cycles on its base path, leaving **19**. One voice needs **34**. It does not fit, and no
 rearrangement changes that: the deficit is larger than the whole remaining budget.
 

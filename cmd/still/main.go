@@ -10,7 +10,7 @@
 // measured rather than assumed:
 //
 //  1. FRAME CHOICE. The picture does not exist yet at frame 1. Measured on a
-//     technojacket cover ROM, the mean luminance of the picture band is 6.00 at
+//     cover ROM of one of the works, the mean luminance of the picture band is 6.00 at
 //     frame 1 and 52.39 from frame 7 on, so a tool that grabs frame 1 writes a
 //     uniformly near-black PNG -- which is exactly what the user was shown.
 //     Picking the frame by a RAM byte is not automatically better: the first
@@ -211,7 +211,7 @@ func blit(dst *image.RGBA, src *image.RGBA, xo, s int) {
 
 // diffPixels counts pixels that differ between the picture bands of a and b.
 //
-// READ THIS AS COLOUR PLUS GEOMETRY, NEVER AS GEOMETRY. On the technojacket covers
+// READ THIS AS COLOUR PLUS GEOMETRY, NEVER AS GEOMETRY. On one work's cover ROMs
 // COLUPF follows the drum envelope in EVERY build, glitched or not, so the clean
 // control still reports 6136 differing pixels between its two frames. A raw pixel
 // diff therefore cannot tell "the picture changed shape" from "the picture changed
@@ -233,12 +233,12 @@ func diffPixels(a, b *image.RGBA) int {
 func main() {
 	single := flag.Bool("single", false, "write only the -hi frame")
 	scale := flag.Int("scale", 2, "integer upscale factor")
-	// These three used to default to 0x83 / 3 / 6, which is TECHNOJACKET's kick-envelope index
-	// (k0i = $83, roms/260809_technojacket/src/prologue.asm). "Which byte selects the frame" is a
+	// These three used to default to 0x83 / 3 / 6, which is one work's kick-envelope index
+	// (k0i = $83 in that work's prologue). "Which byte selects the frame" is a
 	// property of the ROM being rendered and cannot have a default; the old one silently picked
 	// another work's variable, and the tool only notices when that byte never moves -- not when
 	// it moves and means something else. Required since 2026-08-15 (unless -frame is used).
-	trigger := flag.Int("trigger", -1, "zero-page RAM address whose value selects the frames (REQUIRED unless -frame; technojacket's is 0x83)")
+	trigger := flag.Int("trigger", -1, "zero-page RAM address whose value selects the frames (REQUIRED unless -frame; one work's is 0x83)")
 	lo := flag.Int("lo", 3, "the right-hand frame is the first with RAM[trigger] < this")
 	hi := flag.Int("hi", 6, "the left-hand frame is the first with RAM[trigger] >= this")
 	frame := flag.Int("frame", 0, "render exactly this frame instead of choosing one by -trigger, "+
@@ -258,7 +258,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "-trigger has NO default. It names the zero-page byte whose value selects the")
 		fmt.Fprintln(os.Stderr, "frame, which is a property of the ROM. It defaulted to 0x83 until 2026-08-15;")
-		fmt.Fprintln(os.Stderr, "that is technojacket's kick-envelope index and means nothing in another ROM.")
+		fmt.Fprintln(os.Stderr, "that is one work's kick-envelope index and means nothing in another ROM.")
 		os.Exit(2)
 	}
 	rom, outPath := flag.Arg(0), flag.Arg(1)

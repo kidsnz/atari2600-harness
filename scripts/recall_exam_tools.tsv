@@ -4,14 +4,14 @@
 # Where the questions come from. A question a tool's author writes after reading the tool's description is a
 # question the description already answers. So these are sentences that were written BEFORE this file, by
 # someone who needed the thing and did not find it here: the first sentence of the docstring of a tool a work
-# wrote for itself (roms/261011_edo/tools, roms/260816_transistor/tools), copied verbatim on 2026-10-13, and
+# wrote for itself (two works' own tools/ folders), copied verbatim on 2026-10-13, and
 # three questions typed into recall.py that day while checking those tools against this repository. The
 # expected answers are from the works' own reviews (which command came nearest); `none` is a correct answer.
 # Frozen before any command was given an "Answers:" line. Add questions; do not reword one to make it pass.
 # Changed since, and why: 2026-10-13, `cmd/sound` was written because two works had each built a tool for it. The
 # key of "Dump a ROM's TIA audio registers ..." gained `sound` (the question's words are untouched; the command
 # writes them as text, not JSON), and the last question was added -- the first sentence of the header of
-# roms/261011_edo/tools/sound/main.go, verbatim, written two days before the command.
+# one work's own sound tool (tools/sound/main.go), verbatim, written two days before the command.
 Picture of the current ROM against the original's, zone by zone, aligned at zone bottoms.	vismatch|framesim
 Does a build show the same scenes, in the same order, moving the same way, as the original?	trajdiff|behavmatch|ramtrace
 Re-record the pins of scenarios/fire-held.json from the current ROM.	scenario

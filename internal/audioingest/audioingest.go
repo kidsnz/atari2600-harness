@@ -419,7 +419,7 @@ func BassNotes(samples []float64, rate int, startSec, stepSec float64, steps int
 // WHY THIS EXISTS. F0 searches loHz..hiHz and cannot return anything outside it. That is
 // correct behaviour and it is also a trap: if the caller's band excludes the real
 // fundamental, F0 returns a HARMONIC of it, confidently and with no way for the caller to
-// tell. On the Transistor Dub work a lead line was measured over 110-800 Hz for two days
+// tell. On one of the works a lead line was measured over 110-800 Hz for two days
 // and read 194 Hz; its fundamental is 96.9 Hz, below the band, and 194 Hz was its second
 // harmonic. Two independent methods were needed to find that out. This makes it a
 // property the code reports rather than a mistake a person has to remember not to make.

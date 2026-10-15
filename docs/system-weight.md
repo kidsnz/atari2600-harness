@@ -222,7 +222,7 @@ done
 ```
 
 **Why step 3 must not swallow stderr, learned by shipping it wrong earlier the same day.** The
-first version of this checklist ran `find /Users/shinji/Documents/2D -name .git 2>/dev/null`. On
+first version of this checklist ran `find ~/Documents/2D -name .git 2>/dev/null`. On
 this machine macOS refuses to list that directory — and `find` prints the refusal to stderr **and
 exits 0**. With stderr discarded the step printed an empty list under a successful exit, which
 reads exactly like "there are no other repositories". A step that cannot tell *nothing is there*
@@ -234,24 +234,24 @@ unfinished step, not a pass.** To make it actually run, grant the terminal Full 
 System Settings → Privacy & Security. The umbrella-internal sweep works either way and finds the
 three.
 
-And the sibling line is the one that matters: `260811_cover-demos` lived **beside** the umbrella,
+And the sibling line is the one that matters: a demo-page repository lived **beside** the umbrella,
 not inside it, so an enumeration that only descends from here would have missed it exactly as the
 handoffs did.
 
 ### Count the repositories, do not recite them
 
-For two days there were **four**, and every handoff said three. `260811_cover-demos` (created
-2026-08-11) published a browser-playable page of the technojacket builds at
-`kidsnz.github.io/260811_cover-demos/`, and it appeared in no board, no index and no memory file
+For two days there were **four**, and every handoff said three. a demo-page repository (created
+2026-08-11) published a browser-playable page of one work's builds at
+a GitHub Pages address, and it appeared in no board, no index and no memory file
 until it was found by accident on 2026-08-13 — while being the only artefact here with an
 audience.
 
 **It is three again as of 2026-08-13**: the page had served its purpose, and the repository was
-retired. The page itself could not be rebuilt — `roms/260809_technojacket/tools/mkpage.py` embeds the ROMs at generation
-time, and three ROMs had landed since — so it is archived at
-`roms/260809_technojacket/_archive/2026-08-11-cover-demos/` with the exact served bytes, a `git bundle`
+retired. The page itself could not be rebuilt — the work's own page generator embeds the ROMs at generation
+time, and three ROMs had landed since — so it is archived in
+the work's own folder with the exact served bytes, a `git bundle`
 of its history, and a `PROVENANCE.md` carrying the restore procedure. The bytes were nearly lost
-to a subtlety worth remembering: the identical local copy at `roms/260809_technojacket/tools/preview.html` is **gitignored
+to a subtlety worth remembering: the identical local copy at the work's own preview page is **gitignored
 on purpose**, so it had never entered any git history.
 
 The lesson is not the number. It is that **the shutdown sweep must enumerate what exists rather

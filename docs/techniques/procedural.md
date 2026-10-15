@@ -198,9 +198,9 @@ A seed saves the ROM a stored map would take. It does not, by itself, save RAM.
 
 ## What a generated scene gets wrong for one seed in many
 
-Faults of one work (a landscape generator, `roms/261011_edo`), three of which no check of the
+Faults of one work (a landscape generator), three of which no check of the
 shipped seeds had found, and one way of narrowing a draw. All are measured there; what was run is in
-`roms/261011_edo/steps/README.md`, rows 02, 13, 14 and 20.
+that work's step log (`steps/README.md`), rows 02, 13, 14 and 20.
 
 - **Something drawn again until it fits takes as long as the draws say: there is no upper limit.**
   A sprite too tall for its zone was chosen again until one fitted, so how long a scene takes to

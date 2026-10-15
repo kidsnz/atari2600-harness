@@ -20,7 +20,7 @@ import (
 // Nothing here checked the size. `internal/build` has no size assertion, the gates have none, and
 // `LoadROM`'s only floor is `minCartBytes = 0x100` — 4098 sails through, and so does a 5887-byte
 // **partial output from an assembly that failed**, which is what was found in
-// `roms/260816_transistor/bin/` on 2026-09-05 (`Origin Reverse-indexed`, `Aborting assembly`, and
+// one work's `bin/` on 2026-09-05 (`Origin Reverse-indexed`, `Aborting assembly`, and
 // the partial image committed anyway).
 //
 // ★Measured across this repository's ROMs: 2048 x1, 4096 x175, 8192 x11, 16384 x2, 32768 x2, and

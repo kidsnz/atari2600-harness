@@ -7,11 +7,11 @@ key being playable and not.
 **Status:** measured on the machine, `roms/litmus/litmus_pitchdither.asm` +
 `internal/audioingest/pitchdither_test.go`. The ROM takes the waveform, the rung pair, the swap
 rate and the scanline of the store from RAM, so one machine produces every case instead of
-several builds assumed to be alike. **In use**: `roms/260809_technojacket` `cover-fsharp` plays
+several builds assumed to be alike. **In use**: one work's `cover-fsharp` plays
 "Bassline" in the record's own key, measured on the ROM at the piece's real seven-frame note
 length -- D2 -0.9 c, E2 -6.0 c, F#2 +14.7 c, where the nearest single registers are -27.1,
 +29.8 and -25.8.
-**Source:** in-house, 2026-08-09, reproducing Satoshi Tomiie's "Bassline" — the record's key
+**Source:** in-house, 2026-08-09, reproducing a commissioned record — the record's key
 was rejected because D and E are more than 23 cents out in every bass octave, and this is the
 mechanism that would have let it be kept.
 
@@ -137,7 +137,7 @@ mean.
 
 So the technique gives **one** in-between pitch per pair, not a continuum, and it is the
 midpoint. A note that needs something else needs a different key or a different octave —
-`technojacket`'s `cover-fs-hi` went up a fifth rather than up an octave for exactly this.
+one work's `cover-fs-hi` went up a fifth rather than up an octave for exactly this.
 
 ## Faster than a frame, the ORDER of the swaps is a fourth axis (Cited only, not verified)
 
@@ -212,7 +212,7 @@ pitch dithering.
 One bit of frame parity, in VBLANK, and the note table has to carry a flag saying which notes
 are dithered. No kernel cost at all: the kernel never sees this.
 
-⚠️ **If a picture is driven from the AUDF byte** — as `technojacket`'s piano roll is, where the
+⚠️ **If a picture is driven from the AUDF byte** — as one work's piano roll is, where the
 column is `(COLBASE − AUDF) × 2` — the alternation makes the drawn column flicker between two
 neighbours. Drive the picture from the note's BASE value, not from what was last written.
 

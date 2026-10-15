@@ -219,7 +219,7 @@ low-confidence multi-color band, the game is doing mid-line color splits — rea
   the inputs are images or a ROM (`cmd/ingest -in`, `cmd/fieldtest -rom`), never assembler source. masswerk's Tiny
   Playfield Editor reads and writes both layouts (its author: *"byte orders either per row (as before) or
   by labeled arrays per playfield register, both for import and for export"*, AtariAge `topic/305741`;
-  **Cited only, not verified**), and `tools/research-w1-tooling.md` records that shape as worth adopting.
+  **Cited only, not verified**), and an early research memo (w1, kept outside this repository since 2026-10-15) records that shape as worth adopting.
   Here, transposing into it is done by hand.
 - **Sprite labels are numbers, not names.** `DASMSprites` (`internal/ingest/emit.go`) labels the tables
   `Spr0Gfx`, `Spr1Gfx`, … by position in the report's sprite list; the input file's name does not reach the

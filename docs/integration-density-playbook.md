@@ -23,7 +23,7 @@ Reverse-indexed`, or the last free bytes are gone): the knowledge on saving byte
 each with what it saves. `techniques/branch-always.md` — a `jmp` that can be a branch, one byte each,
 and the condition under which it cannot. Count before cutting: assemble twice with two different
 fill values and compare the two ROMs — the bytes that differ are the free ones. One work's notes said
-4 where that count gave 3 (`roms/261011_edo`, 2026-10-13).
+4 where that count gave 3 (one of the works, 2026-10-13).
 
 ---
 

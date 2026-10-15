@@ -23,7 +23,7 @@ import "sort"
 // caller must not do is read `len(Bytes)` as "this technique uses exactly N bytes".
 //
 // ★★★★CALIBRATED against a known answer, which is what makes the bound trustworthy rather than
-// merely conservative. `roms/260816_transistor/src/rom/meterv-dual.asm` states its own RAM map in
+// merely conservative. One work's meter kernel states its own RAM map in
 // source: `MUSZP = $80`, `LVL = $8A` (ten bytes), `TMP = $94`, `BAR = $96` with the comment
 // "$96..$F9", `BARD = $C8`. That is $80–$F9 = **122 bytes** of the 128, leaving $FA–$FF. This
 // function reports **119** — a lower bound three bytes under the author's own map, on a real work

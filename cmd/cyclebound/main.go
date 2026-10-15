@@ -113,7 +113,7 @@ func main() {
 		// for the next line and the frame comes out one scanline long. Printing a bare
 		// "CERTIFIED" while the report's own BlankOver list is non-empty told a reader
 		// the ROM was fine when the tool had already found the defect -- measured
-		// 2026-08-09 on technojacket, where a 77-cycle VBLANK line made 5 frames in
+		// 2026-08-09 on one of the works, where a 77-cycle VBLANK line made 5 frames in
 		// 300 come out at 263 lines and only ntsc_frame_lines caught it.
 		if len(rep.BlankOver) > 0 {
 			fmt.Fprintf(os.Stderr, "NOT ROLL-FREE: every visible region is within budget, but %d BLANK region(s) "+
@@ -127,7 +127,7 @@ func main() {
 		// Fitting the budget is not the same as landing in time. Certifying a kernel
 		// whose playfield writes arrive after the beam has already drawn those columns
 		// tells the author the picture is fine when it is shifted right -- measured
-		// 2026-08-09 on technojacket's cover kernel, 75 of 76 cycles and two and a half
+		// 2026-08-09 on an in-house cover kernel, 75 of 76 cycles and two and a half
 		// columns out. So the deadline report prints with the verdict, and a miss is a
 		// failure here, not a footnote.
 		pfd, pferr := cyclebound.CheckPFDeadlines(*asm)

@@ -30,7 +30,7 @@ Recording is the strict part (CI-enforced); this list is just the consolidated l
 | `nusiz-shaping.md` | **Source:** the situation and the idea come from the Fishing Derby entry in `docs/casebook.md` |
 | `paddle.md` | Hardware basis: `litmus_paddle` (v0.54.0; INPT0 dump/charge transfer curve measured). |
 | `pf-modes.md` | Learned from (clean-room): Stella Programmer's Guide CTRLPF; spiceware Step 7. Demo: |
-| `pitch-dither.md` | **Source:** in-house, 2026-08-09, reproducing Satoshi Tomiie's "Bassline" — the record's key |
+| `pitch-dither.md` | **Source:** in-house, 2026-08-09, reproducing a commissioned record — the record's key |
 | `procedural.md` | Hardware basis: `litmus_lfsr` (v0.46.0; period 255, never-zero, `eor #$8E` taps verified). |
 | `restrobe-copies.md` | **Source:** `reference/atariage/180632-32-character-text-display` records solidcorp's 2011 |
 | `road.md` | **Source:** clean-room re-implementation studying the 8bitworkshop `road.asm` (Steven Hugg, |

@@ -4,7 +4,7 @@
 ; colour; then it calls two subroutines deep, and the second return address lands on $FD
 ; and $FC. The program does not crash and the picture is stable -- the variable is simply
 ; no longer what was counted -- which is how this fault passed every check in a real work
-; for two steps (roms/261011_edo, steps 15 and 16: a scene builder eight bytes deep under
+; for two steps (one of the works, steps 15 and 16: a scene builder eight bytes deep under
 ; variables that were set again for every zone). WatchStackOverlap must FLAG $FD.
 ;
 ; The clear at reset pushes zeros through all of RAM on purpose; that is not the fault, and

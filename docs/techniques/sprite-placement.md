@@ -656,7 +656,7 @@ single; it is markedly less free, and the loss is concentrated where the comb al
 ★★This is a statement about **the solver**, not the TIA: it is the set of x this package can currently
 produce a plan for. The test's controls hold that meaning — the free middle must stay free, the left
 comb must stay a comb of 1s and 2s, and if either changes the numbers move and it says so. Found by the
-mailing-list distillation (helper-2), whose note said it plainly: *"作品1（TRANSISTOR DUB）に直に効く
+mailing-list distillation (helper-2), whose note said it plainly: *"作品1に直に効く
 ——文字の x が穴に落ちるかどうか"*.
 
 **Other routines have other dead zones, and in other places.** Bradford Mott, 1998, sketched a

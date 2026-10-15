@@ -4,7 +4,7 @@
 //	ffmpeg -i track.mp3 -ac 1 -ar 44100 -c:a pcm_s16le track.wav
 //	f0check -wav track.wav -at 1.09 -band 110,800
 //
-// WHY IT EXISTS. On the Transistor Dub work a lead line was measured over 110-800 Hz and
+// WHY IT EXISTS. On one of the works a lead line was measured over 110-800 Hz and
 // read 194 Hz for two days. Its fundamental is 96.9 Hz — below the band — and 194 Hz was
 // its second harmonic. Nothing in the toolchain could say so: cmd/audioingest takes the
 // band and the grid as INPUTS and reports what it finds inside them, which is the correct

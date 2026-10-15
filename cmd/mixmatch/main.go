@@ -2,7 +2,7 @@
 // by band, so "the melody is too heavy" becomes a number a volume can be chosen against.
 //
 //	ffmpeg -i track.mp3 -ac 1 -ar 44100 -c:a pcm_s16le ref.wav
-//	mixmatch -ref ref.wav -rom roms/260809_technojacket/build/cover-bl-3.asm
+//	mixmatch -ref ref.wav -rom roms/<work>/build/cover.asm
 //	mixmatch -ref ref.wav -got mine.wav          ; two recordings, no emulator
 //
 // The TIA gives four bits of volume and no EQ, so the only lever an author has is which

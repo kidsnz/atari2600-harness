@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# pre-commit — nothing private goes into this PUBLIC repository (scripts/check_leaks.py).
+# Looks only at the lines this commit adds, so an old line elsewhere never blocks an unrelated
+# change. Enable once per clone: git config core.hooksPath scripts/git-hooks
+exec python3 "$(git rev-parse --show-toplevel)/scripts/check_leaks.py" --staged

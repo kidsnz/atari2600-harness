@@ -3,7 +3,7 @@
 The canon of "graphics-design principles that can be reduced to rules", obtained from mining (AtariAge) plus
 web research. Purpose = (1) explicit rules for Claude's design judgement (roms/EVALUATION.md's ⑥craft)
 (2) the basis of `pkg/design` feasibility judgements (also reusable for the frozen TIA Studio templates).
-Detailed sources = `tools/research-w2-design.md` + `docs/mining-digest.md` (mined-thread index) + `reference/atariage/*/notes.ja.md`.
+Detailed sources = an early research memo (w2, kept outside this repository since 2026-10-15) + `docs/mining-digest.md` (mined-thread index) + `reference/atariage/*/notes.ja.md`.
 
 **The executable judgements are already "absorbed" into `pkg/design/`** (machine-checked before any asm is written).
 Rules that can be quantified name their function at the end of the line with `→ func`. Judgement rules that
@@ -491,7 +491,7 @@ multiplexing = `multiplex.go` / character count = `text.go` / budget = `budget.g
   price of a clash, and one object drawn at a different level of treatment from the rest sits apart
   from them (our reading of both). He does not say what on the screen is red, and no reply in the
   thread takes it up. **Cited only, not verified** — one viewer's taste; the demo was not run here.
-- **The atom of the colour data model is "colour per scanline" = `colorPerRow[]`**: holding an array of scanline index → COLUPx value instead of a single `color` expresses vertical multi-colour (the cheapest multi-colour) directly. TIA Studio's M1 design decision converged on this too. 〔research w4 / `tools/research-w4-m1-open-questions.md`〕
+- **The atom of the colour data model is "colour per scanline" = `colorPerRow[]`**: holding an array of scanline index → COLUPx value instead of a single `color` expresses vertical multi-colour (the cheapest multi-colour) directly. TIA Studio's M1 design decision converged on this too. 〔research w4, an early memo kept outside this repository since 2026-10-15〕
   - **A colour table takes a decision out of the kernel, not only cycles.** nukey-shay, 2016, to
     just-jeff, whose kernel chose a sprite colour mid-line: *"That is burning unnecessary cycle time by
     having to decide which color to use mid-scanline. Without careful timing, the color data and/or
@@ -3883,7 +3883,7 @@ These cannot be quantified and need a judgement from Claude, a person, or an ima
 
 ## Landing this in the implementation (`pkg/design` / the frozen TIA Studio)
 - Feasibility = `pkg/design`'s static estimate plus live assert_line_budget / read_cycles / calibrate answers "does this layout fit inside 76cy?" immediately. Used as the gate before Claude writes asm.
-- The defaults for the 4 feasibility axes (colour / scanlines / multiplexing / budget) are detailed at the end of `tools/research-w2-design.md`.
+- The defaults for the 4 feasibility axes (colour / scanlines / multiplexing / budget) are detailed at the end of an early research memo (w2, kept outside this repository since 2026-10-15).
   - **RAM is not one of the four, and it was the one a practitioner looked at first.** Christopher
     Tumber, 2004, picking a platform for a 48-hour competition before its theme was announced: *"I plan
     to do either 2600 or Vectrex depending on the theme ... So it's probably 2600 unless it's a theme

@@ -8,7 +8,7 @@ seven of the problems met afterwards were already answered in it. This is the ch
 
     python3 scripts/recall.py "the scene change frame is one scanline too long"
     python3 scripts/recall.py -n 10 "save bytes, the ROM is full"
-    python3 scripts/recall.py -work ../roms/261011_edo "plucked notes, volume per frame"
+    python3 scripts/recall.py -work ../roms/<work> "plucked notes, volume per frame"
 
 Every passage comes with the file, the line it starts on, and its own first words (quote
 those, not the line number, when you write the reference down). Open the file and read the

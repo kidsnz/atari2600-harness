@@ -2,6 +2,7 @@ package cyclebound
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -24,8 +25,18 @@ var romBins = map[string]string{
 	// frogger.bin is a BUILD PRODUCT and gitignored (roms/.gitignore), so this entry silently
 	// skips on any machine that has not run `go run ./frogger/gen` + dasm. It is listed anyway
 	// because the corpus is meant to include the flagship; the skip is the honest state, not a
-	// pass. Regenerate with: cd roms && go run ./frogger/gen && dasm frogger/frogger.asm -f3 -ofrogger/frogger.bin
-	"Frogger(4K)": "../../../roms/260610_frogger/frogger.bin",
+	// pass. Regenerate it with that work's own gen and dasm. The folder is found by a pattern
+	// because a work's folder name is kept out of this public repository (scripts/check_leaks.py).
+	"Frogger(4K)": firstMatch("../../../roms/*_frogger/frogger.bin"),
+}
+
+// firstMatch is the first file a glob pattern finds, or the pattern itself, so that a missing
+// file still reaches loadROMBin and is reported there as a skip with the pattern in it.
+func firstMatch(pattern string) string {
+	if m, _ := filepath.Glob(pattern); len(m) > 0 {
+		return m[0]
+	}
+	return pattern
 }
 
 func loadROMBin(t *testing.T, path string) []byte {

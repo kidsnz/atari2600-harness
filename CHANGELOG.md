@@ -8,6 +8,37 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — `check_leaks.py`: nothing private enters this public repository (2026-10-15)
+
+This repository is public and the works are not, and nothing stopped a work from leaking in
+through the text written about it. Run over the tree for the first time, the new gate found
+**91 lines**: an unreleased record's title and its artist in six (the oldest from 2026-08-09),
+work folder names and file paths in the rest, and this machine's home path in a test and a doc.
+Not one was a copied file; every one was a sentence saying where something had been measured.
+
+- **The gate.** gitleaks' default credential rules, the public rules in `.gitleaks.toml` (a home
+  folder path, a session's temporary folder), and the private words: each work keeps its own
+  `private-words.txt` in its own folder in the private works repository, and every dated work
+  folder name is added automatically. The rules built from those lists exist only in a temporary
+  file. Modes: `--staged`, `--message`, `--range`, `--tree`, `--selftest`.
+- **Commit messages too.** gitleaks' `git` mode does not read them — measured on a throwaway
+  repository, a commit whose only private word was in its message reported no leaks — and they
+  are published with the code, so `--message` and `--range` pass them through `gitleaks stdin`.
+- **Where it runs.** New `pre-commit` and `commit-msg` hooks beside `pre-push`, which now checks
+  every commit a push carries before anything else. A missing gitleaks fails the gate.
+- **The selftest is shown to go red**: 4 of 8 cases with the private words emptied, 1 of 8 with
+  push messages unread, a refusal with the public config missing.
+- **The 91 lines are reworded** to "one of the works" and the like; `--tree` reports 0. Two tests
+  used paths that only one machine has: `cmd/cover` read a cartridge by an absolute path and now
+  uses the relative one the other tests use, and `internal/cyclebound` finds its work ROM by a
+  pattern instead of the folder name. Both still find their ROM and pass.
+
+### Removed — the TIA Studio research memos under `tools/` (2026-10-15)
+
+Fourteen planning memos from 2026-06-13, for a browser drawing tool the project dropped, were
+never written for the public (three held this machine's paths). They are kept outside this
+repository; the five places in `docs/` that cited them now say so instead of linking.
+
 ### Fixed — MCP `set_input` keeps what was already held (2026-10-14)
 
 Pressing a second input let go of the first: the liveness probe a press runs leaves the machine
@@ -167,8 +198,8 @@ first place on its question and `trajdiff` and `guidedfuzz` from first to second
 writes what the two channels put out as a 16-bit mono WAV, and with `-regs` the six sound registers
 at the end of every frame as text. Until now the registers over time were reachable only through
 the MCP tool `read_audio_trace`, whose answer a script cannot hold, and nothing here made a file one
-could listen to; two works had each written a tool for it (`roms/261011_edo/tools/sound`,
-`roms/260816_transistor/tools/trace_audio.py`, whose header tells of 240 frames transcribed by hand
+could listen to; two works had each written a tool for it (one work's `tools/sound`,
+the other's `tools/trace_audio.py`, whose header tells of 240 frames transcribed by hand
 with three of six series the wrong length).
 
 - The gain is fixed, so two ROMs' files compare in loudness as the ROMs do. A recording in which
@@ -203,7 +234,7 @@ tool's own first sentence); the tools half reads 11 of 14, from 9 of 13.
 the ROM runs — a name alone from power-on, `name@N` from frame N on — in both of the command's modes.
 The line it prints says what was held. Until now `still` pressed nothing, so a ROM whose picture
 answers to its buttons could only be drawn at rest, and two works had written a tool of their own for
-it (`roms/260816_transistor/tools/shot_held.py`, which says so in its first lines; one work's
+it (one work's `tools/shot_held.py`, which says so in its first lines; one work's
 measuring driver).
 
 Tested on a ROM the test builds (`cmd/still/hold_test.go`): the background is red while fire is down
@@ -230,7 +261,7 @@ the one point is this paragraph and nothing more general.
 ### Added — four things one work's generator got wrong or needed, and a verdict the stack check could not give (2026-10-13)
 
 `docs/techniques/procedural.md` gains a section, *What a generated scene gets wrong for one seed in
-many*. A review of the first work made after the landing (`roms/261011_edo/REVIEW.md`) classed
+many*. A review of the first work made after the landing (that work's `REVIEW.md`) classed
 seventeen problems by whether the documents already answered them; these are the ones they did not,
 each as measured in that work: a loop that hands out heights until a total is reached and has no
 count of its own (a total of 256 is 0 in a byte, and the loop wrote past its arrays into the stack);
@@ -382,7 +413,7 @@ never met. Fixed; the knowledge exam is unchanged by it (15 of 21 in the first 5
 `"no_stack_overlap": N` runs a ROM from reset for N frames with no input and fails on the first RAM
 byte that a push wrote and that an instruction also reached through zero page
 (`Emu.WatchStackOverlap`). The fault it is for does not crash and does not move a pixel: in
-`roms/261011_edo` a scene builder ran eight bytes deep under two kernel variables for two steps and
+one of the works a scene builder ran eight bytes deep under two kernel variables for two steps and
 every check passed; it was found by a separate driver that happened to record the stack pointer.
 `ramtrace activity` already printed the stack's low-water mark for those steps (`$F7` against `$F9`),
 but nothing turned it into a failure, and a low-water mark cannot be a gate by itself — `TXS` moves
@@ -468,7 +499,7 @@ ranked by BM25 with a passage's heading or bold lead counting double — with fi
 own first words. Standard library only, no index file, about a second. `-work DIR` appends the question
 and what came back to `DIR/build/recall.log`.
 
-Why: the first work made after the forum knowledge was landed (`roms/261011_edo`, 2026-10) read these
+Why: the first work made after the forum knowledge was landed (2026-10) read these
 documents once, at the plan, and not again in two days of work. Looked up afterwards, seven of the
 problems it met were already answered here. The documents are about 20,000 lines and 77 technique
 pages; the authoring protocol's first step said to read five of them, and nothing made that cheap
@@ -762,7 +793,7 @@ Each was fixed by one writer and checked by a separate reviewer.
   bytes and the same prover results).
 
 Found, not fixed here: `hscroll` and `two_line_vdel` are allowed two lines where they take one, so a copy
-that really overflows still passes the prover. `roms/260816_transistor/transistor2x.asm` (outside every
+that really overflows still passes the prover. One work's double-width kernel (outside every
 scenario) was building with two includes missing and now fails.
 
 ### Fixed — the rest of the errors found while landing (2026-10-01)
@@ -1827,7 +1858,7 @@ test.
 ROM**"* 〔stella-list `200401/msg00073`, Eric Ball, 2004〕. Cycles are continuous — a cycle saved is
 a cycle spent elsewhere. **ROM is quantised at the 2K/4K/8K boundaries**: inside one, ninety-six
 bytes buy nothing; at one, a single byte decides the work. Measured here the same day: twelve of
-`260809_technojacket`'s cover ROMs have **10 bytes** of trailing fill out of 4096 — the boundary
+one work's cover ROMs have **10 bytes** of trailing fill out of 4096 — the boundary
 Ball is describing — while most of the other 153 built work ROMs are comfortably inside one, where
 trimming buys nothing at all. That is a criterion for **which** ROM to work on, which the project did
 not have. Recovered by the mailing-list distillation (helper-2).
@@ -1969,7 +2000,7 @@ the result and the test asserts that this case reports it — a confident zero h
 goldens.
 
 **Calibrated against a known answer**, which is what separates a trustworthy bound from a merely
-conservative one. `roms/260816_transistor/src/rom/meterv-dual.asm` states its own RAM map in source
+conservative one. One work's meter kernel states its own RAM map in source
 — `MUSZP = $80`, `LVL = $8A` (ten bytes), `TMP = $94`, `BAR = $96` with the comment "$96..$F9",
 `BARD = $C8` — which is $80–$F9, **122 of the 128 bytes**. The tool reports **119**: three short of
 the author's own map, on a real work with a hundred-byte array in it. A bound that lands three under
@@ -2646,7 +2677,7 @@ no consumer at all. Dead rather than wrong — it sits in VBLANK padding — but
 *"the motion registers, at the value the frame wraps with"*, claims a purpose the ROM does not have.
 
 **And the reason those strobes were quieted is a fix worth having in the catalogue.** The generator
-records it (`roms/260816_transistor/tools/mk_transistor_ms.py:1023-1027`): a repeat pass that
+records it (one work's own music generator (lines 1023-1027)): a repeat pass that
 strobes again *"applies the nudge AGAIN: measured on --thick=2, pass 1 drew at x=19 and its repeat
 at x=20"* — this repository's own multiple-HMOVE trap, hit independently, measured, and fixed. The
 fix is the interesting part: in a generated kernel where every write is timed from the top of the
@@ -6156,17 +6187,17 @@ queued since 2026-08-23, was captured in the same pass at 37/37.
 
 ### Changed
 - **The fourth repository is retired, and the count in the shutdown sweep is replaced by an
-  enumeration.** `260811_cover-demos` published a browser-playable page of the technojacket
+  enumeration.** a demo-page repository published a browser-playable page of one work's
   builds and had served its purpose; the repository is being taken down. The page **cannot be
   rebuilt** — `tools/mkpage.py` embeds the ROMs at generation time and three ROMs landed after
-  it was made — so it is archived in the roms repo at
-  `technojacket/_archive/2026-08-11-cover-demos/` with the exact served bytes (cmp-verified),
+  it was made — so it is archived in the roms repo, in
+  that work's own folder, with the exact served bytes (cmp-verified),
   the retired repo's README and robots.txt, a `git bundle --all` of its one-commit history
   (verified by cloning it back), and a `PROVENANCE.md` holding the restore procedure.
   - **The bytes were nearly lost to a deliberate `.gitignore`.** `tools/preview.html` is
     byte-identical to the published page, and lines 31-32 exclude it and `tools/index.html`
     from the roms repo on purpose. Those bytes had therefore never entered any git history, so
-    deleting the cover-demos repository would have left the only copy of a PUBLISHED artifact
+    deleting the demo-page repository would have left the only copy of a PUBLISHED artifact
     untracked on one machine. The archive lives outside `tools/`, where the ignore rules do
     not reach; checked with `git check-ignore` before staging.
   - The checklist no longer says "all FOUR repositories". **It enumerates.** The figure was
@@ -6194,7 +6225,7 @@ queued since 2026-08-23, was captured in the same pass at 37/37.
   - Fixed by dropping the redirect, so the sweep fails loudly (`Operation not permitted`,
     exit 1) and the refusal is read as an unfinished step. The umbrella-internal sweep is
     separate and works regardless.
-  - **The sibling line is the one that mattered**: `260811_cover-demos` lived BESIDE the
+  - **The sibling line is the one that mattered**: a demo-page repository lived BESIDE the
     umbrella, so an enumeration that only descends from the umbrella root would have missed it
     exactly as every handoff did.
 
@@ -6276,7 +6307,7 @@ queued since 2026-08-23, was captured in the same pass at 37/37.
     measurement worktree goes outside the repo; the baseline run above used one under
     `/private/tmp` and removed it afterwards.
   - **There are FOUR repositories, not three.** Every handoff counts harness / roms /
-    sandbox. `../260811_cover-demos` (2026-08-11, pushed, `robots.txt` + `noindex`) carries
+    sandbox. A sibling demo-page repository (2026-08-11, pushed, `robots.txt` + `noindex`) carries
     every build of the jacket piece as base64 beside a javatari.js emulator. It is the one
     artefact here with an audience, and it appeared in no board, no index and no memory file
     until it was found by accident. Its `index.html` is GENERATED and embeds the ROMs at
@@ -6644,7 +6675,7 @@ queued since 2026-08-23, was captured in the same pass at 37/37.
   write has a DEADLINE (PF0 by colour clock 0, PF1 by 16, PF2 by 48; the right half's
   rewrites by 80 / 96 / 128), and a region can prove 75 of 76 cycles, certify, report 262
   stable lines, and still draw the picture in the wrong place. That is not hypothetical: it
-  shipped in technojacket's `cover-tear-speck`, where three cycles of index arithmetic at
+  shipped in an in-house cover kernel (`cover-tear-speck`), where three cycles of index arithmetic at
   the top of the line pushed PF0's store to cycle 26 against a 22.67-cycle deadline and the
   picture sat two and a half columns right with the previous line wrapping in at the left.
   **Nothing in the repo asked the question**, though `BeamIntervals` had been computing the
@@ -6710,7 +6741,7 @@ queued since 2026-08-23, was captured in the same pass at 37/37.
   cy` and its scenario went green, while the report's own `BlankOver` list held the
   violation. A blank overrun is not a visible tear; it is worse. The WSYNC after it
   waits for the next line and the frame gains a scanline.
-  Found 2026-08-09 on `roms/260809_technojacket`: two instructions added to a VBLANK line took
+  Found 2026-08-09 on one of the works: two instructions added to a VBLANK line took
   one path to 77 cycles, 5 frames in 300 came out at 263 lines, and `ntsc_frame_lines` /
   `frame_lines_stable` were the only checks that noticed. The ∀-over-all-paths gate —
   whose whole claim is that it does not need to catch the bad frame in a sample — was
@@ -10885,7 +10916,7 @@ every capability** — is met:
 - **Physical spinoff: split the base into a standalone repo `atari2600-harness` (game ROMs move to a
   separate repo `atari2600-roms`).** Under an umbrella folder `260609_atari2600-dev/`, place `harness/`
   (this repo, history preserved) and `roms/` (new repo) as siblings, bound by `go.work`. Remove
-  `roms/260610_frogger` from the harness (moved to the roms repo); `roms/litmus` stays as the harness's own
+  `roms/<work>` from the harness (moved to the roms repo); `roms/litmus` stays as the harness's own
   verification ROMs. **Eradicate the harness→game dependency:** repoint the scenario/emu unit tests from
   frogger ROMs to litmus, and add a new fixture `roms/litmus/scenarios/golden.json` (+`.golden`).
   `.mcp.json`/`.claude` move up to the umbrella (read at Claude Code's project root). Updated CLAUDE.md's
@@ -10895,12 +10926,12 @@ every capability** — is met:
   (spinoff prep).** `go.mod` and 9 import files replaced. build/vet/test green, all scenarios PASS.
 - **Promoted `internal/playfield` → `pkg/playfield` (spinoff prep).** Go can't import `internal/` across
   modules, so the playfield encoder (universal Atari 2600 knowledge) became a public package. Updated the
-  only cross-package importer (`roms/260610_frogger/gen`). Regenerated all scenes (header-comment-only diffs).
+  only cross-package importer (`roms/<work>/gen`). Regenerated all scenes (header-comment-only diffs).
   Verified green; all scenarios (3 frogger + 3 litmus) PASS.
 - **Documentation freshness audit (spinoff preamble).** Rewrote `README.md` to v0.21.0 reality (old diagram
   = `cmd/probe` + `internal/emu` only → 4 cmds, 6 internals, roms/<game>, 19 MCP tools, gaps A–E all
   closed; fixed the smoke.asm path to `roms/litmus/`). Fixed minor staleness in `improvement-roadmap`,
-  `mcp-tools`, `tool-landscape`, and a stale `cmd/genpf` comment in `roms/260610_frogger/gen/asmgen.go`.
+  `mcp-tools`, `tool-landscape`, and a stale `cmd/genpf` comment in `roms/<work>/gen/asmgen.go`.
 
 ### Added
 - **Improvement roadmap document (`docs/improvement-roadmap.md`).** Prioritizes next moves to make authoring
@@ -10944,7 +10975,7 @@ every capability** — is met:
   rendering (complements the D-1/D-2 logic/timing regression). Implementation: wire Gopher2600's exported
   `digest.Video` into `internal/emu` (`EnableVideoDigest`/`ResetVideoDigest`/`VideoHash`); `internal/scenario`
   enables it for golden scenarios, resets after warmup (deterministic), and compares to `.golden`.
-  `cmd/scenario -update` records/updates the baseline. Sample: `roms/260610_frogger/scenarios/golden.json` +
+  `cmd/scenario -update` records/updates the baseline. Sample: `roms/<work>/scenarios/golden.json` +
   committed `golden.golden`. CLI only; `bin/harness` (MCP) unchanged.
 
 ## [0.18.0] - 2026-06-10
@@ -10958,7 +10989,7 @@ every capability** — is met:
   fields are an error (no swallowing typos). Whole-run measurements with side effects are separated into
   `checks{ntsc_frame_lines, max_line_budget}`. Structure: `internal/scenario` (parse + vocab + Run,
   ROM-agnostic) / `cmd/scenario` (thin CLI). Samples under `roms/litmus/scenarios/` and
-  `roms/260610_frogger/scenarios/` (including `hop` = `up` input drives FrogY 144→128). CLI only; MCP unchanged.
+  `roms/<work>/scenarios/` (including `hop` = `up` input drives FrogY 144→128). CLI only; MCP unchanged.
 
 ## [0.17.0] - 2026-06-10
 ### Added
@@ -11015,7 +11046,7 @@ every capability** — is met:
 ### Changed
 - **Monorepo reorg: root = harness base / `roms/<game>/` = ROMs (spinoff Phase 1).** Demonstrated the
   game→harness one-way dependency and separated without surgery. Moved game-specific kernel generation
-  (`cmd/genpf` + asmgen) into `roms/260610_frogger/gen/` (package main importing `playfield`); litmus under
+  (`cmd/genpf` + asmgen) into `roms/<work>/gen/` (package main importing `playfield`); litmus under
   `roms/litmus/`. All builds/tests green; `litmus_pf` read_row identical after the reorg.
 
 ## [0.10.1] - 2026-06-10

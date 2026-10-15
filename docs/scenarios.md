@@ -187,7 +187,7 @@ ROM (our count, 2026-10-06), so it has not happened here. **Not verified.**
   separates them is this one. `pf_late` puts three cycles of index arithmetic at the *top* of the line
   instead of in its tail, so PF1 lands at clock 31 against a deadline of 16 and the picture comes out
   shifted right by four columns with the previous line's right edge wrapping in at the left. That shipped
-  (technojacket `cover-tear-speck`, 2026-08-09, measured at 75 of 76 cycles) and the author found it by eye.
+  (an in-house cover kernel, 2026-08-09, measured at 75 of 76 cycles) and the author found it by eye.
   The deadlines are the machine's geometry: PF0 by clock 0, PF1 by 16, PF2 by 48, and in repeat mode the
   right half's rewrites by 80 / 96 / 128; `COLUPF`/`COLUBK` by 0.
   **What it cannot judge it says so about rather than passing:** a third write to the same register in one
