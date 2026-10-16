@@ -8,6 +8,19 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — `pre-commit` also reports the ledger quotes a commit would break (2026-10-16)
+
+The author's review ledgers, kept beside this repository and outside every repository, quote this
+repository's sentences verbatim as evidence. The commit that reworded the work names and moved the
+research memos out broke 40 of those quotes in 37 rows, and nothing on either side noticed: the
+rewording was right, and the ledgers simply stopped matching. `scripts/git-hooks/pre-commit` now
+runs the ledgers' own checker after `check_leaks.py` when it is present (a clone does not have it,
+and the step is then silent). It names the quotes that hit at `HEAD` and miss in the staged tree,
+and it never blocks: the ledger's owner re-quotes. `check_leaks.py` still decides the commit, as
+before (the hook kept its exit status, where it used to `exec`). Shown both ways before use: one
+quoted sentence reworded in a throwaway index reports two broken quotes, an unquoted line reworded
+reports nothing; run against the ledgers as they were before that commit it finds the same 40.
+
 ### Added — `check_leaks.py`: nothing private enters this public repository (2026-10-15)
 
 This repository is public and the works are not, and nothing stopped a work from leaking in

@@ -2,4 +2,11 @@
 # pre-commit — nothing private goes into this PUBLIC repository (scripts/check_leaks.py).
 # Looks only at the lines this commit adds, so an old line elsewhere never blocks an unrelated
 # change. Enable once per clone: git config core.hooksPath scripts/git-hooks
-exec python3 "$(git rev-parse --show-toplevel)/scripts/check_leaks.py" --staged
+top="$(git rev-parse --show-toplevel)"
+python3 "$top/scripts/check_leaks.py" --staged || exit $?
+# The author's review ledgers quote sentences of this repository verbatim. They live beside it,
+# outside every repository, so a clone has no such script and this step is silent. When it is
+# there it reports quotes this commit would break, and never blocks: rewording here is fine, the
+# ledger's owner re-quotes.
+q="$(dirname "$top")/reference/_tools/quotebreak.py"
+if [ -f "$q" ]; then python3 "$q" --staged || true; fi
