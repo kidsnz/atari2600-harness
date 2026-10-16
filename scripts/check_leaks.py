@@ -134,6 +134,23 @@ def describe(f, where):
     return "  %s  %s\n      %s" % (loc, rule, (f.get("Match") or "").strip()[:160])
 
 
+# gitleaks' default config skips whole file types by path (measured 2026-10-16 by the second
+# independent check: a private word in an .svg passed every mode). Those files are read here and
+# their text passed through `gitleaks stdin`, so the same rules apply.
+SKIPPED = (".svg", ".pdf", ".sum", ".mod", ".bin", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2")
+
+
+def skipped_text(cwd, rev_paths):
+    """Text of the files gitleaks would skip, as (label, text) pairs; binary bytes are dropped."""
+    out = []
+    for label, spec in rev_paths:
+        if not spec.lower().endswith(SKIPPED):
+            continue
+        blob = subprocess.run(["git", "show", spec], cwd=cwd, capture_output=True).stdout
+        out.append((label, blob.decode("utf-8", "ignore")))
+    return out
+
+
 def scan(mode, arg, works_dir=None, cwd=REPO):
     """Return (findings as text lines, a note about coverage)."""
     words = private_words(works_dir or WORKS)
@@ -150,6 +167,9 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
                                    cwd=cwd, capture_output=True, text=True, check=True).stdout
             for f in gitleaks(["stdin"], cfg, tmp, stdin=names, cwd=cwd):
                 found.append(describe(f, "a staged FILE NAME"))
+            for label, text in skipped_text(cwd, [(n, ":" + n) for n in names.split()]):
+                for f in gitleaks(["stdin"], cfg, tmp, stdin=text, cwd=cwd):
+                    found.append(describe(f, label + " (a type gitleaks skips)"))
         elif mode == "message":
             # Every line, '#' ones too: with -F or -m (this project's commit form) git keeps them in
             # the published message. Only the editor's own template comments would be stripped, and
@@ -161,6 +181,19 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
         elif mode == "range":
             for f in gitleaks(["git", "--log-opts", arg, "."], cfg, tmp, cwd=cwd):
                 found.append(describe(f, "pushed lines"))
+            if ".." in arg:
+                names = subprocess.run(["git", "diff", "--name-only", "--diff-filter=ACR", arg], cwd=cwd,
+                                       capture_output=True, text=True, check=True).stdout
+                tip = arg.split("..")[-1] or "HEAD"
+            else:
+                names = subprocess.run(["git", "show", "--name-only", "--format=", arg], cwd=cwd,
+                                       capture_output=True, text=True, check=True).stdout
+                tip = arg
+            for f in gitleaks(["stdin"], cfg, tmp, stdin=names, cwd=cwd):
+                found.append(describe(f, "a pushed FILE NAME"))
+            for label, text in skipped_text(cwd, [(n, tip + ":" + n) for n in names.split()]):
+                for f in gitleaks(["stdin"], cfg, tmp, stdin=text, cwd=cwd):
+                    found.append(describe(f, label + " (a type gitleaks skips)"))
             shas = subprocess.run(["git", "rev-list", arg], cwd=cwd, capture_output=True,
                                   text=True, check=True).stdout.split()
             for sha in shas:
@@ -263,9 +296,27 @@ def selftest():
         expect("pushed commit whose MESSAGE holds a folder name", "range", base + "..HEAD", True)
         git("commit", "-q", "--amend", "-m", "named nothing")
         expect("pushed commit with a clean message and line", "range", base + "..HEAD", False)
+        with open(os.path.join(repo, "260101_fixture-notes.txt"), "w") as f:
+            f.write("nothing\n")
+        git("add", "260101_fixture-notes.txt")
+        git("commit", "-q", "--no-verify", "-m", "plain")
+        expect("a pushed FILE NAME holding a folder name", "range", base + "..HEAD", True)
+        git("reset", "-q", "--hard", "HEAD~1")
+        with open(os.path.join(repo, "logo.svg"), "w") as f:
+            f.write("<svg><text>quaxolotl records</text></svg>\n")
+        git("add", "logo.svg")
+        expect("a private word inside an .svg (a type gitleaks skips)", "staged", None, True)
+        git("commit", "-q", "--no-verify", "-m", "plain")
+        expect("the same .svg in a push", "range", base + "..HEAD", True)
+        git("reset", "-q", "--hard", "HEAD~1")
+        msg2 = os.path.join(tmp, "msg2")
+        for label, text in (("a /home path", "/" + "ho" + "me/alice/x"), ("a /tmp/claude path", "/" + "tm" + "p/claude-501/x")):
+            with open(msg2, "w") as f:
+                f.write("see %s\n" % text)
+            expect(label + " in a message (gitleaks' own allowlist used to drop it)", "message", msg2, True)
         # Built at run time: written out whole, this fixture is itself the thing the gate stops
         # (it stopped the commit that added it, 2026-10-15).
-        write("/" + "Users/someone/Documents/x")
+        write("/" + "Use" + "rs/someone/Documents/x")
         git("add", "notes.txt")
         expect("an absolute home path (public rule)", "staged", None, True)
     return fails, len(ran)

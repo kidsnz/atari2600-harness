@@ -21,7 +21,11 @@ A reviewer that did not write the gate tried to get private words past it. Fixed
   key by gitleaks' default rules; a landing commit could have been stopped the same way. Allowed
   only when the finding is exactly that text, so a key elsewhere on the line is still caught.
 - **A wrong `LEAK_WORKS_DIR`** passed on the public rules with only a note; it now fails.
-- `/tmp/claude-N` is caught as well as `/private/tmp/claude-N`.
+- `/tmp/claude-N` is caught as well as `/private/tmp/claude-N`. A second independent check found
+  it was NOT: gitleaks' default allowlist drops a finding that starts with `/tmp/`, which also
+  silenced `/home/<name>/`. Both rules now match from the folder name on.
+- **File names in a push**, and **file types gitleaks skips** (`.svg`, `.pdf`, `go.sum`, images,
+  `.bin`): their text is read and put through the same rules, staged and pushed.
 
 Still getting through, on purpose or for now: lookalike letters and zero-width characters (this
 gate is for accidents, not for an author hiding a word), an inline `gitleaks:allow`, and tag

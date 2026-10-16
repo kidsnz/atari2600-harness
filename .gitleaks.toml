@@ -8,12 +8,15 @@ useDefault = true
 [[rules]]
 id = "home-path"
 description = "an absolute path inside someone's home folder"
-regex = '''(?:/Users|/home)/[A-Za-z][A-Za-z0-9._-]*/'''
+# No leading slash: gitleaks' default allowlist drops any finding that STARTS with /tmp/ or similar
+# system folders, which silenced the /home half of this rule and the temp rule below (measured
+# 2026-10-16 by the second independent check). Matching from the folder name on avoids that.
+regex = '''(?:Users|home)/[A-Za-z][A-Za-z0-9._-]*/'''
 
 [[rules]]
 id = "session-temp-path"
 description = "a Claude Code session's temporary folder, gone when the session ends"
-regex = '''(?:/private)?/tmp/claude-\d+'''
+regex = '''tmp/claude-\d+'''
 
 # A landing commit's message carries `Land-Key: <12 hex digits>` lines, and a random-looking key
 # is sometimes taken for an API key by the default rules (2 of the published messages, both false).
