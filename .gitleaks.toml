@@ -13,4 +13,14 @@ regex = '''(?:/Users|/home)/[A-Za-z][A-Za-z0-9._-]*/'''
 [[rules]]
 id = "session-temp-path"
 description = "a Claude Code session's temporary folder, gone when the session ends"
-regex = '''/private/tmp/claude-\d+'''
+regex = '''(?:/private)?/tmp/claude-\d+'''
+
+# A landing commit's message carries `Land-Key: <12 hex digits>` lines, and a random-looking key
+# is sometimes taken for an API key by the default rules (2 of the published messages, both false).
+# Allowed only when the finding IS exactly that text, so a real key elsewhere on the same line is a
+# finding of its own and is still caught. (regexTarget "line" did not take effect on gitleaks
+# 8.30.1 stdin scans, measured 2026-10-16; "match" does.)
+[[allowlists]]
+description = "Land-Key lines in landing commit messages"
+regexTarget = "match"
+regexes = ['''^Land-Key: [0-9a-f]{12}$''']

@@ -8,6 +8,26 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — `check_leaks.py` closes the gaps an independent check found (2026-10-16)
+
+A reviewer that did not write the gate tried to get private words past it. Fixed here:
+- **Spelling variants.** A word was matched literally, so `Blue-Harbor`, `blue_harbor`, a double
+  space, `BlueHarbor` and `**Blue** Harbor` all went through. A word now matches with any of
+  spaces, `-`, `_` or markdown emphasis between its parts, and across camel case.
+- **File names.** A private word in the name of an added file, not its content, went through.
+- **`#` lines of a message.** The commit-msg check dropped them, but with `-F` or `-m` — this
+  project's commit form — git keeps them in the published message. They are scanned now.
+- **Land-Key lines.** Two published landing messages had `Land-Key: <12 hex>` taken for an API
+  key by gitleaks' default rules; a landing commit could have been stopped the same way. Allowed
+  only when the finding is exactly that text, so a key elsewhere on the line is still caught.
+- **A wrong `LEAK_WORKS_DIR`** passed on the public rules with only a note; it now fails.
+- `/tmp/claude-N` is caught as well as `/private/tmp/claude-N`.
+
+Still getting through, on purpose or for now: lookalike letters and zero-width characters (this
+gate is for accidents, not for an author hiding a word), an inline `gitleaks:allow`, and tag
+messages. The published history still holds the old findings; the user decided on 2026-10-15
+not to rewrite it.
+
 ### Changed — `pre-commit` also reports the ledger quotes a commit would break (2026-10-16)
 
 The author's review ledgers, kept beside this repository and outside every repository, quote this

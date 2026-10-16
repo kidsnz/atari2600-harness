@@ -28,7 +28,10 @@ MODES
                     pushed commit must each be stopped, the same text without it must pass, and an
                     old line that already holds the word must not stop an unrelated change. Shown
                     to go red 2026-10-15 with the private words emptied (4 of 8 cases), with push
-                    messages unread (1 of 8) and with the public config missing (gitleaks refuses)
+                    messages unread (1 of 8) and with the public config missing (gitleaks refuses).
+                    2026-10-16, after an independent check found variants getting through: red
+                    again with words matched literally (2 of 12), file names unread (1 of 12), and
+                    the Land-Key allowance removed (1 of 12)
 
 gitleaks' own `git` mode does not read commit messages (measured 2026-10-15 on a throwaway
 repository: a commit whose only private word was in its message reported "no leaks found"), which
@@ -72,6 +75,19 @@ def private_words(works_dir):
     return out
 
 
+SEP = r"[\s_*`~.\-]*"   # what may sit between two parts of a word: spaces, -, _, markdown
+
+
+def word_regex(word):
+    """A private word as a regex that also matches its spacing, joining and emphasis variants:
+    "Blue Harbor" matches "blue  harbor", "blue-harbor", "blue_harbor", "BlueHarbor", "**Blue** Harbor".
+    Measured need (2026-10-15, the independent check of this gate): each of those got through when
+    the words were matched literally. Lookalike letters and zero-width characters still get
+    through; they are deliberate, and this gate is for the accidental kind."""
+    parts = [p for p in re.split(r"[\s_\-]+|(?<=[a-z])(?=[A-Z])", word) if p]
+    return SEP.join(re.escape(p) for p in parts) if parts else re.escape(word)
+
+
 def toml_str(s):
     return "'''" + s + "'''"
 
@@ -81,7 +97,7 @@ def build_config(words, tmpdir):
     lines = ["[extend]", "path = %s" % toml_str(PUBLIC_CONFIG), ""]
     by_work = {}
     for work, word in words or []:
-        by_work.setdefault(work, []).append(re.escape(word))
+        by_work.setdefault(work, []).append(word_regex(word))
     for work, pats in sorted(by_work.items()):
         lines += ["[[rules]]",
                   "id = %s" % toml_str("private-word:" + work),
@@ -130,9 +146,16 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
         if mode == "staged":
             for f in gitleaks(["git", "--pre-commit", "--staged", "."], cfg, tmp, cwd=cwd):
                 found.append(describe(f, "staged"))
+            names = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACR"],
+                                   cwd=cwd, capture_output=True, text=True, check=True).stdout
+            for f in gitleaks(["stdin"], cfg, tmp, stdin=names, cwd=cwd):
+                found.append(describe(f, "a staged FILE NAME"))
         elif mode == "message":
+            # Every line, '#' ones too: with -F or -m (this project's commit form) git keeps them in
+            # the published message. Only the editor's own template comments would be stripped, and
+            # scanning those as well costs nothing.
             with open(arg, encoding="utf-8") as fh:
-                text = "".join(l for l in fh if not l.startswith("#"))
+                text = fh.read()
             for f in gitleaks(["stdin"], cfg, tmp, stdin=text, cwd=cwd):
                 found.append(describe(f, "commit message"))
         elif mode == "range":
@@ -205,6 +228,16 @@ def selftest():
         git("add", "notes.txt")
         expect("private word on a staged line (any case)", "staged", None, True)
         git("reset", "-q", "--hard")
+        write("see the Quaxolotl-Records_sleeve and **Quaxolotl** Records")
+        git("add", "notes.txt")
+        expect("private word joined by - or _, or with markdown emphasis", "staged", None, True)
+        git("reset", "-q", "--hard")
+        with open(os.path.join(repo, "quaxolotl_records.txt"), "w") as f:
+            f.write("nothing here\n")
+        git("add", "quaxolotl_records.txt")
+        expect("private word in a FILE NAME only", "staged", None, True)
+        git("rm", "-q", "--cached", "quaxolotl_records.txt")
+        os.remove(os.path.join(repo, "quaxolotl_records.txt"))
         write("see roms/260101_fixture/tools for the measurement")
         git("add", "notes.txt")
         expect("the work's folder name on a staged line", "staged", None, True)
@@ -215,8 +248,14 @@ def selftest():
             f.write("Measured on the %s work\n# a comment line naming 260101_fixture is dropped\n" % word)
         expect("private word in a commit message", "message", msg, True)
         with open(msg, "w") as f:
-            f.write("Measured on one of the works\n# 260101_fixture in a comment is not published\n")
-        expect("clean message (the word only in a # comment)", "message", msg, False)
+            f.write("Measured on one of the works\n# 260101_fixture on a '#' line\n")
+        expect("a '#' line of a message is scanned (git -F keeps it)", "message", msg, True)
+        with open(msg, "w") as f:
+            f.write("Measured on one of the works\n\nLand-Key: " + "c6e8910b427d\n")
+        expect("a clean message with a Land-Key line passes", "message", msg, False)
+        with open(msg, "w") as f:
+            f.write("Measured\n\nLand-Key: " + "c6e8910b427d api_key=" + "Zq8Kp2Lm9Xv4Rt7Wn3Hs6Jd1\n")
+        expect("a key on a Land-Key line is still caught", "message", msg, True)
 
         write("plain text")
         git("add", "notes.txt")
@@ -256,6 +295,11 @@ def main(argv):
         print(__doc__, file=sys.stderr)
         return 2
     mode, n = modes[argv[0]]
+    if os.environ.get("LEAK_WORKS_DIR") and not os.path.isdir(WORKS):
+        # Asked for a works repository that is not there: passing on the public rules alone would
+        # look like a pass on the private words too.
+        print("✗ check_leaks: LEAK_WORKS_DIR=%s is not a directory." % WORKS)
+        return 1
     found, note = scan(mode, argv[1] if n else None)
     if found:
         print("✗ check_leaks: %d finding(s) — this repository is PUBLIC." % len(found))
