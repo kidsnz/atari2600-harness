@@ -137,7 +137,18 @@ def describe(f, where):
 # gitleaks' default config skips whole file types by path (measured 2026-10-16 by the second
 # independent check: a private word in an .svg passed every mode). Those files are read here and
 # their text passed through `gitleaks stdin`, so the same rules apply.
-SKIPPED = (".svg", ".pdf", ".sum", ".mod", ".bin", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2")
+SKIPPED = (".svg", ".pdf", ".sum", ".mod", ".bin", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2",
+           ".tif", ".tiff", ".bmp", ".ttf", ".otf", ".eot", ".lock")
+
+
+def changed_names(cwd, *diff_args):
+    """Names of added, copied, modified or renamed files, read NUL-separated so a space or a
+    non-ASCII letter in a name survives (a plain split on whitespace cut such names, and git quotes
+    non-ASCII names otherwise; both found by the third independent check). Modified files count
+    too: an existing file edited to hold a word is the same leak as a new one."""
+    raw = subprocess.run(["git", "diff", "-z", "--name-only", "--diff-filter=ACMR"] + list(diff_args),
+                         cwd=cwd, capture_output=True, check=True).stdout
+    return [n for n in raw.decode("utf-8", "surrogateescape").split("\0") if n]
 
 
 def skipped_text(cwd, rev_paths):
@@ -163,11 +174,10 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
         if mode == "staged":
             for f in gitleaks(["git", "--pre-commit", "--staged", "."], cfg, tmp, cwd=cwd):
                 found.append(describe(f, "staged"))
-            names = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACR"],
-                                   cwd=cwd, capture_output=True, text=True, check=True).stdout
-            for f in gitleaks(["stdin"], cfg, tmp, stdin=names, cwd=cwd):
+            names = changed_names(cwd, "--cached")
+            for f in gitleaks(["stdin"], cfg, tmp, stdin="\n".join(names) + "\n", cwd=cwd):
                 found.append(describe(f, "a staged FILE NAME"))
-            for label, text in skipped_text(cwd, [(n, ":" + n) for n in names.split()]):
+            for label, text in skipped_text(cwd, [(n, ":" + n) for n in names]):
                 for f in gitleaks(["stdin"], cfg, tmp, stdin=text, cwd=cwd):
                     found.append(describe(f, label + " (a type gitleaks skips)"))
         elif mode == "message":
@@ -181,21 +191,20 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
         elif mode == "range":
             for f in gitleaks(["git", "--log-opts", arg, "."], cfg, tmp, cwd=cwd):
                 found.append(describe(f, "pushed lines"))
-            if ".." in arg:
-                names = subprocess.run(["git", "diff", "--name-only", "--diff-filter=ACR", arg], cwd=cwd,
-                                       capture_output=True, text=True, check=True).stdout
-                tip = arg.split("..")[-1] or "HEAD"
-            else:
-                names = subprocess.run(["git", "show", "--name-only", "--format=", arg], cwd=cwd,
-                                       capture_output=True, text=True, check=True).stdout
-                tip = arg
-            for f in gitleaks(["stdin"], cfg, tmp, stdin=names, cwd=cwd):
-                found.append(describe(f, "a pushed FILE NAME"))
-            for label, text in skipped_text(cwd, [(n, tip + ":" + n) for n in names.split()]):
-                for f in gitleaks(["stdin"], cfg, tmp, stdin=text, cwd=cwd):
-                    found.append(describe(f, label + " (a type gitleaks skips)"))
             shas = subprocess.run(["git", "rev-list", arg], cwd=cwd, capture_output=True,
                                   text=True, check=True).stdout.split()
+            # Every commit of the push, not only its tip: a name renamed away or a file deleted
+            # before the tip is still published in the commit that had it.
+            for sha in shas:
+                names = changed_names(cwd, sha + "^!") if subprocess.run(
+                    ["git", "rev-parse", "-q", "--verify", sha + "^"], cwd=cwd, capture_output=True).returncode == 0 \
+                    else [n for n in subprocess.run(["git", "show", "-z", "--name-only", "--format=", sha], cwd=cwd,
+                          capture_output=True, check=True).stdout.decode("utf-8", "surrogateescape").split("\0") if n]
+                for f in gitleaks(["stdin"], cfg, tmp, stdin="\n".join(names) + "\n", cwd=cwd):
+                    found.append(describe(f, "a FILE NAME in %s" % sha[:8]))
+                for label, text in skipped_text(cwd, [(n, sha + ":" + n) for n in names]):
+                    for f in gitleaks(["stdin"], cfg, tmp, stdin=text, cwd=cwd):
+                        found.append(describe(f, "%s in %s (a type gitleaks skips)" % (label, sha[:8])))
             for sha in shas:
                 msg = subprocess.run(["git", "log", "-1", "--format=%B", sha], cwd=cwd,
                                      capture_output=True, text=True, check=True).stdout
@@ -309,6 +318,25 @@ def selftest():
         git("commit", "-q", "--no-verify", "-m", "plain")
         expect("the same .svg in a push", "range", base + "..HEAD", True)
         git("reset", "-q", "--hard", "HEAD~1")
+        with open(os.path.join(repo, "my logo.svg"), "w") as f:
+            f.write("<svg>clean</svg>\n")
+        git("add", "my logo.svg")
+        git("commit", "-q", "--no-verify", "-m", "plain")
+        with open(os.path.join(repo, "my logo.svg"), "w") as f:
+            f.write("<svg><text>quaxolotl records</text></svg>\n")
+        git("add", "my logo.svg")
+        expect("an EXISTING .svg with a space in its name, edited to hold the word", "staged", None, True)
+        git("commit", "-q", "--no-verify", "-m", "plain")
+        expect("the same edit in a push", "range", base + "..HEAD", True)
+        git("reset", "-q", "--hard", base)
+        with open(os.path.join(repo, "260101_fixture.txt"), "w") as f:
+            f.write("x\n")
+        git("add", "260101_fixture.txt")
+        git("commit", "-q", "--no-verify", "-m", "plain")
+        git("mv", "260101_fixture.txt", "renamed.txt")
+        git("commit", "-q", "--no-verify", "-m", "plain")
+        expect("a private FILE NAME renamed away before the tip of a push", "range", base + "..HEAD", True)
+        git("reset", "-q", "--hard", base)
         msg2 = os.path.join(tmp, "msg2")
         for label, text in (("a /home path", "/" + "ho" + "me/alice/x"), ("a /tmp/claude path", "/" + "tm" + "p/claude-501/x")):
             with open(msg2, "w") as f:

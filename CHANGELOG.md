@@ -25,7 +25,9 @@ A reviewer that did not write the gate tried to get private words past it. Fixed
   it was NOT: gitleaks' default allowlist drops a finding that starts with `/tmp/`, which also
   silenced `/home/<name>/`. Both rules now match from the folder name on.
 - **File names in a push**, and **file types gitleaks skips** (`.svg`, `.pdf`, `go.sum`, images,
-  `.bin`): their text is read and put through the same rules, staged and pushed.
+  fonts, `.bin`): their text is read and put through the same rules, staged and pushed — for
+  modified files as well as new ones, for names with spaces or non-ASCII letters, and for every
+  commit of a push rather than its tip only (a third independent check found each of those gaps).
 
 Still getting through, on purpose or for now: lookalike letters and zero-width characters (this
 gate is for accidents, not for an author hiding a word), an inline `gitleaks:allow`, and tag
