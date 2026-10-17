@@ -8,6 +8,25 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — `check_leaks.py` and the pre-push leak step: what a fourth measurement got through (2026-10-17)
+
+A measurement run by the other session found private words leaving through four routes. Fixed:
+- **Every ref of a push.** The pre-push hook kept only the last ref of a push, so a leak on an
+  earlier ref went out. Each ref is now checked on its own range. Shown live on a throwaway clone
+  pushing two refs to a local bare remote: the new hook stops it, the old one let the leak through.
+- **gitleaks' own skip list.** The files gitleaks skips by path are now taken from its own
+  `[allowlist] paths` at the pinned v8.30.1, copied verbatim; the hand-made list of extensions
+  missed 15 of 26 probed types (`.docx`, lock files and others). Those files are read with the
+  private words and the path rules only: gitleaks' credential rules are why it skips them (a
+  `go.sum` module hash reads as an API key).
+- **Packed content.** gzip, UTF-16, PDF streams and PNG text chunks are unpacked and read, in any
+  file, not only the skipped ones (a gzipped `.svgz` passed).
+- **Merges.** A merge's file names are taken against its first parent (`sha^!` named nothing for
+  a merge) and the lines a merge adds, where a conflict resolution lives, are read; gitleaks' git
+  mode does not read merge diffs.
+- `--tree` reads the skipped and packed files too.
+Selftest 25 cases; red again (5 of 25) with the old list, no unpacking and no merge reading.
+
 ### Fixed — `check_leaks.py` closes the gaps an independent check found (2026-10-16)
 
 A reviewer that did not write the gate tried to get private words past it. Fixed here:

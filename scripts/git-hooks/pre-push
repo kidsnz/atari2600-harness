@@ -33,10 +33,18 @@ REPO="$(git rev-parse --show-toplevel)"
 SHA=""
 REFS=0
 TO_MAIN=0
+LEAK_RANGES=""
 while read -r _lref lsha rref rsha; do
   REFS=$((REFS+1))
   case "$lsha" in ""|0000000000000000000000000000000000000000) continue ;; esac
   SHA="$lsha"
+  # every ref of the push gets its own leak check (one push can carry several; measured 2026-10-17:
+  # only the last ref's commits were read, so a leak on an earlier ref went out)
+  case "$rsha" in ""|0000000000000000000000000000000000000000)
+    if git -C "$REPO" rev-parse -q --verify origin/main >/dev/null; then
+      LEAK_RANGES="$LEAK_RANGES origin/main..$lsha"; else LEAK_RANGES="$LEAK_RANGES $lsha"; fi ;;
+  *) LEAK_RANGES="$LEAK_RANGES $rsha..$lsha" ;;
+  esac
   # The REMOTE sha git hands us is the state being replaced. Comparing against it — rather than
   # against a local `origin/main`, which may already have been fetched forward — is what makes the
   # workflow guard below see the change the push actually carries.
@@ -96,18 +104,15 @@ fi
 # commit as it is made; this checks every commit the push carries, lines AND messages, because a
 # commit made with --no-verify, or before those hooks existed, reaches here unchecked. It runs
 # first because it is cheap and a leak is the one failure a later fix cannot take back.
-LEAK_RANGE="$SHA"
-if [ -n "${BASE:-}" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
-  LEAK_RANGE="$BASE..$SHA"
-elif git -C "$REPO" rev-parse -q --verify origin/main >/dev/null; then
-  LEAK_RANGE="origin/main..$SHA"
-fi
+[ -n "$LEAK_RANGES" ] || LEAK_RANGES="$SHA"
+for LEAK_RANGE in $LEAK_RANGES; do
 python3 "$REPO/scripts/check_leaks.py" --range "$LEAK_RANGE" || {
   echo ""
   echo "✗ pre-push BLOCKED: a private word or a machine path is in what this push carries."
   echo "  A commit already made has to be rewritten (git commit --amend, or git rebase) before pushing."
   exit 1
 }
+done
 
 # A previous run killed outright (SIGKILL skips the trap) leaves its worktree registered; prune
 # before adding, or `git worktree list` grows a tail of dead entries that nothing removes.

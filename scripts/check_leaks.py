@@ -31,7 +31,9 @@ MODES
                     messages unread (1 of 8) and with the public config missing (gitleaks refuses).
                     2026-10-16, after an independent check found variants getting through: red
                     again with words matched literally (2 of 12), file names unread (1 of 12), and
-                    the Land-Key allowance removed (1 of 12)
+                    the Land-Key allowance removed (1 of 12).
+                    2026-10-17, after 261009_next's measurement: red again with the old hand-made
+                    list of skipped types, no unpacking and no merge reading (5 of 25)
 
 gitleaks' own `git` mode does not read commit messages (measured 2026-10-15 on a throwaway
 repository: a commit whose only private word was in its message reported "no leaks found"), which
@@ -92,9 +94,17 @@ def toml_str(s):
     return "'''" + s + "'''"
 
 
-def build_config(words, tmpdir):
-    """A gitleaks config: the public one, plus one rule per work. Written only to tmpdir."""
-    lines = ["[extend]", "path = %s" % toml_str(PUBLIC_CONFIG), ""]
+def build_config(words, tmpdir, credentials=True):
+    """A gitleaks config: the public one, plus one rule per work. Written only to tmpdir.
+    credentials=False leaves out gitleaks' default credential rules, for the files gitleaks itself
+    skips by path: those rules are why it skips them (a go.sum module hash reads as an API key,
+    measured 2026-10-17), and what is looked for there is the private words and the paths."""
+    if credentials:
+        lines = ["[extend]", "path = %s" % toml_str(PUBLIC_CONFIG), ""]
+    else:
+        with open(PUBLIC_CONFIG, encoding="utf-8") as f:
+            public = f.read()
+        lines = [re.sub(r"(?ms)^\[extend\]\s*\nuseDefault\s*=\s*true\s*\n", "", public), ""]
     by_work = {}
     for work, word in words or []:
         by_work.setdefault(work, []).append(word_regex(word))
@@ -134,11 +144,85 @@ def describe(f, where):
     return "  %s  %s\n      %s" % (loc, rule, (f.get("Match") or "").strip()[:160])
 
 
-# gitleaks' default config skips whole file types by path (measured 2026-10-16 by the second
+# gitleaks' default config skips whole files by path (measured 2026-10-16 by the second
 # independent check: a private word in an .svg passed every mode). Those files are read here and
-# their text passed through `gitleaks stdin`, so the same rules apply.
-SKIPPED = (".svg", ".pdf", ".sum", ".mod", ".bin", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2",
-           ".tif", ".tiff", ".bmp", ".ttf", ".otf", ".eot", ".lock")
+# their text passed through `gitleaks stdin`, so the same rules apply. The paths are gitleaks' OWN
+# list, copied verbatim from the `[allowlist] paths` of config/gitleaks.toml at the pinned v8.30.1
+# (https://github.com/gitleaks/gitleaks/blob/v8.30.1/config/gitleaks.toml, MIT): a hand-made list
+# of extensions missed 15 of 26 probed types (measured 2026-10-17 by 261009_next's measurer).
+# When the pinned gitleaks version changes, copy the list again.
+GITLEAKS_SKIPPED_PATHS = [re.compile(p) for p in (
+    r'''gitleaks\.toml''',
+    r'''(?i)\.(?:bmp|gif|jpe?g|png|svg|tiff?)$''',
+    r'''(?i)\.(?:eot|[ot]tf|woff2?)$''',
+    r'''(?i)\.(?:docx?|xlsx?|pdf|bin|socket|vsidx|v2|suo|wsuo|.dll|pdb|exe|gltf)$''',
+    r'''go\.(?:mod|sum|work(?:\.sum)?)$''',
+    r'''(?:^|/)vendor/modules\.txt$''',
+    r'''(?:^|/)vendor/(?:github\.com|golang\.org/x|google\.golang\.org|gopkg\.in|istio\.io|k8s\.io|sigs\.k8s\.io)(?:/.*)?$''',
+    r'''(?:^|/)gradlew(?:\.bat)?$''',
+    r'''(?:^|/)gradle\.lockfile$''',
+    r'''(?:^|/)mvnw(?:\.cmd)?$''',
+    r'''(?:^|/)\.mvn/wrapper/MavenWrapperDownloader\.java$''',
+    r'''(?:^|/)node_modules(?:/.*)?$''',
+    r'''(?:^|/)(?:deno\.lock|npm-shrinkwrap\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$''',
+    r'''(?:^|/)bower_components(?:/.*)?$''',
+    r'''(?:^|/)(?:angular|bootstrap|jquery(?:-?ui)?|plotly|swagger-?ui)[a-zA-Z0-9.-]*(?:\.min)?\.js(?:\.map)?$''',
+    r'''(?:^|/)javascript\.json$''',
+    r'''(?:^|/)(?:Pipfile|poetry)\.lock$''',
+    r'''(?i)(?:^|/)(?:v?env|virtualenv)/lib(?:64)?(?:/.*)?$''',
+    r'''(?i)(?:^|/)(?:lib(?:64)?/python[23](?:\.\d{1,2})+|python/[23](?:\.\d{1,2})+/lib(?:64)?)(?:/.*)?$''',
+    r'''(?i)(?:^|/)[a-z0-9_.]+-[0-9.]+\.dist-info(?:/.+)?$''',
+    r'''(?:^|/)vendor/(?:bundle|ruby)(?:/.*?)?$''',
+    r'''\.gem$''',
+    r'''verification-metadata\.xml''',
+    r'''Database.refactorlog''',
+    r'''(?:^|/)\.git$''',
+)]
+# Compressed or differently encoded files are read too: gzip by its magic bytes, UTF-16 by a BOM or
+# by NUL bytes, zlib streams inside a PDF or a PNG (measured: all four passed before).
+ZLIB_STREAM = re.compile(rb"stream\r?\n(.*?)\r?\nendstream", re.S)
+
+
+def gitleaks_skips(name):
+    return any(r.search(name) for r in GITLEAKS_SKIPPED_PATHS)
+
+
+def decoded_texts(blob):
+    """Every readable form of a file's bytes: as UTF-8, and whatever unpacks out of it."""
+    import gzip, zlib, struct
+    out = [blob.decode("utf-8", "ignore")]
+    if blob[:2] == b"\x1f\x8b":
+        try:
+            out.append(gzip.decompress(blob).decode("utf-8", "ignore"))
+        except (OSError, EOFError, zlib.error):
+            pass
+    if blob[:2] in (b"\xff\xfe", b"\xfe\xff") or (len(blob) > 8 and blob.count(b"\0") * 4 >= len(blob)):
+        for enc in ("utf-16", "utf-16-le", "utf-16-be"):
+            try:
+                out.append(blob.decode(enc))
+                break
+            except UnicodeDecodeError:
+                continue
+    for m in ZLIB_STREAM.finditer(blob):                         # PDF streams
+        try:
+            out.append(zlib.decompress(m.group(1)).decode("utf-8", "ignore"))
+        except zlib.error:
+            pass
+    if blob[:8] == b"\x89PNG\r\n\x1a\n":                         # PNG text chunks
+        i = 8
+        while i + 8 <= len(blob):
+            n, kind = struct.unpack(">I4s", blob[i:i + 8])
+            data = blob[i + 8:i + 8 + n]
+            if kind == b"tEXt":
+                out.append(data.decode("latin-1"))
+            elif kind in (b"zTXt", b"iTXt"):
+                key, _, rest = data.partition(b"\0")
+                try:
+                    out.append(zlib.decompress(rest[1:] if kind == b"zTXt" else rest.split(b"\0", 3)[-1]).decode("utf-8", "ignore"))
+                except zlib.error:
+                    out.append(rest.decode("utf-8", "ignore"))
+            i += 12 + n
+    return "\n".join(out)
 
 
 def changed_names(cwd, *diff_args):
@@ -155,11 +239,28 @@ def skipped_text(cwd, rev_paths):
     """Text of the files gitleaks would skip, as (label, text) pairs; binary bytes are dropped."""
     out = []
     for label, spec in rev_paths:
-        if not spec.lower().endswith(SKIPPED):
-            continue
         blob = subprocess.run(["git", "show", spec], cwd=cwd, capture_output=True).stdout
-        out.append((label, blob.decode("utf-8", "ignore")))
+        if gitleaks_skips(label):
+            out.append((label, decoded_texts(blob)))
+        else:
+            # a file gitleaks does read can still hide words it cannot see: compressed or UTF-16
+            # (measured: a gzipped .svgz passed). Only what unpacks out of it is added here.
+            unpacked = decoded_texts(blob)[len(blob.decode("utf-8", "ignore")):]
+            if unpacked.strip():
+                out.append((label, unpacked))
     return out
+
+
+def merge_added_text(cwd, sha):
+    """The lines a merge commit adds against its first parent: a conflict resolution lives only
+    there, and gitleaks' git mode does not read merge diffs (measured 2026-10-17)."""
+    parents = subprocess.run(["git", "rev-list", "--parents", "-n", "1", sha], cwd=cwd,
+                             capture_output=True, text=True).stdout.split()[1:]
+    if len(parents) < 2:
+        return ""
+    diff = subprocess.run(["git", "diff", "--no-color", "-U0", parents[0], sha], cwd=cwd,
+                          capture_output=True).stdout.decode("utf-8", "surrogateescape")
+    return "\n".join(l[1:] for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++"))
 
 
 def scan(mode, arg, works_dir=None, cwd=REPO):
@@ -171,6 +272,8 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
     found = []
     with tempfile.TemporaryDirectory(prefix="leaks.") as tmp:
         cfg = build_config(words, tmp)
+        os.makedirs(os.path.join(tmp, "plain"))
+        cfg_plain = build_config(words, os.path.join(tmp, "plain"), credentials=False)   # skipped types only
         if mode == "staged":
             for f in gitleaks(["git", "--pre-commit", "--staged", "."], cfg, tmp, cwd=cwd):
                 found.append(describe(f, "staged"))
@@ -178,7 +281,7 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
             for f in gitleaks(["stdin"], cfg, tmp, stdin="\n".join(names) + "\n", cwd=cwd):
                 found.append(describe(f, "a staged FILE NAME"))
             for label, text in skipped_text(cwd, [(n, ":" + n) for n in names]):
-                for f in gitleaks(["stdin"], cfg, tmp, stdin=text, cwd=cwd):
+                for f in gitleaks(["stdin"], cfg_plain, tmp, stdin=text, cwd=cwd):
                     found.append(describe(f, label + " (a type gitleaks skips)"))
         elif mode == "message":
             # Every line, '#' ones too: with -F or -m (this project's commit form) git keeps them in
@@ -196,15 +299,20 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
             # Every commit of the push, not only its tip: a name renamed away or a file deleted
             # before the tip is still published in the commit that had it.
             for sha in shas:
-                names = changed_names(cwd, sha + "^!") if subprocess.run(
+                # against the FIRST parent: `sha^!` names nothing for a merge (measured 2026-10-17)
+                names = changed_names(cwd, sha + "^1", sha) if subprocess.run(
                     ["git", "rev-parse", "-q", "--verify", sha + "^"], cwd=cwd, capture_output=True).returncode == 0 \
                     else [n for n in subprocess.run(["git", "show", "-z", "--name-only", "--format=", sha], cwd=cwd,
                           capture_output=True, check=True).stdout.decode("utf-8", "surrogateescape").split("\0") if n]
                 for f in gitleaks(["stdin"], cfg, tmp, stdin="\n".join(names) + "\n", cwd=cwd):
                     found.append(describe(f, "a FILE NAME in %s" % sha[:8]))
                 for label, text in skipped_text(cwd, [(n, sha + ":" + n) for n in names]):
-                    for f in gitleaks(["stdin"], cfg, tmp, stdin=text, cwd=cwd):
+                    for f in gitleaks(["stdin"], cfg_plain, tmp, stdin=text, cwd=cwd):
                         found.append(describe(f, "%s in %s (a type gitleaks skips)" % (label, sha[:8])))
+                merged = merge_added_text(cwd, sha)
+                if merged:
+                    for f in gitleaks(["stdin"], cfg, tmp, stdin=merged, cwd=cwd):
+                        found.append(describe(f, "a line the merge %s adds" % sha[:8]))
             for sha in shas:
                 msg = subprocess.run(["git", "log", "-1", "--format=%B", sha], cwd=cwd,
                                      capture_output=True, text=True, check=True).stdout
@@ -224,6 +332,10 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
             for f in gitleaks(["dir", snap], cfg, tmp, cwd=cwd):
                 f["File"] = os.path.relpath(f.get("File", ""), snap)
                 found.append(describe(f, "tree"))
+            # the files gitleaks skips by path, and anything compressed or UTF-16, read here too
+            for label, text in skipped_text(cwd, [(rel, "HEAD:" + rel) for rel in filter(None, files)]):
+                for f in gitleaks(["stdin"], cfg_plain, tmp, stdin=text, cwd=cwd):
+                    found.append(describe(f, label + " (a type gitleaks skips, or packed content)"))
     return found, note
 
 
@@ -318,6 +430,33 @@ def selftest():
         git("commit", "-q", "--no-verify", "-m", "plain")
         expect("the same .svg in a push", "range", base + "..HEAD", True)
         git("reset", "-q", "--hard", "HEAD~1")
+        # the types and encodings found getting through on 2026-10-17
+        import gzip
+        for fname, data, label in (
+                ("notes.docx", b"quaxolotl records", "a .docx (on gitleaks' own skip list, not on the old one)"),
+                ("package-lock.json", b'{"name": "quaxolotl records"}', "a lock file gitleaks skips by name"),
+                ("logo.svgz", gzip.compress(b"<svg>quaxolotl records</svg>"), "a gzipped file"),
+                ("u16.svg", "<svg>quaxolotl records</svg>".encode("utf-16"), "a UTF-16 file")):
+            with open(os.path.join(repo, fname), "wb") as f:
+                f.write(data)
+            git("add", fname)
+            expect(label, "staged", None, True)
+            git("rm", "-q", "--cached", fname)
+            os.remove(os.path.join(repo, fname))
+        # a word that only a merge's conflict resolution adds
+        git("checkout", "-q", "-b", "side")
+        write("side line")
+        git("commit", "-q", "-am", "side")
+        git("checkout", "-q", "-")
+        write("main line")
+        git("commit", "-q", "-am", "main")
+        subprocess.run(["git", "merge", "-q", "side"], cwd=repo, env=env, capture_output=True)
+        with open(os.path.join(repo, "notes.txt"), "w") as f:
+            f.write("resolved: quaxolotl records\n")
+        git("add", "notes.txt")
+        git("commit", "-q", "--no-verify", "-m", "merge")
+        expect("a word only a merge's resolution adds", "range", base + "..HEAD", True)
+        git("reset", "-q", "--hard", base)
         with open(os.path.join(repo, "my logo.svg"), "w") as f:
             f.write("<svg>clean</svg>\n")
         git("add", "my logo.svg")
