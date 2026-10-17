@@ -8,6 +8,21 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — the public repository refuses audio, images, documents and archives (2026-10-17)
+
+The second measurement of the leak gate found real `.docx`, `.xlsx`, `.zip`, `.pdf`, `.wav` and
+`.mp3` content passing (gitleaks prints nothing for input that starts `%PDF` or `PK`), and that a
+recording leaks as sound, which no text rule can see. Reading insides has no end, so such files are
+now refused outright, by name and by their first bytes, unless `.leak-allow-binaries` names them
+with their origin. The tree holds none today (`git ls-files` by extension). Also fixed:
+- **Tag messages.** An annotated tag's message is written by a session and published; pre-push now
+  checks it like a commit message. Shown on a throwaway clone: the new hook stops a tag whose
+  message holds a home path, the old one let it through.
+- **Lock-file keys.** Checksum files were read without the key rules, which let a key in them
+  through; they are now read with all rules after the checksum tokens themselves are removed.
+- **NUL bytes** inside text no longer hide a word.
+Selftest 33 cases; red again without the byte check, the NUL handling or the checksum removal.
+
 ### Fixed — `check_leaks.py` and the pre-push leak step: what a fourth measurement got through (2026-10-17)
 
 A measurement run by the other session found private words leaving through four routes. Fixed:

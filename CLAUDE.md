@@ -375,6 +375,10 @@ files, all of them sentences saying where something was learned (reworded 2026-1
 path runs `scripts/check_leaks.py` on every commit (`pre-commit` for the added lines, `commit-msg` for
 the message) and on every push; the words come from each work's `private-words.txt` in the private
 works repository, so the list is never published. It needs `brew install gitleaks`, and fails without it.
+**No audio, images, documents or archives either** (decided 2026-10-17): the same gate refuses
+`.wav`/`.mp3`/`.png`/`.docx`/`.pdf`/`.zip` and the like, by name and by their first bytes, because
+reading their insides never ends and a recording leaks as sound. A file that must be here goes into
+`.leak-allow-binaries` with where it comes from; today there are none.
 
 > **The hook is the ONLY gate on the authored ROMs, and that is by design.** `sandbox/` is local-only with no
 > remote, so GitHub Actions cannot see the 16 scenarios under `sandbox/practice/**` — `TestTheAuthoredROMsStillPass`

@@ -34,10 +34,16 @@ SHA=""
 REFS=0
 TO_MAIN=0
 LEAK_RANGES=""
+TAG_OBJECTS=""
 while read -r _lref lsha rref rsha; do
   REFS=$((REFS+1))
   case "$lsha" in ""|0000000000000000000000000000000000000000) continue ;; esac
   SHA="$lsha"
+  # an annotated tag's message is written by a session and published with the tag (measured
+  # 2026-10-17: it was never read); its text gets the same check as a commit message
+  case "$rref" in refs/tags/*)
+    [ "$(git -C "$REPO" cat-file -t "$lsha" 2>/dev/null)" = tag ] && TAG_OBJECTS="$TAG_OBJECTS $lsha" ;;
+  esac
   # every ref of the push gets its own leak check (one push can carry several; measured 2026-10-17:
   # only the last ref's commits were read, so a leak on an earlier ref went out)
   case "$rsha" in ""|0000000000000000000000000000000000000000)
@@ -104,6 +110,17 @@ fi
 # commit as it is made; this checks every commit the push carries, lines AND messages, because a
 # commit made with --no-verify, or before those hooks existed, reaches here unchecked. It runs
 # first because it is cheap and a leak is the one failure a later fix cannot take back.
+for TAG in $TAG_OBJECTS; do
+  TAG_MSG="$(mktemp "${TMPDIR:-/tmp}/tagmsg.XXXXXX")"
+  git -C "$REPO" cat-file -p "$TAG" | sed '1,/^$/d' > "$TAG_MSG"
+  python3 "$REPO/scripts/check_leaks.py" --message "$TAG_MSG" || {
+    rm -f "$TAG_MSG"
+    echo ""
+    echo "✗ pre-push BLOCKED: the message of tag ${TAG:0:8} names something private."
+    exit 1
+  }
+  rm -f "$TAG_MSG"
+done
 [ -n "$LEAK_RANGES" ] || LEAK_RANGES="$SHA"
 for LEAK_RANGE in $LEAK_RANGES; do
 python3 "$REPO/scripts/check_leaks.py" --range "$LEAK_RANGE" || {
