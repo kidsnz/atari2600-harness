@@ -17,8 +17,10 @@ A measurement run by the other session found private words leaving through four 
 - **gitleaks' own skip list.** The files gitleaks skips by path are now taken from its own
   `[allowlist] paths` at the pinned v8.30.1, copied verbatim; the hand-made list of extensions
   missed 15 of 26 probed types (`.docx`, lock files and others). Those files are read with the
-  private words and the path rules only: gitleaks' credential rules are why it skips them (a
-  `go.sum` module hash reads as an API key).
+  private words, the path rules and gitleaks' credential rules, except files that hold nothing
+  but checksums (`go.sum`, lock files), where a module hash reads as an API key; those alone are
+  read without the credential rules. A token in a `.docx` is stopped (asked for by the other
+  session: reading every skipped type without the key rules would have missed it).
 - **Packed content.** gzip, UTF-16, PDF streams and PNG text chunks are unpacked and read, in any
   file, not only the skipped ones (a gzipped `.svgz` passed).
 - **Merges.** A merge's file names are taken against its first parent (`sha^!` named nothing for

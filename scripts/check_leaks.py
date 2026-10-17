@@ -183,6 +183,19 @@ GITLEAKS_SKIPPED_PATHS = [re.compile(p) for p in (
 ZLIB_STREAM = re.compile(rb"stream\r?\n(.*?)\r?\nendstream", re.S)
 
 
+# Of the files gitleaks skips, these hold nothing but checksums, which its credential rules read as
+# keys (a go.sum module hash, measured 2026-10-17); they alone are read without those rules. Every
+# other skipped file (documents, images, fonts, binaries) is read with the credential rules too, so
+# a real key in a .docx or a .pdf is still stopped (asked for by 261009_next, 2026-10-17).
+HASHES_ONLY = re.compile(r"(?:^|/)(?:go\.(?:mod|sum|work(?:\.sum)?)|gradle\.lockfile|deno\.lock|npm-shrinkwrap\.json"
+                         r"|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|(?:Pipfile|poetry)\.lock"
+                         r"|verification-metadata\.xml)$")
+
+
+def hashes_only(name):
+    return bool(HASHES_ONLY.search(name))
+
+
 def gitleaks_skips(name):
     return any(r.search(name) for r in GITLEAKS_SKIPPED_PATHS)
 
@@ -281,7 +294,7 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
             for f in gitleaks(["stdin"], cfg, tmp, stdin="\n".join(names) + "\n", cwd=cwd):
                 found.append(describe(f, "a staged FILE NAME"))
             for label, text in skipped_text(cwd, [(n, ":" + n) for n in names]):
-                for f in gitleaks(["stdin"], cfg_plain, tmp, stdin=text, cwd=cwd):
+                for f in gitleaks(["stdin"], cfg_plain if hashes_only(label) else cfg, tmp, stdin=text, cwd=cwd):
                     found.append(describe(f, label + " (a type gitleaks skips)"))
         elif mode == "message":
             # Every line, '#' ones too: with -F or -m (this project's commit form) git keeps them in
@@ -307,7 +320,7 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
                 for f in gitleaks(["stdin"], cfg, tmp, stdin="\n".join(names) + "\n", cwd=cwd):
                     found.append(describe(f, "a FILE NAME in %s" % sha[:8]))
                 for label, text in skipped_text(cwd, [(n, sha + ":" + n) for n in names]):
-                    for f in gitleaks(["stdin"], cfg_plain, tmp, stdin=text, cwd=cwd):
+                    for f in gitleaks(["stdin"], cfg_plain if hashes_only(label) else cfg, tmp, stdin=text, cwd=cwd):
                         found.append(describe(f, "%s in %s (a type gitleaks skips)" % (label, sha[:8])))
                 merged = merge_added_text(cwd, sha)
                 if merged:
@@ -334,7 +347,7 @@ def scan(mode, arg, works_dir=None, cwd=REPO):
                 found.append(describe(f, "tree"))
             # the files gitleaks skips by path, and anything compressed or UTF-16, read here too
             for label, text in skipped_text(cwd, [(rel, "HEAD:" + rel) for rel in filter(None, files)]):
-                for f in gitleaks(["stdin"], cfg_plain, tmp, stdin=text, cwd=cwd):
+                for f in gitleaks(["stdin"], cfg_plain if hashes_only(label) else cfg, tmp, stdin=text, cwd=cwd):
                     found.append(describe(f, label + " (a type gitleaks skips, or packed content)"))
     return found, note
 
@@ -436,7 +449,9 @@ def selftest():
                 ("notes.docx", b"quaxolotl records", "a .docx (on gitleaks' own skip list, not on the old one)"),
                 ("package-lock.json", b'{"name": "quaxolotl records"}', "a lock file gitleaks skips by name"),
                 ("logo.svgz", gzip.compress(b"<svg>quaxolotl records</svg>"), "a gzipped file"),
-                ("u16.svg", "<svg>quaxolotl records</svg>".encode("utf-16"), "a UTF-16 file")):
+                ("u16.svg", "<svg>quaxolotl records</svg>".encode("utf-16"), "a UTF-16 file"),
+                ("keys.docx", ("token = " + "gh" + "p_" + "R7kQ2mZx9VbN4cT8wLp3sYd6fHj1aUe5Gi0O").encode(),
+                 "a real-looking key in a skipped document type")):
             with open(os.path.join(repo, fname), "wb") as f:
                 f.write(data)
             git("add", fname)
